@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HealthCompass{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous"/>
+    <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--primary:#0ea5e9;--primary-dk:#0284c7;--secondary:#6366f1;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--bg:#f0f7ff;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--shadow-sm:0 1px 3px rgba(0,0,0,.07);--radius:14px}
+    body{font-family:Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
+    a{color:inherit;text-decoration:none}
+    .navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
+    .nav-brand{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.2rem;color:var(--primary-dk)}
+    .nav-links{display:flex;align-items:center;gap:.25rem;list-style:none}
+    .nav-links a{padding:.45rem .85rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--muted);transition:all .2s}
+    .nav-links a:hover{color:var(--primary-dk);background:#e0f2fe}
+    .nav-right{display:flex;align-items:center;gap:.75rem}
+    .btn-nav-outline{padding:.4rem .9rem;border:1.5px solid var(--primary);color:var(--primary-dk);border-radius:8px;font-size:.85rem;font-weight:600;transition:all .2s}
+    .btn-nav-outline:hover{background:var(--primary);color:white}
+    .btn-nav-solid{padding:.4rem .9rem;background:var(--primary);color:white;border-radius:8px;font-size:.85rem;font-weight:600;transition:all .2s}
+    .btn-nav-solid:hover{background:var(--primary-dk)}
+    .nav-notification{position:relative;color:var(--muted);font-size:1.1rem;padding:.3rem}
+    .notif-badge{position:absolute;top:-2px;right:-2px;background:var(--danger);color:white;font-size:.6rem;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+    .nav-user{display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;border-radius:10px;cursor:pointer;transition:background .2s}
+    .nav-user:hover{background:var(--bg)}
+    .nav-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:.85rem}
+    .role-pill{padding:.15rem .5rem;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .role-patient{background:#dbeafe;color:#1d4ed8}
+    .role-doctor{background:#dcfce7;color:#15803d}
+    .role-data_scientist{background:#ede9fe;color:#7c3aed}
+    .role-hospital_admin{background:#fef3c7;color:#92400e}
+    .role-admin{background:#fee2e2;color:#b91c1c}
+    .messages-wrap{padding:.75rem 1.5rem 0}
+    .alert{padding:.75rem 1.25rem;border-radius:10px;margin-bottom:.5rem;font-size:.875rem;display:flex;align-items:center;gap:.6rem}
+    .alert-success{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
+    .alert-error,.alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
+    .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+    .alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
+    main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%}
+    footer{background:#0f172a;color:#94a3b8;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
+    footer strong{color:white}
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.2rem;border-radius:10px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
+    .btn-primary{background:var(--primary);color:white}
+    .btn-primary:hover{background:var(--primary-dk);color:white;transform:translateY(-1px)}
+    .btn-outline{background:white;color:var(--primary-dk);border:1.5px solid var(--primary)}
+    .btn-outline:hover{background:#e0f2fe;color:var(--primary-dk)}
+    .btn-danger{background:var(--danger);color:white}
+    .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
+    .card-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-weight:600;font-size:.95rem}
+    .card-header i{color:var(--primary)}
+    .card-body{padding:1.25rem}
+    .badge{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:20px;font-size:.72rem;font-weight:600}
+    .badge-info{background:#dbeafe;color:#1d4ed8}
+    .badge-success{background:#dcfce7;color:#15803d}
+    .badge-warning{background:#fef3c7;color:#92400e}
+    .badge-danger{background:#fee2e2;color:#b91c1c}
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<nav class="navbar">
+    <a href="/" class="nav-brand"><span>🧭</span><span>HealthCompass</span></a>
+    <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/stories/">Health News</a></li>
+        <li><a href="/insights/">AI &amp; Analytics</a></li>
+        {% if user.is_authenticated %}
+        <li><a href="/records/">My Records</a></li>
+        <li><a href="/assistant/">AI Assistant</a></li>
+        <li><a href="/dashboard/">Dashboard</a></li>
+        {% endif %}
+    </ul>
+    <div class="nav-right">
+        {% if user.is_authenticated %}
+        <a href="/notifications/" class="nav-notification" title="Notifications">
+            <i class="fas fa-bell"></i>
+            {% if unread_notifications_count %}<span class="notif-badge">{{ unread_notifications_count }}</span>{% endif %}
+        </a>
+        <div class="nav-user" style="position:relative" id="navUserBtn" onclick="toggleUserMenu()">
+            {% if user.profile_picture %}
+            <img src="{{ user.profile_picture.url }}" class="nav-avatar" style="object-fit:cover">
+            {% else %}
+            <div class="nav-avatar">{{ user.username|first|upper }}</div>
+            {% endif %}
+            <span style="font-size:.85rem;font-weight:600">{{ user.username }}</span>
+            <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}</span>
+            <i class="fas fa-chevron-down" style="font-size:.65rem;color:var(--muted)"></i>
+        </div>
+        <div id="userMenu" style="display:none;position:absolute;top:56px;right:1.5rem;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:180px;z-index:200;overflow:hidden">
+            <a href="/dashboard/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-bottom:1px solid var(--border)"><i class="fas fa-tachometer-alt" style="color:var(--primary);width:16px"></i> Dashboard</a>
+            <a href="/accounts/profile/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user" style="color:var(--primary);width:16px"></i> My Profile</a>
+            <a href="/accounts/profile/edit/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-edit" style="color:var(--primary);width:16px"></i> Edit Profile</a>
+            <a href="/accounts/password/change/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-lock" style="color:var(--primary);width:16px"></i> Change Password</a>
+            <a href="/accounts/logout/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:#dc2626;border-top:1px solid var(--border)"><i class="fas fa-sign-out-alt" style="width:16px"></i> Log out</a>
+        {% else %}
+        <a href="/accounts/login/" class="btn-nav-outline">Log in</a>
+        <a href="/accounts/register/" class="btn-nav-solid">Get Started</a>
+        {% endif %}
+    </div>
+</nav>
+{% if messages %}
+<div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>
+{% endif %}
+<main>{% block content %}{% endblock %}</main>
+<footer>
+    <p><strong>HealthCompass</strong> &nbsp;·&nbsp; AI-Powered Health Insights &nbsp;·&nbsp; MVP Prototype</p>
+    <p style="margin-top:.3rem;font-size:.75rem">Not a substitute for professional medical advice</p>
+</footer>
+{% block extra_js %}{% endblock %}
+<script>
+function toggleUserMenu() {
+  const m = document.getElementById('userMenu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('navUserBtn')?.contains(e.target)) {
+    const m = document.getElementById('userMenu');
+    if (m) m.style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>

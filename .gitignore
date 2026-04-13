@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+static_collected/
+
+# Environment variables — NEVER commit these
+.env
+*.env
+.env.*
+!.env.example
+
+# Vector store cache
+rag_vector_store/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# ML model files (large binaries)
+*.pkl
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# Analysis docs generated locally
+HEALTHCOMPASS_*.md
+HEALTHCOMPASS_*.txt
+RAG_SYSTEM_DOCUMENTATION.*

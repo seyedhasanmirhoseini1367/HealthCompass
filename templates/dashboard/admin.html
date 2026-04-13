@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.dash-header{background:linear-gradient(135deg,#1e293b,#334155);color:white;border-radius:16px;padding:2rem 1.5rem;margin-bottom:1.5rem}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:var(--primary)}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.action-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+.action-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;text-align:center;text-decoration:none;transition:all .2s;display:block}
+.action-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);transform:translateY(-2px)}
+.action-icon{font-size:2rem;margin-bottom:.5rem}
+.action-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.2rem}
+.action-desc{font-size:.78rem;color:var(--muted)}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="dash-header">
+  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.2rem">⚙️ Admin Dashboard</h1>
+  <p style="opacity:.8;font-size:.88rem">HealthCompass platform management</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ total_users }}</div>
+    <div class="stat-lbl">Total Users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#f59e0b">{{ pending_models }}</div>
+    <div class="stat-lbl">Models Pending</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#dc2626">{{ pending_scientists }}</div>
+    <div class="stat-lbl">Pending Scientists</div>
+  </div>
+</div>
+
+<div class="action-grid">
+  <a href="/admin/accounts/customuser/" class="action-card">
+    <div class="action-icon">👥</div>
+    <div class="action-title">Manage Users</div>
+    <div class="action-desc">View, approve, and manage all user accounts</div>
+  </a>
+  <a href="/admin/ai_insights/aimodel/?status__exact=pending" class="action-card">
+    <div class="action-icon">🤖</div>
+    <div class="action-title">Review AI Models</div>
+    <div class="action-desc">{{ pending_models }} model(s) awaiting review</div>
+  </a>
+  <a href="/admin/accounts/customuser/?role__exact=data_scientist&is_approved__exact=0" class="action-card">
+    <div class="action-icon">🔬</div>
+    <div class="action-title">Approve Scientists</div>
+    <div class="action-desc">{{ pending_scientists }} pending approval</div>
+  </a>
+  <a href="/admin/stories/story/" class="action-card">
+    <div class="action-icon">📰</div>
+    <div class="action-title">Manage Stories</div>
+    <div class="action-desc">Publish health news articles</div>
+  </a>
+  <a href="/admin/ai_insights/healthalert/" class="action-card">
+    <div class="action-icon">⚠️</div>
+    <div class="action-title">Health Alerts</div>
+    <div class="action-desc">View all patient alerts</div>
+  </a>
+  <a href="/admin/" class="action-card">
+    <div class="action-icon">⚙️</div>
+    <div class="action-title">Django Admin</div>
+    <div class="action-desc">Full admin panel access</div>
+  </a>
+</div>
+
+{% endblock %}

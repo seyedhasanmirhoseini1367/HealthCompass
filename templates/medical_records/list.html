@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}My Medical Records — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.page-header h1{font-size:1.375rem;font-weight:700;color:var(--text);margin:0}
+.upload-btns{display:flex;gap:.5rem;flex-wrap:wrap}
+.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.filter-btn{padding:.35rem .85rem;border-radius:20px;font-size:.82rem;font-weight:600;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:pointer;transition:all .18s;text-decoration:none}
+.filter-btn:hover,.filter-btn.active{background:var(--primary);color:white;border-color:var(--primary)}
+.record-grid{display:grid;gap:1rem}
+.rec-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem 1.4rem;display:flex;align-items:flex-start;gap:1rem;transition:all .2s;cursor:pointer}
+.rec-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#cbd5e1}
+.rec-card.flagged{border-left:4px solid #f59e0b}
+.rec-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;background:#dbeafe}
+.rec-body{flex:1;min-width:0}
+.rec-title{font-size:.975rem;font-weight:700;color:var(--text);margin-bottom:.2rem}
+.rec-meta{font-size:.8rem;color:var(--muted);display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.2rem}
+.rec-actions{display:flex;gap:.5rem;margin-top:.7rem}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty-state .icon{font-size:3rem;margin-bottom:.75rem}
+.alert-strip{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.88rem;color:#92400e}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>📋 My Medical Records</h1>
+  <div class="upload-btns">
+    <a href="{% url 'medical_records:upload_kanta' %}" class="btn" style="background:#0ea5e9;color:white;font-size:.85rem;padding:.45rem 1rem">
+      <i class="fas fa-file-code"></i> Kanta XML
+    </a>
+    <a href="{% url 'medical_records:upload_wearable' %}" class="btn" style="background:#6366f1;color:white;font-size:.85rem;padding:.45rem 1rem">
+      <i class="fas fa-watch"></i> Wearable CSV
+    </a>
+    <a href="{% url 'medical_records:upload_pdf' %}" class="btn" style="background:#10b981;color:white;font-size:.85rem;padding:.45rem 1rem">
+      <i class="fas fa-file-pdf"></i> Upload PDF
+    </a>
+  </div>
+</div>
+
+{% if flagged_count %}
+<div class="alert-strip">
+  <i class="fas fa-triangle-exclamation"></i>
+  <strong>{{ flagged_count }} record(s)</strong> contain abnormal values. Review them below.
+</div>
+{% endif %}
+
+<div class="filter-bar">
+  <a href="{% url 'medical_records:list' %}" class="filter-btn {% if not active_type %}active{% endif %}">All</a>
+  {% for value, label in record_types %}
+  <a href="?type={{ value }}" class="filter-btn {% if active_type == value %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if records %}
+<div class="record-grid">
+  {% for rec in records %}
+  {% with rtype=rec.record_type %}
+  <div class="rec-card {% if rec.is_flagged %}flagged{% endif %}"
+       onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
+    <div class="rec-icon"
+         style="background:{% if rtype == 'lab_result' %}#dbeafe{% elif rtype == 'prescription' %}#dcfce7{% elif rtype == 'diagnosis' %}#fce7f3{% elif rtype == 'vaccination' %}#fef9c3{% elif rtype == 'imaging' %}#ede9fe{% elif rtype == 'wearable' %}#ecfdf5{% elif rtype == 'discharge' %}#fff7ed{% else %}#f1f5f9{% endif %}">
+      {% if rtype == 'lab_result' %}🧪
+      {% elif rtype == 'prescription' %}💊
+      {% elif rtype == 'diagnosis' %}🏥
+      {% elif rtype == 'vaccination' %}💉
+      {% elif rtype == 'imaging' %}🩻
+      {% elif rtype == 'wearable' %}⌚
+      {% elif rtype == 'discharge' %}📄
+      {% else %}📁{% endif %}
+    </div>
+    <div class="rec-body">
+      <div class="rec-title">{{ rec.title }}</div>
+      <div class="rec-meta">
+        <span>{{ rec.get_record_type_display }}</span>
+        <span>{{ rec.get_source_display }}</span>
+        {% if rec.record_date %}<span>{{ rec.record_date|date:"M d, Y" }}</span>{% endif %}
+        <span>Uploaded {{ rec.uploaded_at|date:"M d, Y" }}</span>
+        {% if rec.is_flagged %}<span style="color:#f59e0b;font-weight:700">⚠️ Abnormal values</span>{% endif %}
+      </div>
+      <div class="rec-actions" onclick="event.stopPropagation()">
+        <a href="{% url 'medical_records:detail' rec.pk %}" class="btn" style="font-size:.8rem;padding:.3rem .75rem">View</a>
+        <form method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline"
+              onsubmit="return confirm('Delete this record permanently?')">
+          {% csrf_token %}
+          <button type="submit" class="btn" style="font-size:.8rem;padding:.3rem .75rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer">Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">📁</div>
+  <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records yet</p>
+  <p style="font-size:.875rem">Upload your Kanta XML, wearable CSV, or medical PDFs to get started.</p>
+</div>
+{% endif %}
+
+{% endblock %}

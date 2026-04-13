@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% block title %}{{ record.title }} — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.rec-header{background:white;border-radius:16px;border:1px solid var(--border);padding:1.5rem;margin-bottom:1.25rem;display:flex;align-items:flex-start;gap:1.25rem}
+.rec-header-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;background:#dbeafe}
+.rec-title{font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:.35rem}
+.rec-meta{font-size:.85rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
+.section-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
+.section-h{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.lab-table{width:100%;border-collapse:collapse;font-size:.875rem}
+.lab-table th{text-align:left;padding:.5rem .75rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+.lab-table td{padding:.5rem .75rem;border-bottom:1px solid #f1f5f9}
+.lab-table tr:last-child td{border-bottom:none}
+.flag-ab{color:#f59e0b;font-weight:700}
+.flag-crit{color:#dc2626;font-weight:700}
+.wearable-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
+.metric-card{background:#f8fafc;border-radius:10px;padding:1rem;text-align:center}
+.metric-val{font-size:1.375rem;font-weight:700;color:var(--primary)}
+.metric-label{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+.json-section{background:#f8fafc;border-radius:10px;padding:1rem;font-size:.8rem;font-family:monospace;overflow-x:auto;max-height:300px;overflow-y:auto}
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted);font-size:.875rem;text-decoration:none;margin-bottom:1rem}
+.back-btn:hover{color:var(--primary)}
+</style>
+{% endblock %}
+{% block content %}
+
+<a href="{% url 'medical_records:list' %}" class="back-btn">
+  <i class="fas fa-arrow-left"></i> Back to records
+</a>
+
+<div class="rec-header {% if record.is_flagged %}flagged{% endif %}">
+  <div class="rec-header-icon">
+    {% with rtype=record.record_type %}
+    {% if rtype == 'lab_result' %}🧪
+    {% elif rtype == 'prescription' %}💊
+    {% elif rtype == 'diagnosis' %}🏥
+    {% elif rtype == 'vaccination' %}💉
+    {% elif rtype == 'imaging' %}🩻
+    {% elif rtype == 'wearable' %}⌚
+    {% elif rtype == 'discharge' %}📄
+    {% else %}📁{% endif %}
+    {% endwith %}
+  </div>
+  <div style="flex:1">
+    <div class="rec-title">{{ record.title }}</div>
+    <div class="rec-meta">
+      <span>{{ record.get_record_type_display }}</span>
+      <span>{{ record.get_source_display }}</span>
+      {% if record.record_date %}<span>{{ record.record_date|date:"F j, Y" }}</span>{% endif %}
+      <span>Uploaded {{ record.uploaded_at|date:"M d, Y H:i" }}</span>
+    </div>
+    {% if record.notes %}
+    <p style="font-size:.875rem;color:var(--muted);margin-top:.5rem">{{ record.notes }}</p>
+    {% endif %}
+    {% if record.is_flagged %}
+    <div style="margin-top:.5rem;font-size:.85rem;color:#f59e0b;font-weight:700">
+      ⚠️ This record contains abnormal values
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Lab Values -->
+{% if lab_values %}
+<div class="section-card">
+  <div class="section-h">🔬 Lab Values ({{ lab_values|length }})</div>
+  <table class="lab-table">
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Value</th>
+        <th>Unit</th>
+        <th>Reference Range</th>
+        <th>Status</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lv in lab_values %}
+      <tr {% if lv.is_critical %}style="background:#fef2f2"{% elif lv.is_abnormal %}style="background:#fffbeb"{% endif %}>
+        <td style="font-weight:600">{{ lv.parameter_name }}</td>
+        <td>{{ lv.value }}</td>
+        <td style="color:var(--muted)">{{ lv.unit }}</td>
+        <td style="color:var(--muted)">{{ lv.reference_range|default:"—" }}</td>
+        <td>
+          {% if lv.is_critical %}
+            <span class="flag-crit">🔴 Critical</span>
+          {% elif lv.is_abnormal %}
+            <span class="flag-ab">⚠️ Abnormal</span>
+          {% else %}
+            <span style="color:#10b981">✓ Normal</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--muted)">{{ lv.measured_at|date:"M d, Y"|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Wearable Data Summary -->
+{% if wearable_points %}
+<div class="section-card">
+  <div class="section-h">⌚ Wearable Data ({{ wearable_points|length }} points shown)</div>
+  {% regroup wearable_points by get_metric_display as metric_groups %}
+  <div class="wearable-grid">
+    {% for group in metric_groups %}
+    {% with last=group.list|last %}
+    <div class="metric-card">
+      <div class="metric-val">{{ last.value|floatformat:1 }}</div>
+      <div style="font-size:.7rem;color:var(--muted)">{{ last.unit }}</div>
+      <div class="metric-label">{{ group.grouper }}</div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Parsed Data -->
+{% if record.parsed_data %}
+<div class="section-card">
+  <div class="section-h">📊 Parsed Data</div>
+
+  {% if record.parsed_data.structured.summary %}
+  <p style="font-size:.9rem;margin-bottom:1rem">{{ record.parsed_data.structured.summary }}</p>
+  {% endif %}
+
+  {% if record.parsed_data.records %}
+    {% for doc in record.parsed_data.records %}
+    <div style="margin-bottom:1.25rem">
+      <p style="font-weight:700;font-size:.9rem">{{ doc.type }}: {{ doc.title }}</p>
+      <p style="font-size:.8rem;color:var(--muted)">{{ doc.date|default:"" }} — {{ doc.author|default:"" }}</p>
+      {% for section in doc.sections %}
+        {% if section.entries %}
+        <p style="font-size:.83rem;font-weight:600;margin-top:.5rem;margin-bottom:.25rem">{{ section.display }}</p>
+        <ul style="font-size:.83rem;padding-left:1.25rem;color:var(--muted)">
+          {% for e in section.entries %}
+          <li>
+            {% if e.kind == 'lab' %}
+              <strong>{{ e.name }}</strong>: {{ e.value }} {{ e.unit }}
+              {% if e.is_abnormal %} <span style="color:#f59e0b">⚠️</span>{% endif %}
+            {% elif e.kind == 'medication' %}
+              💊 {{ e.name }} {{ e.dose }} {{ e.unit }} {{ e.route }}
+            {% else %}
+              {{ e }}
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% elif section.text %}
+        <p style="font-size:.8rem;color:var(--muted);margin-top:.4rem">{{ section.text|truncatechars:300 }}</p>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="json-section">{{ record.parsed_data|pprint }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Raw Text -->
+{% if record.raw_text %}
+<div class="section-card">
+  <div class="section-h">📝 Raw Text</div>
+  <div class="json-section" style="font-family:inherit;white-space:pre-wrap">{{ record.raw_text|truncatechars:3000 }}</div>
+</div>
+{% endif %}
+
+<!-- File Download -->
+{% if record.file %}
+<div class="section-card">
+  <div class="section-h">📎 Attached File</div>
+  <a href="{{ record.file.url }}" class="btn" download>
+    <i class="fas fa-download"></i> Download {{ record.file.name|slice:"15:" }}
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

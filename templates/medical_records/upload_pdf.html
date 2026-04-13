@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Upload PDF — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.upload-card{max-width:560px;margin:0 auto}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box}
+.form-control:focus{outline:none;border-color:var(--primary)}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.ai-note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:.9rem 1rem;font-size:.84rem;color:#166534;margin-bottom:1.25rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="upload-card">
+  <a href="{% url 'medical_records:list' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
+    <i class="fas fa-arrow-left"></i> Back to records
+  </a>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="font-size:3rem;text-align:center;margin-bottom:1rem">📄</div>
+      <h2 style="font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:.4rem">Upload Medical Document</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.875rem;margin-bottom:1.5rem">
+        Upload a PDF medical document. AI will extract and structure the content automatically.
+      </p>
+
+      <div class="ai-note">
+        <i class="fas fa-robot"></i>
+        <strong> AI-powered extraction:</strong> We use Gemini to identify record type, extract lab values, medications, diagnoses, and generate a summary.
+      </div>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label">Record Type</label>
+          <select name="record_type" class="form-control">
+            {% for value, label in form.fields.record_type.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="help-text">AI will override this if it detects a more specific type.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_pdf_file">{{ form.pdf_file.label }}</label>
+          {{ form.pdf_file }}
+          <div class="help-text">Max file size: 50 MB. Text-based PDFs work best.</div>
+          {% if form.pdf_file.errors %}
+          <div style="color:#dc2626;font-size:.8rem;margin-top:.3rem">{{ form.pdf_file.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          {{ form.notes }}
+        </div>
+        <button type="submit" class="btn" style="width:100%;background:#10b981;color:white;padding:.7rem;font-size:.95rem">
+          <i class="fas fa-upload"></i> Upload &amp; Parse
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

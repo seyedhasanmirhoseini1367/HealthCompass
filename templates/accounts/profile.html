@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}My Profile — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.profile-card{background:white;border-radius:16px;border:1px solid var(--border);padding:2rem;margin-bottom:1.25rem}
+.avatar{width:80px;height:80px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#0ea5e9,#6366f1);display:flex;align-items:center;justify-content:center;font-size:2rem;color:white;flex-shrink:0}
+.role-badge{display:inline-block;padding:.25rem .8rem;border-radius:20px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1.25rem}
+.info-item .label{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem}
+.info-item .value{font-size:.9rem;color:var(--text);font-weight:500}
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
+  <h1 style="font-size:1.375rem;font-weight:700;margin:0">👤 My Profile</h1>
+  <div style="display:flex;gap:.5rem">
+    <a href="{% url 'accounts:profile_edit' %}" class="btn" style="background:var(--primary);color:white;font-size:.85rem">
+      <i class="fas fa-edit"></i> Edit Profile
+    </a>
+    <a href="{% url 'accounts:change_password' %}" class="btn" style="background:#f1f5f9;color:var(--text);font-size:.85rem">
+      <i class="fas fa-lock"></i> Change Password
+    </a>
+  </div>
+</div>
+
+<div class="profile-card">
+  <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
+    {% if user.profile_picture %}
+    <img src="{{ user.profile_picture.url }}" class="avatar" alt="Avatar">
+    {% else %}
+    <div class="avatar">{{ user.username|first|upper }}</div>
+    {% endif %}
+    <div>
+      <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:.3rem">{{ user.get_full_name|default:user.username }}</h2>
+      <p style="color:var(--muted);font-size:.875rem;margin-bottom:.5rem">@{{ user.username }}</p>
+      <span class="role-badge"
+        style="{% if user.is_patient %}background:#dbeafe;color:#1d4ed8
+        {% elif user.is_doctor %}background:#dcfce7;color:#16a34a
+        {% elif user.is_data_scientist %}background:#ede9fe;color:#7c3aed
+        {% elif user.is_hospital_admin %}background:#fef3c7;color:#b45309
+        {% else %}background:#f1f5f9;color:var(--text){% endif %}">
+        {{ user.get_role_display }}
+      </span>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-item">
+      <div class="label">Email</div>
+      <div class="value">{{ user.email|default:"—" }}</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Phone</div>
+      <div class="value">{{ user.phone_number|default:"—" }}</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Date of Birth</div>
+      <div class="value">{{ user.date_of_birth|date:"M d, Y"|default:"—" }}</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Member Since</div>
+      <div class="value">{{ user.date_joined|date:"M d, Y" }}</div>
+    </div>
+  </div>
+</div>
+
+{% if profile %}
+<div class="profile-card">
+  <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)">
+    {% if user.is_patient %}🏥 Patient Details
+    {% elif user.is_doctor %}👨‍⚕️ Doctor Details
+    {% elif user.is_data_scientist %}🔬 Researcher Details
+    {% elif user.is_hospital_admin %}🏨 Hospital Details
+    {% endif %}
+  </h3>
+  <div class="info-grid">
+    {% if user.is_patient %}
+      <div class="info-item"><div class="label">Blood Type</div><div class="value">{{ profile.blood_type|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Allergies</div><div class="value">{{ profile.allergies|default:"None recorded" }}</div></div>
+      <div class="info-item"><div class="label">Emergency Contact</div><div class="value">{{ profile.emergency_contact_name|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Emergency Phone</div><div class="value">{{ profile.emergency_contact_phone|default:"—" }}</div></div>
+    {% elif user.is_doctor %}
+      <div class="info-item"><div class="label">Specialty</div><div class="value">{{ profile.specialty|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">License Number</div><div class="value">{{ profile.license_number|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Hospital</div><div class="value">{{ profile.hospital|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Department</div><div class="value">{{ profile.department|default:"—" }}</div></div>
+    {% elif user.is_data_scientist %}
+      <div class="info-item"><div class="label">Institution</div><div class="value">{{ profile.institution|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Research Area</div><div class="value">{{ profile.research_area|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Approval Status</div>
+        <div class="value">{% if user.is_approved %}<span style="color:#16a34a">✓ Approved</span>{% else %}<span style="color:#f59e0b">⏳ Pending</span>{% endif %}</div>
+      </div>
+    {% elif user.is_hospital_admin %}
+      <div class="info-item"><div class="label">Hospital Name</div><div class="value">{{ profile.hospital_name|default:"—" }}</div></div>
+      <div class="info-item"><div class="label">Hospital Code</div><div class="value">{{ profile.hospital_code|default:"—" }}</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div style="display:flex;gap:.75rem;flex-wrap:wrap">
+  <a href="{% url 'dashboard:home' %}" class="btn" style="background:#f1f5f9;color:var(--text)">← Dashboard</a>
+  {% if user.is_patient %}
+  <a href="{% url 'medical_records:list' %}" class="btn" style="background:var(--primary);color:white">My Records</a>
+  {% endif %}
+</div>
+
+{% endblock %}

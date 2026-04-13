@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}My Dashboard — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.dash-header{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;border-radius:0 0 32px 32px;padding:2rem 1.5rem 2.5rem;margin:-1.5rem -1.5rem 2rem}
+.dash-header h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
+.dash-header p{opacity:.85;font-size:.9rem}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
+.stat-card .num{font-size:1.8rem;font-weight:800;color:var(--primary-dk)}
+.stat-card .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.section-h{font-size:1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.section-h i{color:var(--primary)}
+.item-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-radius:10px;background:#f8fafc;margin-bottom:.5rem;font-size:.875rem}
+.item-row:last-child{margin-bottom:0}
+.empty-msg{color:var(--muted);font-size:.85rem;text-align:center;padding:2rem}
+.alert-critical{border-left:4px solid var(--danger);background:#fff5f5}
+.alert-warning{border-left:4px solid var(--warning);background:#fffbf0}
+.alert-info{border-left:4px solid var(--primary);background:#f0f9ff}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:768px){.grid-2{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="dash-header">
+  <h1>👋 Hello, {{ user.get_full_name|default:user.username }}</h1>
+  <p>Here is your health overview</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="num">{{ total_records }}</div><div class="lbl">Records</div></div>
+  <div class="stat-card"><div class="num" style="color:var(--danger)">{{ unread_alerts }}</div><div class="lbl">Alerts</div></div>
+  <div class="stat-card"><div class="num">0</div><div class="lbl">AI Runs</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><i class="fas fa-exclamation-triangle"></i> Health Alerts</div>
+    <div class="card-body">
+      {% if alerts %}
+        {% for alert in alerts %}
+        <div class="item-row alert-{{ alert.severity }}">
+          <span>{{ alert.title }}</span>
+          <span class="badge badge-{{ alert.severity }}">{{ alert.get_severity_display }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-msg"><i class="fas fa-check-circle" style="color:var(--success)"></i><br>No alerts — looking good!</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="fas fa-file-medical"></i> Recent Records</div>
+    <div class="card-body">
+      {% if records %}
+        {% for r in records %}
+        <div class="item-row">
+          <span>{{ r.title }}</span>
+          <span class="badge badge-info">{{ r.get_record_type_display }}</span>
+        </div>
+        {% endfor %}
+        <div style="text-align:right;margin-top:.75rem"><a href="/records/" class="btn btn-outline" style="font-size:.8rem">View All</a></div>
+      {% else %}
+        <div class="empty-msg">No records yet. <a href="/records/">Upload your first record</a></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap">
+  <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
+  <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI Assistant</a>
+  <a href="/insights/" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Run AI Models</a>
+</div>
+{% endblock %}

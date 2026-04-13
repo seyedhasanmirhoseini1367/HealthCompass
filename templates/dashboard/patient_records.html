@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}{{ patient.get_full_name|default:patient.username }} — Records{% endblock %}
+{% block content %}
+
+<a href="{% url 'dashboard:home' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
+  <i class="fas fa-arrow-left"></i> Back to dashboard
+</a>
+
+<div style="background:white;border-radius:16px;border:1px solid var(--border);padding:1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem">
+  {% if patient.profile_picture %}
+  <img src="{{ patient.profile_picture.url }}" style="width:56px;height:56px;border-radius:50%;object-fit:cover">
+  {% else %}
+  <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#6366f1);display:flex;align-items:center;justify-content:center;color:white;font-size:1.3rem;font-weight:700">
+    {{ patient.username|first|upper }}
+  </div>
+  {% endif %}
+  <div>
+    <h1 style="font-size:1.2rem;font-weight:700;margin:0 0 .2rem">{{ patient.get_full_name|default:patient.username }}</h1>
+    <p style="color:var(--muted);font-size:.85rem;margin:0">
+      Linked since {{ relationship.created_at|date:"M d, Y" }}
+      {% if patient.patient_profile and patient.patient_profile.blood_type %}
+       · Blood type: <strong>{{ patient.patient_profile.blood_type }}</strong>
+      {% endif %}
+      {% if patient.date_of_birth %}
+       · DOB: {{ patient.date_of_birth|date:"M d, Y" }}
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if alerts %}
+<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:1rem;margin-bottom:1.25rem">
+  <p style="font-weight:700;font-size:.875rem;color:#b45309;margin-bottom:.5rem">⚠️ Active Alerts</p>
+  {% for alert in alerts %}
+  <div style="font-size:.85rem;padding:.3rem 0;color:#92400e">
+    <strong>{{ alert.get_severity_display }}:</strong> {{ alert.title }}
+    <span style="color:var(--muted);margin-left:.5rem">{{ alert.created_at|timesince }} ago</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:.875rem">Medical Records ({{ records|length }})</h2>
+
+{% if records %}
+<div style="display:grid;gap:.75rem">
+  {% for rec in records %}
+  <div class="card" style="cursor:pointer" onclick="location.href='{% url 'dashboard:doctor_record' rec.pk %}'">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;flex-wrap:wrap;gap:.5rem">
+      <div>
+        <span style="font-weight:600;font-size:.9rem">{{ rec.title }}</span>
+        <span style="font-size:.8rem;color:var(--muted);margin-left:.5rem">{{ rec.get_record_type_display }}</span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        {% if rec.is_flagged %}<span style="color:#f59e0b;font-size:.8rem">⚠️</span>{% endif %}
+        <span style="font-size:.78rem;color:var(--muted)">{{ rec.record_date|date:"M d, Y"|default:rec.uploaded_at|date:"M d, Y" }}</span>
+        <span style="color:var(--primary);font-size:.8rem">View →</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:2rem;color:var(--muted);font-size:.875rem">
+    No medical records uploaded yet.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

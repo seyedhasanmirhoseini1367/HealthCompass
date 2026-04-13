@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% block title %}AI Health Assistant — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.chat-layout{display:grid;grid-template-columns:220px 1fr;gap:1.25rem;height:calc(100vh - 140px);min-height:500px}
+@media(max-width:700px){.chat-layout{grid-template-columns:1fr}.sidebar{display:none}}
+.sidebar{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto}
+.sidebar-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:.25rem .5rem;margin-bottom:.25rem}
+.session-row{position:relative;display:flex;align-items:center;border-radius:9px;transition:background .15s}
+.session-row:hover{background:#f1f5f9}
+.session-row.active{background:#dbeafe}
+.session-item{flex:1;padding:.5rem .75rem;border-radius:9px;font-size:.83rem;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none;display:block;min-width:0}
+.session-row.active .session-item{color:#1d4ed8;font-weight:600}
+.session-menu-btn{flex-shrink:0;padding:.25rem .4rem;background:none;border:none;cursor:pointer;color:var(--muted);border-radius:6px;font-size:.78rem;opacity:0;transition:opacity .15s}
+.session-row:hover .session-menu-btn,.session-row.active .session-menu-btn{opacity:1}
+.session-menu-btn:hover{background:#e2e8f0;color:var(--text)}
+.session-dropdown{position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:140px;padding:.3rem;display:none}
+.session-dropdown.open{display:block}
+.session-dropdown button{display:flex;align-items:center;gap:.5rem;width:100%;padding:.45rem .75rem;background:none;border:none;font-size:.82rem;color:var(--text);cursor:pointer;border-radius:7px;text-align:left}
+.session-dropdown button:hover{background:#f1f5f9}
+.session-dropdown button.danger{color:#dc2626}
+.session-dropdown button.danger:hover{background:#fee2e2}
+.new-chat-btn{display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border-radius:9px;font-size:.83rem;color:var(--primary);font-weight:600;cursor:pointer;border:1.5px dashed var(--primary);background:transparent;transition:all .15s;text-decoration:none;margin-bottom:.25rem}
+.new-chat-btn:hover{background:#eff6ff}
+.chat-main{display:flex;flex-direction:column;min-height:0}
+.chat-header{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem}
+.chat-header h1{font-size:1rem;font-weight:700;margin:0}
+.chat-header p{font-size:.8rem;opacity:.85;margin:0}
+.messages-area{flex:1;overflow-y:auto;background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;display:flex;flex-direction:column;gap:1rem;min-height:0}
+.msg-user{align-self:flex-end;max-width:75%}
+.msg-assistant{align-self:flex-start;max-width:85%}
+.bubble{padding:.75rem 1rem;border-radius:14px;font-size:.9rem;line-height:1.55}
+.bubble-user{background:var(--primary);color:white;border-radius:14px 14px 4px 14px}
+.bubble-assistant{background:#f1f5f9;color:var(--text);border-radius:14px 14px 14px 4px;position:relative}
+.bubble-assistant .copy-btn{position:absolute;top:.4rem;right:.4rem;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.2rem .4rem;border-radius:5px;transition:all .15s;opacity:0}
+.bubble-assistant:hover .copy-btn{opacity:1}
+.bubble-assistant .copy-btn:hover{background:#e2e8f0}
+.msg-time{font-size:.7rem;color:var(--muted);margin-top:.25rem;text-align:right}
+.msg-user .msg-time{text-align:right}
+.msg-assistant .msg-time{text-align:left}
+.sources-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem}
+.source-chip{font-size:.7rem;background:white;border:1px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--muted)}
+.chat-input-area{margin-top:.75rem;display:flex;gap:.6rem;align-items:flex-end}
+.chat-input{flex:1;padding:.65rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;resize:none;outline:none;font-family:inherit;transition:border .15s;max-height:120px}
+.chat-input:focus{border-color:var(--primary)}
+.send-btn{padding:.65rem 1.1rem;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:.9rem;transition:all .15s;flex-shrink:0}
+.send-btn:hover{background:#0284c7}
+.send-btn:disabled{opacity:.5;cursor:not-allowed}
+.typing-indicator{display:none;align-self:flex-start}
+.typing-bubble{background:#f1f5f9;border-radius:14px 14px 14px 4px;padding:.65rem 1rem;display:flex;gap:.35rem;align-items:center}
+.typing-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;animation:bounce .8s infinite}
+.typing-dot:nth-child(2){animation-delay:.15s}
+.typing-dot:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+.no-records-banner{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:.75rem 1rem;font-size:.83rem;color:#92400e;margin-bottom:.75rem}
+/* Markdown rendering */
+.bubble-assistant p{margin:.25rem 0}
+.bubble-assistant ul,.bubble-assistant ol{padding-left:1.25rem;margin:.35rem 0}
+.bubble-assistant li{margin:.15rem 0}
+.bubble-assistant code{background:#e2e8f0;padding:.1rem .3rem;border-radius:4px;font-size:.83em}
+.bubble-assistant pre{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:.75rem;overflow-x:auto;font-size:.82em;margin:.5rem 0}
+.bubble-assistant h3{font-size:.95rem;font-weight:700;margin:.5rem 0 .2rem}
+.bubble-assistant strong{font-weight:700}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="chat-layout">
+  <!-- Sidebar: session list -->
+  <div class="sidebar">
+    <a href="{% url 'rag_assistant:new_session' %}" class="new-chat-btn">
+      <i class="fas fa-plus"></i> New chat
+    </a>
+    <div class="sidebar-title">Recent chats</div>
+    {% for s in sessions %}
+    <div class="session-row {% if s.pk == session.pk %}active{% endif %}"
+         id="srow-{{ s.pk }}">
+      <a href="/assistant/?session={{ s.pk }}" class="session-item">
+        {{ s.title|truncatechars:26 }}
+      </a>
+      <button class="session-menu-btn" onclick="toggleMenu(event,'menu-{{ s.pk }}')"
+              title="Options">
+        <i class="fas fa-ellipsis-v"></i>
+      </button>
+      <div class="session-dropdown" id="menu-{{ s.pk }}">
+        <button onclick="renameSession('{{ s.pk }}','srow-{{ s.pk }}')">
+          <i class="fas fa-pen" style="width:14px"></i> Rename
+        </button>
+        <button class="danger" onclick="deleteSession('{{ s.pk }}','srow-{{ s.pk }}')">
+          <i class="fas fa-trash" style="width:14px"></i> Delete
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Main chat -->
+  <div class="chat-main">
+    <div class="chat-header">
+      <div style="font-size:1.5rem">🤖</div>
+      <div>
+        <h1>AI Health Assistant</h1>
+        <p>Ask about your records, lab results, medications, and health topics</p>
+      </div>
+    </div>
+
+    {% if not has_records %}
+    <div class="no-records-banner">
+      <i class="fas fa-info-circle"></i>
+      <strong>No records yet.</strong> Upload your medical records for personalized answers.
+      <a href="{% url 'medical_records:list' %}" style="color:#92400e;font-weight:700;margin-left:.3rem">Upload records →</a>
+    </div>
+    {% endif %}
+
+    <div class="messages-area" id="messagesArea">
+      {% if not messages %}
+      <div id="emptyState" style="text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div style="font-size:2.5rem;margin-bottom:.75rem">💬</div>
+        <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.5rem">Start a conversation</p>
+        <p style="font-size:.85rem;max-width:360px">
+          Ask about your latest lab results, what a medication does, or any general health question.
+        </p>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:1.25rem">
+          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">What do my latest lab results show?</button>
+          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">Do I have any abnormal values?</button>
+          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">What are my current medications?</button>
+          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">Explain my recent diagnosis</button>
+        </div>
+      </div>
+      {% else %}
+        {% for msg in messages %}
+        <div class="msg-user">
+          <div class="bubble bubble-user">{{ msg.query }}</div>
+          <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
+        </div>
+        <div class="msg-assistant">
+          <div class="bubble bubble-assistant" data-raw="{{ msg.response|escapejs }}">
+            <button class="copy-btn" onclick="copyMsg(this)" title="Copy"><i class="fas fa-copy"></i></button>
+            <div class="md-content"></div>
+          </div>
+          {% if msg.sources %}
+          <div class="sources-row">
+            {% for src in msg.sources %}
+            <a href="/records/{{ src.pk }}/" class="source-chip">📎 {{ src.title|truncatechars:25 }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Typing indicator -->
+      <div class="typing-indicator" id="typingIndicator">
+        <div class="typing-bubble">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="msgInput" rows="1"
+                placeholder="Ask a health question…"
+                onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+    <p style="font-size:.72rem;color:var(--muted);margin-top:.4rem;text-align:center">
+      ⚠️ AI responses are not a substitute for professional medical advice. Always consult your doctor.
+    </p>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+const SESSION_ID = "{{ session.pk }}";
+const SEND_URL = "{% url 'rag_assistant:send_message' %}";
+const CSRF = "{{ csrf_token }}";
+
+// Render existing messages
+document.querySelectorAll('.bubble-assistant[data-raw]').forEach(bubble => {
+  const raw = bubble.getAttribute('data-raw');
+  bubble.querySelector('.md-content').innerHTML = marked.parse(raw);
+});
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+  // Auto-resize textarea
+  const ta = e.target;
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+}
+
+function usePrompt(text) {
+  document.getElementById('msgInput').value = text;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Hide empty state
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.style.display = 'none';
+
+  // Add user message
+  const area = document.getElementById('messagesArea');
+  area.appendChild(makeBubble('user', msg));
+
+  // Show typing indicator
+  const typing = document.getElementById('typingIndicator');
+  typing.style.display = 'flex';
+  scrollToBottom();
+
+  try {
+    const resp = await fetch(SEND_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF,
+      },
+      body: JSON.stringify({ message: msg, session_id: SESSION_ID }),
+    });
+    const data = await resp.json();
+
+    typing.style.display = 'none';
+
+    if (data.response) {
+      area.appendChild(makeAssistantBubble(data.response, data.sources || []));
+    } else {
+      area.appendChild(makeAssistantBubble('Sorry, something went wrong. Please try again.', []));
+    }
+  } catch(err) {
+    typing.style.display = 'none';
+    area.appendChild(makeAssistantBubble('Network error. Please check your connection.', []));
+  } finally {
+    btn.disabled = false;
+    scrollToBottom();
+  }
+}
+
+function makeBubble(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg-${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = `bubble bubble-${role}`;
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = new Date().toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
+  wrap.appendChild(time);
+  return wrap;
+}
+
+function makeAssistantBubble(text, sources) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-assistant';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble bubble-assistant';
+  bubble.setAttribute('data-raw', text);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.title = 'Copy';
+  copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+  copyBtn.onclick = function() { copyMsg(this); };
+
+  const content = document.createElement('div');
+  content.className = 'md-content';
+  content.innerHTML = marked.parse(text);
+
+  bubble.appendChild(copyBtn);
+  bubble.appendChild(content);
+  wrap.appendChild(bubble);
+
+  if (sources && sources.length) {
+    const row = document.createElement('div');
+    row.className = 'sources-row';
+    sources.forEach(s => {
+      const chip = document.createElement('a');
+      chip.className = 'source-chip';
+      chip.href = `/records/${s.pk}/`;
+      chip.textContent = `📎 ${s.title.substring(0, 25)}`;
+      row.appendChild(chip);
+    });
+    wrap.appendChild(row);
+  }
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = new Date().toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
+  wrap.appendChild(time);
+  return wrap;
+}
+
+function copyMsg(btn) {
+  const bubble = btn.closest('.bubble-assistant');
+  const text = bubble.getAttribute('data-raw');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = '<i class="fas fa-check"></i>';
+    setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500);
+  });
+}
+
+function scrollToBottom() {
+  const area = document.getElementById('messagesArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+// Scroll to bottom on load
+scrollToBottom();
+
+// ── Session menu ──────────────────────────────────────────────────────────────
+
+function toggleMenu(e, menuId) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelectorAll('.session-dropdown.open').forEach(m => {
+    if (m.id !== menuId) m.classList.remove('open');
+  });
+  document.getElementById(menuId).classList.toggle('open');
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.session-dropdown.open').forEach(m => m.classList.remove('open'));
+});
+
+async function renameSession(pk, rowId) {
+  document.getElementById('menu-' + pk).classList.remove('open');
+  const row   = document.getElementById(rowId);
+  const link  = row.querySelector('.session-item');
+  const current = link.textContent.trim();
+  const title = prompt('Rename chat:', current);
+  if (!title || title.trim() === current) return;
+  const resp = await fetch(`/assistant/session/${pk}/rename/`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({title: title.trim()}),
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    link.textContent = data.title.length > 26 ? data.title.substring(0, 26) + '…' : data.title;
+  }
+}
+
+async function deleteSession(pk, rowId) {
+  document.getElementById('menu-' + pk).classList.remove('open');
+  if (!confirm('Delete this chat? This cannot be undone.')) return;
+  const resp = await fetch(`/assistant/session/${pk}/delete/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    const row = document.getElementById(rowId);
+    row.remove();
+    // If deleted the active session, redirect to new chat
+    if (row.classList.contains('active')) {
+      window.location.href = '/assistant/new/';
+    }
+  }
+}
+</script>
+{% endblock %}

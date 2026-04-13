@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Upload Wearable Data — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.upload-card{max-width:560px;margin:0 auto}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box}
+.form-control:focus{outline:none;border-color:var(--primary)}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.device-chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.device-chip{padding:.4rem 1rem;border-radius:20px;border:1.5px solid var(--border);font-size:.82rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.device-chip:hover{border-color:var(--primary);color:var(--primary)}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="upload-card">
+  <a href="{% url 'medical_records:list' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
+    <i class="fas fa-arrow-left"></i> Back to records
+  </a>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="font-size:3rem;text-align:center;margin-bottom:1rem">⌚</div>
+      <h2 style="font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:.4rem">Import Wearable Data</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.875rem;margin-bottom:1.5rem">
+        Export data as CSV from your wearable app and upload here. We support Fitbit, Garmin, Oura, and Apple Health.
+      </p>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label">Device (optional — we'll auto-detect)</label>
+          <select name="device" class="form-control">
+            {% for value, label in form.fields.device.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_csv_file">{{ form.csv_file.label }}</label>
+          {{ form.csv_file }}
+          <div class="help-text">
+            Supported columns: date/time, heart_rate, steps, sleep, calories, spo2, weight, temperature.
+            Column names are auto-detected.
+          </div>
+          {% if form.csv_file.errors %}
+          <div style="color:#dc2626;font-size:.8rem;margin-top:.3rem">{{ form.csv_file.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          {{ form.notes }}
+        </div>
+        <button type="submit" class="btn" style="width:100%;background:#6366f1;color:white;padding:.7rem;font-size:.95rem">
+          <i class="fas fa-upload"></i> Import Wearable Data
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

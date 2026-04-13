@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Admin Dashboard — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.dash-header{background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;border-radius:16px;padding:2rem 1.5rem;margin-bottom:1.5rem}
+.dash-header h1{font-size:1.4rem;font-weight:700;margin-bottom:.2rem}
+.dash-header p{opacity:.85;font-size:.88rem}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:#f59e0b}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.link-row{background:white;border-radius:12px;border:1px solid var(--border);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap}
+.link-names{font-size:.9rem;font-weight:600}
+.link-meta{font-size:.78rem;color:var(--muted)}
+.form-inline{display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end}
+.fi{flex:1;min-width:160px}
+.fi label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
+.fi select,.fi input{width:100%;padding:.5rem .75rem;border-radius:9px;border:1.5px solid var(--border);font-size:.85rem;background:white;box-sizing:border-box}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="dash-header">
+  <h1>🏨 {{ user.get_full_name|default:user.username }}</h1>
+  <p>{% if user.hospital_admin_profile %}{{ user.hospital_admin_profile.hospital_name }}{% endif %} — Manage patient–doctor relationships</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ total_links }}</div>
+    <div class="stat-lbl">Active Links</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ total_patients }}</div>
+    <div class="stat-lbl">Patients</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ total_doctors }}</div>
+    <div class="stat-lbl">Doctors</div>
+  </div>
+</div>
+
+<!-- Create new link -->
+<div class="card" style="margin-bottom:1.25rem">
+  <div class="card-body">
+    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:1rem">🔗 Link Patient to Doctor</h3>
+    {% if messages %}
+      {% for msg in messages %}
+      <div style="background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};border-radius:8px;padding:.6rem .9rem;margin-bottom:.75rem;font-size:.85rem;color:{% if msg.tags == 'error' %}#dc2626{% else %}#16a34a{% endif %}">
+        {{ msg }}
+      </div>
+      {% endfor %}
+    {% endif %}
+    <form method="post" action="{% url 'dashboard:create_link' %}">
+      {% csrf_token %}
+      <div class="form-inline">
+        <div class="fi">
+          <label>Patient</label>
+          <select name="patient_id" required>
+            <option value="">— Select patient —</option>
+            {% for p in all_patients %}
+            <option value="{{ p.pk }}">{{ p.get_full_name|default:p.username }} ({{ p.username }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fi">
+          <label>Doctor</label>
+          <select name="doctor_id" required>
+            <option value="">— Select doctor —</option>
+            {% for d in all_doctors %}
+            <option value="{{ d.pk }}">Dr. {{ d.get_full_name|default:d.username }}{% if d.doctor_profile %} — {{ d.doctor_profile.specialty }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn" style="background:#f59e0b;color:white;padding:.5rem 1.1rem;white-space:nowrap">
+          <i class="fas fa-link"></i> Create Link
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Existing links -->
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:.875rem">Existing Links ({{ total_links }})</h2>
+
+{% if relationships %}
+{% for rel in relationships %}
+<div class="link-row">
+  <div>
+    <div class="link-names">
+      <i class="fas fa-user" style="color:#0ea5e9;margin-right:.3rem"></i>{{ rel.patient.get_full_name|default:rel.patient.username }}
+      <span style="color:var(--muted);margin:0 .5rem">↔</span>
+      <i class="fas fa-user-md" style="color:#10b981;margin-right:.3rem"></i>Dr. {{ rel.doctor.get_full_name|default:rel.doctor.username }}
+    </div>
+    <div class="link-meta">Linked {{ rel.created_at|date:"M d, Y" }} · {{ rel.hospital|default:"" }}</div>
+  </div>
+  <form method="post" action="{% url 'dashboard:remove_link' rel.pk %}"
+        onsubmit="return confirm('Remove this patient–doctor link?')">
+    {% csrf_token %}
+    <button type="submit" class="btn" style="background:#fee2e2;color:#dc2626;border:none;cursor:pointer;font-size:.8rem;padding:.3rem .7rem">
+      Remove
+    </button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:2rem;color:var(--muted)">
+    <div style="font-size:2rem;margin-bottom:.5rem">🔗</div>
+    <p style="font-size:.875rem">No links yet. Use the form above to connect patients with doctors.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

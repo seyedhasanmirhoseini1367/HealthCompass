@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Delete Record — HealthCompass{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:0 auto">
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:2rem">
+      <div style="font-size:2.5rem;margin-bottom:1rem">🗑️</div>
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Delete Record?</h2>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.5rem">
+        This will permanently delete <strong>{{ record.title }}</strong> including all parsed lab values and data points.
+        This cannot be undone.
+      </p>
+      <div style="display:flex;gap:.75rem;justify-content:center">
+        <a href="{% url 'medical_records:list' %}" class="btn" style="background:#f1f5f9;color:var(--text)">Cancel</a>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn" style="background:#dc2626;color:white;border:none;cursor:pointer">
+            Delete permanently
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

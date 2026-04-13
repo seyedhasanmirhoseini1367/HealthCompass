@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Notifications — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.notif-row{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.2rem;background:white;border-radius:12px;border:1px solid var(--border);margin-bottom:.6rem;transition:all .18s}
+.notif-row:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.notif-row.unread{border-left:3px solid var(--primary);background:#f0f9ff}
+.notif-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.notif-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.15rem}
+.notif-msg{font-size:.82rem;color:var(--muted);line-height:1.45}
+.notif-time{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+  <h1 style="font-size:1.375rem;font-weight:700;margin:0">🔔 Notifications</h1>
+  <span style="font-size:.82rem;color:var(--muted)">Unread ones are marked blue</span>
+</div>
+
+{% if notifications %}
+{% for n in notifications %}
+<div class="notif-row {% if not n.is_read %}unread{% endif %}"
+     {% if n.link %}style="cursor:pointer" onclick="location.href='{{ n.link }}'"{% endif %}>
+  <div class="notif-icon"
+    style="{% if n.type == 'health_alert' %}background:#fee2e2{% elif n.type == 'model_result' %}background:#ede9fe{% elif n.type == 'record_parsed' %}background:#dcfce7{% else %}background:#f1f5f9{% endif %}">
+    {% if n.type == 'health_alert' %}⚠️
+    {% elif n.type == 'model_result' %}🤖
+    {% elif n.type == 'record_parsed' %}📋
+    {% else %}ℹ️{% endif %}
+  </div>
+  <div style="flex:1;min-width:0">
+    <div class="notif-title">{{ n.title }}</div>
+    <div class="notif-msg">{{ n.message }}</div>
+    <div class="notif-time">{{ n.created_at|timesince }} ago · {{ n.get_type_display }}</div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:3rem;color:var(--muted)">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">🔔</div>
+    <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.3rem">All caught up!</p>
+    <p style="font-size:.875rem">No notifications yet.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

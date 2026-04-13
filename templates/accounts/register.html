@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Register — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.auth-wrap{max-width:520px;margin:2rem auto}
+.auth-card{background:white;border-radius:20px;padding:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,.08);border:1px solid var(--border)}
+.auth-title{font-size:1.5rem;font-weight:700;margin-bottom:.25rem;color:var(--text)}
+.auth-sub{color:var(--muted);font-size:.875rem;margin-bottom:2rem}
+.form-group{margin-bottom:1.1rem}
+.form-group label{display:block;font-size:.825rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
+.form-group input,.form-group select{width:100%;padding:.6rem .9rem;border:1.5px solid var(--border);border-radius:9px;font-size:.875rem;transition:border .2s;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.errorlist{color:var(--danger);font-size:.78rem;margin-top:.25rem;list-style:none;padding:0}
+.btn-submit{width:100%;padding:.7rem;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .2s;margin-top:.5rem}
+.btn-submit:hover{background:var(--primary-dk)}
+.auth-footer{text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--muted)}
+.auth-footer a{color:var(--primary);font-weight:600}
+.role-info{background:#f0f7ff;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#0369a1}
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <h1 class="auth-title">Create your account</h1>
+    <p class="auth-sub">Join HealthCompass as a patient, doctor, or researcher</p>
+    <div class="role-info"><i class="fas fa-info-circle"></i> Data Scientist accounts require admin approval before activation.</div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          {{ form.first_name }}
+          {{ form.first_name.errors }}
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          {{ form.last_name }}
+          {{ form.last_name.errors }}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        {{ form.username }}
+        {{ form.username.errors }}
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        {{ form.email }}
+        {{ form.email.errors }}
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        {{ form.role }}
+        {{ form.role.errors }}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Password</label>
+          {{ form.password1 }}
+          {{ form.password1.errors }}
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          {{ form.password2 }}
+          {{ form.password2.errors }}
+        </div>
+      </div>
+      <button type="submit" class="btn-submit">Create Account</button>
+    </form>
+    <div class="auth-footer">Already have an account? <a href="/accounts/login/">Log in</a></div>
+  </div>
+</div>
+{% endblock %}

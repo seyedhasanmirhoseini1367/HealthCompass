@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Doctor Dashboard — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.dash-header{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;border-radius:16px;padding:2rem 1.5rem;margin-bottom:1.5rem}
+.dash-header h1{font-size:1.4rem;font-weight:700;margin-bottom:.2rem}
+.dash-header p{opacity:.85;font-size:.88rem}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:var(--primary)}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.patient-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.patient-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;cursor:pointer;transition:all .2s}
+.patient-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);border-color:#cbd5e1}
+.patient-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0}
+.flagged-dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;margin-left:.3rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="dash-header">
+  <h1>👨‍⚕️ Dr. {{ user.get_full_name|default:user.username }}</h1>
+  <p>{{ user.doctor_profile.specialty|default:"General" }} · {{ user.doctor_profile.hospital|default:"" }}</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ patient_count }}</div>
+    <div class="stat-lbl">My Patients</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ recent_records|length }}</div>
+    <div class="stat-lbl">New Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ unread_alerts }}</div>
+    <div class="stat-lbl">Patient Alerts</div>
+  </div>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+  <h2 style="font-size:1rem;font-weight:700">👥 My Patients</h2>
+</div>
+
+{% if relationships %}
+<div class="patient-grid">
+  {% for rel in relationships %}
+  <div class="patient-card" onclick="location.href='{% url 'dashboard:patient_records' rel.patient.pk %}'">
+    <div style="display:flex;align-items:center;gap:.875rem;margin-bottom:.75rem">
+      {% if rel.patient.profile_picture %}
+      <img src="{{ rel.patient.profile_picture.url }}" class="patient-avatar" style="object-fit:cover">
+      {% else %}
+      <div class="patient-avatar">{{ rel.patient.username|first|upper }}</div>
+      {% endif %}
+      <div>
+        <div style="font-weight:700;font-size:.9rem">{{ rel.patient.get_full_name|default:rel.patient.username }}</div>
+        <div style="font-size:.78rem;color:var(--muted)">Linked {{ rel.created_at|date:"M d, Y" }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <span style="font-size:.75rem;background:#f1f5f9;border-radius:6px;padding:.2rem .5rem;color:var(--muted)">
+        <i class="fas fa-file-medical"></i> View records
+      </span>
+      {% if rel.patient.health_alerts.filter %}
+      <span style="font-size:.75rem;background:#fef3c7;border-radius:6px;padding:.2rem .5rem;color:#b45309">
+        ⚠️ Has alerts
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:2.5rem;color:var(--muted)">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">👥</div>
+    <p style="font-weight:600;color:var(--text);margin-bottom:.35rem">No patients linked yet</p>
+    <p style="font-size:.875rem">Contact your hospital admin to link patients to your account.</p>
+  </div>
+</div>
+{% endif %}
+
+{% if recent_records %}
+<h2 style="font-size:1rem;font-weight:700;margin:1.5rem 0 .875rem">📋 Recent Patient Records</h2>
+<div style="display:grid;gap:.6rem">
+  {% for rec in recent_records %}
+  <div class="card" style="cursor:pointer" onclick="location.href='{% url 'dashboard:doctor_record' rec.pk %}'">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1.1rem;flex-wrap:wrap">
+      <div>
+        <span style="font-weight:600;font-size:.9rem">{{ rec.title }}</span>
+        <span style="color:var(--muted);font-size:.8rem;margin-left:.5rem">— {{ rec.patient.get_full_name|default:rec.patient.username }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        {% if rec.is_flagged %}<span style="color:#f59e0b;font-size:.8rem">⚠️ Abnormal</span>{% endif %}
+        <span class="badge" style="background:#f1f5f9;color:var(--muted);font-size:.72rem">{{ rec.get_record_type_display }}</span>
+        <span style="font-size:.75rem;color:var(--muted)">{{ rec.uploaded_at|date:"M d" }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

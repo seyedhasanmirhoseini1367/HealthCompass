@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}My Models — HealthCompass{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem">
+  <h1 style="font-size:1.375rem;font-weight:700;margin:0">🔬 My Submitted Models</h1>
+  <a href="{% url 'ai_insights:submit_model' %}" class="btn" style="background:var(--secondary);color:white;font-size:.85rem">
+    <i class="fas fa-plus"></i> Submit New Model
+  </a>
+</div>
+
+{% if models %}
+<div style="display:grid;gap:1rem">
+  {% for m in models %}
+  <div class="card">
+    <div class="card-body" style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div>
+        <p style="font-weight:700;font-size:.975rem;margin-bottom:.25rem">{{ m.name }}</p>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.4rem">{{ m.get_category_display }} · {{ m.run_count }} runs · Submitted {{ m.created_at|date:"M d, Y" }}</p>
+        <p style="font-size:.84rem;color:var(--muted)">{{ m.description|truncatewords:20 }}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.5rem">
+        <span class="badge"
+          style="{% if m.status == 'active' %}background:#dcfce7;color:#16a34a
+          {% elif m.status == 'pending' %}background:#fef3c7;color:#b45309
+          {% elif m.status == 'approved' %}background:#dbeafe;color:#1d4ed8
+          {% else %}background:#fee2e2;color:#dc2626{% endif %}">
+          {{ m.get_status_display }}
+        </span>
+        {% if m.status == 'active' %}
+        <a href="{% url 'ai_insights:model_detail' m.slug %}" style="font-size:.8rem;color:var(--primary)">View live →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:3rem;color:var(--muted)">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">🔬</div>
+    <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.4rem">No models yet</p>
+    <p style="font-size:.875rem;margin-bottom:1.25rem">Submit your first trained model to get started.</p>
+    <a href="{% url 'ai_insights:submit_model' %}" class="btn" style="background:var(--secondary);color:white">Submit a model</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

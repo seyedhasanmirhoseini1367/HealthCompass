@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}My Predictions — HealthCompass{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+  <h1 style="font-size:1.375rem;font-weight:700;margin:0">📊 My Prediction History</h1>
+  <a href="{% url 'ai_insights:list' %}" class="btn" style="background:#f1f5f9;color:var(--text);font-size:.85rem">
+    ← Browse Models
+  </a>
+</div>
+
+{% if predictions %}
+<div style="display:grid;gap:.9rem">
+  {% for p in predictions %}
+  <div class="card" style="cursor:pointer" onclick="location.href='{% url 'ai_insights:prediction_detail' p.pk %}'">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div>
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:.2rem">{{ p.model.name }}</p>
+        <p style="font-size:.8rem;color:var(--muted)">{{ p.model.get_category_display }} · {{ p.created_at|date:"M d, Y H:i" }}</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        {% if p.result.label %}
+        <span style="font-size:.9rem;font-weight:600">{{ p.result.label }}</span>
+        {% endif %}
+        {% if p.risk_score is not None %}
+        <span class="badge"
+          style="{% if p.risk_score >= 0.75 %}background:#fee2e2;color:#dc2626{% elif p.risk_score >= 0.45 %}background:#fef3c7;color:#b45309{% else %}background:#dcfce7;color:#16a34a{% endif %}">
+          {{ p.risk_score|floatformat:0 }}% risk
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:3rem;color:var(--muted)">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">📊</div>
+    <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.4rem">No predictions yet</p>
+    <p style="font-size:.875rem;margin-bottom:1.25rem">Run an AI model to see your results here.</p>
+    <a href="{% url 'ai_insights:list' %}" class="btn" style="background:var(--primary);color:white">Browse models</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% block title %}{{ model.name }} — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted);font-size:.875rem;text-decoration:none;margin-bottom:1rem}
+.back-btn:hover{color:var(--primary)}
+.model-header{background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;border-radius:16px;padding:1.5rem 2rem;margin-bottom:1.25rem}
+.model-header h1{font-size:1.4rem;font-weight:700;margin-bottom:.3rem}
+.model-meta{display:flex;gap:1.25rem;margin-top:.75rem;flex-wrap:wrap;font-size:.82rem;opacity:.85}
+.card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem}
+.card-h{font-size:.875rem;font-weight:700;color:var(--text);margin-bottom:.875rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.form-group{margin-bottom:.875rem}
+.form-label{display:block;font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
+.form-control{width:100%;padding:.5rem .75rem;border-radius:9px;border:1.5px solid var(--border);font-size:.875rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
+.form-control:focus{outline:none;border-color:var(--primary)}
+.input-hint{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+.file-drop{border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:all .2s}
+.file-drop:hover,.file-drop.dragover{border-color:var(--primary);background:#f0f9ff}
+.file-drop input{display:none}
+.file-icon{font-size:1.75rem;margin-bottom:.4rem}
+.result-box{display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:1.1rem;margin-top:.875rem}
+.result-score{font-size:2.25rem;font-weight:800;color:var(--text);margin-bottom:.2rem}
+.risk-bar{height:10px;border-radius:5px;background:#e2e8f0;overflow:hidden;margin:.6rem 0}
+.risk-fill{height:100%;border-radius:5px;transition:width .6s ease;background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444)}
+.interp-box{background:#f8fafc;border-radius:10px;padding:.875rem;margin-top:.6rem;font-size:.85rem;line-height:1.65;color:var(--text)}
+.input-type-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:6px;font-size:.72rem;font-weight:700;background:#ede9fe;color:#7c3aed;margin-bottom:.6rem}
+.schema-row{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid #f1f5f9;font-size:.82rem}
+.pred-row{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f8fafc;border-radius:8px;margin-bottom:.35rem;font-size:.82rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<a href="{% url 'ai_insights:list' %}" class="back-btn">
+  <i class="fas fa-arrow-left"></i> Back to models
+</a>
+
+<!-- Header -->
+<div class="model-header">
+  <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.75;margin-bottom:.35rem">
+    {{ model.get_category_display }}
+  </div>
+  <h1>{{ model.name }}</h1>
+  <div class="model-meta">
+    <span><i class="fas fa-user"></i> {{ model.data_scientist.get_full_name|default:model.data_scientist.username }}</span>
+    <span><i class="fas fa-play-circle"></i> {{ model.run_count }} runs</span>
+    <span><i class="fas fa-calendar"></i> {{ model.created_at|date:"M d, Y" }}</span>
+    <span><i class="fas fa-database"></i> {{ model.get_input_type_display }}</span>
+  </div>
+</div>
+
+<!-- ROW 1: Description | Recent Predictions -->
+<div class="two-col">
+
+  <!-- Description -->
+  <div class="card">
+    <div class="card-h">📋 About This Model</div>
+    <p style="font-size:.875rem;color:#374151;line-height:1.75;margin-bottom:{% if model.interpretation_guide %}1rem{% else %}0{% endif %}">
+      {{ model.description }}
+    </p>
+    {% if model.interpretation_guide %}
+    <div style="padding-top:.75rem;border-top:1px solid #f1f5f9">
+      <p style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.35rem">
+        Clinical Context
+      </p>
+      <p style="font-size:.82rem;color:#4b5563;line-height:1.65">{{ model.interpretation_guide|truncatewords:60 }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Predictions -->
+  <div class="card">
+    <div class="card-h">🕒 Your Recent Predictions</div>
+    {% if user.is_authenticated %}
+      {% if user_predictions %}
+        {% for p in user_predictions %}
+        <div class="pred-row">
+          <span style="color:var(--muted)">{{ p.created_at|date:"M d, H:i" }}</span>
+          <span style="font-weight:600">{{ p.result.label|default:"—" }}</span>
+          {% if p.risk_score is not None %}
+          <span style="padding:.15rem .5rem;border-radius:5px;font-size:.75rem;font-weight:700;
+            {% if p.risk_score >= 0.75 %}background:#fee2e2;color:#dc2626
+            {% elif p.risk_score >= 0.45 %}background:#fef3c7;color:#b45309
+            {% else %}background:#dcfce7;color:#16a34a{% endif %}">
+            {{ p.risk_score|floatformat:1 }}
+          </span>
+          {% endif %}
+          <a href="{% url 'ai_insights:prediction_detail' p.pk %}" style="color:var(--primary);font-size:.78rem">Details →</a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center;padding:2rem 1rem;color:var(--muted)">
+          <i class="fas fa-history" style="font-size:1.75rem;margin-bottom:.5rem;display:block;opacity:.3"></i>
+          <p style="font-size:.875rem">No predictions yet.<br>Run the model to see your history here.</p>
+        </div>
+      {% endif %}
+    {% else %}
+      <div style="text-align:center;padding:2rem 1rem;color:var(--muted)">
+        <p style="font-size:.875rem;margin-bottom:.75rem">Log in to see your prediction history.</p>
+        <a href="/accounts/login/?next=/insights/{{ model.slug }}/" class="btn" style="background:var(--primary);color:white;font-size:.85rem">Log in</a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ROW 2: Run Model | Input & Output Schema -->
+<div class="two-col" style="margin-bottom:0">
+
+  <!-- Run Model -->
+  <div class="card">
+    <div class="card-h">▶ Run This Model</div>
+
+    {% if user.is_authenticated %}
+    <div class="input-type-badge">
+      <i class="fas fa-{% if model.input_type == 'tabular' %}table{% elif model.input_type == 'image' %}image{% else %}file{% endif %}"></i>
+      {{ model.get_input_type_display }}
+    </div>
+
+    <form id="runForm" method="post" action="{% url 'ai_insights:run_prediction' model.slug %}"
+          enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {% if model.input_type == 'tabular' %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem">
+        {% for field_name, field_type in input_fields.items %}
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="f_{{ field_name }}">{{ field_name|title }}</label>
+          <input type="number" step="any" name="{{ field_name }}" id="f_{{ field_name }}"
+                 class="form-control" placeholder="{{ field_type }}">
+          <div class="input-hint">{{ field_type }}</div>
+        </div>
+        {% endfor %}
+        </div>
+
+      {% elif model.input_type == 'image' %}
+        <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+          <input type="file" name="input_file" id="fileInput"
+                 accept=".jpg,.jpeg,.png,.bmp,.tiff,.dcm" onchange="fileSelected(this)">
+          <div class="file-icon">🖼️</div>
+          <p style="font-weight:600;font-size:.875rem;margin-bottom:.2rem">Click or drop an image here</p>
+          <p style="font-size:.75rem;color:var(--muted)">JPG, PNG, BMP, TIFF, DICOM</p>
+        </div>
+        <p id="fileName" style="font-size:.82rem;color:var(--primary);margin-top:.4rem;display:none"></p>
+
+      {% elif model.input_type in 'eeg_csv,parquet,file' %}
+        <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+          <input type="file" name="input_file" id="fileInput"
+                 accept=".csv,.parquet,.txt,.edf" onchange="fileSelected(this)">
+          <div class="file-icon">📊</div>
+          <p style="font-weight:600;font-size:.875rem;margin-bottom:.2rem">Click or drop your data file here</p>
+          <p style="font-size:.75rem;color:var(--muted)">
+            {% if model.input_type == 'eeg_csv' %}EEG signals as CSV — rows=samples, columns=channels
+            {% elif model.input_type == 'parquet' %}CSV or Parquet tabular file
+            {% else %}Upload the required data file{% endif %}
+          </p>
+        </div>
+        <p id="fileName" style="font-size:.82rem;color:var(--primary);margin-top:.4rem;display:none"></p>
+      {% endif %}
+
+      <button type="submit" class="btn" id="runBtn"
+              style="width:100%;background:var(--secondary);color:white;padding:.6rem;font-size:.9rem;margin-top:.875rem">
+        <i class="fas fa-play"></i> Run Prediction
+      </button>
+    </form>
+
+    <!-- Result box -->
+    <div class="result-box" id="resultBox">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+        <div class="result-score" id="resultScore">—</div>
+        <div>
+          <div style="font-weight:700;font-size:.975rem" id="resultLabel"></div>
+          <div style="font-size:.72rem;color:var(--muted)" id="resultNote"></div>
+        </div>
+      </div>
+      <div class="risk-bar"><div class="risk-fill" id="riskFill" style="width:0%"></div></div>
+      <div class="interp-box" id="interpretationBox" style="display:none">
+        <p style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.35rem">
+          <i class="fas fa-robot"></i> AI Interpretation
+        </p>
+        <div id="interpretationText"></div>
+      </div>
+      <a id="detailLink" href="#" style="display:none;font-size:.82rem;color:var(--primary);margin-top:.4rem">
+        View full result →
+      </a>
+    </div>
+
+    {% else %}
+    <div style="text-align:center;padding:2rem;color:var(--muted)">
+      <p style="margin-bottom:1rem">Log in to run this model on your data.</p>
+      <a href="/accounts/login/?next=/insights/{{ model.slug }}/" class="btn" style="background:var(--primary);color:white">Log in</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Input & Output Schema -->
+  <div>
+    {% if model.input_schema %}
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-h">📥 Input Fields</div>
+      {% if model.input_type == 'tabular' %}
+        {% for field_name, field_type in model.input_schema.items %}
+        <div class="schema-row">
+          <span style="font-weight:600">{{ field_name }}</span>
+          <span style="color:var(--muted)">{{ field_type }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:.875rem;color:var(--muted)">
+          Accepts a <strong>{{ model.get_input_type_display }}</strong> file as input.
+        </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if model.output_schema %}
+    <div class="card">
+      <div class="card-h">📤 Output</div>
+      {% for key, val in model.output_schema.items %}
+      <div class="schema-row">
+        <span style="font-weight:600">{{ key }}</span>
+        <span style="color:var(--muted)">{{ val }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function fileSelected(input) {
+  const name = document.getElementById('fileName');
+  if (input.files[0]) {
+    name.textContent = '✓ ' + input.files[0].name;
+    name.style.display = 'block';
+    document.getElementById('fileDrop').style.borderColor = 'var(--primary)';
+    document.getElementById('fileDrop').style.background = '#f0f9ff';
+  }
+}
+
+['dragenter','dragover'].forEach(e => {
+  document.getElementById('fileDrop')?.addEventListener(e, ev => {
+    ev.preventDefault();
+    document.getElementById('fileDrop').classList.add('dragover');
+  });
+});
+['dragleave','drop'].forEach(e => {
+  document.getElementById('fileDrop')?.addEventListener(e, ev => {
+    ev.preventDefault();
+    document.getElementById('fileDrop').classList.remove('dragover');
+    if (e === 'drop' && ev.dataTransfer.files[0]) {
+      const fi = document.getElementById('fileInput');
+      fi.files = ev.dataTransfer.files;
+      fileSelected(fi);
+    }
+  });
+});
+
+document.getElementById('runForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running…';
+  try {
+    const resp = await fetch(this.action, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: new FormData(this),
+    });
+    const data = await resp.json();
+    const box = document.getElementById('resultBox');
+    box.style.display = 'block';
+    if (data.success) {
+      const risk = data.result.risk_score;
+      const pct  = risk !== null ? parseFloat((risk * 100).toFixed(1)) : null;
+      document.getElementById('resultScore').textContent = pct !== null ? pct + '%' : '✓';
+      document.getElementById('resultLabel').textContent = data.result.label || '';
+      document.getElementById('riskFill').style.width    = (pct ?? 50) + '%';
+      document.getElementById('resultNote').textContent  = data.result.demo ? '(Demo — no model file)' : '';
+      const riskColor   = risk >= 0.75 ? '#fef2f2' : risk >= 0.45 ? '#fffbeb' : '#f0fdf4';
+      const borderColor = risk >= 0.75 ? '#fca5a5' : risk >= 0.45 ? '#fde68a' : '#bbf7d0';
+      box.style.background  = riskColor;
+      box.style.borderColor = borderColor;
+      if (data.interpretation) {
+        document.getElementById('interpretationBox').style.display = 'block';
+        document.getElementById('interpretationText').textContent  = data.interpretation;
+      }
+      if (data.prediction_id) {
+        const link = document.getElementById('detailLink');
+        link.href         = '/insights/prediction/' + data.prediction_id + '/';
+        link.style.display = 'inline';
+      }
+    } else {
+      document.getElementById('resultScore').textContent = '✗';
+      document.getElementById('resultLabel').textContent = data.error || 'Run failed';
+      box.style.background  = '#fef2f2';
+      box.style.borderColor = '#fca5a5';
+    }
+  } catch(err) {
+    alert('Network error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-play"></i> Run Prediction';
+  }
+});
+</script>
+{% endblock %}

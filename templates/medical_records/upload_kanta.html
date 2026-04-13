@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Upload Kanta XML — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.upload-card{max-width:560px;margin:0 auto}
+.upload-icon{font-size:3rem;text-align:center;margin-bottom:1rem}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;transition:border .15s;box-sizing:border-box}
+.form-control:focus{outline:none;border-color:var(--primary)}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.info-box{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:1rem;margin-bottom:1.25rem;font-size:.85rem;color:#0369a1}
+.info-box h4{font-weight:700;margin-bottom:.4rem}
+.info-box li{margin-left:1rem;margin-top:.2rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="upload-card">
+  <a href="{% url 'medical_records:list' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
+    <i class="fas fa-arrow-left"></i> Back to records
+  </a>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="upload-icon">🏥</div>
+      <h2 style="font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:.4rem">Import from Kanta</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.875rem;margin-bottom:1.5rem">
+        Upload your Kanta XML export file. We'll automatically parse lab results, prescriptions, diagnoses, and more.
+      </p>
+
+      <div class="info-box">
+        <h4>How to get your Kanta export</h4>
+        <ol>
+          <li>Go to <strong>omakanta.fi</strong> and log in</li>
+          <li>Navigate to <em>Health records → Archive</em></li>
+          <li>Click <em>Download XML</em></li>
+          <li>Upload the downloaded .xml file here</li>
+        </ol>
+      </div>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="id_xml_file">{{ form.xml_file.label }}</label>
+          {{ form.xml_file }}
+          <div class="help-text">{{ form.xml_file.help_text }}</div>
+          {% if form.xml_file.errors %}
+          <div style="color:#dc2626;font-size:.8rem;margin-top:.3rem">{{ form.xml_file.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="id_notes">Notes (optional)</label>
+          {{ form.notes }}
+        </div>
+        <button type="submit" class="btn" style="width:100%;background:var(--primary);color:white;padding:.7rem;font-size:.95rem">
+          <i class="fas fa-upload"></i> Import Kanta Records
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

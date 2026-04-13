@@ -1,0 +1,15 @@
+django>=5.2
+pillow
+python-dotenv
+google-generativeai
+sentence-transformers
+rank-bm25
+openai
+scikit-learn
+pdfplumber
+pandas
+numpy
+anthropic
+pyarrow
+joblib
+scipy

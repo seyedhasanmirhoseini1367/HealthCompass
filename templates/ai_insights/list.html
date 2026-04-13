@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}AI & Analytics — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.page-header h1{font-size:1.375rem;font-weight:700;color:var(--text);margin:0}
+.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.filter-btn{padding:.35rem .85rem;border-radius:20px;font-size:.82rem;font-weight:600;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:pointer;transition:all .18s;text-decoration:none}
+.filter-btn:hover,.filter-btn.active{background:var(--primary);color:white;border-color:var(--primary)}
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1.25rem}
+.model-card{background:white;border-radius:16px;border:1px solid var(--border);padding:1.4rem;display:flex;flex-direction:column;gap:.75rem;transition:all .22s;cursor:pointer}
+.model-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);transform:translateY(-2px);border-color:#cbd5e1}
+.model-cat{display:inline-block;padding:.2rem .65rem;border-radius:20px;font-size:.72rem;font-weight:700;background:#dbeafe;color:#1d4ed8;text-transform:uppercase;letter-spacing:.04em}
+.model-name{font-size:1rem;font-weight:700;color:var(--text)}
+.model-desc{font-size:.84rem;color:var(--muted);line-height:1.55;flex:1}
+.model-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.5rem;border-top:1px solid var(--border)}
+.run-count{font-size:.78rem;color:var(--muted)}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>🤖 AI & Analytics Models</h1>
+  <div style="display:flex;gap:.5rem">
+    {% if user.is_authenticated and user.is_data_scientist %}
+    <a href="{% url 'ai_insights:submit_model' %}" class="btn" style="background:var(--secondary);color:white;font-size:.85rem;padding:.45rem 1rem">
+      <i class="fas fa-plus"></i> Submit Model
+    </a>
+    {% endif %}
+    {% if user.is_authenticated %}
+    <a href="{% url 'ai_insights:my_predictions' %}" class="btn" style="background:#f1f5f9;color:var(--text);font-size:.85rem;padding:.45rem 1rem">
+      <i class="fas fa-history"></i> My Predictions
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="filter-bar">
+  <a href="{% url 'ai_insights:list' %}" class="filter-btn {% if not active_cat %}active{% endif %}">All</a>
+  {% for value, label in categories %}
+  <a href="?cat={{ value }}" class="filter-btn {% if active_cat == value %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if models %}
+<div class="model-grid">
+  {% for m in models %}
+  <div class="model-card" onclick="location.href='{% url 'ai_insights:model_detail' m.slug %}'">
+    <div>
+      <span class="model-cat">{{ m.get_category_display }}</span>
+    </div>
+    <div class="model-name">{{ m.name }}</div>
+    <div class="model-desc">{{ m.description|truncatewords:25 }}</div>
+    <div class="model-footer">
+      <span class="run-count"><i class="fas fa-play-circle"></i> {{ m.run_count }} runs</span>
+      <span class="btn" style="font-size:.8rem;padding:.3rem .8rem;background:var(--primary);color:white">Run Model →</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size:3rem;margin-bottom:.75rem">🤖</div>
+  <p style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:.5rem">No models available yet</p>
+  <p style="font-size:.875rem">Data scientists are working on publishing models. Check back soon.</p>
+  {% if user.is_authenticated and user.is_data_scientist %}
+  <a href="{% url 'ai_insights:submit_model' %}" class="btn" style="margin-top:1rem;background:var(--secondary);color:white">Submit the first model</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
