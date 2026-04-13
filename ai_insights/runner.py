@@ -305,11 +305,18 @@ Write a concise, empathetic 3–5 sentence interpretation for the patient. Inclu
 Do NOT use markdown. Write in plain paragraphs."""
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        from google import genai
+        from google.genai import types
+        from django.conf import settings as django_settings
+
+        client   = genai.Client(api_key=api_key)
+        model_id = django_settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
+        response = client.models.generate_content(
+            model    = model_id,
+            contents = [prompt],
+            config   = types.GenerateContentConfig(temperature=0.4, max_output_tokens=512),
+        )
+        return (response.text or '').strip() or _static_interpretation(result)
     except Exception as e:
         logger.warning(f'Gemini interpretation failed: {e}')
         return _static_interpretation(result)
