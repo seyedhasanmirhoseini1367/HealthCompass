@@ -16,15 +16,14 @@ logger = logging.getLogger(__name__)
 # ─── Public model catalog ─────────────────────────────────────────────────────
 
 def model_list(request):
-    models = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
-    categories = AIModel.Category.choices
-    active_cat = request.GET.get('cat', '')
-    if active_cat:
-        models = models.filter(category=active_cat)
+    models      = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
+    categories  = AIModel.Category.choices
+    input_types = AIModel.InputType.choices
     return render(request, 'ai_insights/list.html', {
-        'models': models,
-        'categories': categories,
-        'active_cat': active_cat,
+        'models':      models,
+        'categories':  categories,
+        'input_types': input_types,
+        'total':       models.count(),
     })
 
 
