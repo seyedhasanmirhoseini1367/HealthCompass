@@ -1,14 +1,12 @@
 from pathlib import Path
-from dotenv import load_dotenv
+from decouple import config, Csv
 import os
-
-load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'healthcompass-dev-secret-key')
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+SECRET_KEY    = config('SECRET_KEY', default='healthcompass-dev-secret-key')
+DEBUG         = config('DEBUG', default=True, cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -94,18 +92,18 @@ LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Email
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Console for dev
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@healthcompass.dev')
+EMAIL_BACKEND     = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST        = config('EMAIL_HOST',        default='smtp.gmail.com')
+EMAIL_PORT        = config('EMAIL_PORT',        default=587, cast=int)
+EMAIL_USE_TLS     = True
+EMAIL_HOST_USER   = config('EMAIL_HOST_USER',   default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default='noreply@healthcompass.dev')
 
 # AI APIs
-GEMINI_API_KEY    = os.getenv('GEMINI_API_KEY', '')
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
-OPENAI_API_KEY    = os.getenv('OPENAI_API_KEY', '')
+GEMINI_API_KEY    = config('GEMINI_API_KEY',    default='')
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+OPENAI_API_KEY    = config('OPENAI_API_KEY',    default='')
 
 # ── RAG Configuration ──────────────────────────────────────────────────────────
 RAG_CONFIG = {
@@ -123,7 +121,7 @@ RAG_CONFIG = {
     'MMR_LAMBDA':        0.6,   # MMR diversity param (1=pure relevance, 0=pure diversity)
     'SIM_THRESHOLD':     0.15,  # minimum similarity to include a chunk
     # Generation
-    'GEMINI_MODEL':      'gemini-1.5-flash',
+    'GEMINI_MODEL':      'gemini-2.5-flash',
     'ANTHROPIC_MODEL':   'claude-haiku-4-5-20251001',
     'OPENAI_MODEL':      'gpt-4o-mini',
     'MAX_TOKENS':        800,
