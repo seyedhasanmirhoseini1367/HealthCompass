@@ -179,7 +179,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 const SESSION_ID = "{{ session.pk }}";
-const SEND_URL = "{% url 'rag_assistant:send_message' %}";
+const STREAM_URL = "{% url 'rag_assistant:stream_message' %}";
 const CSRF = "{{ csrf_token }}";
 
 // Render existing messages
@@ -218,36 +218,81 @@ async function sendMessage() {
   const empty = document.getElementById('emptyState');
   if (empty) empty.style.display = 'none';
 
-  // Add user message
   const area = document.getElementById('messagesArea');
   area.appendChild(makeBubble('user', msg));
 
-  // Show typing indicator
+  // Show typing indicator while waiting for first token
   const typing = document.getElementById('typingIndicator');
   typing.style.display = 'flex';
   scrollToBottom();
 
+  // Create the assistant bubble up-front so tokens stream into it
+  const assistantWrap = makeAssistantBubble('', []);
+  const contentDiv    = assistantWrap.querySelector('.md-content');
+  const rawBuf        = [];   // collects raw text for copy & markdown re-render
+
+  let firstToken = true;
+
   try {
-    const resp = await fetch(SEND_URL, {
+    const resp = await fetch(STREAM_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': CSRF,
-      },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
       body: JSON.stringify({ message: msg, session_id: SESSION_ID }),
     });
-    const data = await resp.json();
 
-    typing.style.display = 'none';
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-    if (data.response) {
-      area.appendChild(makeAssistantBubble(data.response, data.sources || []));
-    } else {
-      area.appendChild(makeAssistantBubble('Sorry, something went wrong. Please try again.', []));
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let   buf     = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream: true });
+
+      // SSE lines are separated by double newline
+      const lines = buf.split('\n\n');
+      buf = lines.pop();   // keep incomplete tail
+
+      for (const block of lines) {
+        const line = block.trim();
+        if (!line.startsWith('data: ')) continue;
+        let payload;
+        try { payload = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (payload.type === 'token') {
+          if (firstToken) {
+            typing.style.display = 'none';
+            area.appendChild(assistantWrap);
+            firstToken = false;
+          }
+          rawBuf.push(payload.content);
+          // Re-render markdown on every token so formatting appears incrementally
+          contentDiv.innerHTML = marked.parse(rawBuf.join(''));
+          scrollToBottom();
+
+        } else if (payload.type === 'sources') {
+          renderSources(assistantWrap, payload.sources || []);
+
+        } else if (payload.type === 'error') {
+          typing.style.display = 'none';
+          if (firstToken) area.appendChild(assistantWrap);
+          rawBuf.push(payload.message || 'An error occurred.');
+          contentDiv.innerHTML = marked.parse(rawBuf.join(''));
+          firstToken = false;
+
+        } else if (payload.type === 'done') {
+          // Store full raw text for copy button
+          assistantWrap.querySelector('.bubble-assistant').setAttribute('data-raw', rawBuf.join(''));
+        }
+      }
     }
+
   } catch(err) {
     typing.style.display = 'none';
-    area.appendChild(makeAssistantBubble('Network error. Please check your connection.', []));
+    if (firstToken) area.appendChild(makeAssistantBubble('Network error. Please check your connection.', []));
   } finally {
     btn.disabled = false;
     scrollToBottom();
@@ -284,23 +329,19 @@ function makeAssistantBubble(text, sources) {
 
   const content = document.createElement('div');
   content.className = 'md-content';
-  content.innerHTML = marked.parse(text);
+  if (text) content.innerHTML = marked.parse(text);
 
   bubble.appendChild(copyBtn);
   bubble.appendChild(content);
   wrap.appendChild(bubble);
 
+  // Placeholder sources row — filled later by renderSources()
+  const sourcesRow = document.createElement('div');
+  sourcesRow.className = 'sources-row';
+  wrap.appendChild(sourcesRow);
+
   if (sources && sources.length) {
-    const row = document.createElement('div');
-    row.className = 'sources-row';
-    sources.forEach(s => {
-      const chip = document.createElement('a');
-      chip.className = 'source-chip';
-      chip.href = `/records/${s.pk}/`;
-      chip.textContent = `📎 ${s.title.substring(0, 25)}`;
-      row.appendChild(chip);
-    });
-    wrap.appendChild(row);
+    renderSources(wrap, sources);
   }
 
   const time = document.createElement('div');
@@ -308,6 +349,21 @@ function makeAssistantBubble(text, sources) {
   time.textContent = new Date().toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
   wrap.appendChild(time);
   return wrap;
+}
+
+function renderSources(wrap, sources) {
+  if (!sources || !sources.length) return;
+  const row = wrap.querySelector('.sources-row');
+  if (!row) return;
+  row.innerHTML = '';
+  sources.forEach(s => {
+    const chip = document.createElement('a');
+    chip.className = 'source-chip';
+    // sources from SSE use document_id, not pk
+    chip.href = s.document_id ? `/records/${s.document_id}/` : '#';
+    chip.textContent = `📎 ${(s.title || 'Record').substring(0, 25)}`;
+    row.appendChild(chip);
+  });
 }
 
 function copyMsg(btn) {
