@@ -1,0 +1,639 @@
+{% extends 'base.html' %}
+{% block title %}Monitoring — HealthCompass{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.mon-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;border-radius:16px;padding:2rem 1.75rem;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.mon-header h1{font-size:1.4rem;font-weight:800;margin-bottom:.25rem}
+.mon-header p{opacity:.75;font-size:.875rem}
+.mon-header .live-badge{display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.12);padding:.4rem .9rem;border-radius:20px;font-size:.78rem;font-weight:600}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tab-bar{display:flex;gap:.5rem;margin-bottom:1.5rem;border-bottom:2px solid var(--border);padding-bottom:.5rem}
+.tab-btn{padding:.5rem 1.1rem;border-radius:8px 8px 0 0;font-size:.875rem;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;transition:all .2s;display:flex;align-items:center;gap:.4rem}
+.tab-btn.active{color:var(--primary-dk);background:#e0f2fe;border-bottom:2px solid var(--primary)}
+.tab-btn:hover:not(.active){color:var(--text);background:var(--bg)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Stat cards ───────────────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1rem;margin-bottom:1.75rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem 1rem;border:1px solid var(--border);box-shadow:var(--shadow-sm);text-align:center;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:var(--primary)}
+.stat-card.green::before{background:#22c55e}
+.stat-card.amber::before{background:#f59e0b}
+.stat-card.red::before{background:#ef4444}
+.stat-card.purple::before{background:#8b5cf6}
+.stat-num{font-size:2rem;font-weight:800;color:var(--text);line-height:1}
+.stat-lbl{font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.35rem}
+.stat-sub{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+
+/* ── Section headers ──────────────────────────────────────────────────────── */
+.sec-h{font-size:.95rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;color:var(--text)}
+.sec-h i{color:var(--primary)}
+
+/* ── Grid layouts ─────────────────────────────────────────────────────────── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* ── Chart card ───────────────────────────────────────────────────────────── */
+.chart-card{background:white;border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:1.25rem;margin-bottom:1.25rem}
+.chart-title{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem}
+.chart-wrap{position:relative;height:180px}
+
+/* ── Progress bar ─────────────────────────────────────────────────────────── */
+.prog-row{margin-bottom:.75rem}
+.prog-header{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.3rem;color:var(--text)}
+.prog-header .lbl{font-weight:600}
+.prog-header .val{color:var(--muted)}
+.prog-track{height:8px;background:#f1f5f9;border-radius:20px;overflow:hidden}
+.prog-fill{height:100%;border-radius:20px;transition:width .6s ease}
+.fill-blue{background:var(--primary)}
+.fill-green{background:#22c55e}
+.fill-amber{background:#f59e0b}
+.fill-red{background:#ef4444}
+.fill-purple{background:#8b5cf6}
+.fill-indigo{background:#6366f1}
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.mono-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.mono-table th{text-align:left;padding:.5rem .75rem;border-bottom:2px solid var(--border);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.mono-table td{padding:.6rem .75rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.mono-table tr:last-child td{border-bottom:none}
+.mono-table tr:hover td{background:#f8fafc}
+
+/* ── Coverage pill ────────────────────────────────────────────────────────── */
+.cov-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:700}
+.cov-good{background:#dcfce7;color:#15803d}
+.cov-warn{background:#fef3c7;color:#92400e}
+.cov-bad{background:#fee2e2;color:#b91c1c}
+
+/* ── Risk bands ───────────────────────────────────────────────────────────── */
+.risk-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem}
+.risk-cell{border-radius:12px;padding:1rem;text-align:center;border:1px solid transparent}
+.risk-low{background:#f0fdf4;border-color:#bbf7d0}
+.risk-med{background:#fffbeb;border-color:#fde68a}
+.risk-high{background:#fff1f2;border-color:#fecdd3}
+.risk-num{font-size:1.6rem;font-weight:800}
+.risk-low .risk-num{color:#15803d}
+.risk-med .risk-num{color:#92400e}
+.risk-high .risk-num{color:#b91c1c}
+.risk-lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:.2rem;font-weight:600}
+
+/* ── Status badge override ────────────────────────────────────────────────── */
+.tag{display:inline-flex;padding:.15rem .55rem;border-radius:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tag-active{background:#dcfce7;color:#15803d}
+.tag-pending{background:#fef3c7;color:#92400e}
+.tag-approved{background:#dbeafe;color:#1d4ed8}
+.tag-rejected{background:#fee2e2;color:#b91c1c}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.85rem}
+.empty-state i{font-size:2rem;display:block;margin-bottom:.75rem;opacity:.4}
+
+/* ── Divider ──────────────────────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:1.25rem 0}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="mon-header">
+  <div>
+    <h1><i class="fas fa-chart-line" style="margin-right:.5rem"></i>MLOps Monitoring</h1>
+    <p>RAG system health · AI inference stats · Platform overview</p>
+  </div>
+  <div class="live-badge">
+    <span class="live-dot"></span>
+    Live · DB snapshot
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('rag', this)">
+    <i class="fas fa-brain"></i> RAG System
+  </button>
+  <button class="tab-btn" onclick="switchTab('models', this)">
+    <i class="fas fa-robot"></i> AI Model Inference
+  </button>
+  <button class="tab-btn" onclick="switchTab('platform', this)">
+    <i class="fas fa-server"></i> Platform Overview
+  </button>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 1 · RAG SYSTEM
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-rag" class="tab-panel active">
+
+  <!-- Top stats -->
+  <div class="stat-grid">
+    <div class="stat-card blue">
+      <div class="stat-num">{{ total_queries }}</div>
+      <div class="stat-lbl">Total Queries</div>
+      <div class="stat-sub">{{ queries_7d }} last 7 days</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-num">{{ total_sessions }}</div>
+      <div class="stat-lbl">Chat Sessions</div>
+      <div class="stat-sub">{{ queries_30d }} queries / 30d</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-num">{{ avg_response_len }}</div>
+      <div class="stat-lbl">Avg Response</div>
+      <div class="stat-sub">characters per answer</div>
+    </div>
+    <div class="stat-card {% if retrieval_failure_pct > 20 %}red{% elif retrieval_failure_pct > 10 %}amber{% else %}green{% endif %}">
+      <div class="stat-num">{{ retrieval_failure_pct }}%</div>
+      <div class="stat-lbl">Retrieval Failures</div>
+      <div class="stat-sub">{{ retrieval_failures }} queries w/ no sources</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-num">{{ total_chunks }}</div>
+      <div class="stat-lbl">Total Chunks</div>
+      <div class="stat-sub">{{ total_documents }} documents indexed</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-num">{{ avg_chunks }}</div>
+      <div class="stat-lbl">Avg Chunks / Query</div>
+      <div class="stat-sub">context passed to LLM</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Daily query trend chart -->
+    <div class="chart-card" style="grid-column:1/-1">
+      <div class="chart-title"><i class="fas fa-chart-area" style="margin-right:.4rem"></i>Query Volume — Last 14 Days</div>
+      <div class="chart-wrap">
+        <canvas id="queryChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Embedding coverage -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-database"></i> Vector Store Coverage</div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <div>
+            <div style="font-size:2.5rem;font-weight:800;color:var(--primary-dk);line-height:1">{{ embedding_pct }}%</div>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem">{{ embedded_chunks }} / {{ total_chunks }} chunks embedded</div>
+          </div>
+          <span class="cov-pill {% if embedding_pct >= 90 %}cov-good{% elif embedding_pct >= 60 %}cov-warn{% else %}cov-bad{% endif %}">
+            <i class="fas fa-{% if embedding_pct >= 90 %}check-circle{% elif embedding_pct >= 60 %}exclamation-circle{% else %}times-circle{% endif %}"></i>
+            {% if embedding_pct >= 90 %}Good{% elif embedding_pct >= 60 %}Partial{% else %}Low{% endif %}
+          </span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill {% if embedding_pct >= 90 %}fill-green{% elif embedding_pct >= 60 %}fill-amber{% else %}fill-red{% endif %}" style="width:{{ embedding_pct }}%"></div>
+        </div>
+        {% if embedding_pct < 100 and total_chunks > 0 %}
+        <p style="font-size:.78rem;color:var(--muted);margin-top:.75rem">
+          <i class="fas fa-info-circle"></i>
+          Run <code>python manage.py reindex_records</code> to embed missing chunks.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Documents by type -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-file-medical"></i> Documents by Type</div>
+      <div class="card-body">
+        {% if docs_by_type %}
+          {% for row in docs_by_type %}
+          {% with pct=row.count|floatformat:0 %}
+          <div class="prog-row">
+            <div class="prog-header">
+              <span class="lbl">{{ row.document_type|title|cut:"_" }}</span>
+              <span class="val">{{ row.count }}</span>
+            </div>
+            <div class="prog-track">
+              {% if total_documents > 0 %}
+              <div class="prog-fill fill-blue" style="width:{% widthratio row.count total_documents 100 %}%"></div>
+              {% endif %}
+            </div>
+          </div>
+          {% endwith %}
+          {% endfor %}
+        {% else %}
+          <div class="empty-state"><i class="fas fa-inbox"></i>No documents indexed yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+
+  <!-- LLM Provider breakdown -->
+  <div class="card" style="margin-bottom:1.25rem">
+    <div class="card-header"><i class="fas fa-robot"></i> LLM Provider Usage</div>
+    <div class="card-body">
+      {% if provider_counts %}
+        {% with total_with_provider=total_queries %}
+        {% for row in provider_counts %}
+        <div class="prog-row">
+          <div class="prog-header">
+            <span class="lbl" style="text-transform:capitalize">
+              {% if row.llm_provider == 'gemini' %}<i class="fas fa-star" style="color:#f59e0b;font-size:.75rem"></i>{% endif %}
+              {{ row.llm_provider|default:"unknown" }}
+            </span>
+            <span class="val">{{ row.count }} queries</span>
+          </div>
+          <div class="prog-track">
+            {% if total_queries > 0 %}
+            <div class="prog-fill
+              {% if row.llm_provider == 'gemini' %}fill-amber
+              {% elif row.llm_provider == 'anthropic' %}fill-purple
+              {% elif row.llm_provider == 'openai' %}fill-green
+              {% else %}fill-red{% endif %}"
+              style="width:{% widthratio row.count total_queries 100 %}%">
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endwith %}
+      {% else %}
+        <div class="empty-state"><i class="fas fa-robot"></i>No provider data yet — queries will populate this once users start chatting.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Retrieval health detail -->
+  <div class="card">
+    <div class="card-header"><i class="fas fa-search"></i> Retrieval Health Summary</div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.25rem">
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Embedding Model</div>
+          <div style="font-size:.9rem;font-weight:600">all-MiniLM-L6-v2</div>
+          <div style="font-size:.75rem;color:var(--muted)">384-dim · sentence-transformers</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Hybrid Weights</div>
+          <div style="font-size:.9rem;font-weight:600">35% BM25 · 65% Cosine</div>
+          <div style="font-size:.75rem;color:var(--muted)">MMR λ=0.6 · top-6 chunks</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Time Decay</div>
+          <div style="font-size:.9rem;font-weight:600">365-day window · 15% factor</div>
+          <div style="font-size:.75rem;color:var(--muted)">Older records down-weighted</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Similarity Threshold</div>
+          <div style="font-size:.9rem;font-weight:600">0.15 minimum score</div>
+          <div style="font-size:.75rem;color:var(--muted)">Fallback: top-K regardless</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Generation Chain</div>
+          <div style="font-size:.9rem;font-weight:600">Gemini → Anthropic → OpenAI</div>
+          <div style="font-size:.75rem;color:var(--muted)">Multi-LLM fallback</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">RAG Evaluation</div>
+          <div style="font-size:.9rem;font-weight:600;color:var(--muted)">Not yet configured</div>
+          <div style="font-size:.75rem;color:var(--muted)">RAGAS metrics coming soon</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-rag -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 2 · AI MODEL INFERENCE
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-models" class="tab-panel">
+
+  <!-- Top stats -->
+  <div class="stat-grid">
+    <div class="stat-card blue">
+      <div class="stat-num">{{ total_models }}</div>
+      <div class="stat-lbl">Total Models</div>
+      <div class="stat-sub">{{ active_models }} active</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-num">{{ pending_models }}</div>
+      <div class="stat-lbl">Pending Review</div>
+      <div class="stat-sub">awaiting approval</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-num">{{ total_predictions }}</div>
+      <div class="stat-lbl">Total Predictions</div>
+      <div class="stat-sub">{{ predictions_7d }} last 7 days</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Risk distribution -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-heartbeat"></i> Prediction Risk Distribution</div>
+      <div class="card-body">
+        {% if total_predictions > 0 %}
+        <div class="risk-grid">
+          <div class="risk-cell risk-low">
+            <div class="risk-num">{{ low_risk }}</div>
+            <div class="risk-lbl">Low Risk<br><span style="font-size:.65rem;font-weight:400">&lt; 0.30</span></div>
+          </div>
+          <div class="risk-cell risk-med">
+            <div class="risk-num">{{ med_risk }}</div>
+            <div class="risk-lbl">Medium Risk<br><span style="font-size:.65rem;font-weight:400">0.30 – 0.70</span></div>
+          </div>
+          <div class="risk-cell risk-high">
+            <div class="risk-num">{{ high_risk }}</div>
+            <div class="risk-lbl">High Risk<br><span style="font-size:.65rem;font-weight:400">&gt; 0.70</span></div>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="fas fa-chart-pie"></i>No predictions run yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Models by status -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-tasks"></i> Models by Status</div>
+      <div class="card-body">
+        {% if models_by_status %}
+          {% for row in models_by_status %}
+          <div class="prog-row">
+            <div class="prog-header">
+              <span class="lbl" style="text-transform:capitalize">{{ row.status }}</span>
+              <span class="val">{{ row.count }}</span>
+            </div>
+            <div class="prog-track">
+              {% if total_models > 0 %}
+              <div class="prog-fill
+                {% if row.status == 'active' %}fill-green
+                {% elif row.status == 'pending' %}fill-amber
+                {% elif row.status == 'approved' %}fill-blue
+                {% else %}fill-red{% endif %}"
+                style="width:{% widthratio row.count total_models 100 %}%">
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state"><i class="fas fa-robot"></i>No models registered yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+
+  <!-- Models by category -->
+  <div class="card" style="margin-bottom:1.25rem">
+    <div class="card-header"><i class="fas fa-th-large"></i> Models by Medical Category</div>
+    <div class="card-body">
+      {% if models_by_category %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem">
+        {% for row in models_by_category %}
+        <div style="background:#f8fafc;border-radius:10px;padding:.75rem 1rem;border:1px solid var(--border)">
+          <div style="font-size:1.4rem;font-weight:800;color:var(--primary-dk)">{{ row.count }}</div>
+          <div style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:capitalize;margin-top:.15rem">{{ row.category }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="empty-state"><i class="fas fa-layer-group"></i>No category data yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Top models by usage -->
+  <div class="card">
+    <div class="card-header"><i class="fas fa-trophy"></i> Top Models by Usage</div>
+    <div class="card-body">
+      {% if top_models %}
+      <table class="mono-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th style="text-align:right">Runs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in top_models %}
+          <tr>
+            <td style="font-weight:600">{{ m.name }}</td>
+            <td style="color:var(--muted);text-transform:capitalize">{{ m.category }}</td>
+            <td><span class="tag tag-{{ m.status }}">{{ m.status }}</span></td>
+            <td style="text-align:right;font-weight:700;color:var(--primary-dk)">{{ m.run_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><i class="fas fa-trophy"></i>No model runs recorded yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /tab-models -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 3 · PLATFORM OVERVIEW
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-platform" class="tab-panel">
+
+  <!-- Top stats -->
+  <div class="stat-grid">
+    <div class="stat-card blue">
+      <div class="stat-num">{{ total_users }}</div>
+      <div class="stat-lbl">Total Users</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-num">{{ total_records }}</div>
+      <div class="stat-lbl">Medical Records</div>
+      <div class="stat-sub">{{ records_30d }} uploaded last 30d</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-num">{{ alerts_critical }}</div>
+      <div class="stat-lbl">Critical Alerts</div>
+      <div class="stat-sub">{{ alerts_unread }} unread total</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-num">{{ alerts_warning }}</div>
+      <div class="stat-lbl">Warning Alerts</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Users by role -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-users"></i> Users by Role</div>
+      <div class="card-body">
+        {% if users_by_role %}
+          {% for row in users_by_role %}
+          <div class="prog-row">
+            <div class="prog-header">
+              <span class="lbl" style="text-transform:capitalize">{{ row.role|cut:"_" }}</span>
+              <span class="val">{{ row.count }}</span>
+            </div>
+            <div class="prog-track">
+              {% if total_users > 0 %}
+              <div class="prog-fill fill-indigo" style="width:{% widthratio row.count total_users 100 %}%"></div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state"><i class="fas fa-users"></i>No user data.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Health alerts breakdown -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-bell"></i> Health Alerts Breakdown</div>
+      <div class="card-body">
+        <div class="risk-grid" style="margin-bottom:1rem">
+          <div class="risk-cell" style="background:#fff1f2;border-color:#fecdd3">
+            <div class="risk-num" style="color:#b91c1c">{{ alerts_critical }}</div>
+            <div class="risk-lbl">Critical</div>
+          </div>
+          <div class="risk-cell" style="background:#fffbeb;border-color:#fde68a">
+            <div class="risk-num" style="color:#92400e">{{ alerts_warning }}</div>
+            <div class="risk-lbl">Warning</div>
+          </div>
+          <div class="risk-cell" style="background:#eff6ff;border-color:#bfdbfe">
+            <div class="risk-num" style="color:#1d4ed8">{{ alerts_info }}</div>
+            <div class="risk-lbl">Info</div>
+          </div>
+        </div>
+        <div style="font-size:.8rem;color:var(--muted);text-align:center">
+          {{ alerts_unread }} unread out of {{ alerts_total }} total
+        </div>
+        {% if alerts_total > 0 %}
+        <div class="prog-track" style="margin-top:.75rem">
+          <div class="prog-fill fill-red" style="width:{% widthratio alerts_critical alerts_total 100 %}%"></div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+
+  <!-- Records by type -->
+  <div class="card">
+    <div class="card-header"><i class="fas fa-file-medical-alt"></i> Medical Records by Type</div>
+    <div class="card-body">
+      {% if records_by_type %}
+      <table class="mono-table">
+        <thead>
+          <tr>
+            <th>Record Type</th>
+            <th style="text-align:right">Count</th>
+            <th style="width:40%">Distribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in records_by_type %}
+          <tr>
+            <td style="font-weight:600;text-transform:capitalize">{{ row.record_type|cut:"_" }}</td>
+            <td style="text-align:right;font-weight:700;color:var(--primary-dk)">{{ row.count }}</td>
+            <td>
+              <div class="prog-track">
+                {% if total_records > 0 %}
+                <div class="prog-fill fill-blue" style="width:{% widthratio row.count total_records 100 %}%"></div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty-state"><i class="fas fa-file-medical"></i>No medical records uploaded yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /tab-platform -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Query trend chart ──────────────────────────────────────────────────────
+const labels = {{ chart_labels_json|safe }};
+const data   = {{ chart_data_json|safe }};
+
+const ctx = document.getElementById('queryChart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Queries',
+        data: data,
+        borderColor: '#0ea5e9',
+        backgroundColor: 'rgba(14,165,233,.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#0ea5e9',
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleFont: { size: 11 },
+          bodyFont: { size: 12 },
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (item) => ` ${item.raw} queries`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10 }, color: '#94a3b8' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            font: { size: 10 },
+            color: '#94a3b8',
+            callback: (v) => Number.isInteger(v) ? v : ''
+          },
+          grid: { color: '#f1f5f9' }
+        }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

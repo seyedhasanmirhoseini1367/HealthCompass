@@ -78,13 +78,20 @@ class ChatSession(models.Model):
 
 
 class QueryLog(models.Model):
-    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    session    = models.ForeignKey(ChatSession, on_delete=models.CASCADE,
-                   related_name='messages', null=True, blank=True)
-    query      = models.TextField()
-    response   = models.TextField()
-    sources    = models.JSONField(default=list)
-    created_at = models.DateTimeField(auto_now_add=True)
+    id                    = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session               = models.ForeignKey(ChatSession, on_delete=models.CASCADE,
+                              related_name='messages', null=True, blank=True)
+    query                 = models.TextField()
+    response              = models.TextField()
+    sources               = models.JSONField(default=list)
+    # MLOps observability fields
+    llm_provider          = models.CharField(
+                              max_length=20, blank=True, default='',
+                              help_text='Which LLM produced the response: gemini, anthropic, openai, fallback')
+    retrieved_chunks_count = models.PositiveSmallIntegerField(
+                              null=True, blank=True,
+                              help_text='Number of chunks passed to the LLM as context')
+    created_at            = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['created_at']

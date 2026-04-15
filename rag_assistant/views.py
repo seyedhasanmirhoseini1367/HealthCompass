@@ -5,7 +5,6 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
 
 from .models import ChatSession, QueryLog
 from .services.rag_service import RAGService
@@ -27,14 +26,14 @@ def chat_view(request):
         if not session:
             session = ChatSession.objects.create(patient=request.user, title='My Health Chat')
 
-    messages = session.messages.all()
+    chat_messages = session.messages.all()
     sessions = ChatSession.objects.filter(patient=request.user)[:10]
 
     has_records = request.user.medical_records.exists()
 
     return render(request, 'rag_assistant/chat.html', {
         'session': session,
-        'messages': messages,
+        'chat_messages': chat_messages,
         'sessions': sessions,
         'has_records': has_records,
     })
@@ -81,19 +80,23 @@ def send_message(request):
     history.reverse()
 
     # Call RAG service
-    response_text, sources = RAGService().ask(request.user, query, history)
+    response_text, sources, provider, chunks_count = RAGService().ask(
+        request.user, query, history
+    )
 
     # Auto-title the session on first message
     if session.messages.count() == 0:
         session.title = query[:60]
         session.save(update_fields=['title'])
 
-    # Save to DB
+    # Save to DB — include observability fields
     log = QueryLog.objects.create(
-        session=session,
-        query=query,
-        response=response_text,
-        sources=sources,
+        session                = session,
+        query                  = query,
+        response               = response_text,
+        sources                = sources,
+        llm_provider           = provider,
+        retrieved_chunks_count = chunks_count,
     )
 
     return JsonResponse({
@@ -182,8 +185,10 @@ def stream_message(request):
     history.reverse()
 
     def _event_stream():
-        collected_tokens = []
-        collected_sources = []
+        collected_tokens   = []
+        collected_sources  = []
+        collected_provider = ''
+        collected_chunks   = 0
 
         try:
             for event_str in RAGService().stream_ask(
@@ -194,15 +199,19 @@ def stream_message(request):
                 # event_str is already SSE-formatted ("data: {...}\n\n")
                 yield event_str
 
-                # Parse to collect tokens + sources for DB save
+                # Parse to collect tokens + sources + meta for DB save
                 try:
                     raw = event_str.strip()
                     if raw.startswith('data: '):
                         payload = json.loads(raw[6:])
-                        if payload.get('type') == 'token':
+                        t = payload.get('type')
+                        if t == 'token':
                             collected_tokens.append(payload.get('content', ''))
-                        elif payload.get('type') == 'sources':
+                        elif t == 'sources':
                             collected_sources.extend(payload.get('sources', []))
+                        elif t == 'meta':
+                            collected_provider = payload.get('provider', '')
+                            collected_chunks   = payload.get('chunks', 0)
                 except Exception:
                     pass  # parsing failure doesn't break the stream
 
@@ -215,10 +224,12 @@ def stream_message(request):
                     session.save(update_fields=['title'])
 
                 QueryLog.objects.create(
-                    session  = session,
-                    query    = query,
-                    response = full_response,
-                    sources  = collected_sources,
+                    session                = session,
+                    query                  = query,
+                    response               = full_response,
+                    sources                = collected_sources,
+                    llm_provider           = collected_provider,
+                    retrieved_chunks_count = collected_chunks,
                 )
             except Exception as exc:
                 logger.exception('Failed to save streamed QueryLog: %s', exc)

@@ -2,102 +2,478 @@
 {% block title %}My Medical Records — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
-.page-header h1{font-size:1.375rem;font-weight:700;color:var(--text);margin:0}
-.upload-btns{display:flex;gap:.5rem;flex-wrap:wrap}
-.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
-.filter-btn{padding:.35rem .85rem;border-radius:20px;font-size:.82rem;font-weight:600;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:pointer;transition:all .18s;text-decoration:none}
-.filter-btn:hover,.filter-btn.active{background:var(--primary);color:white;border-color:var(--primary)}
-.record-grid{display:grid;gap:1rem}
-.rec-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem 1.4rem;display:flex;align-items:flex-start;gap:1rem;transition:all .2s;cursor:pointer}
-.rec-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#cbd5e1}
-.rec-card.flagged{border-left:4px solid #f59e0b}
-.rec-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;background:#dbeafe}
-.rec-body{flex:1;min-width:0}
-.rec-title{font-size:.975rem;font-weight:700;color:var(--text);margin-bottom:.2rem}
-.rec-meta{font-size:.8rem;color:var(--muted);display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.2rem}
-.rec-actions{display:flex;gap:.5rem;margin-top:.7rem}
-.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
-.empty-state .icon{font-size:3rem;margin-bottom:.75rem}
-.alert-strip{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.88rem;color:#92400e}
+/* ── Two-panel page layout ───────────────────────────────────────────────── */
+.records-page {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+/* ── Left sidebar ────────────────────────────────────────────────────────── */
+.upload-sidebar {
+  width: 252px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  position: sticky;
+  top: 1rem;
+}
+.sidebar-heading {
+  font-size: .7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  padding: 0 .25rem;
+}
+.upload-card {
+  border-radius: 16px;
+  padding: 1.1rem 1rem .95rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  border: 1.5px solid transparent;
+  transition: transform .18s, box-shadow .18s;
+}
+.upload-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(0,0,0,.1);
+}
+.upload-card.kanta { background: linear-gradient(135deg,#e0f2fe,#f0f9ff); border-color: #bae6fd; }
+.upload-card.wear  { background: linear-gradient(135deg,#ede9fe,#f5f3ff); border-color: #c4b5fd; }
+.upload-card.pdf   { background: linear-gradient(135deg,#dcfce7,#f0fdf4); border-color: #86efac; }
+
+.uc-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; color: white;
+}
+.kanta .uc-icon { background: #0ea5e9; }
+.wear  .uc-icon { background: #7c3aed; }
+.pdf   .uc-icon { background: #10b981; }
+
+.uc-title { font-size: .92rem; font-weight: 800; color: var(--text); }
+.uc-desc  { font-size: .76rem; color: #64748b; line-height: 1.45; }
+
+.uc-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .36rem .8rem;
+  border-radius: 8px;
+  font-size: .78rem; font-weight: 700;
+  text-decoration: none;
+  width: fit-content;
+  margin-top: .15rem;
+  transition: opacity .15s;
+  color: white;
+}
+.uc-btn:hover { opacity: .85; }
+.kanta .uc-btn { background: #0ea5e9; }
+.wear  .uc-btn { background: #7c3aed; }
+.pdf   .uc-btn { background: #10b981; }
+
+.stats-widget {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: .8rem 1rem;
+}
+.sw-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .81rem; padding: .18rem 0;
+}
+.sw-row + .sw-row { border-top: 1px solid var(--border); margin-top: .25rem; padding-top: .25rem; }
+.sw-label { color: var(--muted); display: flex; align-items: center; gap: .4rem; }
+.sw-val   { font-weight: 800; color: var(--text); }
+.sw-val.warn { color: #f59e0b; }
+
+/* ── Right main panel ────────────────────────────────────────────────────── */
+.records-main { flex: 1; min-width: 0; }
+
+.panel-title {
+  font-size: 1.25rem; font-weight: 800; color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.alert-strip {
+  background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px;
+  padding: .7rem 1rem; margin-bottom: 1rem;
+  font-size: .87rem; color: #92400e;
+}
+
+/* ── Filter toolbar ──────────────────────────────────────────────────────── */
+.filter-toolbar {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  background: white; border: 1px solid var(--border); border-radius: 14px;
+  padding: .65rem 1rem; margin-bottom: .85rem;
+}
+.vdivider {
+  width: 1px; height: 22px;
+  background: var(--border); flex-shrink: 0; margin: 0 .1rem;
+}
+
+.search-wrap { position: relative; flex: 1; min-width: 180px; }
+.search-wrap input {
+  width: 100%;
+  padding: .42rem .9rem .42rem 2.2rem;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .875rem; outline: none;
+  transition: border .18s; background: #f8fafc;
+}
+.search-wrap input:focus { border-color: var(--primary); background: white; }
+.search-wrap .s-icon {
+  position: absolute; left: .65rem; top: 50%; transform: translateY(-50%);
+  color: #94a3b8; font-size: .8rem; pointer-events: none;
+}
+.search-wrap .s-clear {
+  position: absolute; right: .6rem; top: 50%; transform: translateY(-50%);
+  color: #94a3b8; font-size: .78rem; cursor: pointer; display: none;
+}
+.search-wrap input:not(:placeholder-shown) ~ .s-clear { display: block; }
+
+.type-select-wrap { position: relative; flex-shrink: 0; }
+.type-select-wrap select {
+  appearance: none; -webkit-appearance: none;
+  padding: .42rem 1.9rem .42rem .8rem;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .83rem; font-weight: 600; color: var(--text);
+  background: #f8fafc; outline: none; cursor: pointer;
+  transition: border .18s;
+}
+.type-select-wrap select:focus { border-color: var(--primary); background: white; }
+.type-select-wrap .sel-arrow {
+  position: absolute; right: .58rem; top: 50%; transform: translateY(-50%);
+  color: #94a3b8; font-size: .7rem; pointer-events: none;
+}
+
+.pill-group { display: flex; gap: .3rem; flex-wrap: wrap; }
+.p-pill {
+  padding: .3rem .72rem; border-radius: 20px;
+  font-size: .78rem; font-weight: 600;
+  border: 1.5px solid var(--border); background: #f8fafc; color: var(--muted);
+  cursor: pointer; transition: all .15s; white-space: nowrap; line-height: 1.4;
+}
+.p-pill:hover { border-color: #a5b4fc; color: #4f46e5; }
+.p-pill.active { background: #6366f1; color: white; border-color: #6366f1; }
+
+.custom-dates {
+  display: none; align-items: center; gap: .5rem; flex-wrap: wrap;
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 10px;
+  padding: .55rem 1rem; margin-bottom: .85rem;
+  font-size: .82rem; color: var(--muted);
+}
+.custom-dates.visible { display: flex; }
+.custom-dates input[type=date] {
+  padding: .32rem .6rem;
+  border: 1.5px solid var(--border); border-radius: 7px;
+  font-size: .82rem; outline: none; background: white;
+}
+.custom-dates input[type=date]:focus { border-color: var(--primary); }
+.apply-btn {
+  padding: .32rem .9rem; border-radius: 7px; border: none; cursor: pointer;
+  background: #6366f1; color: white; font-size: .82rem; font-weight: 700;
+}
+
+/* ── Results bar ─────────────────────────────────────────────────────────── */
+.results-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .85rem; font-size: .82rem; color: var(--muted);
+}
+.results-bar .count { font-weight: 700; color: var(--text); }
+.clear-link {
+  display: inline-flex; align-items: center; gap: .3rem;
+  color: #f43f5e; text-decoration: none; font-size: .8rem; font-weight: 700;
+  padding: .22rem .65rem; border-radius: 6px;
+  background: #fff1f2; border: 1px solid #fecdd3;
+  transition: background .15s;
+}
+.clear-link:hover { background: #ffe4e6; }
+
+/* ── Record 2-column grid ────────────────────────────────────────────────── */
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .85rem;
+}
+@media (max-width: 860px) { .record-grid { grid-template-columns: 1fr; } }
+
+.rec-card {
+  background: white; border-radius: 14px; border: 1px solid var(--border);
+  padding: 1.1rem 1.15rem; display: flex; align-items: flex-start; gap: .85rem;
+  transition: all .2s; cursor: pointer;
+}
+.rec-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: #cbd5e1; }
+.rec-card.flagged { border-left: 4px solid #f59e0b; }
+.rec-icon {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; flex-shrink: 0;
+}
+.rec-body { flex: 1; min-width: 0; }
+.rec-title {
+  font-size: .92rem; font-weight: 700; color: var(--text);
+  margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rec-meta {
+  font-size: .77rem; color: var(--muted);
+  display: flex; gap: .55rem; flex-wrap: wrap; margin-top: .2rem;
+}
+.rec-actions { display: flex; gap: .45rem; margin-top: .65rem; }
+
+.empty-state {
+  text-align: center; padding: 3rem 1rem; color: var(--muted);
+  grid-column: 1 / -1;
+}
+.empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
+
+/* ── Responsive stack ────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .records-page    { flex-direction: column; }
+  .upload-sidebar  { width: 100%; position: static; flex-direction: row; flex-wrap: wrap; }
+  .upload-card     { flex: 1; min-width: 190px; }
+}
 </style>
 {% endblock %}
+
 {% block content %}
+<div class="records-page">
 
-<div class="page-header">
-  <h1>📋 My Medical Records</h1>
-  <div class="upload-btns">
-    <a href="{% url 'medical_records:upload_kanta' %}" class="btn" style="background:#0ea5e9;color:white;font-size:.85rem;padding:.45rem 1rem">
-      <i class="fas fa-file-code"></i> Kanta XML
-    </a>
-    <a href="{% url 'medical_records:upload_wearable' %}" class="btn" style="background:#6366f1;color:white;font-size:.85rem;padding:.45rem 1rem">
-      <i class="fas fa-watch"></i> Wearable CSV
-    </a>
-    <a href="{% url 'medical_records:upload_pdf' %}" class="btn" style="background:#10b981;color:white;font-size:.85rem;padding:.45rem 1rem">
-      <i class="fas fa-file-pdf"></i> Upload PDF
-    </a>
-  </div>
-</div>
+  <!-- ════════ LEFT SIDEBAR ════════ -->
+  <aside class="upload-sidebar">
+    <p class="sidebar-heading">Add Records</p>
 
-{% if flagged_count %}
-<div class="alert-strip">
-  <i class="fas fa-triangle-exclamation"></i>
-  <strong>{{ flagged_count }} record(s)</strong> contain abnormal values. Review them below.
-</div>
-{% endif %}
-
-<div class="filter-bar">
-  <a href="{% url 'medical_records:list' %}" class="filter-btn {% if not active_type %}active{% endif %}">All</a>
-  {% for value, label in record_types %}
-  <a href="?type={{ value }}" class="filter-btn {% if active_type == value %}active{% endif %}">{{ label }}</a>
-  {% endfor %}
-</div>
-
-{% if records %}
-<div class="record-grid">
-  {% for rec in records %}
-  {% with rtype=rec.record_type %}
-  <div class="rec-card {% if rec.is_flagged %}flagged{% endif %}"
-       onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
-    <div class="rec-icon"
-         style="background:{% if rtype == 'lab_result' %}#dbeafe{% elif rtype == 'prescription' %}#dcfce7{% elif rtype == 'diagnosis' %}#fce7f3{% elif rtype == 'vaccination' %}#fef9c3{% elif rtype == 'imaging' %}#ede9fe{% elif rtype == 'wearable' %}#ecfdf5{% elif rtype == 'discharge' %}#fff7ed{% else %}#f1f5f9{% endif %}">
-      {% if rtype == 'lab_result' %}🧪
-      {% elif rtype == 'prescription' %}💊
-      {% elif rtype == 'diagnosis' %}🏥
-      {% elif rtype == 'vaccination' %}💉
-      {% elif rtype == 'imaging' %}🩻
-      {% elif rtype == 'wearable' %}⌚
-      {% elif rtype == 'discharge' %}📄
-      {% else %}📁{% endif %}
+    <div class="upload-card kanta">
+      <div class="uc-icon"><i class="fas fa-file-code"></i></div>
+      <div class="uc-title">Kanta XML</div>
+      <div class="uc-desc">Import your Finnish health records directly from the Kanta patient data repository. Supports lab results, prescriptions, and diagnoses.</div>
+      <a href="{% url 'medical_records:upload_kanta' %}" class="uc-btn">
+        <i class="fas fa-upload"></i> Upload Kanta
+      </a>
     </div>
-    <div class="rec-body">
-      <div class="rec-title">{{ rec.title }}</div>
-      <div class="rec-meta">
-        <span>{{ rec.get_record_type_display }}</span>
-        <span>{{ rec.get_source_display }}</span>
-        {% if rec.record_date %}<span>{{ rec.record_date|date:"M d, Y" }}</span>{% endif %}
-        <span>Uploaded {{ rec.uploaded_at|date:"M d, Y" }}</span>
-        {% if rec.is_flagged %}<span style="color:#f59e0b;font-weight:700">⚠️ Abnormal values</span>{% endif %}
+
+    <div class="upload-card wear">
+      <div class="uc-icon"><i class="fas fa-watch"></i></div>
+      <div class="uc-title">Wearable CSV</div>
+      <div class="uc-desc">Sync health data from Apple Watch, Fitbit, Garmin, or any device that exports CSV — steps, heart rate, sleep, SpO₂ and more.</div>
+      <a href="{% url 'medical_records:upload_wearable' %}" class="uc-btn">
+        <i class="fas fa-upload"></i> Upload CSV
+      </a>
+    </div>
+
+    <div class="upload-card pdf">
+      <div class="uc-icon"><i class="fas fa-file-pdf"></i></div>
+      <div class="uc-title">PDF / Document</div>
+      <div class="uc-desc">Upload lab reports, discharge summaries, prescriptions, or any medical PDF. AI extracts structured data automatically.</div>
+      <a href="{% url 'medical_records:upload_pdf' %}" class="uc-btn">
+        <i class="fas fa-upload"></i> Upload PDF
+      </a>
+    </div>
+
+    <div class="stats-widget">
+      <div class="sw-row">
+        <span class="sw-label"><i class="fas fa-folder-open"></i> Total records</span>
+        <span class="sw-val">{{ total_count }}</span>
       </div>
-      <div class="rec-actions" onclick="event.stopPropagation()">
-        <a href="{% url 'medical_records:detail' rec.pk %}" class="btn" style="font-size:.8rem;padding:.3rem .75rem">View</a>
-        <form method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline"
-              onsubmit="return confirm('Delete this record permanently?')">
-          {% csrf_token %}
-          <button type="submit" class="btn" style="font-size:.8rem;padding:.3rem .75rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer">Delete</button>
-        </form>
+      {% if flagged_count %}
+      <div class="sw-row">
+        <span class="sw-label"><i class="fas fa-triangle-exclamation"></i> Flagged</span>
+        <span class="sw-val warn">{{ flagged_count }}</span>
+      </div>
+      {% endif %}
+      {% if active_type or active_period or active_q %}
+      <div class="sw-row">
+        <span class="sw-label"><i class="fas fa-filter"></i> Filtered</span>
+        <span class="sw-val">{{ filtered_count }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+
+  <!-- ════════ RIGHT PANEL ════════ -->
+  <div class="records-main">
+    <div class="panel-title">📋 My Medical Records</div>
+
+    {% if flagged_count %}
+    <div class="alert-strip">
+      <i class="fas fa-triangle-exclamation"></i>
+      <strong>{{ flagged_count }} record(s)</strong> contain abnormal lab values — review them below.
+    </div>
+    {% endif %}
+
+    <!-- Filter form -->
+    <form id="filter-form" method="get" action="{% url 'medical_records:list' %}">
+      <input type="hidden" name="type"   id="hid-type"   value="{{ active_type }}">
+      <input type="hidden" name="period" id="hid-period" value="{{ active_period }}">
+
+      <div class="filter-toolbar">
+        <div class="search-wrap">
+          <i class="fas fa-magnifying-glass s-icon"></i>
+          <input type="text" name="q" id="search-input"
+                 placeholder="Search by title…"
+                 value="{{ active_q }}"
+                 autocomplete="off">
+          <i class="fas fa-xmark s-clear" id="search-clear" title="Clear"></i>
+        </div>
+
+        <div class="vdivider"></div>
+
+        <div class="type-select-wrap">
+          <select id="type-select" title="Filter by type">
+            <option value="" {% if not active_type %}selected{% endif %}>All types</option>
+            {% for value, label in record_types %}
+            <option value="{{ value }}" {% if active_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <i class="fas fa-chevron-down sel-arrow"></i>
+        </div>
+
+        <div class="vdivider"></div>
+
+        <div class="pill-group">
+          <button type="button" class="p-pill {% if not active_period %}active{% endif %}" data-period="">All time</button>
+          <button type="button" class="p-pill {% if active_period == '30d' %}active{% endif %}" data-period="30d">30d</button>
+          <button type="button" class="p-pill {% if active_period == '3m'  %}active{% endif %}" data-period="3m">3m</button>
+          <button type="button" class="p-pill {% if active_period == '6m'  %}active{% endif %}" data-period="6m">6m</button>
+          <button type="button" class="p-pill {% if active_period == '1y'  %}active{% endif %}" data-period="1y">1y</button>
+          <button type="button" class="p-pill {% if active_period == 'custom' %}active{% endif %}" data-period="custom">
+            <i class="fas fa-calendar-days" style="font-size:.68rem"></i> Custom
+          </button>
+        </div>
+      </div>
+
+      <div class="custom-dates {% if active_period == 'custom' %}visible{% endif %}" id="custom-dates-row">
+        <i class="fas fa-calendar-range" style="font-size:.8rem"></i>
+        <span>From</span>
+        <input type="date" name="date_from" id="date-from" value="{{ date_from }}">
+        <span>to</span>
+        <input type="date" name="date_to" id="date-to" value="{{ date_to }}">
+        <button type="submit" class="apply-btn">Apply</button>
+      </div>
+    </form>
+
+    <!-- Results bar -->
+    <div class="results-bar">
+      <span>
+        {% if active_type or active_period or active_q %}
+          Showing <span class="count">{{ filtered_count }}</span> of {{ total_count }} records
+        {% else %}
+          <span class="count">{{ total_count }}</span> record{{ total_count|pluralize }}
+        {% endif %}
+      </span>
+      {% if active_type or active_period or active_q %}
+      <a href="{% url 'medical_records:list' %}" class="clear-link">
+        <i class="fas fa-xmark"></i> Clear filters
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Record cards -->
+    {% if records %}
+    <div class="record-grid">
+      {% for rec in records %}
+      {% with rtype=rec.record_type %}
+      <div class="rec-card {% if rec.is_flagged %}flagged{% endif %}"
+           onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
+        <div class="rec-icon"
+             style="background:{% if rtype == 'lab_result' %}#dbeafe{% elif rtype == 'prescription' %}#dcfce7{% elif rtype == 'diagnosis' %}#fce7f3{% elif rtype == 'vaccination' %}#fef9c3{% elif rtype == 'imaging' %}#ede9fe{% elif rtype == 'wearable' %}#ecfdf5{% elif rtype == 'discharge' %}#fff7ed{% else %}#f1f5f9{% endif %}">
+          {% if rtype == 'lab_result' %}🧪
+          {% elif rtype == 'prescription' %}💊
+          {% elif rtype == 'diagnosis' %}🏥
+          {% elif rtype == 'vaccination' %}💉
+          {% elif rtype == 'imaging' %}🩻
+          {% elif rtype == 'wearable' %}⌚
+          {% elif rtype == 'discharge' %}📄
+          {% else %}📁{% endif %}
+        </div>
+        <div class="rec-body">
+          <div class="rec-title">{{ rec.title }}</div>
+          <div class="rec-meta">
+            <span>{{ rec.get_record_type_display }}</span>
+            <span>{{ rec.get_source_display }}</span>
+            {% if rec.record_date %}<span>{{ rec.record_date|date:"M d, Y" }}</span>{% endif %}
+            <span>Uploaded {{ rec.uploaded_at|date:"M d, Y" }}</span>
+            {% if rec.is_flagged %}<span style="color:#f59e0b;font-weight:700">⚠️ Abnormal</span>{% endif %}
+          </div>
+          <div class="rec-actions" onclick="event.stopPropagation()">
+            <a href="{% url 'medical_records:detail' rec.pk %}" class="btn" style="font-size:.78rem;padding:.28rem .7rem">View</a>
+            <form method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline"
+                  onsubmit="return confirm('Delete this record permanently?')">
+              {% csrf_token %}
+              <button type="submit" class="btn" style="font-size:.78rem;padding:.28rem .7rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer">Delete</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="record-grid">
+      <div class="empty-state">
+        <div class="icon">📁</div>
+        <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records found</p>
+        <p style="font-size:.875rem">
+          {% if active_type or active_period or active_q %}
+            Try adjusting your filters, or <a href="{% url 'medical_records:list' %}">clear them</a>.
+          {% else %}
+            Upload your first record using one of the sources on the left.
+          {% endif %}
+        </p>
       </div>
     </div>
-  </div>
-  {% endwith %}
-  {% endfor %}
-</div>
-{% else %}
-<div class="empty-state">
-  <div class="icon">📁</div>
-  <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records yet</p>
-  <p style="font-size:.875rem">Upload your Kanta XML, wearable CSV, or medical PDFs to get started.</p>
-</div>
-{% endif %}
+    {% endif %}
 
+  </div><!-- /records-main -->
+</div><!-- /records-page -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var form        = document.getElementById('filter-form');
+  var hidType     = document.getElementById('hid-type');
+  var hidPeriod   = document.getElementById('hid-period');
+  var customRow   = document.getElementById('custom-dates-row');
+  var searchInput = document.getElementById('search-input');
+  var searchClear = document.getElementById('search-clear');
+  var typeSelect  = document.getElementById('type-select');
+
+  typeSelect.addEventListener('change', function () {
+    hidType.value = typeSelect.value;
+    form.submit();
+  });
+
+  document.querySelectorAll('[data-period]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var value = btn.dataset.period;
+      hidPeriod.value = value;
+      document.querySelectorAll('[data-period]').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      customRow.classList.toggle('visible', value === 'custom');
+      if (value !== 'custom') {
+        document.getElementById('date-from').value = '';
+        document.getElementById('date-to').value   = '';
+        form.submit();
+      }
+    });
+  });
+
+  searchClear.addEventListener('click', function () {
+    searchInput.value = '';
+    form.submit();
+  });
+
+  searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); form.submit(); }
+  });
+
+  var searchTimer;
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { form.submit(); }, 600);
+  });
+}());
+</script>
 {% endblock %}

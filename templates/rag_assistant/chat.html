@@ -2,7 +2,7 @@
 {% block title %}AI Health Assistant — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-.chat-layout{display:grid;grid-template-columns:220px 1fr;gap:1.25rem;height:calc(100vh - 140px);min-height:500px}
+.chat-layout{display:grid;grid-template-columns:220px 1fr;gap:1.25rem;height:calc(100vh - 112px);min-height:500px;overflow:hidden}
 @media(max-width:700px){.chat-layout{grid-template-columns:1fr}.sidebar{display:none}}
 .sidebar{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto}
 .sidebar-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:.25rem .5rem;margin-bottom:.25rem}
@@ -61,6 +61,9 @@
 .bubble-assistant pre{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:.75rem;overflow-x:auto;font-size:.82em;margin:.5rem 0}
 .bubble-assistant h3{font-size:.95rem;font-weight:700;margin:.5rem 0 .2rem}
 .bubble-assistant strong{font-weight:700}
+/* Prevent the page itself from scrolling — only messages-area scrolls */
+body,main{overflow:hidden!important}
+footer{display:none!important}
 </style>
 {% endblock %}
 {% block content %}
@@ -113,7 +116,7 @@
     {% endif %}
 
     <div class="messages-area" id="messagesArea">
-      {% if not messages %}
+      {% if not chat_messages %}
       <div id="emptyState" style="text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <div style="font-size:2.5rem;margin-bottom:.75rem">💬</div>
         <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.5rem">Start a conversation</p>
@@ -128,7 +131,7 @@
         </div>
       </div>
       {% else %}
-        {% for msg in messages %}
+        {% for msg in chat_messages %}
         <div class="msg-user">
           <div class="bubble bubble-user">{{ msg.query }}</div>
           <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
@@ -221,8 +224,9 @@ async function sendMessage() {
   const area = document.getElementById('messagesArea');
   area.appendChild(makeBubble('user', msg));
 
-  // Show typing indicator while waiting for first token
+  // Re-append typing indicator AFTER the user bubble so dots appear below it
   const typing = document.getElementById('typingIndicator');
+  area.appendChild(typing);
   typing.style.display = 'flex';
   scrollToBottom();
 

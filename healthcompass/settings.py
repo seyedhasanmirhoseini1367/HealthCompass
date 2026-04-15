@@ -112,7 +112,7 @@ RAG_CONFIG = {
     # Chunking
     'CHUNK_SIZE':        200,   # words per chunk
     'CHUNK_OVERLAP':     40,    # overlapping words between consecutive chunks
-    # Retrieval
+    # Retrieval (defaults)
     'TOP_K':             6,     # final chunks sent to LLM
     'BM25_WEIGHT':       0.35,  # weight for BM25 keyword score in hybrid retrieval
     'SEMANTIC_WEIGHT':   0.65,  # weight for cosine similarity score
@@ -120,11 +120,30 @@ RAG_CONFIG = {
     'TIME_DECAY_FACTOR': 0.15,  # max score reduction from time decay (0–1)
     'MMR_LAMBDA':        0.6,   # MMR diversity param (1=pure relevance, 0=pure diversity)
     'SIM_THRESHOLD':     0.15,  # minimum similarity to include a chunk
+    # ── Adaptive retrieval weights (PhD proposal: α·BM25 + β·cos) ─────────────
+    # Weights shift based on detected query intent.  Values sum to 1.0.
+    # temporal   — semantic focus: need broad conceptual match for trend queries
+    # medication — balanced: drug names need exact term + semantic context
+    # diagnostic — slight semantic bias: diagnosis terms are concept-heavy
+    # general    — default weights above
+    'INTENT_WEIGHTS': {
+        'temporal':   (0.20, 0.80),
+        'medication': (0.50, 0.50),
+        'diagnostic': (0.30, 0.70),
+        'general':    (0.35, 0.65),
+    },
+    # ── Context-type boost (PhD proposal: δ·Context(D,i)) ─────────────────────
+    # Score bonus applied when retrieved chunk's document_type aligns with intent.
+    'CONTEXT_TYPE_BOOST': 0.08,
+    # ── Trajectory (PhD proposal Gap 1) ───────────────────────────────────────
+    'TRAJECTORY_ENABLED': True,   # set False to disable trajectory routing globally
+    # ── Cold-start fallback (PhD proposal contribution) ───────────────────────
+    'COLD_START_ENABLED': True,   # show population reference ranges when patient has no records
     # Generation
     'GEMINI_MODEL':      'gemini-2.5-flash',
     'ANTHROPIC_MODEL':   'claude-haiku-4-5-20251001',
     'OPENAI_MODEL':      'gpt-4o-mini',
-    'MAX_TOKENS':        800,
+    'MAX_TOKENS':        1200,   # increased from 800 — trajectory context needs more output room
     # Vector store (file cache — speeds up cold retrieval)
     'VECTOR_STORE_PATH': str(BASE_DIR / 'rag_vector_store'),
 }

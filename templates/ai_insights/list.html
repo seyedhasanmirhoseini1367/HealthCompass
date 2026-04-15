@@ -81,6 +81,19 @@
   <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
   <aside class="ai-sidebar">
 
+    <!-- My Analytics nav (patients only) -->
+    {% if user.is_authenticated and user.is_patient %}
+    <a href="{% url 'ai_insights:patient_analytics' %}"
+       class="analytics-nav-btn"
+       style="display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:12px;background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;font-size:.875rem;font-weight:700;text-decoration:none;transition:opacity .15s"
+       onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+      <i class="fas fa-chart-line" style="font-size:.95rem"></i>
+      My Analytics
+      <i class="fas fa-arrow-right" style="margin-left:auto;font-size:.75rem;opacity:.8"></i>
+    </a>
+    <hr class="sidebar-divider">
+    {% endif %}
+
     <!-- Search -->
     <div>
       <div class="sidebar-section-title">Search</div>

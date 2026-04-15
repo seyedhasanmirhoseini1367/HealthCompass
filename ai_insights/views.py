@@ -1,7 +1,10 @@
 import json
 import logging
+from collections import defaultdict
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.db.models.functions import TruncMonth
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -220,3 +223,110 @@ def my_models(request):
         return redirect('ai_insights:list')
     models = AIModel.objects.filter(data_scientist=request.user).order_by('-created_at')
     return render(request, 'ai_insights/my_models.html', {'models': models})
+
+
+# ─── Patient Analytics ────────────────────────────────────────────────────────
+
+@login_required
+def patient_analytics(request):
+    """
+    Personal health analytics for patients — lives under /insights/analytics/
+    so it sits naturally in the AI & Analytics section.
+    """
+    if not request.user.is_patient:
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard:home')
+
+    from medical_records.models import MedicalRecord, ParsedLabValue
+    from ai_insights.models import HealthAlert
+
+    patient = request.user
+
+    # ── Lab value history ─────────────────────────────────────────────────────
+    lab_qs = (
+        ParsedLabValue.objects
+        .filter(record__patient=patient, record__record_date__isnull=False)
+        .select_related('record')
+        .order_by('record__record_date')
+    )
+
+    biomarker_map = defaultdict(list)
+    for lv in lab_qs:
+        try:
+            numeric = float(lv.value)
+        except (ValueError, TypeError):
+            continue
+        biomarker_map[lv.parameter_name].append({
+            'date':     str(lv.record.record_date),
+            'value':    numeric,
+            'unit':     lv.unit or '',
+            'abnormal': lv.is_abnormal,
+            'critical': lv.is_critical,
+            'ref':      lv.reference_range or '',
+        })
+
+    trending_biomarkers = {k: v for k, v in biomarker_map.items() if len(v) >= 2}
+    latest_values = {name: pts[-1] for name, pts in biomarker_map.items()}
+
+    # ── Records by type ───────────────────────────────────────────────────────
+    records_by_type = list(
+        MedicalRecord.objects.filter(patient=patient)
+        .values('record_type').annotate(count=Count('id')).order_by('-count')
+    )
+
+    # ── Monthly upload activity ───────────────────────────────────────────────
+    monthly_uploads = list(
+        MedicalRecord.objects.filter(patient=patient)
+        .annotate(month=TruncMonth('uploaded_at'))
+        .values('month').annotate(count=Count('id'))
+        .order_by('month')
+    )
+    upload_labels = [r['month'].strftime('%b %Y') for r in monthly_uploads]
+    upload_counts = [r['count'] for r in monthly_uploads]
+
+    # ── Alerts ────────────────────────────────────────────────────────────────
+    alerts_summary = {
+        'critical': HealthAlert.objects.filter(patient=patient, severity='critical').count(),
+        'warning':  HealthAlert.objects.filter(patient=patient, severity='warning').count(),
+        'info':     HealthAlert.objects.filter(patient=patient, severity='info').count(),
+    }
+    recent_alerts = HealthAlert.objects.filter(patient=patient).order_by('-created_at')[:8]
+
+    # ── AI risk predictions (field is 'model', not 'ai_model') ───────────────
+    predictions = list(
+        ModelPrediction.objects
+        .filter(patient=patient, risk_score__isnull=False)
+        .order_by('created_at')
+        .values('created_at', 'risk_score', 'model__name')
+    )
+    pred_labels = [p['created_at'].strftime('%b %d') for p in predictions]
+    pred_scores = [round(float(p['risk_score']) * 100, 1) for p in predictions]
+    latest_risk  = pred_scores[-1] if pred_scores else None
+
+    # ── Summary stats ─────────────────────────────────────────────────────────
+    total_records    = MedicalRecord.objects.filter(patient=patient).count()
+    total_biomarkers = len(biomarker_map)
+    unread_alerts    = HealthAlert.objects.filter(patient=patient, is_read=False).count()
+    last_record_date = (
+        MedicalRecord.objects.filter(patient=patient, record_date__isnull=False)
+        .order_by('-record_date').values_list('record_date', flat=True).first()
+    )
+
+    ctx = {
+        'trending_json':       json.dumps(trending_biomarkers),
+        'latest_values':       latest_values,
+        'records_type_json':   json.dumps(records_by_type),
+        'upload_labels_json':  json.dumps(upload_labels),
+        'upload_counts_json':  json.dumps(upload_counts),
+        'alerts_summary_json': json.dumps(alerts_summary),
+        'pred_labels_json':    json.dumps(pred_labels),
+        'pred_scores_json':    json.dumps(pred_scores),
+        'recent_alerts':       recent_alerts,
+        'latest_risk':         latest_risk,
+        'total_records':       total_records,
+        'total_biomarkers':    total_biomarkers,
+        'unread_alerts':       unread_alerts,
+        'last_record_date':    last_record_date,
+        'has_data':            total_records > 0,
+    }
+    return render(request, 'ai_insights/patient_analytics.html', ctx)

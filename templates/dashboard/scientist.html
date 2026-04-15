@@ -32,6 +32,12 @@
   <div class="stat-card"><div class="num">{{ total_runs }}</div><div class="lbl">Total Runs</div></div>
 </div>
 
+<div style="margin-bottom:1.25rem">
+  <a href="{% url 'dashboard:monitoring' %}" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:.5rem">
+    <i class="fas fa-chart-line"></i> MLOps Monitoring
+  </a>
+</div>
+
 <div class="card">
   <div class="card-header"><i class="fas fa-brain"></i> My Models</div>
   <div class="card-body">

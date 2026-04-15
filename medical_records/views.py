@@ -16,20 +16,55 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def record_list(request):
-    records = MedicalRecord.objects.filter(patient=request.user).order_by('-uploaded_at')
+    from datetime import date, timedelta
 
-    # Filter by type
-    rtype = request.GET.get('type', '')
+    qs = MedicalRecord.objects.filter(patient=request.user).order_by('-record_date', '-uploaded_at')
+
+    # ── Type filter ───────────────────────────────────────────────────────────
+    rtype = request.GET.get('type', '').strip()
     if rtype:
-        records = records.filter(record_type=rtype)
+        qs = qs.filter(record_type=rtype)
 
-    flagged_count = MedicalRecord.objects.filter(patient=request.user, is_flagged=True).count()
+    # ── Time-period filter ────────────────────────────────────────────────────
+    period = request.GET.get('period', '').strip()
+    today  = date.today()
+    PERIOD_CUTOFFS = {
+        '30d': today - timedelta(days=30),
+        '3m':  today - timedelta(days=90),
+        '6m':  today - timedelta(days=180),
+        '1y':  today - timedelta(days=365),
+    }
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to',   '').strip()
+
+    if period in PERIOD_CUTOFFS:
+        qs = qs.filter(record_date__gte=PERIOD_CUTOFFS[period])
+    elif period == 'custom':
+        if date_from:
+            qs = qs.filter(record_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(record_date__lte=date_to)
+
+    # ── Keyword search (title) ────────────────────────────────────────────────
+    q = request.GET.get('q', '').strip()
+    if q:
+        qs = qs.filter(title__icontains=q)
+
+    total_count    = MedicalRecord.objects.filter(patient=request.user).count()
+    flagged_count  = MedicalRecord.objects.filter(patient=request.user, is_flagged=True).count()
+    filtered_count = qs.count()
 
     return render(request, 'medical_records/list.html', {
-        'records': records,
-        'record_types': MedicalRecord.RecordType.choices,
-        'active_type': rtype,
-        'flagged_count': flagged_count,
+        'records':        qs,
+        'record_types':   MedicalRecord.RecordType.choices,
+        'active_type':    rtype,
+        'active_period':  period,
+        'active_q':       q,
+        'date_from':      date_from,
+        'date_to':        date_to,
+        'flagged_count':  flagged_count,
+        'total_count':    total_count,
+        'filtered_count': filtered_count,
     })
 
 

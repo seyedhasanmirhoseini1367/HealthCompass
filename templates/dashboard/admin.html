@@ -68,6 +68,11 @@
     <div class="action-title">Django Admin</div>
     <div class="action-desc">Full admin panel access</div>
   </a>
+  <a href="{% url 'dashboard:monitoring' %}" class="action-card">
+    <div class="action-icon">📊</div>
+    <div class="action-title">MLOps Monitoring</div>
+    <div class="action-desc">RAG health · inference stats · platform overview</div>
+  </a>
 </div>
 
 {% endblock %}

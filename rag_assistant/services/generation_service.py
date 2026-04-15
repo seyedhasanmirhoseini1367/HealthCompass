@@ -8,7 +8,7 @@ LLM generation service — supports:
 Both regular (full response) and streaming (token-by-token SSE) modes.
 """
 import logging
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 from django.conf import settings
 
@@ -27,6 +27,29 @@ for medical decisions, diagnosis, or treatment changes.
 - If you don't have enough information, say so honestly.
 - Keep answers concise and well-structured (use bullet points when helpful).
 - End every response with a brief reminder to consult a healthcare professional.
+"""
+
+# ── Trajectory-specific system prompt ─────────────────────────────────────────
+# Used when context_override is supplied (i.e. trajectory mode is active).
+# Instructs the LLM to reason about direction and magnitude, not just values.
+
+TRAJECTORY_SYSTEM_PROMPT = """You are HealthCompass AI, a medical assistant specialising in \
+interpreting longitudinal health data and trends.
+
+You have been given a chronologically ordered set of health measurements. Your task is to \
+reason about the TREND, not just the individual values.
+
+TRAJECTORY REASONING RULES:
+- Always comment on the DIRECTION of change (improving / worsening / stable).
+- Quantify the change where possible (e.g. "increased by 133% over 11 months").
+- Mention the RATE of change if the data allows (e.g. "rising approximately 0.11 mg/dL per month").
+- Identify any inflection points (e.g. "values were stable until June, then accelerated").
+- If a value has entered a clinically significant range (abnormal / critical), flag this clearly.
+- Compare the patient's trajectory to typical clinical reference thresholds where relevant.
+- Be empathetic but honest — do not downplay a clearly worsening trend.
+- You are NOT a doctor. Strongly recommend consulting a healthcare provider, especially for \
+  worsening or accelerating trends.
+- End every response with a recommendation to discuss the trend with their doctor.
 """
 
 
@@ -48,6 +71,22 @@ def _build_context(chunks: List[Dict[str, Any]]) -> str:
         parts.append(c.get('text', c.get('content', '')))
         parts.append("")
     return "\n".join(parts)
+
+
+def _resolve_context_and_prompt(
+    chunks:           List[Dict[str, Any]],
+    context_override: str = '',
+) -> Tuple[str, str]:
+    """
+    Return (context_string, system_prompt_string).
+
+    When *context_override* is provided (trajectory mode), use it directly
+    with the trajectory-specific system prompt.  Otherwise build standard
+    context from chunks with the default system prompt.
+    """
+    if context_override:
+        return context_override, TRAJECTORY_SYSTEM_PROMPT
+    return _build_context(chunks), SYSTEM_PROMPT
 
 
 def _build_sources(chunks: List[Dict]) -> List[Dict]:
@@ -77,7 +116,7 @@ def _build_messages(context: str, query: str, history: List[Dict]) -> List[Dict]
 
 # ── Non-streaming: Gemini ──────────────────────────────────────────────────────
 
-def _call_gemini(context: str, query: str, history: List[Dict]) -> Optional[str]:
+def _call_gemini(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Optional[str]:
     api_key = getattr(settings, 'GEMINI_API_KEY', '')
     if not api_key:
         return None
@@ -85,21 +124,21 @@ def _call_gemini(context: str, query: str, history: List[Dict]) -> Optional[str]
         from google import genai
         from google.genai import types
 
-        client  = genai.Client(api_key=api_key)
-        model   = settings.RAG_CONFIG['GEMINI_MODEL']
+        client   = genai.Client(api_key=api_key)
+        model    = settings.RAG_CONFIG['GEMINI_MODEL']
         messages = _build_messages(context, query, history)
 
-        # Flatten history into Gemini contents list
         contents = []
         for m in messages[:-1]:
-            contents.append(f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}")
-        contents.append(messages[-1]['content'])
+            role = 'user' if m['role'] == 'user' else 'model'
+            contents.append({'role': role, 'parts': [{'text': m['content']}]})
+        contents.append({'role': 'user', 'parts': [{'text': messages[-1]['content']}]})
 
         response = client.models.generate_content(
             model    = model,
             contents = contents,
             config   = types.GenerateContentConfig(
-                system_instruction = SYSTEM_PROMPT,
+                system_instruction = sys_prompt,
                 max_output_tokens  = settings.RAG_CONFIG['MAX_TOKENS'],
                 temperature        = 0.4,
             ),
@@ -112,7 +151,7 @@ def _call_gemini(context: str, query: str, history: List[Dict]) -> Optional[str]
 
 # ── Non-streaming: Anthropic ───────────────────────────────────────────────────
 
-def _call_anthropic(context: str, query: str, history: List[Dict]) -> Optional[str]:
+def _call_anthropic(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Optional[str]:
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
         return None
@@ -122,7 +161,7 @@ def _call_anthropic(context: str, query: str, history: List[Dict]) -> Optional[s
         msg    = client.messages.create(
             model      = settings.RAG_CONFIG['ANTHROPIC_MODEL'],
             max_tokens = settings.RAG_CONFIG['MAX_TOKENS'],
-            system     = SYSTEM_PROMPT,
+            system     = sys_prompt,
             messages   = _build_messages(context, query, history),
         )
         return msg.content[0].text
@@ -133,14 +172,14 @@ def _call_anthropic(context: str, query: str, history: List[Dict]) -> Optional[s
 
 # ── Non-streaming: OpenAI ──────────────────────────────────────────────────────
 
-def _call_openai(context: str, query: str, history: List[Dict]) -> Optional[str]:
+def _call_openai(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Optional[str]:
     api_key = getattr(settings, 'OPENAI_API_KEY', '')
     if not api_key:
         return None
     try:
         from openai import OpenAI
         client   = OpenAI(api_key=api_key)
-        messages = [{'role': 'system', 'content': SYSTEM_PROMPT}] + _build_messages(context, query, history)
+        messages = [{'role': 'system', 'content': sys_prompt}] + _build_messages(context, query, history)
         resp     = client.chat.completions.create(
             model      = settings.RAG_CONFIG['OPENAI_MODEL'],
             messages   = messages,
@@ -155,24 +194,36 @@ def _call_openai(context: str, query: str, history: List[Dict]) -> Optional[str]
 # ── Public: non-streaming ──────────────────────────────────────────────────────
 
 def generate(
-    chunks:  List[Dict[str, Any]],
-    query:   str,
-    history: List[Dict],
-) -> Tuple[str, List[Dict]]:
-    """Try Gemini → Anthropic → OpenAI. Returns (response_text, sources)."""
-    context = _build_context(chunks)
+    chunks:           List[Dict[str, Any]],
+    query:            str,
+    history:          List[Dict],
+    context_override: str = '',
+) -> Tuple[str, List[Dict], str]:
+    """
+    Try Gemini → Anthropic → OpenAI.
+    Returns (response_text, sources, provider_name).
+    provider_name is one of: 'gemini', 'anthropic', 'openai', 'fallback'.
 
-    for caller in (_call_gemini, _call_anthropic, _call_openai):
-        result = caller(context, query, history)
+    When *context_override* is provided (trajectory mode), it is used as the
+    context string and TRAJECTORY_SYSTEM_PROMPT is used instead of SYSTEM_PROMPT.
+    """
+    context, sys_prompt = _resolve_context_and_prompt(chunks, context_override)
+
+    for caller, name in [
+        (_call_gemini,    'gemini'),
+        (_call_anthropic, 'anthropic'),
+        (_call_openai,    'openai'),
+    ]:
+        result = caller(context, query, history, sys_prompt=sys_prompt)
         if result:
-            return result, _build_sources(chunks)
+            return result, _build_sources(chunks), name
 
-    return _fallback(), []
+    return _fallback(), [], 'fallback'
 
 
 # ── Streaming: Gemini ──────────────────────────────────────────────────────────
 
-def _stream_gemini(context: str, query: str, history: List[Dict]) -> Generator[str, None, None]:
+def _stream_gemini(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
     api_key = getattr(settings, 'GEMINI_API_KEY', '')
     if not api_key:
         return
@@ -186,14 +237,15 @@ def _stream_gemini(context: str, query: str, history: List[Dict]) -> Generator[s
 
         contents = []
         for m in messages[:-1]:
-            contents.append(f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}")
-        contents.append(messages[-1]['content'])
+            role = 'user' if m['role'] == 'user' else 'model'
+            contents.append({'role': role, 'parts': [{'text': m['content']}]})
+        contents.append({'role': 'user', 'parts': [{'text': messages[-1]['content']}]})
 
         for chunk in client.models.generate_content_stream(
             model    = model,
             contents = contents,
             config   = types.GenerateContentConfig(
-                system_instruction = SYSTEM_PROMPT,
+                system_instruction = sys_prompt,
                 max_output_tokens  = settings.RAG_CONFIG['MAX_TOKENS'],
                 temperature        = 0.4,
             ),
@@ -204,13 +256,13 @@ def _stream_gemini(context: str, query: str, history: List[Dict]) -> Generator[s
 
     except Exception as exc:
         logger.warning('Gemini stream error: %s', exc)
-        yield from _stream_anthropic(context, query, history)
+        yield from _stream_anthropic(context, query, history, sys_prompt=sys_prompt)
 
 
-def _stream_anthropic(context: str, query: str, history: List[Dict]) -> Generator[str, None, None]:
+def _stream_anthropic(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
-        yield from _stream_openai(context, query, history)
+        yield from _stream_openai(context, query, history, sys_prompt=sys_prompt)
         return
     try:
         import anthropic
@@ -218,7 +270,7 @@ def _stream_anthropic(context: str, query: str, history: List[Dict]) -> Generato
         with client.messages.stream(
             model      = settings.RAG_CONFIG['ANTHROPIC_MODEL'],
             max_tokens = settings.RAG_CONFIG['MAX_TOKENS'],
-            system     = SYSTEM_PROMPT,
+            system     = sys_prompt,
             messages   = _build_messages(context, query, history),
         ) as stream:
             for text in stream.text_stream:
@@ -226,17 +278,17 @@ def _stream_anthropic(context: str, query: str, history: List[Dict]) -> Generato
                     yield text
     except Exception as exc:
         logger.warning('Anthropic stream error: %s', exc)
-        yield from _stream_openai(context, query, history)
+        yield from _stream_openai(context, query, history, sys_prompt=sys_prompt)
 
 
-def _stream_openai(context: str, query: str, history: List[Dict]) -> Generator[str, None, None]:
+def _stream_openai(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
     api_key = getattr(settings, 'OPENAI_API_KEY', '')
     if not api_key:
         return
     try:
         from openai import OpenAI
         client   = OpenAI(api_key=api_key)
-        messages = [{'role': 'system', 'content': SYSTEM_PROMPT}] + _build_messages(context, query, history)
+        messages = [{'role': 'system', 'content': sys_prompt}] + _build_messages(context, query, history)
         stream   = client.chat.completions.create(
             model      = settings.RAG_CONFIG['OPENAI_MODEL'],
             messages   = messages,
@@ -254,15 +306,17 @@ def _stream_openai(context: str, query: str, history: List[Dict]) -> Generator[s
 # ── Public: streaming ──────────────────────────────────────────────────────────
 
 def generate_streaming(
-    chunks:  List[Dict[str, Any]],
-    query:   str,
-    history: List[Dict],
+    chunks:           List[Dict[str, Any]],
+    query:            str,
+    history:          List[Dict],
+    context_override: str = '',
 ) -> Generator[str, None, None]:
     """
     Yields text tokens one by one.
+    Respects context_override for trajectory mode.
     Tracks whether anything was yielded — emits fallback if all LLMs fail.
     """
-    context = _build_context(chunks)
+    context, sys_prompt = _resolve_context_and_prompt(chunks, context_override)
     yielded = False
 
     def _track(gen):
@@ -276,14 +330,27 @@ def generate_streaming(
     api_key_openai    = getattr(settings, 'OPENAI_API_KEY', '')
 
     if api_key_gemini:
-        yield from _track(_stream_gemini(context, query, history))
+        yield from _track(_stream_gemini(context, query, history, sys_prompt=sys_prompt))
     elif api_key_anthropic:
-        yield from _track(_stream_anthropic(context, query, history))
+        yield from _track(_stream_anthropic(context, query, history, sys_prompt=sys_prompt))
     elif api_key_openai:
-        yield from _track(_stream_openai(context, query, history))
+        yield from _track(_stream_openai(context, query, history, sys_prompt=sys_prompt))
 
     if not yielded:
         yield _fallback()
+
+
+# ── Provider detection (for logging streaming calls) ───────────────────────────
+
+def active_stream_provider() -> str:
+    """Return which provider would be used for a streaming call right now."""
+    if getattr(settings, 'GEMINI_API_KEY', ''):
+        return 'gemini'
+    if getattr(settings, 'ANTHROPIC_API_KEY', ''):
+        return 'anthropic'
+    if getattr(settings, 'OPENAI_API_KEY', ''):
+        return 'openai'
+    return 'fallback'
 
 
 # ── Fallback ───────────────────────────────────────────────────────────────────

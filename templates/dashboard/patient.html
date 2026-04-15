@@ -71,6 +71,7 @@
 <div style="margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap">
   <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
   <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI Assistant</a>
+  <a href="{% url 'ai_insights:patient_analytics' %}" class="btn btn-outline" style="background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;border:none"><i class="fas fa-chart-line"></i> My Analytics</a>
   <a href="/insights/" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Run AI Models</a>
 </div>
 {% endblock %}

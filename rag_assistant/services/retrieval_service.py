@@ -1,20 +1,33 @@
 # rag_assistant/services/retrieval_service.py
 """
 Hybrid retrieval: BM25 keyword score + cosine semantic score,
-with time-decay weighting and MMR diversity re-ranking.
+with time-decay weighting, adaptive query-intent weights, context-type boost,
+and MMR diversity re-ranking.
 
 Pipeline:
   1. load_patient_embeddings()  — texts, vectors, metadata from DB
-  2. bm25_scores()              — keyword relevance
-  3. cosine_scores()            — semantic similarity
-  4. hybrid_scores()            — weighted blend
-  5. time_decay()               — down-weight old records
-  6. mmr_rerank()               — diversify top-K
+  2. classify_query_intent()    — 'temporal'|'medication'|'diagnostic'|'general'
+  3. bm25_scores()              — keyword relevance
+  4. cosine_scores()            — semantic similarity
+  5. hybrid_scores()            — intent-adaptive weighted blend  ← PhD proposal α·BM25 + β·cos
+  6. time_decay()               — down-weight old records
+  7. context_type_boost()       — boost chunks whose doc-type aligns with intent ← PhD proposal δ·Context
+  8. threshold filter           — drop anything below SIM_THRESHOLD
+  9. mmr_rerank()               — diversify top-K
+
+Adaptive weights (PhD proposal Score formula):
+    Score(q,D) = α·BM25 + β·cos + γ·Δ(D,t,s) + δ·Context(D,i)
+    γ·Δ is handled by time_decay(); δ·Context is the context_type_boost().
+    α and β are selected per query intent:
+        temporal   → α=0.20, β=0.80  (semantic focus for trend reasoning)
+        medication → α=0.50, β=0.50  (exact term match for drug names)
+        diagnostic → α=0.30, β=0.70  (concept-heavy diagnostic terms)
+        general    → α=0.35, β=0.65  (default)
 """
 import logging
 import math
 from datetime import date, datetime
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 import numpy as np
 from django.conf import settings
@@ -22,26 +35,71 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+# ── Query intent → document_type alignment map ────────────────────────────────
+# Used by _apply_context_boost() to implement δ·Context(D,i).
+_INTENT_DOCTYPE_MAP: Dict[str, List[str]] = {
+    'lab_results': ['lab_result'],
+    'medication':  ['medication'],
+    'diagnostic':  ['note', 'raw_text'],
+    'wearable':    ['wearable'],
+    'temporal':    ['lab_result', 'wearable'],   # trajectory queries benefit from all numeric records
+    'general':     [],                            # no boost for general
+}
+
+# Intent keyword map for classify_query_intent()
+_INTENT_KEYWORDS: Dict[str, List[str]] = {
+    'temporal': [
+        'getting better', 'getting worse', 'over time', 'trend', 'trending',
+        'improving', 'worsening', 'trajectory', 'progression', 'changed',
+        'going up', 'going down', 'increasing', 'decreasing', 'over the past',
+        'last year', 'last month', 'last 6 months', 'history of my',
+    ],
+    'medication': [
+        'medication', 'medicine', 'drug', 'prescription', 'dose', 'dosage',
+        'tablet', 'capsule', 'pill', 'mg', 'side effect', 'interaction',
+        'metformin', 'insulin', 'statin', 'taking', 'prescribed', 'pharmacy',
+    ],
+    'diagnostic': [
+        'diagnosis', 'condition', 'disease', 'symptom', 'imaging', 'mri',
+        'ct scan', 'x-ray', 'xray', 'ultrasound', 'discharge', 'finding',
+        'impression', 'clinical note', 'assessment', 'report',
+    ],
+    'lab_results': [
+        'lab', 'blood test', 'result', 'cholesterol', 'glucose', 'hba1c',
+        'creatinine', 'thyroid', 'tsh', 'wbc', 'platelet', 'vitamin',
+        'egfr', 'gfr', 'kidney function', 'abnormal', 'reference range',
+    ],
+}
+
+
 class RetrievalService:
 
     def __init__(self):
-        self.cfg             = settings.RAG_CONFIG
-        self.top_k           = self.cfg['TOP_K']
-        self.bm25_weight     = self.cfg['BM25_WEIGHT']
-        self.sem_weight      = self.cfg['SEMANTIC_WEIGHT']
-        self.decay_days      = self.cfg['TIME_DECAY_DAYS']
-        self.decay_factor    = self.cfg['TIME_DECAY_FACTOR']
-        self.mmr_lambda      = self.cfg['MMR_LAMBDA']
-        self.sim_threshold   = self.cfg['SIM_THRESHOLD']
+        self.cfg           = settings.RAG_CONFIG
+        self.top_k         = self.cfg['TOP_K']
+        self.bm25_weight   = self.cfg['BM25_WEIGHT']
+        self.sem_weight    = self.cfg['SEMANTIC_WEIGHT']
+        self.decay_days    = self.cfg['TIME_DECAY_DAYS']
+        self.decay_factor  = self.cfg['TIME_DECAY_FACTOR']
+        self.mmr_lambda    = self.cfg['MMR_LAMBDA']
+        self.sim_threshold = self.cfg['SIM_THRESHOLD']
+        self.intent_weights = self.cfg.get('INTENT_WEIGHTS', {
+            'temporal':   (0.20, 0.80),
+            'medication': (0.50, 0.50),
+            'diagnostic': (0.30, 0.70),
+            'general':    (0.35, 0.65),
+        })
+        self.ctx_boost = self.cfg.get('CONTEXT_TYPE_BOOST', 0.08)
 
     # ── Main entry point ───────────────────────────────────────────────────────
 
     def retrieve(
         self,
         patient,
-        query: str,
-        document_type: Optional[str] = None,
-        top_k: Optional[int] = None,
+        query:         str,
+        document_type: Optional[str]  = None,
+        top_k:         Optional[int]  = None,
+        query_intent:  Optional[str]  = None,
     ) -> List[Dict[str, Any]]:
         """
         Return up to *top_k* dicts: {'text', 'score', 'metadata'}.
@@ -57,21 +115,28 @@ class RetrievalService:
 
         k = top_k or self.top_k
 
+        # Detect intent from query if not supplied by caller
+        intent = query_intent or self.classify_query_intent(query)
+        bm25_w, sem_w = self.intent_weights.get(intent, (self.bm25_weight, self.sem_weight))
+
+        logger.debug('retrieve: intent=%s  α(BM25)=%.2f  β(sem)=%.2f', intent, bm25_w, sem_w)
+
         # 1. BM25
         bm25   = self._bm25_scores(query, texts)
         # 2. Cosine similarity
         q_vec  = emb_svc.embed(query)
         cosine = self._cosine_scores(q_vec, matrix)
-        # 3. Hybrid blend
-        hybrid = self.bm25_weight * bm25 + self.sem_weight * cosine
-        # 4. Time decay
+        # 3. Adaptive hybrid blend  (α·BM25 + β·cos)
+        hybrid = bm25_w * bm25 + sem_w * cosine
+        # 4. Time decay  (γ·Δ)
         hybrid = self._apply_time_decay(hybrid, meta)
-        # 5. Threshold filter
-        valid  = np.where(hybrid >= self.sim_threshold)[0]
+        # 5. Context-type boost  (δ·Context)
+        hybrid = self._apply_context_boost(hybrid, meta, intent)
+        # 6. Threshold filter
+        valid = np.where(hybrid >= self.sim_threshold)[0]
         if len(valid) == 0:
-            valid = np.argsort(hybrid)[-k:][::-1]  # fallback: take top-k anyway
-
-        # 6. MMR re-rank
+            return []
+        # 7. MMR re-rank
         indices = self._mmr(q_vec, matrix, hybrid, valid, k)
 
         results = []
@@ -83,14 +148,46 @@ class RetrievalService:
             })
         return results
 
+    # ── Query intent classifier ────────────────────────────────────────────────
+
+    def classify_query_intent(self, query: str) -> str:
+        """
+        Return the dominant intent of *query*: temporal | medication |
+        diagnostic | lab_results | general.
+
+        The order of checking matters: temporal is checked first because
+        temporal queries often also mention lab keywords.
+        """
+        q = query.lower()
+        for intent in ('temporal', 'medication', 'diagnostic', 'lab_results'):
+            keywords = _INTENT_KEYWORDS.get(intent, [])
+            if any(kw in q for kw in keywords):
+                return intent
+        return 'general'
+
     # ── BM25 ───────────────────────────────────────────────────────────────────
+
+    _STOPWORDS = frozenset([
+        'a', 'an', 'the', 'is', 'it', 'in', 'on', 'at', 'to', 'for',
+        'of', 'and', 'or', 'my', 'me', 'i', 'was', 'are', 'be', 'do',
+        'did', 'has', 'have', 'had', 'what', 'when', 'how', 'which',
+        'with', 'from', 'that', 'this', 'by', 'as', 'can', 'will',
+    ])
+
+    def _tokenize(self, text: str) -> List[str]:
+        import re
+        text = text.lower()
+        text = re.sub(r'[-/]', ' ', text)
+        text = re.sub(r'[^\w\s]', ' ', text)
+        tokens = text.split()
+        return [t for t in tokens if t not in self._STOPWORDS and len(t) > 1]
 
     def _bm25_scores(self, query: str, texts: List[str]) -> np.ndarray:
         try:
             from rank_bm25 import BM25Okapi
-            tokenized_corpus = [t.lower().split() for t in texts]
+            tokenized_corpus = [self._tokenize(t) for t in texts]
             bm25             = BM25Okapi(tokenized_corpus)
-            scores           = bm25.get_scores(query.lower().split())
+            scores           = bm25.get_scores(self._tokenize(query))
             mx               = scores.max()
             return (scores / mx) if mx > 0 else scores
         except ImportError:
@@ -103,7 +200,6 @@ class RetrievalService:
     # ── Cosine similarity ──────────────────────────────────────────────────────
 
     def _cosine_scores(self, q_vec: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-        """Vectorised cosine similarity between query and all chunk embeddings."""
         if matrix.shape[0] == 0:
             return np.zeros(0, dtype=np.float32)
         q_norm = np.linalg.norm(q_vec)
@@ -113,7 +209,7 @@ class RetrievalService:
         norms  = np.where(norms == 0, 1e-9, norms)
         return (matrix @ q_vec) / (norms * q_norm)
 
-    # ── Time decay ─────────────────────────────────────────────────────────────
+    # ── Time decay (γ·Δ) ───────────────────────────────────────────────────────
 
     def _apply_time_decay(self, scores: np.ndarray, meta: List[Dict]) -> np.ndarray:
         scores = scores.copy()
@@ -133,6 +229,28 @@ class RetrievalService:
                 pass
         return scores
 
+    # ── Context-type boost (δ·Context) ────────────────────────────────────────
+
+    def _apply_context_boost(
+        self,
+        scores:  np.ndarray,
+        meta:    List[Dict],
+        intent:  str,
+    ) -> np.ndarray:
+        """
+        Add a small bonus when a chunk's document_type aligns with the
+        detected query intent.  This implements δ·Context(D,i) from the
+        unified Clinical Retrievability Score in the PhD proposal.
+        """
+        boosted_types = _INTENT_DOCTYPE_MAP.get(intent, [])
+        if not boosted_types:
+            return scores
+        scores = scores.copy()
+        for i, m in enumerate(meta):
+            if m.get('doc_type', m.get('document_type', '')) in boosted_types:
+                scores[i] = min(1.0, scores[i] + self.ctx_boost)
+        return scores
+
     # ── MMR re-ranking ─────────────────────────────────────────────────────────
 
     def _mmr(
@@ -143,25 +261,15 @@ class RetrievalService:
         valid:   np.ndarray,
         k:       int,
     ) -> List[int]:
-        """
-        Maximal Marginal Relevance selection from *valid* indices.
-        mmr_lambda=1 → pure relevance, 0 → pure diversity.
-        """
-        lam      = self.mmr_lambda
-        selected = []
+        lam       = self.mmr_lambda
+        selected  = []
         remaining = list(valid)
-
-        # Pre-compute cosine similarity between candidates
-        sub    = matrix[remaining]
-        q_norm = np.linalg.norm(q_vec)
 
         while remaining and len(selected) < k:
             if not selected:
-                # Pick highest-scoring candidate first
                 best_local = int(np.argmax([scores[i] for i in remaining]))
                 chosen     = remaining[best_local]
             else:
-                # For each remaining candidate, compute max similarity to selected
                 sel_mat  = matrix[selected]
                 best_mmr = -np.inf
                 chosen   = remaining[0]
