@@ -3,6 +3,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 
 from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm
@@ -38,12 +39,24 @@ def record_list(request):
     date_to   = request.GET.get('date_to',   '').strip()
 
     if period in PERIOD_CUTOFFS:
-        qs = qs.filter(record_date__gte=PERIOD_CUTOFFS[period])
+        cutoff = PERIOD_CUTOFFS[period]
+        # Include records whose record_date is within range, OR whose
+        # record_date is NULL (date not extracted) but uploaded within range.
+        qs = qs.filter(
+            Q(record_date__gte=cutoff) |
+            Q(record_date__isnull=True, uploaded_at__date__gte=cutoff)
+        )
     elif period == 'custom':
         if date_from:
-            qs = qs.filter(record_date__gte=date_from)
+            qs = qs.filter(
+                Q(record_date__gte=date_from) |
+                Q(record_date__isnull=True, uploaded_at__date__gte=date_from)
+            )
         if date_to:
-            qs = qs.filter(record_date__lte=date_to)
+            qs = qs.filter(
+                Q(record_date__lte=date_to) |
+                Q(record_date__isnull=True, uploaded_at__date__lte=date_to)
+            )
 
     # ── Keyword search (title) ────────────────────────────────────────────────
     q = request.GET.get('q', '').strip()

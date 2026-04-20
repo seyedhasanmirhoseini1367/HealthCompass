@@ -137,7 +137,7 @@ footer{display:none!important}
           <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
         </div>
         <div class="msg-assistant">
-          <div class="bubble bubble-assistant" data-raw="{{ msg.response|escapejs }}">
+          <div class="bubble bubble-assistant" data-raw="{{ msg.response }}">
             <button class="copy-btn" onclick="copyMsg(this)" title="Copy"><i class="fas fa-copy"></i></button>
             <div class="md-content"></div>
           </div>
