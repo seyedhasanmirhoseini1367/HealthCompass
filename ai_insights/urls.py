@@ -10,6 +10,7 @@ urlpatterns = [
     path('my-models/', views.my_models, name='my_models'),
     path('my-predictions/', views.my_predictions, name='my_predictions'),
     path('prediction/<uuid:pk>/', views.prediction_detail, name='prediction_detail'),
+    path('seizure/', views.seizure_analysis, name='seizure_analysis'),
     path('<slug:slug>/', views.model_detail, name='model_detail'),
     path('<slug:slug>/run/', views.run_prediction, name='run_prediction'),
     path('debug/handlers/', views.debug_handlers, name='debug_handlers'),
