@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Complete Registration — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.auth-wrap{max-width:440px;margin:3rem auto}
+.auth-card{background:white;border-radius:20px;padding:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,.08);border:1px solid var(--border)}
+.auth-logo{text-align:center;font-size:2.5rem;margin-bottom:1rem}
+.auth-title{font-size:1.4rem;font-weight:700;text-align:center;margin-bottom:.25rem}
+.auth-sub{color:var(--muted);font-size:.875rem;text-align:center;margin-bottom:2rem}
+.form-group{margin-bottom:1.25rem}
+.form-group label{display:block;font-size:.825rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
+.form-group select{width:100%;padding:.65rem .9rem;border:1.5px solid var(--border);border-radius:9px;font-size:.875rem;outline:none;transition:border .2s}
+.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+.role-info{background:#e0f2fe;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#0369a1}
+.btn-submit{width:100%;padding:.7rem;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .2s;margin-top:.5rem}
+.btn-submit:hover{background:var(--primary-dk)}
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">🧭</div>
+    <h1 class="auth-title">One last step</h1>
+    <p class="auth-sub">You're signing in with Google. Please select your role to complete registration.</p>
+    <div class="role-info"><i class="fas fa-info-circle"></i> Doctors, researchers, and hospital admins require admin approval before access is granted.</div>
+    <form method="post" action="{% url 'socialaccount_signup' %}">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="form-group">
+        <label>{{ form.role.label }}</label>
+        {{ form.role }}
+        {{ form.role.errors }}
+      </div>
+      <button type="submit" class="btn-submit">Complete Registration</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
