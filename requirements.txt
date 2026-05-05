@@ -16,6 +16,7 @@ scipy
 langgraph==0.2.28
 # Google OAuth
 django-allauth
+PyJWT
 # Production server & database
 gunicorn
 psycopg2-binary
