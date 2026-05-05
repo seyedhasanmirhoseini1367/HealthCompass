@@ -8,10 +8,18 @@ import os
 
 
 def serve_media(request, path):
-    file_path = os.path.join(settings.MEDIA_ROOT, path)
-    if os.path.isfile(file_path):
+    import sys
+    file_path = os.path.join(str(settings.MEDIA_ROOT), path)
+    exists = os.path.isfile(file_path)
+    print(f"[serve_media] path={path!r} file_path={file_path!r} exists={exists}", file=sys.stderr, flush=True)
+    if exists:
         return FileResponse(open(file_path, 'rb'))
     raise Http404
+
+
+def media_ping(request):
+    from django.http import HttpResponse
+    return HttpResponse(f"media_ping OK — MEDIA_ROOT={settings.MEDIA_ROOT}", content_type="text/plain")
 
 
 urlpatterns = [
@@ -26,6 +34,7 @@ urlpatterns = [
     path('notifications/', include('notifications.urls')),
     path('integrations/', include('integrations.urls')),
     re_path(r'^media/(?P<path>.+)$', serve_media),
+    path('media-ping/', media_ping),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
