@@ -2,9 +2,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
-from django.conf import settings
-import os
 from .models import CustomUser, PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
 from .forms import RegisterForm, LoginForm, ProfileForm, PasswordChangeForm
 
@@ -112,37 +109,6 @@ def profile_edit(request):
         messages.success(request, "Profile updated.")
         return redirect("accounts:profile")
     return render(request, "accounts/profile_edit.html", {"form": form})
-
-
-@login_required
-def media_debug(request):
-    media_root = str(settings.MEDIA_ROOT)
-    user = request.user
-    pic_field = str(user.profile_picture) if user.profile_picture else None
-    pic_url = user.profile_picture.url if user.profile_picture else None
-
-    media_exists = os.path.isdir(media_root)
-    media_writable = os.access(media_root, os.W_OK) if media_exists else False
-
-    files_on_disk = []
-    profile_pics_dir = os.path.join(media_root, 'profile_pics')
-    if os.path.isdir(profile_pics_dir):
-        files_on_disk = os.listdir(profile_pics_dir)
-
-    actual_file_exists = False
-    if pic_field:
-        actual_file_exists = os.path.isfile(os.path.join(media_root, pic_field))
-
-    return JsonResponse({
-        'MEDIA_ROOT': media_root,
-        'MEDIA_URL': settings.MEDIA_URL,
-        'media_dir_exists': media_exists,
-        'media_dir_writable': media_writable,
-        'profile_picture_field': pic_field,
-        'profile_picture_url': pic_url,
-        'actual_file_exists_on_disk': actual_file_exists,
-        'files_in_profile_pics_dir': files_on_disk,
-    })
 
 
 @login_required
