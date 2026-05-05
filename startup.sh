@@ -38,6 +38,13 @@ echo ""
 echo ">>> [2/3] Running migrations..."
 python manage.py migrate --noinput
 
+# ── superuser (one-time bootstrap) ───────────────────────────────────────────
+if [ "$CREATE_ADMIN" = "true" ]; then
+    echo ""
+    echo ">>> [2.5/3] Creating superuser (CREATE_ADMIN=true)..."
+    python manage.py createsuperuser --noinput || echo "Superuser already exists — skipping."
+fi
+
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
 echo ">>> [3/3] Starting gunicorn on 0.0.0.0:${PORT}..."
