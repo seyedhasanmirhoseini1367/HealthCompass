@@ -15,6 +15,7 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
 AUTHENTICATION_BACKENDS = [
     'accounts.backends.EmailOrUsernameBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -28,6 +29,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    # allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     # Project apps
     'accounts',
     'medical_records',
@@ -49,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'healthcompass.urls'
@@ -164,6 +172,29 @@ RAG_CONFIG = {
 # File upload limits (50 MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
+
+# ── Google OAuth (allauth) ─────────────────────────────────────────────────────
+SITE_ID = 1
+
+SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
+SOCIALACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SocialSignupRoleForm'
+SOCIALACCOUNT_AUTO_SIGNUP   = False   # always show role-selection form for new social users
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
+ACCOUNT_EMAIL_VERIFICATION  = 'none'
+ACCOUNT_EMAIL_REQUIRED      = True
+ACCOUNT_USERNAME_REQUIRED   = False
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': config('GOOGLE_CLIENT_ID',     default=''),
+            'secret':    config('GOOGLE_CLIENT_SECRET', default=''),
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
 
 # ── Production security headers ────────────────────────────────────────────────
 # Railway terminates SSL at the edge, so no SECURE_SSL_REDIRECT needed.
