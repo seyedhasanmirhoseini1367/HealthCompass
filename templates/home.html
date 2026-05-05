@@ -2,96 +2,111 @@
 {% block title %}HealthCompass — Your Health, Understood{% endblock %}
 {% block extra_css %}
 <style>
-/* ── page wrapper breaks out of main's 1.5rem padding ── */
-.pw{margin:-1.5rem}
-.inner{max-width:1100px;margin:0 auto;padding:0 4rem}
-@media(max-width:600px){.inner{padding:0 1rem}.pw{margin:-.75rem -.6rem}}
+/* ── Full-bleed: break out of main's padding AND max-width on all screens ── */
+html,body{overflow-x:hidden}
+.pw{position:relative;left:50%;width:100vw;margin-left:-50vw;margin-top:-1.5rem;margin-bottom:-1.5rem}
+.inner{max-width:1080px;margin:0 auto;padding:0 2.5rem}
+@media(max-width:600px){.inner{padding:0 1.1rem}}
 
 /* ── HERO ── */
-.hero{background:linear-gradient(135deg,#0c1a4b 0%,#1e3a8a 50%,#1e40af 100%);color:white;padding:4rem 5rem 3.5rem}
-.hero-inner{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:1fr 380px;gap:3rem;align-items:center}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);padding:.35rem 1rem;border-radius:20px;font-size:.8rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:1.25rem}
-.hero h1{font-size:2.75rem;font-weight:800;line-height:1.1;margin-bottom:1.1rem;letter-spacing:-.02em}
-.hero h1 span{color:#60a5fa}
-.hero-sub{font-size:1rem;opacity:.85;line-height:1.7;max-width:480px;margin-bottom:1.75rem}
-.hero-btns{display:flex;gap:1rem;flex-wrap:wrap}
-.btn-cta{padding:.85rem 2.25rem;border-radius:10px;font-weight:700;font-size:1rem;transition:all .2s;display:inline-block}
-.btn-cta-primary{background:#3b82f6;color:white;box-shadow:0 4px 18px rgba(59,130,246,.45)}
-.btn-cta-primary:hover{background:#2563eb;transform:translateY(-2px);color:white}
-.btn-cta-ghost{background:rgba(255,255,255,.1);color:white;border:1.5px solid rgba(255,255,255,.3)}
-.btn-cta-ghost:hover{background:rgba(255,255,255,.2);color:white}
-.hero-compass{opacity:.9;width:100%;max-width:480px;justify-self:center}
-@media(max-width:900px){
-  .hero{padding:2.5rem 1.5rem 2.25rem}
-  .hero-inner{grid-template-columns:1fr;text-align:center}
-  .hero h1{font-size:1.9rem}
-  .hero-sub{margin:0 auto 2rem}
+.hero{
+  background:linear-gradient(135deg,#312e81 0%,#4f46e5 55%,#0ea5e9 100%);
+  color:white;padding:3.5rem 2rem 3rem;position:relative;overflow:hidden;
+}
+.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:380px;height:380px;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none}
+.hero::after{content:'';position:absolute;left:-50px;bottom:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
+.hero-inner{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1fr 340px;gap:3rem;align-items:center;position:relative;z-index:1}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);padding:.3rem .9rem;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:1rem}
+.hero h1{font-size:2.6rem;font-weight:800;line-height:1.1;margin-bottom:1rem;letter-spacing:-.02em}
+.hero h1 span{color:#a5f3fc}
+.hero-sub{font-size:.95rem;opacity:.88;line-height:1.75;max-width:460px;margin-bottom:1.75rem}
+.hero-btns{display:flex;gap:.75rem;flex-wrap:wrap}
+.btn-cta{padding:.75rem 2rem;border-radius:10px;font-weight:700;font-size:.95rem;transition:all .2s;display:inline-block}
+.btn-cta-primary{background:white;color:#312e81;box-shadow:0 4px 18px rgba(0,0,0,.2)}
+.btn-cta-primary:hover{background:#f0f9ff;transform:translateY(-2px);color:#312e81}
+.btn-cta-ghost{background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.35)}
+.btn-cta-ghost:hover{background:rgba(255,255,255,.22);color:white}
+/* Hero right side: visual stats panel */
+.hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.hstat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:1rem 1.1rem;backdrop-filter:blur(6px)}
+.hstat-num{font-size:1.7rem;font-weight:800;line-height:1}
+.hstat-label{font-size:.72rem;opacity:.75;margin-top:.25rem;font-weight:600;letter-spacing:.02em}
+@media(max-width:880px){
+  .hero{padding:2.25rem 1.25rem 2rem}
+  .hero-inner{grid-template-columns:1fr;gap:1.5rem;text-align:center}
+  .hero h1{font-size:2rem}
+  .hero-sub{margin:0 auto 1.5rem}
   .hero-btns{justify-content:center}
-  .hero-compass{max-width:240px;opacity:.6;margin:0 auto}
+  .hero-stats{grid-template-columns:repeat(4,1fr);gap:.5rem}
+  .hstat{padding:.65rem .75rem}
+  .hstat-num{font-size:1.2rem}
+}
+@media(max-width:560px){
+  .hero-stats{grid-template-columns:repeat(2,1fr)}
 }
 
 /* ── TRUST STRIP ── */
-.trust{background:white;border-bottom:1px solid var(--border);padding:1.5rem 3rem}
-.trust-inner{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;align-items:center}
-.trust-item{display:flex;align-items:center;gap:.6rem;font-size:.85rem;font-weight:600;color:var(--muted);justify-content:center}
-.trust-item i{color:var(--primary);font-size:1rem}
-@media(max-width:700px){.trust-inner{grid-template-columns:repeat(2,1fr)}.trust-item{font-size:.78rem}}
+.trust{background:white;border-bottom:1px solid var(--border);padding:1.1rem 2rem}
+.trust-inner{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1.5rem 2.5rem}
+.trust-item{display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;color:var(--muted)}
+.trust-item i{color:#4f46e5;font-size:.9rem}
 
 /* ── SECTION SHARED ── */
-.section{padding:4rem 2rem}
+.section{padding:3.5rem 2rem}
 .section-alt{background:white}
-.section-title{font-size:1.6rem;font-weight:800;margin-bottom:.5rem;color:var(--text)}
-.section-title span{color:var(--primary)}
-.section-sub{font-size:.95rem;color:var(--muted);max-width:560px;line-height:1.7;margin-bottom:2.5rem}
-@media(max-width:600px){.section{padding:2.5rem 1rem}}
+.section-title{font-size:1.5rem;font-weight:800;margin-bottom:.45rem;color:var(--text)}
+.section-title span{color:#4f46e5}
+.section-sub{font-size:.9rem;color:var(--muted);max-width:520px;line-height:1.7;margin-bottom:2rem}
+@media(max-width:600px){.section{padding:2.25rem 1rem}}
 
 /* ── MISSION ── */
 .mission-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
-.mission-text h2{font-size:1.75rem;font-weight:800;line-height:1.25;margin-bottom:1rem;color:var(--text)}
-.mission-text h2 span{color:var(--primary)}
-.mission-text p{color:var(--muted);line-height:1.8;font-size:.95rem;margin-bottom:1rem}
-.mission-stats{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.stat-box{background:var(--bg);border-radius:12px;padding:1.25rem;border:1px solid var(--border)}
-.stat-box .stat-num{font-size:1.75rem;font-weight:800;color:var(--primary)}
-.stat-box .stat-label{font-size:.78rem;color:var(--muted);font-weight:600;margin-top:.15rem}
+.mission-text h2{font-size:1.55rem;font-weight:800;line-height:1.25;margin-bottom:.9rem;color:var(--text)}
+.mission-text h2 span{color:#4f46e5}
+.mission-text p{color:var(--muted);line-height:1.8;font-size:.9rem;margin-bottom:.9rem}
+.mission-stats{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+.stat-box{background:var(--bg);border-radius:12px;padding:1.1rem 1.25rem;border:1px solid var(--border)}
+.stat-box .stat-num{font-size:1.6rem;font-weight:800;color:#4f46e5}
+.stat-box .stat-label{font-size:.75rem;color:var(--muted);font-weight:600;margin-top:.15rem}
 @media(max-width:700px){.mission-grid{grid-template-columns:1fr}.mission-stats{grid-template-columns:repeat(2,1fr)}}
 
 /* ── ROLES ── */
-.roles-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.25rem}
-.role-card{background:var(--bg);border-radius:16px;padding:1.75rem 1.5rem;border:1.5px solid var(--border);transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
-.role-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;opacity:0;transition:opacity .2s}
-.role-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.08);border-color:var(--primary)}
-.role-card:hover::after{opacity:1}
-.role-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:1rem}
-.role-card h3{font-size:1.05rem;font-weight:700;margin-bottom:.4rem;color:var(--text)}
-.role-card p{font-size:.84rem;color:var(--muted);line-height:1.6}
-.role-patient .role-icon{background:#dbeafe}.role-patient::after{background:#3b82f6}
-.role-doctor .role-icon{background:#dcfce7}.role-doctor::after{background:#22c55e}
-.role-scientist .role-icon{background:#ede9fe}.role-scientist::after{background:#8b5cf6}
-.role-admin .role-icon{background:#fef3c7}.role-admin::after{background:#f59e0b}
-.role-tag{margin-top:1rem;font-size:.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.04em}
+.roles-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem}
+.role-card{background:var(--bg);border-radius:16px;padding:1.5rem;border:1.5px solid var(--border);transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
+.role-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;opacity:0;transition:opacity .2s}
+.role-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.08);border-color:#c7d2fe}
+.role-card:hover::before{opacity:1}
+.role-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:.9rem}
+.role-card h3{font-size:1rem;font-weight:700;margin-bottom:.35rem;color:var(--text)}
+.role-card p{font-size:.82rem;color:var(--muted);line-height:1.6}
+.role-patient .role-icon{background:#dbeafe}.role-patient::before{background:#3b82f6}
+.role-doctor .role-icon{background:#dcfce7}.role-doctor::before{background:#22c55e}
+.role-scientist .role-icon{background:#ede9fe}.role-scientist::before{background:#8b5cf6}
+.role-admin .role-icon{background:#fef3c7}.role-admin::before{background:#f59e0b}
+.role-tag{margin-top:.85rem;font-size:.7rem;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:.04em}
 
 /* ── FEATURES ── */
-.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem}
-.feature{background:var(--bg);border-radius:16px;padding:1.5rem;border:1px solid var(--border);display:flex;gap:1rem;align-items:flex-start}
-.feature-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0ea5e9,#6366f1);display:flex;align-items:center;justify-content:center;color:white;font-size:1.1rem;flex-shrink:0}
-.feature h3{font-size:.95rem;font-weight:700;margin-bottom:.3rem;color:var(--text)}
-.feature p{font-size:.83rem;color:var(--muted);line-height:1.6}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+.feature{background:var(--bg);border-radius:14px;padding:1.35rem;border:1px solid var(--border);display:flex;gap:.9rem;align-items:flex-start;transition:box-shadow .2s}
+.feature:hover{box-shadow:0 6px 20px rgba(0,0,0,.07)}
+.feature-icon{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#4f46e5,#0ea5e9);display:flex;align-items:center;justify-content:center;color:white;font-size:1rem;flex-shrink:0}
+.feature h3{font-size:.9rem;font-weight:700;margin-bottom:.25rem;color:var(--text)}
+.feature p{font-size:.8rem;color:var(--muted);line-height:1.6}
 
 /* ── STORIES ── */
-.stories-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1.25rem}
-.story-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);cursor:pointer;transition:all .2s}
-.story-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
-.story-meta{font-size:.72rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em}
-.story-card h4{font-size:.95rem;font-weight:700;margin-bottom:.4rem;color:var(--text);line-height:1.4}
-.story-card p{font-size:.82rem;color:var(--muted);line-height:1.55}
+.stories-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.story-card{background:white;border-radius:13px;padding:1.15rem;border:1px solid var(--border);cursor:pointer;transition:all .2s}
+.story-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.07)}
+.story-meta{font-size:.7rem;color:var(--muted);margin-bottom:.45rem;text-transform:uppercase;letter-spacing:.04em}
+.story-card h4{font-size:.92rem;font-weight:700;margin-bottom:.35rem;color:var(--text);line-height:1.4}
+.story-card p{font-size:.8rem;color:var(--muted);line-height:1.55}
 
 /* ── CTA ── */
-.cta-section{background:#0f172a;padding:4rem 2rem;text-align:center;color:white}
-.cta-section h2{font-size:2rem;font-weight:800;margin-bottom:.75rem;letter-spacing:-.02em}
-.cta-section h2 span{color:#60a5fa}
-.cta-section p{opacity:.7;font-size:.95rem;margin-bottom:2rem;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.7}
-.cta-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.cta-section{background:linear-gradient(135deg,#1e1b4b,#312e81);padding:3.5rem 2rem;text-align:center;color:white}
+.cta-section h2{font-size:1.8rem;font-weight:800;margin-bottom:.65rem;letter-spacing:-.02em}
+.cta-section h2 span{color:#a5f3fc}
+.cta-section p{opacity:.72;font-size:.9rem;margin-bottom:1.75rem;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
+.cta-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
 </style>
 {% endblock %}
 
@@ -110,46 +125,24 @@
           <a href="#how-it-works" class="btn-cta btn-cta-ghost">See how it works</a>
         </div>
       </div>
-      <svg class="hero-compass" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <g><circle cx="100" cy="100" r="88" fill="none" stroke="#fff" stroke-width="0.7" stroke-dasharray="3 5" opacity="0.4"/>
-          <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="90s" repeatCount="indefinite"/>
-        </g>
-        <g><circle cx="100" cy="100" r="73" fill="none" stroke="#fff" stroke-width="0.5" stroke-dasharray="1.5 3.5" opacity="0.25"/>
-          <animateTransform attributeName="transform" type="rotate" from="360 100 100" to="0 100 100" dur="65s" repeatCount="indefinite"/>
-        </g>
-        <g transform="translate(100,100)">
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#4ADE80" stroke-width="2.2" stroke-linecap="round"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#4ADE80" stroke-width="2.2" stroke-linecap="round" transform="rotate(20)"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#4ADE80" stroke-width="2.2" stroke-linecap="round" transform="rotate(40)"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#FBBF44" stroke-width="2.2" stroke-linecap="round" transform="rotate(120)"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#FBBF44" stroke-width="2.2" stroke-linecap="round" transform="rotate(140)"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#E94B4B" stroke-width="2.2" stroke-linecap="round" transform="rotate(210)"/>
-          <line x1="0" y1="-72" x2="0" y2="-85" stroke="#E94B4B" stroke-width="2.2" stroke-linecap="round" transform="rotate(230)"/>
-        </g>
-        <path d="M 43 55 L 52 55 L 58 43 L 64 64 L 70 55 L 79 55 L 85 34 L 94 70 L 103 31 L 112 70 L 121 55 L 133 55 L 142 46 L 151 61 L 157 55"
-              fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-              stroke-dasharray="280" stroke-dashoffset="280">
-          <animate attributeName="stroke-dashoffset" values="280;0;0;280" keyTimes="0;0.45;0.75;1" dur="4s" repeatCount="indefinite"/>
-        </path>
-        <polyline points="40,97 58,97 70,97 76,82 85,115 94,73 103,109 112,94 121,79 130,97 142,97 160,97"
-                  fill="none" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                  stroke-dasharray="280" stroke-dashoffset="280">
-          <animate attributeName="stroke-dashoffset" values="280;0;0;280" keyTimes="0;0.45;0.75;1" dur="4s" begin="2s" repeatCount="indefinite"/>
-        </polyline>
-        <g>
-          <animateTransform attributeName="transform" type="rotate"
-            values="0 100 100;8 100 100;-5 100 100;10 100 100;-3 100 100;0 100 100"
-            dur="10s" repeatCount="indefinite"/>
-          <circle cx="100" cy="55" r="12" fill="#fff"/>
-          <polygon points="100,67 112,97 100,112 88,97" fill="#fff"/>
-          <path d="M 88 85 Q 67 88 49 97 L 49 103 Q 67 97 88 97 Z" fill="#fff" opacity="0.9"/>
-          <path d="M 112 85 Q 133 88 151 97 L 151 103 Q 133 97 112 97 Z" fill="#fff" opacity="0.9"/>
-          <polygon points="100,112 110,133 100,163 90,133" fill="#E8F0FE" opacity="0.7"/>
-        </g>
-        <circle cx="100" cy="97" r="4" fill="#E94B4B">
-          <animate attributeName="r" values="3.5;7;3.5" dur="2.5s" repeatCount="indefinite"/>
-        </circle>
-      </svg>
+      <div class="hero-stats">
+        <div class="hstat">
+          <div class="hstat-num">4+</div>
+          <div class="hstat-label">AI Models</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-num">100%</div>
+          <div class="hstat-label">Private Data</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-num">Kanta</div>
+          <div class="hstat-label">Records Supported</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-num">Free</div>
+          <div class="hstat-label">To Get Started</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -287,7 +280,7 @@
     <p>Join patients, doctors, and researchers already using HealthCompass. Free to start, no credit card required.</p>
     <div class="cta-btns">
       <a href="/accounts/register/" class="btn-cta btn-cta-primary">Create Free Account</a>
-      <a href="/accounts/login/" class="btn-cta btn-cta-ghost">Log In</a>
+      <a href="/accounts/login/" class="btn-cta" style="background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.3)">Log In</a>
     </div>
   </section>
 
