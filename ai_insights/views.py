@@ -227,6 +227,35 @@ def my_models(request):
 
 # ─── Patient Analytics ────────────────────────────────────────────────────────
 
+# ─── Seizure detection proxy ──────────────────────────────────────────────────
+
+@login_required
+def seizure_analysis(request):
+    """Proxy parquet EEG file to PersonalPortfolio seizure comparison API."""
+    if request.method == 'GET':
+        return render(request, 'ai_insights/seizure_analysis.html', {})
+
+    import requests as http_requests
+    signal_file = request.FILES.get('signal_file')
+    if not signal_file:
+        return JsonResponse({'success': False, 'error': 'No file uploaded.'}, status=400)
+
+    try:
+        resp = http_requests.post(
+            'https://hasanai.net/seizure-comparison/predict/',
+            files={'signal_file': (signal_file.name, signal_file.read(), signal_file.content_type)},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return JsonResponse(data)
+    except http_requests.Timeout:
+        return JsonResponse({'success': False, 'error': 'The analysis timed out. Please try again.'}, status=504)
+    except Exception as exc:
+        logger.exception('seizure_analysis proxy error: %s', exc)
+        return JsonResponse({'success': False, 'error': str(exc)}, status=500)
+
+
 @login_required
 def patient_analytics(request):
     """

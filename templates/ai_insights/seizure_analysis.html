@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% block title %}EEG Seizure Detection — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.sa-wrap{max-width:960px;margin:0 auto}
+.sa-hero{background:linear-gradient(135deg,#312e81,#4f46e5,#0ea5e9);border-radius:20px;padding:2.5rem 2.5rem 2rem;color:white;margin-bottom:1.75rem;position:relative;overflow:hidden}
+.sa-hero::after{content:'';position:absolute;right:-40px;top:-40px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+.sa-hero h1{font-size:1.9rem;font-weight:800;margin-bottom:.4rem}
+.sa-hero p{opacity:.88;font-size:.95rem;max-width:600px;line-height:1.6}
+.sa-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.15);border-radius:20px;padding:.3rem .85rem;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.9rem}
+
+/* disclaimer */
+.disclaimer{background:#fef9c3;border:1px solid #fde68a;border-radius:14px;padding:1rem 1.2rem;margin-bottom:1.5rem;font-size:.83rem;color:#78350f;line-height:1.6;display:flex;gap:.75rem;align-items:flex-start}
+.disclaimer i{margin-top:.05rem;flex-shrink:0;color:#d97706}
+
+/* upload card */
+.upload-card{background:white;border-radius:18px;border:1px solid var(--border);padding:1.75rem 2rem;margin-bottom:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.upload-card h2{font-size:1.05rem;font-weight:700;margin-bottom:1.1rem;display:flex;align-items:center;gap:.5rem}
+.drop-zone{border:2.5px dashed #cbd5e1;border-radius:14px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#f8fafc}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--primary);background:#e0f2fe}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:2.5rem;margin-bottom:.6rem;color:#94a3b8}
+.drop-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.3rem}
+.drop-sub{font-size:.82rem;color:var(--muted)}
+.file-selected{display:none;align-items:center;gap:.6rem;margin-top:.9rem;padding:.55rem 1rem;background:#d1fae5;border-radius:10px;font-size:.85rem;color:#065f46;font-weight:600}
+.file-selected i{color:#059669}
+.btn-run{margin-top:1.1rem;width:100%;padding:.75rem;background:var(--primary);color:white;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .2s}
+.btn-run:hover:not(:disabled){background:var(--primary-dk)}
+.btn-run:disabled{opacity:.55;cursor:not-allowed}
+
+/* progress */
+.progress-wrap{display:none;margin-top:1.1rem}
+.progress-bar-outer{height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-bottom:.6rem}
+.progress-bar-inner{height:100%;background:linear-gradient(90deg,#6366f1,#0ea5e9);border-radius:99px;transition:width .4s ease;width:0%}
+.progress-msg{font-size:.83rem;color:var(--muted);text-align:center}
+
+/* results */
+.results-section{display:none}
+.results-section.show{display:block}
+.ensemble-banner{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:16px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.ensemble-label-box{font-size:1.55rem;font-weight:800;flex:1;min-width:160px}
+.ensemble-label-box span{display:block;font-size:.75rem;font-weight:600;opacity:.65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.25rem}
+.votes-row{display:flex;gap:.5rem;flex-wrap:wrap}
+.vote-chip{padding:.28rem .75rem;border-radius:20px;font-size:.78rem;font-weight:700;background:rgba(255,255,255,.15)}
+.vote-chip.winner{background:rgba(255,255,255,.28)}
+
+/* model cards grid */
+.models-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.model-result-card{background:white;border-radius:16px;border:1px solid var(--border);padding:1.2rem 1.3rem;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform .18s,box-shadow .18s}
+.model-result-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.09)}
+.mrc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem}
+.mrc-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.mrc-variant{font-size:.72rem;color:var(--muted);margin-top:.1rem}
+.conf-badge{font-size:.78rem;font-weight:700;padding:.25rem .7rem;border-radius:20px}
+.conf-high{background:#d1fae5;color:#065f46}
+.conf-med{background:#fef3c7;color:#92400e}
+.conf-low{background:#fee2e2;color:#b91c1c}
+.pred-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.55rem}
+.pred-icon{font-size:1.4rem}
+.pred-label{font-size:.97rem;font-weight:800;color:var(--text)}
+.pred-class{font-size:.75rem;color:var(--muted)}
+.conf-bar-outer{height:5px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-bottom:.55rem}
+.conf-bar-inner{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#0ea5e9);transition:width .6s ease}
+.infer-ms{font-size:.72rem;color:#94a3b8;display:flex;align-items:center;gap:.3rem}
+.mrc-error{font-size:.83rem;color:var(--danger);padding:.6rem .75rem;background:#fee2e2;border-radius:9px;margin-top:.4rem}
+
+/* section heading */
+.section-h{font-size:1rem;font-weight:700;color:var(--text);margin:1.5rem 0 .85rem;display:flex;align-items:center;gap:.5rem}
+.section-h::after{content:'';flex:1;height:1px;background:var(--border);margin-left:.5rem}
+
+/* error state */
+.error-banner{display:none;background:#fee2e2;border:1px solid #fca5a5;border-radius:14px;padding:1rem 1.25rem;font-size:.88rem;color:#b91c1c;margin-bottom:1.25rem;align-items:center;gap:.6rem}
+.error-banner.show{display:flex}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sa-wrap">
+
+  <!-- Hero -->
+  <div class="sa-hero">
+    <div class="sa-badge"><i class="fas fa-brain"></i> Multi-Model EEG Analysis</div>
+    <h1>EEG Seizure Detection</h1>
+    <p>Upload a <strong>Parquet EEG file</strong> and run it simultaneously through multiple neural network architectures — CNN, LSTM, GRU, Transformer, and more — then view ensemble voting results.</p>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>
+      <strong>For informational and research purposes only.</strong>
+      This tool is not a medical device and does not provide clinical diagnoses.
+      Always consult a qualified neurologist or healthcare professional for medical decisions.
+      Results are generated by experimental AI models and may not be accurate.
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="errorBanner">
+    <i class="fas fa-times-circle"></i>
+    <span id="errorMsg"></span>
+  </div>
+
+  <!-- Upload card -->
+  <div class="upload-card">
+    <h2><i class="fas fa-upload" style="color:var(--primary)"></i> Upload EEG Signal</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="drop-zone" id="dropZone">
+        <input type="file" name="signal_file" id="fileInput" accept=".parquet">
+        <div class="drop-icon"><i class="fas fa-file-medical"></i></div>
+        <div class="drop-title">Drop your Parquet file here</div>
+        <div class="drop-sub">or click to browse — .parquet format only</div>
+      </div>
+      <div class="file-selected" id="fileSelected">
+        <i class="fas fa-check-circle"></i>
+        <span id="fileName"></span>
+      </div>
+      <button type="submit" class="btn-run" id="runBtn" disabled>
+        <i class="fas fa-bolt"></i> Run Analysis
+      </button>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="progressBar"></div>
+        </div>
+        <div class="progress-msg" id="progressMsg">Uploading and running models…</div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results section (filled by JS) -->
+  <div class="results-section" id="resultsSection">
+
+    <!-- Ensemble -->
+    <div class="section-h"><i class="fas fa-vote-yea"></i> Ensemble Result</div>
+    <div class="ensemble-banner" id="ensembleBanner">
+      <div class="ensemble-label-box">
+        <span>Ensemble verdict</span>
+        <span id="ensembleLabel">—</span>
+      </div>
+      <div>
+        <div style="font-size:.72rem;opacity:.65;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">Model votes</div>
+        <div class="votes-row" id="votesRow"></div>
+      </div>
+    </div>
+
+    <!-- Per-model cards -->
+    <div class="section-h"><i class="fas fa-microchip"></i> Per-Model Results</div>
+    <div class="models-grid" id="modelsGrid"></div>
+
+    <!-- Bottom disclaimer -->
+    <div class="disclaimer" style="margin-top:1.5rem">
+      <i class="fas fa-shield-alt"></i>
+      <div>
+        Results are produced by deep learning models trained on research datasets.
+        They have not been validated as clinical diagnostic tools.
+        <strong>Do not make any health decisions based solely on these results.</strong>
+        If you have concerns about seizures or epilepsy, please speak with a neurologist.
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const fileInput  = document.getElementById('fileInput');
+const dropZone   = document.getElementById('dropZone');
+const runBtn     = document.getElementById('runBtn');
+const fileSelected = document.getElementById('fileSelected');
+const fileName   = document.getElementById('fileName');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    fileName.textContent = fileInput.files[0].name;
+    fileSelected.style.display = 'flex';
+    runBtn.disabled = false;
+  } else {
+    fileSelected.style.display = 'none';
+    runBtn.disabled = true;
+  }
+});
+
+['dragover','dragleave','drop'].forEach(ev => {
+  dropZone.addEventListener(ev, e => {
+    e.preventDefault();
+    dropZone.classList.toggle('dragover', ev === 'dragover');
+    if (ev === 'drop') {
+      fileInput.files = e.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change'));
+    }
+  });
+});
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  clearError();
+  showProgress();
+
+  let pct = 5;
+  const progressBar = document.getElementById('progressBar');
+  const progressMsg = document.getElementById('progressMsg');
+  progressBar.style.width = pct + '%';
+
+  const messages = [
+    [15, 'Uploading signal file…'],
+    [35, 'Preprocessing EEG channels…'],
+    [55, 'Running CNN and LSTM models…'],
+    [70, 'Running GRU and Transformer models…'],
+    [85, 'Computing ensemble vote…'],
+    [95, 'Finalising results…'],
+  ];
+  let mi = 0;
+  const ticker = setInterval(() => {
+    if (mi < messages.length) {
+      pct = messages[mi][0];
+      progressMsg.textContent = messages[mi][1];
+      progressBar.style.width = pct + '%';
+      mi++;
+    }
+  }, 1800);
+
+  const fd = new FormData(this);
+  try {
+    const resp = await fetch('{% url "ai_insights:seizure_analysis" %}', {
+      method: 'POST',
+      body: fd,
+      headers: {'X-CSRFToken': fd.get('csrfmiddlewaretoken')},
+    });
+    const data = await resp.json();
+    clearInterval(ticker);
+    progressBar.style.width = '100%';
+    progressMsg.textContent = 'Complete!';
+
+    await new Promise(r => setTimeout(r, 400));
+    hideProgress();
+
+    if (!data.success) {
+      showError(data.error || 'Analysis failed. Please try again.');
+      return;
+    }
+    renderResults(data);
+  } catch (err) {
+    clearInterval(ticker);
+    hideProgress();
+    showError('Network error: ' + err.message);
+  }
+});
+
+function showProgress() {
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').style.width = '5%';
+  runBtn.disabled = true;
+  document.getElementById('resultsSection').classList.remove('show');
+}
+function hideProgress() {
+  document.getElementById('progressWrap').style.display = 'none';
+  runBtn.disabled = false;
+}
+function showError(msg) {
+  const b = document.getElementById('errorBanner');
+  document.getElementById('errorMsg').textContent = msg;
+  b.classList.add('show');
+  b.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function clearError() {
+  document.getElementById('errorBanner').classList.remove('show');
+}
+
+function renderResults(data) {
+  // Ensemble
+  document.getElementById('ensembleLabel').textContent = data.ensemble_label || '—';
+
+  const votesRow = document.getElementById('votesRow');
+  votesRow.innerHTML = '';
+  if (data.ensemble_votes) {
+    for (const [label, count] of Object.entries(data.ensemble_votes)) {
+      const chip = document.createElement('span');
+      chip.className = 'vote-chip' + (label === data.ensemble_label ? ' winner' : '');
+      chip.textContent = `${label}: ${count}`;
+      votesRow.appendChild(chip);
+    }
+  }
+
+  // Per-model cards
+  const grid = document.getElementById('modelsGrid');
+  grid.innerHTML = '';
+  (data.results || []).forEach(r => {
+    grid.appendChild(buildCard(r));
+  });
+
+  const section = document.getElementById('resultsSection');
+  section.classList.add('show');
+  section.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function buildCard(r) {
+  const div = document.createElement('div');
+  div.className = 'model-result-card';
+
+  if (!r.success) {
+    div.innerHTML = `
+      <div class="mrc-top">
+        <div>
+          <div class="mrc-title">${esc(r.project_title || r.project_id)}</div>
+          <div class="mrc-variant">${esc(r.model_variant || '')}</div>
+        </div>
+      </div>
+      <div class="mrc-error"><i class="fas fa-exclamation-circle"></i> ${esc(r.error || 'Model failed')}</div>`;
+    return div;
+  }
+
+  const conf     = r.confidence != null ? Math.round(r.confidence * 100) : null;
+  const confClass = conf == null ? '' : conf >= 70 ? 'conf-high' : conf >= 45 ? 'conf-med' : 'conf-low';
+  const isSeizure = (r.prediction_label || '').toLowerCase().includes('seizure')
+                 || (r.prediction_label || '').toLowerCase().includes('ictal');
+  const icon = isSeizure ? '⚡' : '✅';
+
+  div.innerHTML = `
+    <div class="mrc-top">
+      <div>
+        <div class="mrc-title">${esc(r.project_title || r.project_id)}</div>
+        <div class="mrc-variant">${esc(r.model_variant || '')}</div>
+      </div>
+      ${conf != null ? `<span class="conf-badge ${confClass}">${conf}%</span>` : ''}
+    </div>
+    <div class="pred-row">
+      <span class="pred-icon">${icon}</span>
+      <div>
+        <div class="pred-label">${esc(r.prediction_label || String(r.prediction))}</div>
+        <div class="pred-class">Class ${r.prediction}</div>
+      </div>
+    </div>
+    ${conf != null ? `<div class="conf-bar-outer"><div class="conf-bar-inner" style="width:${conf}%"></div></div>` : ''}
+    ${r.inference_ms != null ? `<div class="infer-ms"><i class="fas fa-clock"></i> ${Math.round(r.inference_ms)} ms</div>` : ''}`;
+  return div;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}
