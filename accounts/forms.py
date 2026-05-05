@@ -18,9 +18,17 @@ class RegisterForm(UserCreationForm):
         model = CustomUser
         fields = ["username", "first_name", "last_name", "email", "role", "password1", "password2"]
 
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if CustomUser.objects.filter(email=email).exists():
+            raise forms.ValidationError("An account with this email already exists.")
+        return email
+
 
 class LoginForm(AuthenticationForm):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].label = 'Email or Username'
 
 
 class ProfileForm(forms.ModelForm):

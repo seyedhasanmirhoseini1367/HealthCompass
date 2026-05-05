@@ -2,8 +2,37 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
 from .models import CustomUser, PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
 from .forms import RegisterForm, LoginForm, ProfileForm, PasswordChangeForm
+
+
+ROLES_REQUIRING_APPROVAL = {
+    CustomUser.Role.DOCTOR,
+    CustomUser.Role.DATA_SCIENTIST,
+    CustomUser.Role.HOSPITAL_ADMIN,
+}
+
+
+def _notify_admin_new_registration(user):
+    admin_email = getattr(settings, 'ADMIN_NOTIFICATION_EMAIL', settings.EMAIL_HOST_USER)
+    if not admin_email:
+        return
+    send_mail(
+        subject=f'[HealthCompass] New {user.get_role_display()} registration — {user.get_full_name() or user.username}',
+        message=(
+            f'A new user has registered and requires approval.\n\n'
+            f'Name:     {user.get_full_name() or "—"}\n'
+            f'Username: {user.username}\n'
+            f'Email:    {user.email}\n'
+            f'Role:     {user.get_role_display()}\n\n'
+            f'Approve or reject at: {settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else "your admin panel"}/admin/accounts/customuser/{user.pk}/change/'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[admin_email],
+        fail_silently=True,
+    )
 
 
 def register_view(request):
@@ -14,7 +43,8 @@ def register_view(request):
         if form.is_valid():
             user = form.save(commit=False)
             role = form.cleaned_data["role"]
-            if role == CustomUser.Role.DATA_SCIENTIST:
+            needs_approval = role in ROLES_REQUIRING_APPROVAL
+            if needs_approval:
                 user.is_approved = False
             user.save()
             if role == CustomUser.Role.PATIENT:
@@ -25,13 +55,13 @@ def register_view(request):
                 DataScientistProfile.objects.create(user=user)
             elif role == CustomUser.Role.HOSPITAL_ADMIN:
                 HospitalAdminProfile.objects.create(user=user, hospital_name="")
-            if role != CustomUser.Role.DATA_SCIENTIST:
-                login(request, user)
-                messages.success(request, f"Welcome to HealthCompass, {user.username}!")
-                return redirect("dashboard:home")
-            else:
-                messages.info(request, "Account created. Awaiting admin approval.")
+            if needs_approval:
+                _notify_admin_new_registration(user)
+                messages.info(request, "Account created. An admin will review your registration — you'll receive an email once approved.")
                 return redirect("accounts:login")
+            login(request, user)
+            messages.success(request, f"Welcome to HealthCompass, {user.get_full_name() or user.username}!")
+            return redirect("dashboard:home")
         messages.error(request, "Please correct the errors below.")
     else:
         form = RegisterForm()
