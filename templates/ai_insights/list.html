@@ -175,19 +175,6 @@
   <!-- ── Main ─────────────────────────────────────────────────────────────── -->
   <div class="ai-main">
 
-    <!-- Featured: Seizure Analysis tool -->
-    <a href="{% url 'ai_insights:seizure_analysis' %}"
-       style="display:flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#312e81,#4f46e5,#0ea5e9);border-radius:16px;padding:1.1rem 1.4rem;color:white;text-decoration:none;margin-bottom:1.25rem;transition:opacity .18s;flex-wrap:wrap"
-       onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-      <div style="font-size:2.2rem;line-height:1">🧠</div>
-      <div style="flex:1;min-width:150px">
-        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.2rem">Featured Tool</div>
-        <div style="font-size:1rem;font-weight:800;margin-bottom:.2rem">EEG Seizure Detection</div>
-        <div style="font-size:.82rem;opacity:.82">Multi-model analysis — CNN, LSTM, GRU, Transformer &amp; ensemble voting</div>
-      </div>
-      <div style="font-size:.85rem;font-weight:700;opacity:.88;white-space:nowrap">Run now →</div>
-    </a>
-
     <!-- Mobile-only search (sidebar hidden on mobile) -->
     <div class="mobile-search-bar">
       <input class="mobile-search-input" placeholder="🔍  Search AI models…"
@@ -227,6 +214,19 @@
       </select>
       <span class="results-count" id="resultsCount"></span>
     </div>
+
+    <!-- Featured: Seizure Analysis tool -->
+    <a href="{% url 'ai_insights:seizure_analysis' %}"
+       style="display:flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#312e81,#4f46e5,#0ea5e9);border-radius:16px;padding:1.1rem 1.4rem;color:white;text-decoration:none;margin-bottom:1.1rem;transition:opacity .18s;flex-wrap:wrap"
+       onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+      <div style="font-size:2.2rem;line-height:1">🧠</div>
+      <div style="flex:1;min-width:150px">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.2rem">Featured Tool</div>
+        <div style="font-size:1rem;font-weight:800;margin-bottom:.2rem">EEG Seizure Detection</div>
+        <div style="font-size:.82rem;opacity:.82">Multi-model analysis — CNN, LSTM, GRU, Transformer &amp; ensemble voting</div>
+      </div>
+      <div style="font-size:.85rem;font-weight:700;opacity:.88;white-space:nowrap">Run now →</div>
+    </a>
 
     <div class="model-grid" id="modelGrid">
       {% for m in models %}
