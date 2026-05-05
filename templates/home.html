@@ -121,8 +121,12 @@ html,body{overflow-x:hidden}
         <h1>Your health,<br><span>finally understood</span></h1>
         <p class="hero-sub">HealthCompass brings together your medical records, wearable data, and AI-powered insights — giving you and your care team a complete picture of your health.</p>
         <div class="hero-btns">
-          <a href="/accounts/register/" class="btn-cta btn-cta-primary">Get Started Free</a>
-          <a href="#how-it-works" class="btn-cta btn-cta-ghost">See how it works</a>
+          {% if user.is_authenticated %}
+          <a href="/dashboard/" class="btn-cta btn-cta-primary">Go to Dashboard</a>
+          {% else %}
+          <a href="/accounts/register/" class="btn-cta btn-cta-primary">Create Free Account</a>
+          <a href="/accounts/login/" class="btn-cta btn-cta-ghost">Log In</a>
+          {% endif %}
         </div>
       </div>
       <div class="hero-stats">
@@ -279,8 +283,12 @@ html,body{overflow-x:hidden}
     <h2>Ready to understand<br><span>your health?</span></h2>
     <p>Join patients, doctors, and researchers already using HealthCompass. Free to start, no credit card required.</p>
     <div class="cta-btns">
+      {% if user.is_authenticated %}
+      <a href="/dashboard/" class="btn-cta btn-cta-primary">Go to Dashboard</a>
+      {% else %}
       <a href="/accounts/register/" class="btn-cta btn-cta-primary">Create Free Account</a>
       <a href="/accounts/login/" class="btn-cta" style="background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.3)">Log In</a>
+      {% endif %}
     </div>
   </section>
 
