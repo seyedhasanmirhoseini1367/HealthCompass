@@ -11,12 +11,13 @@
 .form-group input,.form-group select{width:100%;padding:.6rem .9rem;border:1.5px solid var(--border);border-radius:9px;font-size:.875rem;transition:border .2s;outline:none}
 .form-group input:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:500px){.form-row{grid-template-columns:1fr}.auth-card{padding:1.5rem}.auth-wrap{margin:1rem auto}}
 .errorlist{color:var(--danger);font-size:.78rem;margin-top:.25rem;list-style:none;padding:0}
 .btn-submit{width:100%;padding:.7rem;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .2s;margin-top:.5rem}
 .btn-submit:hover{background:var(--primary-dk)}
 .auth-footer{text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--muted)}
 .auth-footer a{color:var(--primary);font-weight:600}
-.role-info{background:#f0f7ff;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#0369a1}
+.role-info{background:#e0f2fe;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#0369a1}
 </style>
 {% endblock %}
 {% block content %}

@@ -35,6 +35,36 @@ class WearableUploadForm(forms.Form):
     )
 
 
+class TextPasteForm(forms.Form):
+    RECORD_TYPE_CHOICES = [('auto', 'Auto-detect (AI)')] + list(MedicalRecord.RecordType.choices)
+
+    text = forms.CharField(
+        label='Medical text',
+        widget=forms.Textarea(attrs={
+            'rows': 12,
+            'placeholder': (
+                'Paste any medical text here — lab results, prescriptions, '
+                'doctor notes, discharge summaries…\n\n'
+                'Example:\n'
+                'Glucose: 5.4 mmol/L (ref 3.9–5.6)\n'
+                'HbA1c: 38 mmol/mol (ref <48)\n'
+                'Cholesterol: 4.8 mmol/L'
+            ),
+        }),
+        help_text='AI will extract lab values, medications, diagnoses and dates automatically.',
+    )
+    record_type = forms.ChoiceField(
+        choices=RECORD_TYPE_CHOICES,
+        initial='auto',
+        label='Record type',
+        help_text='Leave on Auto-detect to let AI decide.',
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional personal notes…'}),
+    )
+
+
 class PDFUploadForm(forms.Form):
     pdf_file = forms.FileField(
         label='PDF file',

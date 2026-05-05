@@ -233,7 +233,7 @@ def patient_analytics(request):
     Personal health analytics for patients — lives under /insights/analytics/
     so it sits naturally in the AI & Analytics section.
     """
-    if not request.user.is_patient:
+    if not request.user.is_patient and not request.user.is_staff:
         messages.error(request, 'Access denied.')
         return redirect('dashboard:home')
 

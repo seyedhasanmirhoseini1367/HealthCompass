@@ -6,9 +6,9 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 
-from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm
+from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm, TextPasteForm
 from .models import MedicalRecord, ParsedLabValue, WearableDataPoint
-from .parsers import KantaXMLParser, WearableCSVParser, PDFParser
+from .parsers import KantaXMLParser, WearableCSVParser, PDFParser, TextParser
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +325,86 @@ def upload_pdf(request):
         return redirect('medical_records:detail', pk=record.pk)
 
     return render(request, 'medical_records/upload_pdf.html', {'form': form})
+
+
+# ─── Plain Text / Paste Upload ───────────────────────────────────────────────
+
+@login_required
+def upload_text(request):
+    form = TextPasteForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        raw_text = form.cleaned_data['text']
+        chosen_type = form.cleaned_data['record_type']
+
+        parser = TextParser()
+        parsed = parser.parse(raw_text)
+        structured = parsed.get('structured') or {}
+
+        # Resolve record type: AI suggestion wins unless user explicitly chose
+        if chosen_type == 'auto':
+            rtype = structured.get('record_type', MedicalRecord.RecordType.OTHER)
+        else:
+            rtype = chosen_type
+
+        title = structured.get('title') or raw_text[:60].strip().replace('\n', ' ')
+
+        rec_date = None
+        if structured.get('date'):
+            try:
+                rec_date = datetime.strptime(structured['date'], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        record = MedicalRecord.objects.create(
+            patient=request.user,
+            record_type=rtype,
+            source=MedicalRecord.Source.MANUAL_UPLOAD,
+            title=title,
+            raw_text=raw_text,
+            parsed_data=structured,
+            notes=form.cleaned_data.get('notes', ''),
+            record_date=rec_date,
+        )
+
+        # Create lab values extracted by AI
+        flagged = 0
+        for lv in structured.get('lab_values', []):
+            is_ab = lv.get('is_abnormal', False)
+            ParsedLabValue.objects.create(
+                record=record,
+                parameter_name=lv.get('name', 'Unknown'),
+                value=str(lv.get('value', '')),
+                unit=lv.get('unit', ''),
+                reference_range=lv.get('ref_range', ''),
+                is_abnormal=is_ab,
+            )
+            if is_ab:
+                flagged += 1
+
+        if flagged:
+            record.is_flagged = True
+            record.save(update_fields=['is_flagged'])
+            _create_alert(record, flagged)
+
+        # Index into RAG so AI Assistant can answer questions about it
+        try:
+            from rag_assistant.services.rag_service import RAGService
+            RAGService().index_record(record)
+        except Exception as e:
+            logger.warning(f'RAG indexing failed for pasted record: {e}')
+
+        msg = 'Record saved from pasted text.'
+        if structured:
+            msg += ' AI extracted structured data.'
+        if flagged:
+            msg += f' ⚠️ {flagged} abnormal value(s) detected.'
+            messages.warning(request, msg)
+        else:
+            messages.success(request, msg)
+
+        return redirect('medical_records:detail', pk=record.pk)
+
+    return render(request, 'medical_records/upload_text.html', {'form': form})
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

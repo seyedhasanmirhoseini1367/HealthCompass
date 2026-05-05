@@ -27,6 +27,14 @@
 .input-type-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:6px;font-size:.72rem;font-weight:700;background:#ede9fe;color:#7c3aed;margin-bottom:.6rem}
 .schema-row{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid #f1f5f9;font-size:.82rem}
 .pred-row{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f8fafc;border-radius:8px;margin-bottom:.35rem;font-size:.82rem}
+@media(max-width:650px){
+  .two-col{grid-template-columns:1fr !important}
+  .model-header{padding:1rem 1.25rem;border-radius:12px}
+  .model-header h1{font-size:1.15rem}
+  .model-meta{gap:.5rem .875rem;font-size:.77rem}
+  .pred-row{flex-wrap:wrap;gap:.3rem}
+  .result-score{font-size:1.75rem}
+}
 </style>
 {% endblock %}
 {% block content %}

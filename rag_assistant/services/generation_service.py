@@ -1,7 +1,8 @@
 # rag_assistant/services/generation_service.py
 """
 LLM generation service — supports:
-  • Gemini (google-genai v1.x)  — primary, free tier
+  • Groq (llama-3.1-8b-instant) — primary, generous free tier
+  • Gemini (google-genai v1.x)  — fallback
   • Anthropic Claude            — fallback
   • OpenAI                      — fallback
 
@@ -114,6 +115,28 @@ def _build_messages(context: str, query: str, history: List[Dict]) -> List[Dict]
     return messages
 
 
+# ── Non-streaming: Groq ───────────────────────────────────────────────────────
+
+def _call_groq(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Optional[str]:
+    api_key = getattr(settings, 'GROQ_API_KEY', '')
+    if not api_key:
+        return None
+    try:
+        from groq import Groq
+        client   = Groq(api_key=api_key)
+        messages = [{'role': 'system', 'content': sys_prompt}] + _build_messages(context, query, history)
+        resp     = client.chat.completions.create(
+            model      = settings.RAG_CONFIG['GROQ_MODEL'],
+            messages   = messages,
+            max_tokens = settings.RAG_CONFIG['MAX_TOKENS'],
+            temperature= 0.4,
+        )
+        return (resp.choices[0].message.content or '').strip() or None
+    except Exception as exc:
+        logger.warning('Groq non-stream error: %s', exc)
+        return None
+
+
 # ── Non-streaming: Gemini ──────────────────────────────────────────────────────
 
 def _call_gemini(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Optional[str]:
@@ -210,6 +233,7 @@ def generate(
     context, sys_prompt = _resolve_context_and_prompt(chunks, context_override)
 
     for caller, name in [
+        (_call_groq,      'groq'),
         (_call_gemini,    'gemini'),
         (_call_anthropic, 'anthropic'),
         (_call_openai,    'openai'),
@@ -219,6 +243,32 @@ def generate(
             return result, _build_sources(chunks), name
 
     return _fallback(), [], 'fallback'
+
+
+# ── Streaming: Groq ───────────────────────────────────────────────────────────
+
+def _stream_groq(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
+    api_key = getattr(settings, 'GROQ_API_KEY', '')
+    if not api_key:
+        return
+    try:
+        from groq import Groq
+        client   = Groq(api_key=api_key)
+        messages = [{'role': 'system', 'content': sys_prompt}] + _build_messages(context, query, history)
+        stream   = client.chat.completions.create(
+            model      = settings.RAG_CONFIG['GROQ_MODEL'],
+            messages   = messages,
+            max_tokens = settings.RAG_CONFIG['MAX_TOKENS'],
+            temperature= 0.4,
+            stream     = True,
+        )
+        for chunk in stream:
+            text = chunk.choices[0].delta.content or ''
+            if text:
+                yield text
+    except Exception as exc:
+        logger.warning('Groq stream error: %s', exc)
+        yield from _stream_gemini(context, query, history, sys_prompt=sys_prompt)
 
 
 # ── Streaming: Gemini ──────────────────────────────────────────────────────────
@@ -325,11 +375,14 @@ def generate_streaming(
             yielded = True
             yield token
 
-    api_key_gemini    = getattr(settings, 'GEMINI_API_KEY', '')
+    api_key_groq      = getattr(settings, 'GROQ_API_KEY',      '')
+    api_key_gemini    = getattr(settings, 'GEMINI_API_KEY',    '')
     api_key_anthropic = getattr(settings, 'ANTHROPIC_API_KEY', '')
-    api_key_openai    = getattr(settings, 'OPENAI_API_KEY', '')
+    api_key_openai    = getattr(settings, 'OPENAI_API_KEY',    '')
 
-    if api_key_gemini:
+    if api_key_groq:
+        yield from _track(_stream_groq(context, query, history, sys_prompt=sys_prompt))
+    elif api_key_gemini:
         yield from _track(_stream_gemini(context, query, history, sys_prompt=sys_prompt))
     elif api_key_anthropic:
         yield from _track(_stream_anthropic(context, query, history, sys_prompt=sys_prompt))
@@ -344,6 +397,8 @@ def generate_streaming(
 
 def active_stream_provider() -> str:
     """Return which provider would be used for a streaming call right now."""
+    if getattr(settings, 'GROQ_API_KEY', ''):
+        return 'groq'
     if getattr(settings, 'GEMINI_API_KEY', ''):
         return 'gemini'
     if getattr(settings, 'ANTHROPIC_API_KEY', ''):
@@ -358,7 +413,7 @@ def active_stream_provider() -> str:
 def _fallback() -> str:
     return (
         "I'm unable to connect to the AI service right now. "
-        "Please ensure GEMINI_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY "
+        "Please ensure GROQ_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY "
         "is configured in your environment.\n\n"
         "*Always consult your doctor for medical advice.*"
     )

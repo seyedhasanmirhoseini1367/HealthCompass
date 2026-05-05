@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Paste Medical Text — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.upload-card{max-width:640px;margin:0 auto}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;font-family:inherit}
+.form-control:focus{outline:none;border-color:var(--primary)}
+textarea.form-control{resize:vertical;line-height:1.6}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.ai-note{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:.9rem 1rem;font-size:.84rem;color:#92400e;margin-bottom:1.25rem}
+.examples-strip{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.ex-chip{padding:.28rem .72rem;border-radius:20px;font-size:.75rem;font-weight:600;background:#f1f5f9;color:#475569;cursor:pointer;border:1px solid var(--border);transition:all .15s}
+.ex-chip:hover{background:#e0f2fe;border-color:#7dd3fc;color:#0369a1}
+.char-count{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.25rem}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="upload-card">
+  <a href="{% url 'medical_records:list' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
+    <i class="fas fa-arrow-left"></i> Back to records
+  </a>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="font-size:3rem;text-align:center;margin-bottom:.75rem">📋</div>
+      <h2 style="font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:.35rem">Paste Medical Text</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.875rem;margin-bottom:1.25rem">
+        Copy any medical text and paste it here. AI will extract lab values, medications, diagnoses and dates automatically.
+      </p>
+
+      <div class="ai-note">
+        <i class="fas fa-magic"></i>
+        <strong> Auto-parse:</strong> Gemini AI reads the text, identifies the record type, extracts structured values, detects abnormal results and saves everything — no manual entry needed.
+      </div>
+
+      <!-- Quick-insert example buttons -->
+      <p style="font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.4rem">QUICK EXAMPLES</p>
+      <div class="examples-strip">
+        <button type="button" class="ex-chip" onclick="fillExample('lab')">🧪 Lab result</button>
+        <button type="button" class="ex-chip" onclick="fillExample('rx')">💊 Prescription</button>
+        <button type="button" class="ex-chip" onclick="fillExample('note')">📝 Doctor note</button>
+      </div>
+
+      <form method="post" id="paste-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label" for="id_text">Medical Text</label>
+          <textarea id="id_text" name="text" class="form-control" rows="12"
+            placeholder="Paste your medical text here…&#10;&#10;Example:&#10;Patient: John Doe, 45M&#10;Date: 2024-03-15&#10;&#10;Lab Results:&#10;Hemoglobin: 142 g/L (ref 130-175)&#10;Glucose: 6.1 mmol/L (ref 3.9-5.6) [HIGH]&#10;Cholesterol: 5.2 mmol/L (ref <5.0) [HIGH]"
+            oninput="updateCount()">{{ form.text.value|default:'' }}</textarea>
+          <div class="char-count"><span id="char-count">0</span> characters</div>
+          {% if form.text.errors %}
+          <div style="color:#dc2626;font-size:.8rem;margin-top:.3rem">{{ form.text.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">{{ form.text.help_text }}</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Record Type</label>
+          <select name="record_type" class="form-control">
+            {% for value, label in form.fields.record_type.choices %}
+            <option value="{{ value }}"{% if value == 'auto' %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="help-text">{{ form.fields.record_type.help_text }}</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Optional personal notes…">{{ form.notes.value|default:'' }}</textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn"
+          style="width:100%;background:#f59e0b;color:white;padding:.7rem;font-size:.95rem;border:none;cursor:pointer">
+          <i class="fas fa-magic"></i> Parse &amp; Save
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function updateCount() {
+  document.getElementById('char-count').textContent =
+    document.getElementById('id_text').value.length;
+}
+updateCount();
+
+document.getElementById('paste-form').addEventListener('submit', function() {
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI is parsing…';
+});
+
+var EXAMPLES = {
+  lab: `Patient: Demo Patient\nDate: 2024-03-15\n\nBlood Test Results:\nHemoglobin: 142 g/L (ref 130-175)\nGlucose (fasting): 6.1 mmol/L (ref 3.9-5.6)  HIGH\nHbA1c: 42 mmol/mol (ref <48)\nTotal Cholesterol: 5.4 mmol/L (ref <5.0)  HIGH\nLDL: 3.2 mmol/L (ref <3.0)  HIGH\nHDL: 1.4 mmol/L (ref >1.0)\nTriglycerides: 1.8 mmol/L (ref <1.7)  HIGH\nCreatinine: 82 umol/L (ref 60-110)\nSodium: 140 mmol/L (ref 136-145)\nPotassium: 4.1 mmol/L (ref 3.5-5.0)\n\nOrdering physician: Dr. A. Mäkinen\nFacility: Terveystalo Helsinki`,
+
+  rx: `PRESCRIPTION\nDate: 2024-03-15\nPatient: Demo Patient, DOB 1979-06-20\n\nMedication 1:\nMetformin 500mg\nTake 1 tablet twice daily with meals\nQty: 60 tablets, 2 refills\n\nMedication 2:\nAtorvastatin 20mg\nTake 1 tablet at bedtime\nQty: 30 tablets, 3 refills\n\nPrescribing physician: Dr. A. Mäkinen\nLicense: FI-12345`,
+
+  note: `OUTPATIENT VISIT NOTE\nDate: 2024-03-15\nPatient: Demo Patient, 45M\n\nChief Complaint: Routine annual check-up. Patient reports fatigue and mild shortness of breath on exertion for the past 2 months.\n\nAssessment:\n1. Type 2 Diabetes Mellitus (E11.9) — HbA1c mildly elevated at 42 mmol/mol. Continue Metformin, dietary counselling advised.\n2. Hyperlipidaemia (E78.5) — LDL elevated. Starting Atorvastatin 20mg.\n3. Essential Hypertension (I10) — BP 138/88 today. Lifestyle modification advised.\n\nPlan:\n- Repeat labs in 3 months\n- Refer to dietitian\n- Follow-up in 6 weeks\n\nDr. A. Mäkinen, MD`
+};
+
+function fillExample(type) {
+  var ta = document.getElementById('id_text');
+  ta.value = EXAMPLES[type];
+  updateCount();
+  ta.focus();
+}
+</script>
+{% endblock %}

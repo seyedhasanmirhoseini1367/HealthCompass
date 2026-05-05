@@ -40,9 +40,10 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 22px rgba(0,0,0,.1);
 }
-.upload-card.kanta { background: linear-gradient(135deg,#e0f2fe,#f0f9ff); border-color: #bae6fd; }
+.upload-card.kanta { background: linear-gradient(135deg,#e0f2fe,#f0f7ff); border-color: #bae6fd; }
 .upload-card.wear  { background: linear-gradient(135deg,#ede9fe,#f5f3ff); border-color: #c4b5fd; }
 .upload-card.pdf   { background: linear-gradient(135deg,#dcfce7,#f0fdf4); border-color: #86efac; }
+.upload-card.txt   { background: linear-gradient(135deg,#fff7ed,#fef9c3); border-color: #fde68a; }
 
 .uc-icon {
   width: 44px; height: 44px;
@@ -53,6 +54,7 @@
 .kanta .uc-icon { background: #0ea5e9; }
 .wear  .uc-icon { background: #7c3aed; }
 .pdf   .uc-icon { background: #10b981; }
+.txt   .uc-icon { background: #f59e0b; }
 
 .uc-title { font-size: .92rem; font-weight: 800; color: var(--text); }
 .uc-desc  { font-size: .76rem; color: #64748b; line-height: 1.45; }
@@ -72,6 +74,7 @@
 .kanta .uc-btn { background: #0ea5e9; }
 .wear  .uc-btn { background: #7c3aed; }
 .pdf   .uc-btn { background: #10b981; }
+.txt   .uc-btn { background: #f59e0b; }
 
 .stats-widget {
   background: white;
@@ -233,6 +236,12 @@
   .upload-sidebar  { width: 100%; position: static; flex-direction: row; flex-wrap: wrap; }
   .upload-card     { flex: 1; min-width: 190px; }
 }
+@media (max-width: 500px) {
+  .upload-sidebar  { gap: .5rem; }
+  .upload-card     { min-width: 100%; flex: unset; }
+  .sidebar-heading { font-size: .8rem; }
+  .record-grid     { grid-template-columns: 1fr; }
+}
 </style>
 {% endblock %}
 
@@ -267,6 +276,15 @@
       <div class="uc-desc">Upload lab reports, discharge summaries, prescriptions, or any medical PDF. AI extracts structured data automatically.</div>
       <a href="{% url 'medical_records:upload_pdf' %}" class="uc-btn">
         <i class="fas fa-upload"></i> Upload PDF
+      </a>
+    </div>
+
+    <div class="upload-card txt">
+      <div class="uc-icon"><i class="fas fa-paste"></i></div>
+      <div class="uc-title">Paste Text</div>
+      <div class="uc-desc">Copy-paste lab results, doctor notes, prescriptions or any medical text. AI auto-parses and stores structured data.</div>
+      <a href="{% url 'medical_records:upload_text' %}" class="uc-btn">
+        <i class="fas fa-magic"></i> Paste & Parse
       </a>
     </div>
 

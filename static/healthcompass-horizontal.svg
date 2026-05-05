@@ -1,0 +1,45 @@
+<svg width="320" height="60" viewBox="0 0 320 60" xmlns="http://www.w3.org/2000/svg">
+<title>HealthCompass horizontal logo</title>
+<desc>Compact horizontal HealthCompass logo for navigation bars and headers.</desc>
+
+<rect x="2" y="2" width="56" height="56" rx="12" fill="#0A1F38"/>
+
+<g transform="translate(30, 30)">
+  <circle cx="0" cy="0" r="22" fill="none" stroke="#7DD3C0" stroke-width="0.6" stroke-dasharray="1.5 2" opacity="0.5"/>
+
+  <g opacity="0.95">
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#4ADE80" stroke-width="1.3" stroke-linecap="round"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#4ADE80" stroke-width="1.3" stroke-linecap="round" transform="rotate(25)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#4ADE80" stroke-width="1.3" stroke-linecap="round" transform="rotate(50)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#4ADE80" stroke-width="1.3" stroke-linecap="round" transform="rotate(75)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FBBF44" stroke-width="1.3" stroke-linecap="round" transform="rotate(115)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FBBF44" stroke-width="1.3" stroke-linecap="round" transform="rotate(140)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FBBF44" stroke-width="1.3" stroke-linecap="round" transform="rotate(165)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#E94B4B" stroke-width="1.3" stroke-linecap="round" transform="rotate(205)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#E94B4B" stroke-width="1.3" stroke-linecap="round" transform="rotate(230)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#E94B4B" stroke-width="1.3" stroke-linecap="round" transform="rotate(255)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FB923C" stroke-width="1.3" stroke-linecap="round" transform="rotate(295)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FB923C" stroke-width="1.3" stroke-linecap="round" transform="rotate(320)"/>
+    <line x1="0" y1="-20" x2="0" y2="-24" stroke="#FB923C" stroke-width="1.3" stroke-linecap="round" transform="rotate(345)"/>
+  </g>
+
+  <circle cx="0" cy="-12" r="3.5" fill="#FFFFFF"/>
+  <polygon points="0,-9 3.5,-1 0,3.5 -3.5,-1" fill="#FFFFFF"/>
+  <path d="M -3 -4 Q -9 -3 -14 -0.5 L -14 0.5 Q -9 -0.5 -3 -0.5 Z" fill="#FFFFFF" opacity="0.92"/>
+  <path d="M 3 -4 Q 9 -3 14 -0.5 L 14 0.5 Q 9 -0.5 3 -0.5 Z" fill="#FFFFFF" opacity="0.92"/>
+  <polygon points="0,3.5 3,9 0,17 -3,9" fill="#E8F0FE"/>
+
+  <path d="M -16 -12 L -12 -12 L -10 -16 L -8 -10 L -5 -18 L -2 -8 L 1 -19 L 4 -8 L 7 -16 L 10 -10 L 12 -12 L 16 -12"
+        fill="none" stroke="#4ADE80" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <polyline points="-16,0 -10,0 -7,-5 -4,4 -1,-7 2,3 5,-2 8,-6 11,0 16,0"
+            fill="none" stroke="#E94B4B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="0" cy="0" r="1.8" fill="#0A1F38"/>
+  <circle cx="0" cy="0" r="1" fill="#E94B4B"/>
+</g>
+
+<g transform="translate(74, 36)">
+  <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22" font-weight="500" fill="#0A1F38" letter-spacing="-0.3">Health<tspan fill="#1B3A57">Compass</tspan></text>
+</g>
+</svg>

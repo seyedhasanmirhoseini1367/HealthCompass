@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}HealthCompass{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/healthcompass-favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous"/>
     <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -11,7 +12,7 @@
     body{font-family:Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
     a{color:inherit;text-decoration:none}
     .navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
-    .nav-brand{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.2rem;color:var(--primary-dk)}
+    .nav-brand{display:flex;align-items:center}
     .nav-links{display:flex;align-items:center;gap:.25rem;list-style:none}
     .nav-links a{padding:.45rem .85rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--muted);transition:all .2s}
     .nav-links a:hover{color:var(--primary-dk);background:#e0f2fe}
@@ -55,12 +56,55 @@
     .badge-success{background:#dcfce7;color:#15803d}
     .badge-warning{background:#fef3c7;color:#92400e}
     .badge-danger{background:#fee2e2;color:#b91c1c}
+    @media(max-width:600px){
+      main{padding:.75rem .6rem}
+      /* Typography */
+      .dash-header{border-radius:0 0 18px 18px !important;padding:1.25rem 1rem 1.75rem !important}
+      .dash-header h1{font-size:1.2rem !important}
+      .dash-header p{font-size:.82rem !important}
+      /* Grids → single column */
+      .grid-2,.grid-3{grid-template-columns:1fr !important}
+      .form-row{grid-template-columns:1fr !important}
+      .risk-grid{grid-template-columns:1fr !important}
+      .record-grid{grid-template-columns:1fr !important}
+      /* Stats: keep 2-col on mobile (compact) */
+      .stat-grid{grid-template-columns:repeat(2,1fr) !important}
+      /* Tables: horizontal scroll */
+      table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .mono-table{overflow-x:auto;display:block}
+      /* Records sidebar stacks */
+      .records-page{flex-direction:column !important}
+      .upload-sidebar{width:100% !important;max-width:100% !important}
+      /* Item rows */
+      .item-row{flex-wrap:wrap;gap:.35rem}
+      /* Cards */
+      .card-body{padding:.875rem}
+      /* Reduce section headings */
+      .section-h{font-size:1.1rem}
+      /* Hero */
+      .hero h1{font-size:1.85rem !important}
+      .hero p{font-size:.95rem !important}
+    }
+    .nav-hamburger{display:none;background:none;border:none;font-size:1.25rem;color:var(--text);cursor:pointer;padding:.35rem .5rem;border-radius:8px;line-height:1;align-items:center;justify-content:center}
+    .nav-hamburger:hover{background:var(--bg)}
+    .mobile-menu{display:none;position:absolute;top:60px;left:0;right:0;background:white;border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.1);z-index:99;padding:.5rem 1rem .875rem}
+    .mobile-menu.open{display:block}
+    .mm-link{display:flex;align-items:center;gap:.65rem;padding:.65rem .75rem;border-radius:9px;font-size:.9rem;font-weight:500;color:var(--text);transition:background .2s}
+    .mm-link:hover{background:var(--bg);color:var(--primary-dk)}
+    .mm-link i{width:16px;text-align:center;color:var(--primary)}
+    .mm-divider{height:1px;background:var(--border);margin:.4rem 0}
+    @media(max-width:768px){
+      .nav-links{display:none}
+      .nav-hamburger{display:flex}
+      .nav-right>a.btn-nav-outline,.nav-right>a.btn-nav-solid{display:none}
+      .nav-user>span,.nav-user>i{display:none}
+    }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
 <nav class="navbar">
-    <a href="/" class="nav-brand"><span>🧭</span><span>HealthCompass</span></a>
+    <a href="/" class="nav-brand"><img src="/static/healthcompass-horizontal.svg" alt="HealthCompass" style="height:38px;width:auto"></a>
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
         <li><a href="/stories/">Health News</a></li>
@@ -72,6 +116,7 @@
         {% endif %}
     </ul>
     <div class="nav-right">
+        <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>
         {% if user.is_authenticated %}
         <a href="/notifications/" class="nav-notification" title="Notifications">
             <i class="fas fa-bell"></i>
@@ -98,6 +143,25 @@
         <a href="/accounts/register/" class="btn-nav-solid">Get Started</a>
         {% endif %}
     </div>
+    <div id="mobileMenu" class="mobile-menu">
+      <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
+      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
+      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
+      {% if user.is_authenticated %}
+      <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
+      <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> My Records</a>
+      <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+      <div class="mm-divider"></div>
+      <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
+      <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
+      {% else %}
+      <div class="mm-divider"></div>
+      <div style="display:flex;gap:.75rem;padding:.25rem 0">
+        <a href="/accounts/login/" class="btn btn-outline" style="flex:1;justify-content:center">Log In</a>
+        <a href="/accounts/register/" class="btn btn-primary" style="flex:1;justify-content:center">Get Started</a>
+      </div>
+      {% endif %}
+    </div>
 </nav>
 {% if messages %}
 <div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>
@@ -113,10 +177,18 @@ function toggleUserMenu() {
   const m = document.getElementById('userMenu');
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
 }
+function toggleMobileMenu() {
+  document.getElementById('mobileMenu').classList.toggle('open');
+}
 document.addEventListener('click', function(e) {
   if (!document.getElementById('navUserBtn')?.contains(e.target)) {
     const m = document.getElementById('userMenu');
     if (m) m.style.display = 'none';
+  }
+  const btn = document.getElementById('hamburgerBtn');
+  const mm = document.getElementById('mobileMenu');
+  if (mm && btn && !mm.contains(e.target) && !btn.contains(e.target)) {
+    mm.classList.remove('open');
   }
 });
 </script>

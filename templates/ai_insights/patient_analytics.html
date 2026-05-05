@@ -47,6 +47,7 @@
 /* ── Two-column layout ───────────────────────────────────────────────────── */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
 @media(max-width:768px){.two-col{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}}
+@media(max-width:500px){.stat-grid{grid-template-columns:repeat(2,1fr)}.snapshot-grid{grid-template-columns:repeat(2,1fr)}.analytics-header{padding:1.25rem 1rem 1.75rem;border-radius:0 0 20px 20px}}
 
 .card{background:white;border-radius:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
 .card-header{padding:.875rem 1.25rem;font-weight:700;font-size:.9rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;color:#1e293b}
@@ -178,7 +179,9 @@
           <div style="font-size:.75rem;color:var(--muted)">Info</div>
         </div>
       </div>
-      <canvas id="alerts-chart" height="140"></canvas>
+      <div style="position:relative;height:140px">
+        <canvas id="alerts-chart"></canvas>
+      </div>
     </div>
   </div>
 
@@ -186,7 +189,9 @@
   <div class="card">
     <div class="card-header"><i class="fas fa-folder-medical" style="color:var(--primary)"></i> Records by Type</div>
     <div class="card-body" style="display:flex;align-items:center;justify-content:center">
-      <canvas id="records-type-chart" style="max-height:180px;max-width:260px"></canvas>
+      <div style="position:relative;height:180px;width:260px">
+        <canvas id="records-type-chart"></canvas>
+      </div>
     </div>
   </div>
 
@@ -199,7 +204,9 @@
   <div class="card">
     <div class="card-header"><i class="fas fa-calendar-check" style="color:#10b981"></i> Upload Activity</div>
     <div class="card-body">
-      <canvas id="upload-chart" height="140"></canvas>
+      <div style="position:relative;height:140px">
+        <canvas id="upload-chart"></canvas>
+      </div>
     </div>
   </div>
 
@@ -219,7 +226,9 @@
           <div style="font-size:.8rem;color:var(--muted)">Latest AI prediction</div>
         </div>
       </div>
-      <canvas id="risk-chart" height="120"></canvas>
+      <div style="position:relative;height:120px">
+        <canvas id="risk-chart"></canvas>
+      </div>
       {% else %}
       <div class="no-data-msg" style="padding:1.5rem">
         <i class="fas fa-robot"></i>
@@ -262,7 +271,7 @@ function ptColor(pt) {
   return '#22c55e';
 }
 function bioColor(idx) {
-  const palette = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+  const palette = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
   return palette[idx % palette.length];
 }
 
@@ -366,6 +375,8 @@ if (alertsCtx && (ALERTS_DATA.critical + ALERTS_DATA.warning + ALERTS_DATA.info)
       }]
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       cutout: '65%',
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
     }
@@ -379,7 +390,7 @@ const recTypeCtx = document.getElementById('records-type-chart');
 if (recTypeCtx && REC_TYPES.length) {
   const rtLabels = REC_TYPES.map(r => r.record_type.replace('_',' '));
   const rtCounts = REC_TYPES.map(r => r.count);
-  const rtColors = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
+  const rtColors = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
   new Chart(recTypeCtx, {
     type: 'doughnut',
     data: {
@@ -392,6 +403,8 @@ if (recTypeCtx && REC_TYPES.length) {
       }]
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       cutout: '55%',
       plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }
     }

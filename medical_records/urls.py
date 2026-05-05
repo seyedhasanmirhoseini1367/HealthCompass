@@ -10,4 +10,5 @@ urlpatterns = [
     path('upload/kanta/', views.upload_kanta, name='upload_kanta'),
     path('upload/wearable/', views.upload_wearable, name='upload_wearable'),
     path('upload/pdf/', views.upload_pdf, name='upload_pdf'),
+    path('upload/text/', views.upload_text, name='upload_text'),
 ]

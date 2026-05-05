@@ -395,6 +395,58 @@ class WearableCSVParser:
         return value, unit
 
 
+# ─── Plain Text Parser ───────────────────────────────────────────────────────
+
+class TextParser:
+    """Parse free-form pasted medical text and structure it with Gemini."""
+
+    def parse(self, text: str) -> dict:
+        result = {
+            'raw_text': text,
+            'structured': None,
+        }
+        if text.strip():
+            result['structured'] = self._structure_with_ai(text)
+        return result
+
+    def _structure_with_ai(self, text: str) -> dict | None:
+        from django.conf import settings
+        api_key = getattr(settings, 'GEMINI_API_KEY', '')
+        if not api_key:
+            return None
+
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
+            prompt = f"""Extract structured medical data from this text. Return JSON with:
+{{
+  "record_type": "lab_result|prescription|diagnosis|vaccination|imaging|discharge|other",
+  "title": "short descriptive title (max 80 chars)",
+  "date": "YYYY-MM-DD or null",
+  "summary": "2-3 sentence summary",
+  "lab_values": [{{"name":"","value":"","unit":"","ref_range":"","is_abnormal":false}}],
+  "medications": [{{"name":"","dose":"","frequency":"","route":""}}],
+  "diagnoses": [{{"code":"","description":""}}],
+  "provider": "",
+  "facility": ""
+}}
+Return only valid JSON, no markdown fences.
+
+TEXT:
+{text[:4000]}"""
+
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning(f'Gemini text structuring failed: {e}')
+            return None
+
+
 # ─── PDF Parser ──────────────────────────────────────────────────────────────
 
 class PDFParser:

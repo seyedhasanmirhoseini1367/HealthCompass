@@ -259,30 +259,23 @@ def _run_file_input(ai_model, input_file, itype: str) -> dict:
 
 def generate_interpretation(ai_model, result: dict, input_data: dict) -> str:
     """
-    Use Gemini to generate a patient-friendly interpretation of the prediction result.
-    Uses the model's interpretation_guide as context.
+    Generate a patient-friendly interpretation of the prediction result.
+    Tries Groq → Gemini → static fallback.
     """
     from django.conf import settings
-    api_key = getattr(settings, 'GEMINI_API_KEY', '')
-    if not api_key:
-        return _static_interpretation(result)
 
     guide = ai_model.interpretation_guide.strip()
     if not guide:
         guide = f"Model: {ai_model.name}. Category: {ai_model.get_category_display()}. {ai_model.description}"
 
-    label  = result.get('label', 'unknown')
-    risk   = result.get('risk_score')
+    label    = result.get('label', 'unknown')
+    risk     = result.get('risk_score')
     risk_pct = f"{risk*100:.0f}%" if risk is not None else 'N/A'
-    demo   = result.get('demo', False)
+    demo     = result.get('demo', False)
 
-    # Summarise inputs for context
     inputs_str = ', '.join(f'{k}={v}' for k, v in input_data.items() if k != 'csrfmiddlewaretoken') if input_data else ''
     raw_summary = result.get('input_summary', '')
-    if isinstance(raw_summary, dict):
-        file_summary = ', '.join(f'{k}: {v}' for k, v in raw_summary.items())
-    else:
-        file_summary = str(raw_summary) if raw_summary else ''
+    file_summary = ', '.join(f'{k}: {v}' for k, v in raw_summary.items()) if isinstance(raw_summary, dict) else str(raw_summary or '')
 
     prompt = f"""You are a compassionate medical AI assistant explaining a health risk assessment result to a patient.
 
@@ -296,7 +289,7 @@ PREDICTION RESULT:
 {'- Input data: ' + file_summary if file_summary else ''}
 {'- Note: this is a demo/rule-based result, not from a real trained model.' if demo else ''}
 
-Write a concise, empathetic 3–5 sentence interpretation for the patient. Include:
+Write a concise, empathetic 3-5 sentence interpretation for the patient. Include:
 1. What the result means in plain language
 2. What factors contributed most (if inputs are provided)
 3. A clear, actionable next step
@@ -304,22 +297,48 @@ Write a concise, empathetic 3–5 sentence interpretation for the patient. Inclu
 
 Do NOT use markdown. Write in plain paragraphs."""
 
-    try:
-        from google import genai
-        from google.genai import types
-        from django.conf import settings as django_settings
+    # ── Try Groq first ────────────────────────────────────────────────────────
+    groq_key = getattr(settings, 'GROQ_API_KEY', '')
+    if groq_key:
+        try:
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+            resp = client.chat.completions.create(
+                model      = settings.RAG_CONFIG.get('GROQ_MODEL', 'llama-3.1-8b-instant'),
+                messages   = [{'role': 'user', 'content': prompt}],
+                max_tokens = 600,
+                temperature= 0.4,
+            )
+            text = (resp.choices[0].message.content or '').strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning('Groq interpretation failed: %s', e)
 
-        client   = genai.Client(api_key=api_key)
-        model_id = django_settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
-        response = client.models.generate_content(
-            model    = model_id,
-            contents = [prompt],
-            config   = types.GenerateContentConfig(temperature=0.4, max_output_tokens=512),
-        )
-        return (response.text or '').strip() or _static_interpretation(result)
-    except Exception as e:
-        logger.warning(f'Gemini interpretation failed: {e}')
-        return _static_interpretation(result)
+    # ── Fallback: Gemini ──────────────────────────────────────────────────────
+    gemini_key = getattr(settings, 'GEMINI_API_KEY', '')
+    if gemini_key:
+        try:
+            from google import genai
+            from google.genai import types
+            client   = genai.Client(api_key=gemini_key)
+            model_id = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
+            config_kwargs = dict(temperature=0.4, max_output_tokens=1024)
+            # Disable thinking for gemini-2.5-* to avoid burning token budget on reasoning
+            if 'gemini-2.5' in model_id:
+                config_kwargs['thinking_config'] = types.ThinkingConfig(thinking_budget=0)
+            response = client.models.generate_content(
+                model    = model_id,
+                contents = [prompt],
+                config   = types.GenerateContentConfig(**config_kwargs),
+            )
+            text = (response.text or '').strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning('Gemini interpretation failed: %s', e)
+
+    return _static_interpretation(result)
 
 
 def _static_interpretation(result: dict) -> str:

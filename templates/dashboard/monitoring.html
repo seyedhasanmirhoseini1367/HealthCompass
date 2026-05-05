@@ -40,6 +40,15 @@
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
 @media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .mon-header{padding:1.25rem 1rem;border-radius:12px}
+  .mon-header h1{font-size:1.1rem}
+  .tab-bar{gap:.25rem;overflow-x:auto;flex-wrap:nowrap;padding-bottom:.25rem}
+  .tab-btn{font-size:.78rem;padding:.4rem .7rem;white-space:nowrap}
+  .risk-grid{grid-template-columns:1fr}
+  .card .mono-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stat-num{font-size:1.5rem}
+}
 
 /* ── Chart card ───────────────────────────────────────────────────────────── */
 .chart-card{background:white;border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:1.25rem;margin-bottom:1.25rem}

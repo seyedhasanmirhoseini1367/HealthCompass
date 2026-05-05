@@ -4,7 +4,19 @@
 <style>
 /* ── Layout ─────────────────────────────────────────────────────────────────── */
 .ai-layout{display:grid;grid-template-columns:240px 1fr;gap:1.5rem;align-items:start}
-@media(max-width:780px){.ai-layout{grid-template-columns:1fr}.ai-sidebar{display:none}}
+@media(max-width:780px){
+  .ai-layout{grid-template-columns:1fr}
+  .ai-sidebar{display:none !important}
+  .mobile-search-bar{display:block !important}
+  .main-header h1{font-size:1.1rem}
+  .main-header-sub{display:none}
+  .header-actions .btn{font-size:.78rem;padding:.38rem .75rem}
+  .sort-bar{font-size:.78rem;flex-wrap:wrap;gap:.4rem}
+  .results-count{margin-left:0}
+}
+.mobile-search-bar{display:none;margin-bottom:1rem}
+.mobile-search-input{width:100%;padding:.6rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;transition:border .15s}
+.mobile-search-input:focus{border-color:var(--primary)}
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */
 .ai-sidebar{position:sticky;top:1.25rem;background:white;border:1px solid var(--border);border-radius:16px;padding:1.25rem;display:flex;flex-direction:column;gap:1.25rem}
@@ -13,10 +25,10 @@
 .sidebar-search:focus{border-color:var(--primary)}
 .filter-chip{display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;border-radius:9px;font-size:.82rem;color:var(--text);cursor:pointer;transition:all .15s;border:none;background:transparent;width:100%;text-align:left}
 .filter-chip:hover{background:#f1f5f9}
-.filter-chip.active{background:#dbeafe;color:#1d4ed8;font-weight:600}
+.filter-chip.active{background:#dbeafe;color:#0369a1;font-weight:600}
 .filter-chip .chip-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .filter-chip .chip-count{margin-left:auto;font-size:.72rem;background:#f1f5f9;padding:.1rem .45rem;border-radius:20px;color:var(--muted)}
-.filter-chip.active .chip-count{background:#bfdbfe;color:#1d4ed8}
+.filter-chip.active .chip-count{background:#bae6fd;color:#0369a1}
 .sidebar-divider{border:none;border-top:1px solid var(--border);margin:0}
 .stats-row{display:flex;flex-direction:column;gap:.35rem}
 .stat-item{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
@@ -59,14 +71,14 @@
 .cat-wearable::before,.cat-wearable .chip-dot{background:#10b981}
 .cat-wearable .model-cat-badge{background:#d1fae5;color:#065f46}
 .cat-general::before,.cat-general .chip-dot{background:#0ea5e9}
-.cat-general .model-cat-badge{background:#e0f2fe;color:#0369a1}
+.cat-general .model-cat-badge{background:#dbeafe;color:#0369a1}
 .cat-other::before,.cat-other .chip-dot{background:#94a3b8}
 .cat-other .model-cat-badge{background:#f1f5f9;color:#64748b}
 
 /* ── Show More ──────────────────────────────────────────────────────────────── */
 .show-more-wrap{text-align:center;margin-top:1.25rem}
 .show-more-btn{padding:.6rem 2rem;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:.88rem;font-weight:600;color:var(--text);cursor:pointer;transition:all .18s}
-.show-more-btn:hover{border-color:var(--primary);color:var(--primary);background:#eff6ff}
+.show-more-btn:hover{border-color:var(--primary);color:var(--primary);background:#e0f2fe}
 .show-more-btn:disabled{opacity:.4;cursor:not-allowed}
 
 /* ── Empty ──────────────────────────────────────────────────────────────────── */
@@ -82,7 +94,7 @@
   <aside class="ai-sidebar">
 
     <!-- My Analytics nav (patients only) -->
-    {% if user.is_authenticated and user.is_patient %}
+    {% if user.is_authenticated and user.is_patient or user.is_staff %}
     <a href="{% url 'ai_insights:patient_analytics' %}"
        class="analytics-nav-btn"
        style="display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:12px;background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;font-size:.875rem;font-weight:700;text-decoration:none;transition:opacity .15s"
@@ -152,6 +164,13 @@
 
   <!-- ── Main ─────────────────────────────────────────────────────────────── -->
   <div class="ai-main">
+
+    <!-- Mobile-only search (sidebar hidden on mobile) -->
+    <div class="mobile-search-bar">
+      <input class="mobile-search-input" placeholder="🔍  Search AI models…"
+             oninput="document.getElementById('sidebarSearch').value=this.value;applyFilters()"
+             autocomplete="off">
+    </div>
 
     <div class="main-header">
       <div>
