@@ -45,7 +45,31 @@ class HealthCompassSocialAdapter(DefaultSocialAccountAdapter):
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form)
+        from accounts.models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
         from accounts.views import ROLES_REQUIRING_APPROVAL, _notify_admin_new_registration
-        if user.role in ROLES_REQUIRING_APPROVAL:
+
+        # Read role directly from POST — don't rely on form.signup() being called
+        from accounts.models import CustomUser
+        valid_roles = {c[0] for c in CustomUser.Role.choices}
+        role = request.POST.get('role', CustomUser.Role.PATIENT)
+        if role not in valid_roles:
+            role = CustomUser.Role.PATIENT
+
+        user.role = role
+        needs_approval = role in ROLES_REQUIRING_APPROVAL
+        if needs_approval:
+            user.is_approved = False
+        user.save(update_fields=['role', 'is_approved'])
+
+        if role == CustomUser.Role.PATIENT:
+            PatientProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.DOCTOR:
+            DoctorProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.DATA_SCIENTIST:
+            DataScientistProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.HOSPITAL_ADMIN:
+            HospitalAdminProfile.objects.get_or_create(user=user, defaults={'hospital_name': ''})
+
+        if needs_approval:
             _notify_admin_new_registration(user)
         return user
