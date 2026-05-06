@@ -40,6 +40,9 @@
         {{ form.password }}
         {{ form.password.errors }}
       </div>
+      <div style="text-align:right;margin-top:-.4rem;margin-bottom:.75rem">
+        <a href="{% url 'accounts:password_reset' %}" style="font-size:.8rem;color:var(--muted)">Forgot password?</a>
+      </div>
       <button type="submit" class="btn-submit">Log In</button>
     </form>
     <div class="divider">or</div>

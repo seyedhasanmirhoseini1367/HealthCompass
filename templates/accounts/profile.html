@@ -99,11 +99,13 @@
 </div>
 {% endif %}
 
-<div style="display:flex;gap:.75rem;flex-wrap:wrap">
+<div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
   <a href="{% url 'dashboard:home' %}" class="btn" style="background:#f1f5f9;color:var(--text)">← Dashboard</a>
   {% if user.is_patient %}
   <a href="{% url 'medical_records:list' %}" class="btn" style="background:var(--primary);color:white">My Records</a>
   {% endif %}
+  <a href="{% url 'accounts:change_password' %}" class="btn" style="background:#f1f5f9;color:var(--text)"><i class="fas fa-lock"></i> Change Password</a>
+  <a href="{% url 'accounts:delete_account' %}" style="margin-left:auto;font-size:.8rem;color:#dc2626;text-decoration:none"><i class="fas fa-trash-alt"></i> Delete account</a>
 </div>
 
 {% endblock %}

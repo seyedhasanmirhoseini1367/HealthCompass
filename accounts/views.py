@@ -154,3 +154,17 @@ def change_password(request):
     else:
         form = PasswordChangeForm(request.user)
     return render(request, "accounts/change_password.html", {"form": form})
+
+
+@login_required
+def delete_account(request):
+    if request.method == "POST":
+        password = request.POST.get("password", "")
+        user = request.user
+        if user.check_password(password):
+            logout(request)
+            user.delete()
+            messages.success(request, "Your account has been permanently deleted.")
+            return redirect("home")
+        messages.error(request, "Incorrect password. Account not deleted.")
+    return render(request, "accounts/delete_account.html")
