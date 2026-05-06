@@ -1,0 +1,201 @@
+<svg width="680" height="460" viewBox="0 0 680 460" xmlns="http://www.w3.org/2000/svg">
+<title>HealthCompass logo</title>
+<desc>HealthCompass full logo with human compass mark, wordmark, tagline and color legend.</desc>
+
+<defs>
+  <clipPath id="iconClipMain">
+    <rect x="-110" y="-110" width="220" height="220" rx="34"/>
+  </clipPath>
+</defs>
+
+<g transform="translate(195, 230)">
+  <rect x="-110" y="-110" width="220" height="220" rx="34" fill="#0A1F38"/>
+
+  <g clip-path="url(#iconClipMain)">
+    <g opacity="0.4">
+      <line x1="-105" y1="-70" x2="-65" y2="-85" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="-70" x2="-65" y2="-40" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="-70" x2="-65" y2="10" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="-25" x2="-65" y2="-40" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="-25" x2="-65" y2="10" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="-25" x2="-65" y2="50" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="20" x2="-65" y2="10" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="20" x2="-65" y2="50" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="65" x2="-65" y2="50" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-105" y1="65" x2="-65" y2="85" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="-65" y1="-85" x2="-30" y2="-95" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="-65" y1="-40" x2="-30" y2="-95" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="-65" y1="50" x2="-30" y2="92" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="-65" y1="85" x2="-30" y2="92" stroke="#7DD3C0" stroke-width="0.4"/>
+    </g>
+    <g opacity="0.4">
+      <line x1="65" y1="-85" x2="105" y2="-70" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="-40" x2="105" y2="-70" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="-40" x2="105" y2="-25" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="10" x2="105" y2="-25" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="10" x2="105" y2="20" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="10" x2="105" y2="65" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="50" x2="105" y2="20" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="50" x2="105" y2="65" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="65" y1="85" x2="105" y2="65" stroke="#7DD3C0" stroke-width="0.5"/>
+      <line x1="30" y1="-95" x2="65" y2="-85" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="30" y1="-95" x2="65" y2="-40" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="30" y1="92" x2="65" y2="50" stroke="#7DD3C0" stroke-width="0.4"/>
+      <line x1="30" y1="92" x2="65" y2="85" stroke="#7DD3C0" stroke-width="0.4"/>
+    </g>
+
+    <circle cx="-105" cy="-70" r="2" fill="#7DD3C0" opacity="0.65"/>
+    <circle cx="-105" cy="-25" r="2" fill="#7DD3C0" opacity="0.65"/>
+    <circle cx="-105" cy="20" r="2" fill="#7DD3C0" opacity="0.65"/>
+    <circle cx="-105" cy="65" r="2" fill="#7DD3C0" opacity="0.65"/>
+    <circle cx="-65" cy="-85" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="-65" cy="-40" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="-65" cy="10" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="-65" cy="50" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="-65" cy="85" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="-30" cy="-95" r="1.4" fill="#7DD3C0" opacity="0.45"/>
+    <circle cx="30" cy="-95" r="1.4" fill="#7DD3C0" opacity="0.45"/>
+    <circle cx="-30" cy="92" r="1.4" fill="#7DD3C0" opacity="0.45"/>
+    <circle cx="30" cy="92" r="1.4" fill="#7DD3C0" opacity="0.45"/>
+    <circle cx="65" cy="-85" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="65" cy="-40" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="65" cy="10" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="65" cy="50" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="65" cy="85" r="1.6" fill="#7DD3C0" opacity="0.5"/>
+    <circle cx="105" cy="-70" r="2.2" fill="#4ADE80" opacity="0.8"/>
+    <circle cx="105" cy="-25" r="2.2" fill="#FBBF44" opacity="0.8"/>
+    <circle cx="105" cy="20" r="2.2" fill="#FB923C" opacity="0.8"/>
+    <circle cx="105" cy="65" r="2.2" fill="#E94B4B" opacity="0.8"/>
+  </g>
+
+  <circle cx="0" cy="0" r="86" fill="none" stroke="#7DD3C0" stroke-width="0.5" stroke-dasharray="2 4" opacity="0.45"/>
+  <circle cx="0" cy="0" r="74" fill="none" stroke="#7DD3C0" stroke-width="0.5" stroke-dasharray="1 3" opacity="0.3"/>
+
+  <g opacity="0.92">
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="-80" x2="0" y2="-90" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(10)"/>
+    <line x1="0" y1="-80" x2="0" y2="-94" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(20)"/>
+    <line x1="0" y1="-80" x2="0" y2="-88" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(30)"/>
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(40)"/>
+    <line x1="0" y1="-80" x2="0" y2="-86" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(50)"/>
+    <line x1="0" y1="-80" x2="0" y2="-90" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(60)"/>
+    <line x1="0" y1="-80" x2="0" y2="-87" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(70)"/>
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" transform="rotate(80)"/>
+
+    <line x1="0" y1="-80" x2="0" y2="-93" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(95)"/>
+    <line x1="0" y1="-80" x2="0" y2="-88" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(105)"/>
+    <line x1="0" y1="-80" x2="0" y2="-95" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(115)"/>
+    <line x1="0" y1="-80" x2="0" y2="-90" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(125)"/>
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(135)"/>
+    <line x1="0" y1="-80" x2="0" y2="-86" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(145)"/>
+    <line x1="0" y1="-80" x2="0" y2="-94" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(155)"/>
+    <line x1="0" y1="-80" x2="0" y2="-89" stroke="#FBBF44" stroke-width="2.5" stroke-linecap="round" transform="rotate(165)"/>
+
+    <line x1="0" y1="-80" x2="0" y2="-90" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(185)"/>
+    <line x1="0" y1="-80" x2="0" y2="-95" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(195)"/>
+    <line x1="0" y1="-80" x2="0" y2="-88" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(205)"/>
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(215)"/>
+    <line x1="0" y1="-80" x2="0" y2="-87" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(225)"/>
+    <line x1="0" y1="-80" x2="0" y2="-90" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(235)"/>
+    <line x1="0" y1="-80" x2="0" y2="-94" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(245)"/>
+    <line x1="0" y1="-80" x2="0" y2="-86" stroke="#E94B4B" stroke-width="2.5" stroke-linecap="round" transform="rotate(255)"/>
+
+    <line x1="0" y1="-80" x2="0" y2="-91" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(275)"/>
+    <line x1="0" y1="-80" x2="0" y2="-88" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(285)"/>
+    <line x1="0" y1="-80" x2="0" y2="-93" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(295)"/>
+    <line x1="0" y1="-80" x2="0" y2="-89" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(305)"/>
+    <line x1="0" y1="-80" x2="0" y2="-95" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(315)"/>
+    <line x1="0" y1="-80" x2="0" y2="-87" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(325)"/>
+    <line x1="0" y1="-80" x2="0" y2="-92" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(335)"/>
+    <line x1="0" y1="-80" x2="0" y2="-89" stroke="#FB923C" stroke-width="2.5" stroke-linecap="round" transform="rotate(345)"/>
+  </g>
+
+  <circle cx="0" cy="-80" r="4" fill="#0A1F38" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="0" cy="-80" r="1.5" fill="#FFFFFF"/>
+
+  <g transform="translate(56,-56)" opacity="0.95">
+    <rect x="-1" y="-4" width="2" height="8" fill="#4ADE80"/>
+    <rect x="-4" y="-1" width="8" height="2" fill="#4ADE80"/>
+  </g>
+  <g transform="translate(56,56)" opacity="0.95">
+    <polygon points="0,-4 4,3 -4,3" fill="none" stroke="#FBBF44" stroke-width="1.4"/>
+    <line x1="0" y1="-1" x2="0" y2="1" stroke="#FBBF44" stroke-width="1.4"/>
+    <circle cx="0" cy="2.5" r="0.5" fill="#FBBF44"/>
+  </g>
+  <g transform="translate(-56,56)" opacity="0.95">
+    <circle cx="0" cy="0" r="4" fill="none" stroke="#E94B4B" stroke-width="1.4"/>
+    <line x1="-2.5" y1="-2.5" x2="2.5" y2="2.5" stroke="#E94B4B" stroke-width="1.4"/>
+  </g>
+  <g transform="translate(-56,-56)" opacity="0.95">
+    <polyline points="-4,1 -2,1 -1,-2 1,2 2,-1 4,-1" fill="none" stroke="#FB923C" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+
+  <polygon points="-66,0 0,-2.5 0,2.5" fill="#FB923C" opacity="0.55"/>
+  <polygon points="66,0 0,-2.5 0,2.5" fill="#FBBF44" opacity="0.55"/>
+
+  <circle cx="0" cy="-50" r="22" fill="#7DD3C0" opacity="0.08"/>
+  <circle cx="0" cy="-50" r="16" fill="#7DD3C0" opacity="0.12"/>
+
+  <circle cx="0" cy="-50" r="12" fill="#FFFFFF"/>
+  <rect x="-2.5" y="-40" width="5" height="6" fill="#FFFFFF"/>
+  <polygon points="0,-34 12,-2 0,12 -12,-2" fill="#FFFFFF"/>
+  <path d="M -11 -16 Q -34 -12 -52 -2 L -52 4 Q -34 -2 -11 -2 Z" fill="#FFFFFF" opacity="0.92"/>
+  <path d="M 11 -16 Q 34 -12 52 -2 L 52 4 Q 34 -2 11 -2 Z" fill="#FFFFFF" opacity="0.92"/>
+  <polygon points="0,12 10,34 0,64 -10,34" fill="#E8F0FE"/>
+
+  <g transform="translate(-48, 1)" opacity="0.95">
+    <rect x="-0.8" y="-3" width="1.6" height="6" fill="#4ADE80"/>
+    <rect x="-3" y="-0.8" width="6" height="1.6" fill="#4ADE80"/>
+  </g>
+  <g transform="translate(48, 1)" opacity="0.95">
+    <circle r="2.5" fill="none" stroke="#7DD3C0" stroke-width="1"/>
+    <circle r="1" fill="#7DD3C0"/>
+  </g>
+
+  <g transform="translate(0, 32)" opacity="0.5">
+    <path d="M -3 -8 Q 0 -4 3 0 Q 0 4 -3 8" fill="none" stroke="#7DD3C0" stroke-width="0.8"/>
+    <path d="M 3 -8 Q 0 -4 -3 0 Q 0 4 3 8" fill="none" stroke="#7DD3C0" stroke-width="0.8"/>
+    <line x1="-2" y1="-6" x2="2" y2="-6" stroke="#7DD3C0" stroke-width="0.6"/>
+    <line x1="-2" y1="-2" x2="2" y2="-2" stroke="#7DD3C0" stroke-width="0.6"/>
+    <line x1="-2" y1="2" x2="2" y2="2" stroke="#7DD3C0" stroke-width="0.6"/>
+    <line x1="-2" y1="6" x2="2" y2="6" stroke="#7DD3C0" stroke-width="0.6"/>
+  </g>
+
+  <path d="M -56 -50 Q -50 -54 -46 -50 T -38 -50 Q -32 -46 -28 -54 T -20 -50 Q -14 -42 -10 -56 T -2 -48 Q 4 -40 8 -56 T 16 -50 Q 22 -46 26 -54 T 34 -50 Q 40 -54 44 -50 L 56 -50"
+        fill="none" stroke="#7DD3C0" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+  <path d="M -60 -50 L -52 -50 L -48 -58 L -44 -42 L -40 -50 L -34 -50 L -30 -62 L -24 -38 L -18 -50 L -12 -50 L -8 -68 L -2 -32 L 4 -70 L 10 -34 L 16 -50 L 22 -50 L 26 -60 L 32 -42 L 38 -50 L 46 -50 L 50 -56 L 54 -48 L 60 -50"
+        fill="none" stroke="#4ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M -4 -50 L 0 -72 L 4 -34 L 8 -50"
+        fill="none" stroke="#FBBF44" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="-60" cy="-50" r="1.8" fill="#4ADE80"/>
+  <circle cx="60" cy="-50" r="1.8" fill="#4ADE80"/>
+
+  <polyline points="-64,-4 -50,-4 -42,-4 -36,-4 -32,-4 -26,-14 -20,8 -14,-22 -8,4 -2,-8 4,2 10,-18 16,-4 22,-4 32,-4 42,-4 50,-4 64,-4"
+            fill="none" stroke="#E94B4B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  <polyline points="-60,-4 -48,-4 -40,-4 -34,-4 -28,-16 -22,12 -16,-26 -10,8 -4,-12 2,4 8,-22 14,-4 22,-4 32,-4 40,-4 48,-4 60,-4"
+            fill="none" stroke="#E94B4B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="-60" cy="-4" r="2" fill="#E94B4B"/>
+  <circle cx="60" cy="-4" r="2" fill="#E94B4B"/>
+
+  <g transform="translate(0,-4)">
+    <circle r="6.5" fill="#0A1F38"/>
+    <path d="M 0 3.2 C -4.5 -0.5, -4.5 -3.8, -2.2 -3.8 C -0.9 -3.8, 0 -2.5, 0 -2.5 C 0 -2.5, 0.9 -3.8, 2.2 -3.8 C 4.5 -3.8, 4.5 -0.5, 0 3.2 Z" fill="#E94B4B"/>
+  </g>
+</g>
+
+<g transform="translate(345, 210)">
+  <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="500" fill="#0A1F38" letter-spacing="-0.5">Health<tspan fill="#1B3A57">Compass</tspan></text>
+  <text x="2" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#5A6B7C">AI that maps your health over time</text>
+
+  <g transform="translate(2, 56)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10" font-weight="400" fill="#8A99A8">
+    <circle cx="4" cy="-3" r="3" fill="#4ADE80"/>
+    <text x="12" y="0">Healthy</text>
+    <circle cx="64" cy="-3" r="3" fill="#FBBF44"/>
+    <text x="72" y="0">Watch</text>
+    <circle cx="118" cy="-3" r="3" fill="#FB923C"/>
+    <text x="126" y="0">Trend</text>
+    <circle cx="170" cy="-3" r="3" fill="#E94B4B"/>
+    <text x="178" y="0">Risk</text>
+  </g>
+</g>
+</svg>
