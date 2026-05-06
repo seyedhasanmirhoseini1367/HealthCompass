@@ -16,7 +16,7 @@ def serve_media(request, path):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('auth/', include('allauth.socialaccount.urls')),
+    path('auth/', include('allauth.urls')),
     path('', home, name='home'),
     path('accounts/', include('accounts.urls')),
     path('dashboard/', include('dashboard.urls')),
