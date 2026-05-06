@@ -45,20 +45,19 @@ class PasswordChangeForm(DjangoPasswordChangeForm):
 
 
 class SocialSignupRoleForm(forms.Form):
-    role = forms.ChoiceField(
-        choices=[
-            (CustomUser.Role.PATIENT,        'Patient'),
-            (CustomUser.Role.DOCTOR,         'Doctor / Nurse'),
-            (CustomUser.Role.DATA_SCIENTIST, 'Data Scientist / Researcher'),
-            (CustomUser.Role.HOSPITAL_ADMIN, 'Hospital Admin'),
-        ],
-        label='I am registering as',
-    )
+    ROLE_CHOICES = [
+        (CustomUser.Role.PATIENT,        'Patient'),
+        (CustomUser.Role.DOCTOR,         'Doctor / Nurse'),
+        (CustomUser.Role.DATA_SCIENTIST, 'Data Scientist / Researcher'),
+        (CustomUser.Role.HOSPITAL_ADMIN, 'Hospital Admin'),
+    ]
+    role = forms.ChoiceField(choices=ROLE_CHOICES, label='I am registering as')
 
     def signup(self, request, user):
         from accounts.models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
         from accounts.views import ROLES_REQUIRING_APPROVAL
-        role = self.cleaned_data['role']
+        # Read role from cleaned_data if available, fall back to POST
+        role = self.cleaned_data.get('role') or request.POST.get('role', CustomUser.Role.PATIENT)
         user.role = role
         if role in ROLES_REQUIRING_APPROVAL:
             user.is_approved = False
