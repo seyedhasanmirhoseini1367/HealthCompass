@@ -180,6 +180,8 @@ USE_X_FORWARDED_HOST    = True
 # ── Google OAuth (allauth) ─────────────────────────────────────────────────────
 SITE_ID = 1
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
+LOGIN_REDIRECT_URL  = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/'
 
 SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SocialSignupRoleForm'
