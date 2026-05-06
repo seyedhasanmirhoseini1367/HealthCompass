@@ -251,10 +251,20 @@ def seizure_analysis(request):
         data['ai_interpretation'] = _generate_seizure_interpretation(data)
         return JsonResponse(data)
     except http_requests.Timeout:
-        return JsonResponse({'success': False, 'error': 'The analysis timed out. Please try again.'}, status=504)
+        return JsonResponse({'success': False, 'error': 'The analysis timed out (>120 s). The EEG file may be too large, or the server is busy — please try again in a moment.'}, status=504)
+    except http_requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else 500
+        if status == 500:
+            msg = 'The hasanai.net analysis server encountered an internal error. This is a temporary issue — please try again in a few minutes.'
+        elif status == 503:
+            msg = 'The analysis server is temporarily unavailable. Please try again shortly.'
+        else:
+            msg = f'The analysis server returned an unexpected error (HTTP {status}). Please try again.'
+        logger.error('seizure_analysis HTTP %s from hasanai.net: %s', status, exc)
+        return JsonResponse({'success': False, 'error': msg}, status=502)
     except Exception as exc:
         logger.exception('seizure_analysis proxy error: %s', exc)
-        return JsonResponse({'success': False, 'error': str(exc)}, status=500)
+        return JsonResponse({'success': False, 'error': 'Could not reach the analysis server. Please try again.'}, status=500)
 
 
 def _generate_seizure_interpretation(data: dict) -> str:

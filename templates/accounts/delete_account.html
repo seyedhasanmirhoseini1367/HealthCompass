@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Delete Account — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.auth-wrap{max-width:440px;margin:3rem auto}
+.auth-card{background:white;border-radius:20px;padding:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,.08);border:1px solid var(--border)}
+.danger-header{background:#fff5f5;border:1px solid #fecaca;border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;text-align:center}
+.danger-icon{font-size:2.5rem;margin-bottom:.4rem}
+.danger-title{font-size:1.2rem;font-weight:700;color:#dc2626;margin-bottom:.25rem}
+.danger-sub{font-size:.85rem;color:#7f1d1d;line-height:1.6}
+.warn-list{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;font-size:.85rem;color:#78350f}
+.warn-list li{margin-bottom:.35rem}
+.form-group{margin-bottom:1.1rem}
+.form-group label{display:block;font-size:.825rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
+.form-group input{width:100%;padding:.65rem .9rem;border:1.5px solid #fca5a5;border-radius:9px;font-size:.875rem;outline:none;transition:border .2s;box-sizing:border-box}
+.form-group input:focus{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.1)}
+.btn-delete{width:100%;padding:.7rem;background:#dc2626;color:white;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;margin-top:.25rem}
+.btn-delete:hover{background:#b91c1c}
+.btn-cancel{display:block;text-align:center;margin-top:.875rem;font-size:.875rem;color:var(--muted);text-decoration:none}
+.btn-cancel:hover{color:var(--text)}
+@media(max-width:500px){.auth-card{padding:1.5rem}.auth-wrap{margin:1rem auto}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="danger-header">
+      <div class="danger-icon">⚠️</div>
+      <div class="danger-title">Delete your account</div>
+      <div class="danger-sub">This action is permanent and cannot be undone.</div>
+    </div>
+
+    <ul class="warn-list">
+      <li>All your medical records will be permanently deleted</li>
+      <li>All AI predictions and analytics will be removed</li>
+      <li>Your chat history with the AI Assistant will be lost</li>
+      <li>You will not be able to recover any data</li>
+    </ul>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;font-size:.85rem;color:#dc2626">
+      {{ msg }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="password">Confirm your password to continue</label>
+        <input type="password" name="password" id="password" placeholder="Enter your current password" required autofocus>
+      </div>
+      <button type="submit" class="btn-delete">Permanently Delete My Account</button>
+    </form>
+    <a href="{% url 'accounts:profile' %}" class="btn-cancel">← Cancel, keep my account</a>
+  </div>
+</div>
+{% endblock %}
