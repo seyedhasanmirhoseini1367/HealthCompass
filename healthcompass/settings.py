@@ -173,8 +173,13 @@ RAG_CONFIG = {
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
 
+# ── Proxy / HTTPS (Railway terminates SSL at edge) ────────────────────────────
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST    = True
+
 # ── Google OAuth (allauth) ─────────────────────────────────────────────────────
 SITE_ID = 1
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SocialSignupRoleForm'
