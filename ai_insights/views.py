@@ -248,12 +248,103 @@ def seizure_analysis(request):
         )
         resp.raise_for_status()
         data = resp.json()
+        data['ai_interpretation'] = _generate_seizure_interpretation(data)
         return JsonResponse(data)
     except http_requests.Timeout:
         return JsonResponse({'success': False, 'error': 'The analysis timed out. Please try again.'}, status=504)
     except Exception as exc:
         logger.exception('seizure_analysis proxy error: %s', exc)
         return JsonResponse({'success': False, 'error': str(exc)}, status=500)
+
+
+def _generate_seizure_interpretation(data: dict) -> str:
+    """Generate a clinical AI interpretation of the ensemble EEG result."""
+    from django.conf import settings
+
+    ensemble_label = data.get('ensemble_label', 'Unknown')
+    votes          = data.get('ensemble_votes', {})
+    results        = data.get('results', [])
+
+    # Summarise per-model confidences
+    model_lines = []
+    for r in results:
+        if r.get('success'):
+            conf = r.get('confidence')
+            conf_str = f"{conf*100:.1f}%" if conf is not None else 'N/A'
+            model_lines.append(f"  - {r.get('project_title', r.get('project_id', '?'))}: "
+                                f"{r.get('prediction_label', '?')} ({conf_str})")
+    models_summary = '\n'.join(model_lines) or '  (no individual model data)'
+
+    votes_str = ', '.join(f'{lbl}: {cnt} vote(s)' for lbl, cnt in votes.items())
+
+    prompt = f"""You are a clinical AI assistant helping a neurologist interpret an EEG ensemble analysis result.
+
+ENSEMBLE RESULT:
+- Final ensemble verdict: {ensemble_label}
+- Votes: {votes_str}
+- Individual model results:
+{models_summary}
+
+Write a concise 4-6 sentence clinical interpretation. Include:
+1. What the ensemble verdict means clinically (LPD = Lateralised Periodic Discharge, Seizure = ictal activity)
+2. What the voting pattern and confidence levels indicate about certainty
+3. Key clinical implications and urgency
+4. A clear reminder that automated EEG analysis must always be verified by a human expert
+
+Write in plain paragraphs, no markdown, no bullet points."""
+
+    # Try Gemini
+    gemini_key = getattr(settings, 'GEMINI_API_KEY', '')
+    if gemini_key:
+        try:
+            from google import genai
+            from google.genai import types
+            client   = genai.Client(api_key=gemini_key)
+            model_id = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-1.5-flash')
+            cfg_kwargs = dict(temperature=0.3, max_output_tokens=600)
+            if 'gemini-2.5' in model_id:
+                cfg_kwargs['thinking_config'] = types.ThinkingConfig(thinking_budget=0)
+            response = client.models.generate_content(
+                model=model_id, contents=[prompt],
+                config=types.GenerateContentConfig(**cfg_kwargs),
+            )
+            text = (response.text or '').strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning('Gemini seizure interpretation failed: %s', e)
+
+    # Try Anthropic
+    anthropic_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    if anthropic_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            msg = client.messages.create(
+                model=settings.RAG_CONFIG.get('ANTHROPIC_MODEL', 'claude-haiku-4-5-20251001'),
+                max_tokens=600,
+                messages=[{'role': 'user', 'content': prompt}],
+            )
+            text = msg.content[0].text.strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning('Anthropic seizure interpretation failed: %s', e)
+
+    # Static fallback
+    if 'seizure' in ensemble_label.lower():
+        return (
+            f"The ensemble voted in favor of {ensemble_label}. "
+            "This outcome indicates probable ictal activity, which requires urgent medical evaluation. "
+            "Immediate clinical assessment is recommended to confirm the finding and initiate appropriate management. "
+            "A critical clinical caveat is that an automated EEG prediction should always be verified by a human expert before making treatment decisions."
+        )
+    return (
+        f"The ensemble voted in favor of {ensemble_label}. "
+        "This pattern may indicate interictal epileptiform activity requiring clinical correlation. "
+        "The unanimous agreement across models increases confidence in the result, though individual variations in confidence levels should be considered. "
+        "A critical clinical caveat is that an automated EEG prediction should always be verified by a human expert before making treatment decisions."
+    )
 
 
 @login_required
