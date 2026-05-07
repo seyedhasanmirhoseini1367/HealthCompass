@@ -183,9 +183,9 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
+ACCOUNT_ADAPTER             = 'accounts.adapters.HealthCompassAccountAdapter'
 SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
-SOCIALACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SocialSignupRoleForm'
-SOCIALACCOUNT_AUTO_SIGNUP   = False   # always show role-selection form for new social users
+SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
 ACCOUNT_EMAIL_VERIFICATION  = 'none'
 ACCOUNT_EMAIL_REQUIRED      = True
