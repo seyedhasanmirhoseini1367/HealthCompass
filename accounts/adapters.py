@@ -1,8 +1,16 @@
+from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.exceptions import ImmediateHttpResponse
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
+
+
+class HealthCompassAccountAdapter(DefaultAccountAdapter):
+    def get_signup_redirect_url(self, request):
+        if request.session.get('needs_role_selection'):
+            return '/accounts/select-role/'
+        return super().get_signup_redirect_url(request)
 
 
 class HealthCompassSocialAdapter(DefaultSocialAccountAdapter):
@@ -45,31 +53,8 @@ class HealthCompassSocialAdapter(DefaultSocialAccountAdapter):
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form)
-        from accounts.models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
-        from accounts.views import ROLES_REQUIRING_APPROVAL, _notify_admin_new_registration
-
-        # Read role directly from POST — don't rely on form.signup() being called
-        from accounts.models import CustomUser
-        valid_roles = {c[0] for c in CustomUser.Role.choices}
-        role = request.POST.get('role', CustomUser.Role.PATIENT)
-        if role not in valid_roles:
-            role = CustomUser.Role.PATIENT
-
-        user.role = role
-        needs_approval = role in ROLES_REQUIRING_APPROVAL
-        if needs_approval:
-            user.is_approved = False
-        user.save(update_fields=['role', 'is_approved'])
-
-        if role == CustomUser.Role.PATIENT:
-            PatientProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.DOCTOR:
-            DoctorProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.DATA_SCIENTIST:
-            DataScientistProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.HOSPITAL_ADMIN:
-            HospitalAdminProfile.objects.get_or_create(user=user, defaults={'hospital_name': ''})
-
-        if needs_approval:
-            _notify_admin_new_registration(user)
+        from accounts.models import PatientProfile
+        # Default to patient role; user will choose their real role on the next screen.
+        PatientProfile.objects.get_or_create(user=user)
+        request.session['needs_role_selection'] = True
         return user

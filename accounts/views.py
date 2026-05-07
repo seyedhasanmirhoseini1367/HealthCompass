@@ -179,6 +179,43 @@ def change_password(request):
 
 
 @login_required
+def select_role(request):
+    if not request.session.get('needs_role_selection'):
+        return redirect('dashboard:home')
+    if request.method == 'POST':
+        role = request.POST.get('role', CustomUser.Role.PATIENT)
+        valid_roles = {c[0] for c in CustomUser.Role.choices}
+        if role not in valid_roles:
+            role = CustomUser.Role.PATIENT
+        user = request.user
+        user.role = role
+        needs_approval = role in ROLES_REQUIRING_APPROVAL
+        if needs_approval:
+            user.is_approved = False
+        user.save(update_fields=['role', 'is_approved'])
+        if role == CustomUser.Role.PATIENT:
+            PatientProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.DOCTOR:
+            PatientProfile.objects.filter(user=user).delete()
+            DoctorProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.DATA_SCIENTIST:
+            PatientProfile.objects.filter(user=user).delete()
+            DataScientistProfile.objects.get_or_create(user=user)
+        elif role == CustomUser.Role.HOSPITAL_ADMIN:
+            PatientProfile.objects.filter(user=user).delete()
+            HospitalAdminProfile.objects.get_or_create(user=user, defaults={'hospital_name': ''})
+        del request.session['needs_role_selection']
+        if needs_approval:
+            _notify_admin_new_registration(user)
+            logout(request)
+            messages.info(request, "Account created. An admin will review your registration — you'll receive an email once approved.")
+            return redirect('accounts:login')
+        messages.success(request, f"Welcome to HealthCompass, {user.get_full_name() or user.username}!")
+        return redirect('dashboard:home')
+    return render(request, 'accounts/select_role.html')
+
+
+@login_required
 def delete_account(request):
     if request.method == "POST":
         password = request.POST.get("password", "")
