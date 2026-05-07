@@ -1,11 +1,33 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.auth.views import PasswordResetView
+from django.urls import reverse_lazy
 from .models import CustomUser, PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
 from .forms import RegisterForm, LoginForm, ProfileForm, PasswordChangeForm
+
+logger = logging.getLogger(__name__)
+
+
+class SafePasswordResetView(PasswordResetView):
+    """Wraps Django's PasswordResetView — always redirects to done page even if email fails."""
+    template_name = 'accounts/password_reset.html'
+    email_template_name = 'accounts/email/password_reset_email.txt'
+    subject_template_name = 'accounts/email/password_reset_subject.txt'
+    success_url = reverse_lazy('accounts:password_reset_done')
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except Exception as e:
+            logger.error('Password reset email failed: %s', e)
+            # Still redirect to done — never reveal whether email was sent
+            from django.http import HttpResponseRedirect
+            return HttpResponseRedirect(self.get_success_url())
 
 
 ROLES_REQUIRING_APPROVAL = {
