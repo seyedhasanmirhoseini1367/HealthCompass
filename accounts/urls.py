@@ -15,12 +15,7 @@ urlpatterns = [
 
     # ── Password reset (Django built-in flow) ──────────────────────────────
     path("password/reset/",
-         auth_views.PasswordResetView.as_view(
-             template_name="accounts/password_reset.html",
-             email_template_name="accounts/email/password_reset_email.txt",
-             subject_template_name="accounts/email/password_reset_subject.txt",
-             success_url="/accounts/password/reset/done/",
-         ),
+         views.SafePasswordResetView.as_view(),
          name="password_reset"),
 
     path("password/reset/done/",
