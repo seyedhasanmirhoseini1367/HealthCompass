@@ -14,6 +14,53 @@ from xml.etree import ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
+
+def _extract_lab_values_regex(text: str) -> list:
+    """
+    Regex fallback: extract numeric lab values from free-form text.
+    Handles formats like:
+      Glucose: 5.2 mmol/L
+      Hemoglobin  12.5  g/dL  (12.0 - 16.0)
+      HbA1c    5.7    %    4.0-5.6
+    """
+    results = []
+    seen = set()
+
+    # Match: Name (colon or 2+ spaces) numeric_value optional_unit optional_ref
+    pattern = re.compile(
+        r'^[ \t]*'
+        r'(?P<name>[A-Za-z][A-Za-z0-9 \-/()\+]+?)'       # test name
+        r'(?:[ \t]*:[ \t]*|[ \t]{2,})'                    # separator
+        r'(?P<value>\d{1,6}(?:\.\d{1,4})?)'               # numeric value
+        r'(?:[ \t]+(?P<unit>[a-zA-Z%][a-zA-Z0-9%/·×^μΩ\[\]\.]*))?' # unit
+        r'(?:[ \t]+[\(\[]?[ \t]*(?P<ref>[\d][\d\.\- –]+\d)[ \t]*[\)\]]?)?',  # ref range
+        re.MULTILINE,
+    )
+
+    for m in pattern.finditer(text):
+        name = m.group('name').strip().rstrip(':- \t')
+        value = m.group('value').strip()
+        unit = (m.group('unit') or '').strip()
+        ref = (m.group('ref') or '').strip()
+
+        if len(name) < 2 or len(name) > 80:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        try:
+            fval = float(value)
+            if fval < 0 or fval > 1_000_000:
+                continue
+        except ValueError:
+            continue
+        seen.add(key)
+        results.append({'name': name, 'value': value, 'unit': unit,
+                        'ref_range': ref, 'is_abnormal': False})
+
+    return results
+
+
 # ─── Kanta XML ──────────────────────────────────────────────────────────────
 
 KANTA_NS = {
@@ -412,13 +459,14 @@ class TextParser:
     def _structure_with_ai(self, text: str) -> dict | None:
         from django.conf import settings
         api_key = getattr(settings, 'GEMINI_API_KEY', '')
+        gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
         if not api_key:
             return None
 
         try:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel(gemini_model)
 
             prompt = f"""Extract structured medical data from this text. Return JSON with:
 {{
@@ -441,9 +489,18 @@ TEXT:
             raw = response.text.strip()
             raw = re.sub(r'^```(?:json)?\s*', '', raw)
             raw = re.sub(r'\s*```$', '', raw)
-            return json.loads(raw)
+            result = json.loads(raw)
+            # If AI returned no lab values, try regex as supplement
+            if not result.get('lab_values'):
+                result['lab_values'] = _extract_lab_values_regex(text)
+            return result
         except Exception as e:
             logger.warning(f'Gemini text structuring failed: {e}')
+            # Fallback: regex-only extraction
+            lab_values = _extract_lab_values_regex(text)
+            if lab_values:
+                return {'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+                        'lab_values': lab_values}
             return None
 
 
@@ -481,13 +538,16 @@ class PDFParser:
     def _structure_with_ai(self, text: str) -> dict | None:
         from django.conf import settings
         api_key = getattr(settings, 'GEMINI_API_KEY', '')
+        gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
         if not api_key:
-            return None
+            lab_values = _extract_lab_values_regex(text)
+            return ({'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+                     'lab_values': lab_values} if lab_values else None)
 
         try:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel(gemini_model)
 
             prompt = f"""Extract structured medical data from this document. Return JSON with:
 {{
@@ -508,10 +568,16 @@ DOCUMENT:
 
             response = model.generate_content(prompt)
             raw = response.text.strip()
-            # Strip markdown code fences if present
             raw = re.sub(r'^```(?:json)?\s*', '', raw)
             raw = re.sub(r'\s*```$', '', raw)
-            return json.loads(raw)
+            result = json.loads(raw)
+            if not result.get('lab_values'):
+                result['lab_values'] = _extract_lab_values_regex(text)
+            return result
         except Exception as e:
             logger.warning(f'Gemini structuring failed: {e}')
+            lab_values = _extract_lab_values_regex(text)
+            if lab_values:
+                return {'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+                        'lab_values': lab_values}
             return None
