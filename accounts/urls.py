@@ -11,7 +11,6 @@ urlpatterns = [
     path("profile/",         views.profile_view,    name="profile"),
     path("profile/edit/",    views.profile_edit,    name="profile_edit"),
     path("password/change/", views.change_password, name="change_password"),
-    path("select-role/",     views.select_role,     name="select_role"),
     path("delete/",          views.delete_account,  name="delete_account"),
 
     # ── Password reset (Django built-in flow) ──────────────────────────────
