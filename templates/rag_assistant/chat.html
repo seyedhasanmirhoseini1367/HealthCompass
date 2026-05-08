@@ -490,20 +490,18 @@ async function renameSession(pk, rowId) {
 
 async function deleteSession(pk, rowId) {
   document.getElementById('menu-' + pk).classList.remove('open');
-  if (!confirm('Delete this chat? This cannot be undone.')) return;
-  const resp = await fetch(`/assistant/session/${pk}/delete/`, {
-    method: 'POST',
-    headers: {'X-CSRFToken': CSRF},
-  });
-  const data = await resp.json();
-  if (data.ok) {
-    const row = document.getElementById(rowId);
-    row.remove();
-    // If deleted the active session, redirect to new chat
-    if (row.classList.contains('active')) {
-      window.location.href = '/assistant/new/';
+  openDeleteModal('Delete this chat? This cannot be undone.', async () => {
+    const resp = await fetch(`/assistant/session/${pk}/delete/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF},
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      const row = document.getElementById(rowId);
+      row.remove();
+      if (row.classList.contains('active')) window.location.href = '/assistant/new/';
     }
-  }
+  }, 'Delete Chat');
 }
 </script>
 {% endblock %}

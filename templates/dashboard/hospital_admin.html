@@ -94,10 +94,10 @@
     </div>
     <div class="link-meta">Linked {{ rel.created_at|date:"M d, Y" }} · {{ rel.hospital|default:"" }}</div>
   </div>
-  <form method="post" action="{% url 'dashboard:remove_link' rel.pk %}"
-        onsubmit="return confirm('Remove this patient–doctor link?')">
+  <form id="del-link-{{ rel.pk }}" method="post" action="{% url 'dashboard:remove_link' rel.pk %}">
     {% csrf_token %}
-    <button type="submit" class="btn" style="background:#fee2e2;color:#dc2626;border:none;cursor:pointer;font-size:.8rem;padding:.3rem .7rem">
+    <button type="button" class="btn" style="background:#fee2e2;color:#dc2626;border:none;cursor:pointer;font-size:.8rem;padding:.3rem .7rem"
+      onclick="openDeleteModal('Remove link between {{ rel.patient.get_full_name|default:rel.patient.username|escapejs }} and {{ rel.doctor.get_full_name|default:rel.doctor.username|escapejs }}?', () => document.getElementById('del-link-{{ rel.pk }}').submit(), 'Remove Link')">
       Remove
     </button>
   </form>

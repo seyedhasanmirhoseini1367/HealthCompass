@@ -375,9 +375,9 @@ def patient_analytics(request):
     # ── Lab value history ─────────────────────────────────────────────────────
     lab_qs = (
         ParsedLabValue.objects
-        .filter(record__patient=patient, record__record_date__isnull=False)
+        .filter(record__patient=patient)
         .select_related('record')
-        .order_by('record__record_date')
+        .order_by('record__record_date', 'record__uploaded_at')
     )
 
     biomarker_map = defaultdict(list)
@@ -386,8 +386,9 @@ def patient_analytics(request):
             numeric = float(lv.value)
         except (ValueError, TypeError):
             continue
+        date_val = lv.record.record_date or lv.record.uploaded_at.date()
         biomarker_map[lv.parameter_name].append({
-            'date':     str(lv.record.record_date),
+            'date':     str(date_val),
             'value':    numeric,
             'unit':     lv.unit or '',
             'abnormal': lv.is_abnormal,
