@@ -57,7 +57,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-    'accounts.middleware.RoleSelectionMiddleware',
 ]
 
 ROOT_URLCONF = 'healthcompass.urls'
@@ -184,7 +183,6 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
-ACCOUNT_ADAPTER             = 'accounts.adapters.HealthCompassAccountAdapter'
 SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account

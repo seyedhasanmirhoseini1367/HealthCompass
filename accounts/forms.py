@@ -5,18 +5,12 @@ from .models import CustomUser
 
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
-    role = forms.ChoiceField(choices=[
-        (CustomUser.Role.PATIENT, "Patient"),
-        (CustomUser.Role.DOCTOR, "Doctor / Nurse"),
-        (CustomUser.Role.DATA_SCIENTIST, "Data Scientist / Researcher"),
-        (CustomUser.Role.HOSPITAL_ADMIN, "Hospital Admin"),
-    ])
     first_name = forms.CharField(max_length=50, required=False)
     last_name = forms.CharField(max_length=50, required=False)
 
     class Meta:
         model = CustomUser
-        fields = ["username", "first_name", "last_name", "email", "role", "password1", "password2"]
+        fields = ["username", "first_name", "last_name", "email", "password1", "password2"]
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -44,29 +38,3 @@ class PasswordChangeForm(DjangoPasswordChangeForm):
     pass
 
 
-class SocialSignupRoleForm(forms.Form):
-    ROLE_CHOICES = [
-        (CustomUser.Role.PATIENT,        'Patient'),
-        (CustomUser.Role.DOCTOR,         'Doctor / Nurse'),
-        (CustomUser.Role.DATA_SCIENTIST, 'Data Scientist / Researcher'),
-        (CustomUser.Role.HOSPITAL_ADMIN, 'Hospital Admin'),
-    ]
-    role = forms.ChoiceField(choices=ROLE_CHOICES, label='I am registering as')
-
-    def signup(self, request, user):
-        from accounts.models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
-        from accounts.views import ROLES_REQUIRING_APPROVAL
-        # Read role from cleaned_data if available, fall back to POST
-        role = self.cleaned_data.get('role') or request.POST.get('role', CustomUser.Role.PATIENT)
-        user.role = role
-        if role in ROLES_REQUIRING_APPROVAL:
-            user.is_approved = False
-        user.save()
-        if role == CustomUser.Role.PATIENT:
-            PatientProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.DOCTOR:
-            DoctorProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.DATA_SCIENTIST:
-            DataScientistProfile.objects.get_or_create(user=user)
-        elif role == CustomUser.Role.HOSPITAL_ADMIN:
-            HospitalAdminProfile.objects.get_or_create(user=user, defaults={'hospital_name': ''})
