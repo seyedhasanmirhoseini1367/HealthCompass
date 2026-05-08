@@ -415,10 +415,10 @@
           </div>
           <div class="rec-actions" onclick="event.stopPropagation()">
             <a href="{% url 'medical_records:detail' rec.pk %}" class="btn" style="font-size:.78rem;padding:.28rem .7rem">View</a>
-            <form method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline"
-                  onsubmit="return confirm('Delete this record permanently?')">
+            <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline">
               {% csrf_token %}
-              <button type="submit" class="btn" style="font-size:.78rem;padding:.28rem .7rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer">Delete</button>
+              <button type="button" class="btn" style="font-size:.78rem;padding:.28rem .7rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer"
+                onclick="openDeleteModal('Delete &ldquo;{{ rec.title|escapejs }}&rdquo; permanently?', () => document.getElementById('del-rec-{{ rec.pk }}').submit(), 'Delete Record')">Delete</button>
             </form>
           </div>
         </div>

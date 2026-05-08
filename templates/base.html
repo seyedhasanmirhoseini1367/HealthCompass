@@ -172,6 +172,20 @@
     <p style="margin-top:.3rem;font-size:.75rem">Not a substitute for professional medical advice</p>
 </footer>
 {% block extra_js %}{% endblock %}
+
+<!-- ── Global delete-confirmation modal ───────────────────────────────────── -->
+<div id="deleteModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:18px;padding:2rem 2rem 1.5rem;max-width:380px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.18);text-align:center">
+    <div style="font-size:2.2rem;margin-bottom:.75rem">🗑️</div>
+    <h3 id="deleteModalTitle" style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Are you sure?</h3>
+    <p id="deleteModalMsg" style="font-size:.875rem;color:#64748b;margin-bottom:1.5rem">This action cannot be undone.</p>
+    <div style="display:flex;gap:.75rem;justify-content:center">
+      <button onclick="closeDeleteModal()" style="padding:.6rem 1.4rem;border:1.5px solid #e2e8f0;border-radius:10px;background:white;font-size:.9rem;font-weight:600;cursor:pointer">Cancel</button>
+      <button id="deleteModalConfirm" style="padding:.6rem 1.4rem;border:none;border-radius:10px;background:#ef4444;color:white;font-size:.9rem;font-weight:600;cursor:pointer">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 function toggleUserMenu() {
   const m = document.getElementById('userMenu');
@@ -180,6 +194,24 @@ function toggleUserMenu() {
 function toggleMobileMenu() {
   document.getElementById('mobileMenu').classList.toggle('open');
 }
+let _deleteCallback = null;
+function openDeleteModal(message, onConfirm, title) {
+  const modal = document.getElementById('deleteModal');
+  document.getElementById('deleteModalTitle').textContent = title || 'Are you sure?';
+  document.getElementById('deleteModalMsg').textContent = message || 'This action cannot be undone.';
+  document.getElementById('deleteModalConfirm').onclick = function() { closeDeleteModal(); onConfirm(); };
+  modal.style.display = 'flex';
+}
+function closeDeleteModal() {
+  document.getElementById('deleteModal').style.display = 'none';
+}
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDeleteModal();
+});
+
 document.addEventListener('click', function(e) {
   if (!document.getElementById('navUserBtn')?.contains(e.target)) {
     const m = document.getElementById('userMenu');
