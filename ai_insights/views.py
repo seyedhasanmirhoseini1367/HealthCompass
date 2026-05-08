@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
+from django.contrib.auth import get_user_model
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -249,6 +250,46 @@ def seizure_analysis(request):
         resp.raise_for_status()
         data = resp.json()
         data['ai_interpretation'] = _generate_seizure_interpretation(data)
+
+        # Persist result so it appears in prediction history
+        try:
+            admin_user = (
+                get_user_model().objects.filter(is_staff=True).first() or request.user
+            )
+            ai_model, _ = AIModel.objects.get_or_create(
+                slug='eeg-seizure-detection',
+                defaults={
+                    'name': 'EEG Seizure Detection',
+                    'description': 'Ensemble seizure detection via hasanai.net external API.',
+                    'category': AIModel.Category.NEUROLOGY,
+                    'input_type': AIModel.InputType.PARQUET,
+                    'status': AIModel.Status.ACTIVE,
+                    'data_scientist': admin_user,
+                },
+            )
+            label = data.get('ensemble_label', '')
+            confidence = data.get('ensemble_confidence') or data.get('confidence')
+            if confidence is not None:
+                try:
+                    confidence = float(confidence)
+                except (TypeError, ValueError):
+                    confidence = None
+            # Risk score: seizure → confidence, no-seizure → 1 - confidence
+            risk_score = None
+            if confidence is not None:
+                risk_score = confidence if 'seizure' in label.lower() else (1 - confidence)
+            ModelPrediction.objects.create(
+                model=ai_model,
+                patient=request.user,
+                input_data={'filename': signal_file.name},
+                result=data,
+                risk_score=risk_score,
+                interpretation=data.get('ai_interpretation', ''),
+            )
+            AIModel.objects.filter(pk=ai_model.pk).update(run_count=ai_model.run_count + 1)
+        except Exception as save_err:
+            logger.warning('Could not save seizure prediction: %s', save_err)
+
         return JsonResponse(data)
     except http_requests.Timeout:
         return JsonResponse({'success': False, 'error': 'The analysis timed out (>120 s). The EEG file may be too large, or the server is busy — please try again in a moment.'}, status=504)
