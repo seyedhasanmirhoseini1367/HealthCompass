@@ -228,11 +228,10 @@ const csrf   = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
     const r = await fetch('{% url "ai_insights:seizure_realtime_models" %}');
     const d = await r.json();
     const sel = document.getElementById('modelSelect');
-    sel.innerHTML = '';
+    sel.innerHTML = '<option value="ensemble" selected>Ensemble (all models)</option>';
     (d.models || []).forEach(m => {
       const o = document.createElement('option');
       o.value = m.variant; o.textContent = m.title;
-      if (m.variant === 'ensemble') o.selected = true;
       sel.appendChild(o);
     });
   } catch(e) {}
@@ -433,7 +432,20 @@ async function runPrediction(upTo) {
     const isSeiz = label.toLowerCase().includes('seizure') || label.toLowerCase().includes('ictal');
     updateEnsemble(label, conf, isSeiz);
     addHistory(label, conf, isSeiz);
-  } catch(e) { console.warn('Prediction error:', e.message); }
+  } catch(e) {
+    console.warn('Prediction error:', e.message);
+    showEnsembleError(e.message);
+  }
+}
+
+function showEnsembleError(msg) {
+  const card = document.getElementById('ensembleCard');
+  card.className = 'ensemble-card waiting';
+  document.getElementById('ensLabel').textContent = '⚠️ Error';
+  document.getElementById('ensLabelSub').textContent = 'Prediction failed';
+  document.getElementById('ensWaitText').style.display = 'block';
+  document.getElementById('ensWaitText').textContent = msg;
+  document.getElementById('ensConfWrap').style.display = 'none';
 }
 
 function updateEnsemble(label, conf, isSeiz) {
