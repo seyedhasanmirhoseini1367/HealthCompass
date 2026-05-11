@@ -15,6 +15,79 @@ from xml.etree import ElementTree as ET
 logger = logging.getLogger(__name__)
 
 
+def _extract_date_regex(text: str):
+    """
+    Scan free-form text for a recognizable date and return 'YYYY-MM-DD' string or None.
+    Tries labelled date fields first (most reliable), then long-form month names, then ISO.
+    """
+    MONTHS = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12,
+        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+        'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9,
+        'oct': 10, 'nov': 11, 'dec': 12,
+    }
+
+    def _to_iso(y, m, d):
+        try:
+            return date(int(y), int(m), int(d)).strftime('%Y-%m-%d')
+        except (ValueError, OverflowError):
+            return None
+
+    # 1. Labelled date field: "Collection Date: November 15, 2024" / "Date: 2024-11-15"
+    labelled = re.search(
+        r'(?:collection\s+date|report\s+date|specimen\s+date|date\s+of\s+(?:service|birth|visit)|'
+        r'test\s+date|sample\s+date|exam\s+date|date)\s*[:\-]\s*'
+        r'((?:[A-Za-z]+ \d{1,2},? \d{4}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{4}[/.\-]\d{1,2}[/.\-]\d{1,2}))',
+        text, re.IGNORECASE | re.MULTILINE,
+    )
+    if labelled:
+        ds = labelled.group(1).strip().rstrip(',')
+        for fmt in ('%B %d, %Y', '%B %d %Y', '%b %d, %Y', '%b %d %Y',
+                    '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
+                    '%d-%m-%Y', '%d.%m.%Y'):
+            try:
+                return datetime.strptime(ds, fmt).strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+
+    # 2. Long-form "November 15, 2024" or "November 15 2024"
+    m = re.search(
+        r'\b(January|February|March|April|May|June|July|August|'
+        r'September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b',
+        text, re.IGNORECASE,
+    )
+    if m:
+        month = MONTHS.get(m.group(1).lower())
+        if month:
+            result = _to_iso(m.group(3), month, m.group(2))
+            if result:
+                return result
+
+    # 3. Reversed "15 November 2024"
+    m = re.search(
+        r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|'
+        r'September|October|November|December)\s+(\d{4})\b',
+        text, re.IGNORECASE,
+    )
+    if m:
+        month = MONTHS.get(m.group(2).lower())
+        if month:
+            result = _to_iso(m.group(3), month, m.group(1))
+            if result:
+                return result
+
+    # 4. ISO date YYYY-MM-DD (only 20xx years to avoid false positives)
+    m = re.search(r'\b(20\d{2})[.\-/](0?[1-9]|1[0-2])[.\-/](0?[1-9]|[12]\d|3[01])\b', text)
+    if m:
+        result = _to_iso(m.group(1), m.group(2), m.group(3))
+        if result:
+            return result
+
+    return None
+
+
 def _extract_lab_values_regex(text: str) -> list:
     """
     Regex fallback: extract numeric lab values from free-form text.
@@ -493,13 +566,17 @@ TEXT:
             # If AI returned no lab values, try regex as supplement
             if not result.get('lab_values'):
                 result['lab_values'] = _extract_lab_values_regex(text)
+            # If AI returned no date, try regex extraction from raw text
+            if not result.get('date'):
+                result['date'] = _extract_date_regex(text)
             return result
         except Exception as e:
             logger.warning(f'Gemini text structuring failed: {e}')
             # Fallback: regex-only extraction
             lab_values = _extract_lab_values_regex(text)
             if lab_values:
-                return {'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+                return {'record_type': 'lab_result', 'title': 'Lab Results',
+                        'date': _extract_date_regex(text),
                         'lab_values': lab_values}
             return None
 
@@ -541,7 +618,8 @@ class PDFParser:
         gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
         if not api_key:
             lab_values = _extract_lab_values_regex(text)
-            return ({'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+            return ({'record_type': 'lab_result', 'title': 'Lab Results',
+                     'date': _extract_date_regex(text),
                      'lab_values': lab_values} if lab_values else None)
 
         try:
@@ -573,11 +651,15 @@ DOCUMENT:
             result = json.loads(raw)
             if not result.get('lab_values'):
                 result['lab_values'] = _extract_lab_values_regex(text)
+            # If AI returned no date, try regex extraction from raw text
+            if not result.get('date'):
+                result['date'] = _extract_date_regex(text)
             return result
         except Exception as e:
             logger.warning(f'Gemini structuring failed: {e}')
             lab_values = _extract_lab_values_regex(text)
             if lab_values:
-                return {'record_type': 'lab_result', 'title': 'Lab Results', 'date': None,
+                return {'record_type': 'lab_result', 'title': 'Lab Results',
+                        'date': _extract_date_regex(text),
                         'lab_values': lab_values}
             return None

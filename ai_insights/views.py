@@ -308,6 +308,83 @@ def seizure_analysis(request):
         return JsonResponse({'success': False, 'error': 'Could not reach the analysis server. Please try again.'}, status=500)
 
 
+# ─── Real-time EEG inference proxies ─────────────────────────────────────────
+
+@login_required
+def seizure_realtime(request):
+    return render(request, 'ai_insights/seizure_realtime.html', {})
+
+
+@login_required
+def seizure_realtime_load(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import requests as http_requests
+    uploaded_files = request.FILES.getlist('files')
+    if not uploaded_files:
+        return JsonResponse({'error': 'No files uploaded.'}, status=400)
+    try:
+        files_payload = [
+            ('files', (f.name, f.read(), f.content_type or 'application/octet-stream'))
+            for f in uploaded_files
+        ]
+        resp = http_requests.post(
+            'https://hasanai.net/seizure-realtime/load/',
+            files=files_payload,
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return JsonResponse(resp.json())
+    except http_requests.Timeout:
+        return JsonResponse({'error': 'Load request timed out — file may be too large.'}, status=504)
+    except Exception as exc:
+        logger.exception('seizure_realtime_load error: %s', exc)
+        return JsonResponse({'error': 'Could not load file. Please try again.'}, status=500)
+
+
+@login_required
+def seizure_realtime_models(request):
+    import requests as http_requests
+    try:
+        resp = http_requests.get('https://hasanai.net/seizure-realtime/models/', timeout=15)
+        resp.raise_for_status()
+        return JsonResponse(resp.json())
+    except Exception as exc:
+        logger.exception('seizure_realtime_models error: %s', exc)
+        # Fallback list so UI isn't broken if hasanai.net is down
+        return JsonResponse({'models': [
+            {'variant': 'cnn_simple',    'title': 'CNN Simple'},
+            {'variant': 'gru_attention', 'title': 'GRU + Attention'},
+            {'variant': 'fusion',        'title': 'CNN-GRU Fusion'},
+            {'variant': 'ensemble',      'title': 'Ensemble (all models)'},
+        ]})
+
+
+@login_required
+def seizure_realtime_predict_chunk(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import requests as http_requests
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except _json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+    try:
+        resp = http_requests.post(
+            'https://hasanai.net/seizure-realtime/predict-chunk/',
+            json=body,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return JsonResponse(resp.json())
+    except http_requests.Timeout:
+        return JsonResponse({'error': 'Prediction timed out.'}, status=504)
+    except Exception as exc:
+        logger.exception('seizure_realtime_predict_chunk error: %s', exc)
+        return JsonResponse({'error': 'Prediction failed. Please try again.'}, status=500)
+
+
 def _generate_seizure_interpretation(data: dict) -> str:
     """Generate a clinical AI interpretation of the ensemble EEG result."""
     from django.conf import settings
