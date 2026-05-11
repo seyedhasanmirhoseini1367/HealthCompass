@@ -28,6 +28,9 @@ static_collected/
 # Vector store cache
 rag_vector_store/
 
+# PyTorch model weights (large binaries — deploy separately)
+ai_insights/models/*.pth
+
 # IDE
 .vscode/
 .idea/

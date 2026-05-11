@@ -308,7 +308,7 @@ def seizure_analysis(request):
         return JsonResponse({'success': False, 'error': 'Could not reach the analysis server. Please try again.'}, status=500)
 
 
-# ─── Real-time EEG inference proxies ─────────────────────────────────────────
+# ─── Real-time EEG inference (local, no proxy) ───────────────────────────────
 
 @login_required
 def seizure_realtime(request):
@@ -317,72 +317,82 @@ def seizure_realtime(request):
 
 @login_required
 def seizure_realtime_load(request):
+    """Parse uploaded parquet/csv and return raw signal as JSON."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    import requests as http_requests
+    import io
     uploaded_files = request.FILES.getlist('files')
     if not uploaded_files:
         return JsonResponse({'error': 'No files uploaded.'}, status=400)
     try:
-        files_payload = [
-            ('files', (f.name, f.read(), f.content_type or 'application/octet-stream'))
-            for f in uploaded_files
-        ]
-        resp = http_requests.post(
-            'https://hasanai.net/seizure-realtime/load/',
-            files=files_payload,
-            timeout=60,
-        )
-        resp.raise_for_status()
-        return JsonResponse(resp.json())
-    except http_requests.Timeout:
-        return JsonResponse({'error': 'Load request timed out — file may be too large.'}, status=504)
+        import pandas as pd
+        frames, file_meta, ref_cols = [], [], None
+        for f in uploaded_files:
+            name = f.name.lower()
+            raw = f.read()
+            df_i = (pd.read_parquet(io.BytesIO(raw)) if name.endswith('.parquet')
+                    else pd.read_csv(io.StringIO(raw.decode('utf-8', errors='replace'))))
+            if 'EKG' in df_i.columns:
+                df_i = df_i.drop(columns=['EKG'])
+            cols = list(df_i.columns[:19])
+            df_i = df_i[cols]
+            if ref_cols is None:
+                ref_cols = cols
+            elif cols != ref_cols:
+                return JsonResponse({'error': f'Column mismatch in "{f.name}".'}, status=400)
+            file_meta.append({'name': f.name, 'samples': len(df_i)})
+            frames.append(df_i)
+
+        df = pd.concat(frames, ignore_index=True)
+        total = len(df)
+        if total < 256:
+            return JsonResponse({'error': f'Signal too short ({total} samples).'}, status=400)
+
+        data = {col: df[col].astype('float32').round(6).tolist() for col in ref_cols}
+        return JsonResponse({
+            'columns': ref_cols, 'total_samples': total,
+            'sampling_rate': 200, 'duration_sec': round(total / 200, 1),
+            'file_count': len(frames), 'files': file_meta, 'data': data,
+        })
     except Exception as exc:
         logger.exception('seizure_realtime_load error: %s', exc)
-        return JsonResponse({'error': 'Could not load file. Please try again.'}, status=500)
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 @login_required
 def seizure_realtime_models(request):
-    import requests as http_requests
-    try:
-        resp = http_requests.get('https://hasanai.net/seizure-realtime/models/', timeout=15)
-        resp.raise_for_status()
-        return JsonResponse(resp.json())
-    except Exception as exc:
-        logger.exception('seizure_realtime_models error: %s', exc)
-        # Fallback list so UI isn't broken if hasanai.net is down
-        return JsonResponse({'models': [
-            {'variant': 'cnn_simple',    'title': 'CNN Simple'},
-            {'variant': 'gru_attention', 'title': 'GRU + Attention'},
-            {'variant': 'fusion',        'title': 'CNN-GRU Fusion'},
-            {'variant': 'ensemble',      'title': 'Ensemble (all models)'},
-        ]})
+    """Return the three locally available model variants + ensemble."""
+    return JsonResponse({'models': [
+        {'variant': 'ensemble',       'title': 'Ensemble (all 3 models)'},
+        {'variant': 'cnn_transformer','title': 'CNN-Transformer'},
+        {'variant': 'gru_attention',  'title': 'GRU + Attention'},
+        {'variant': 'fusion',         'title': 'CNN-GRU Fusion'},
+    ]})
 
 
 @login_required
 def seizure_realtime_predict_chunk(request):
+    """Run local PyTorch inference on a 10-second EEG window."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    import requests as http_requests
     import json as _json
     try:
         body = _json.loads(request.body)
     except _json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    data_dict = body.get('data')
+    variant   = body.get('model_variant', 'ensemble')
+    if not data_dict or not isinstance(data_dict, dict):
+        return JsonResponse({'error': 'Missing "data" field.'}, status=400)
+
     try:
-        resp = http_requests.post(
-            'https://hasanai.net/seizure-realtime/predict-chunk/',
-            json=body,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return JsonResponse(resp.json())
-    except http_requests.Timeout:
-        return JsonResponse({'error': 'Prediction timed out.'}, status=504)
+        from ai_insights.seizure_inference import predict
+        result = predict(data_dict, variant=variant)
+        return JsonResponse(result)
     except Exception as exc:
         logger.exception('seizure_realtime_predict_chunk error: %s', exc)
-        return JsonResponse({'error': 'Prediction failed. Please try again.'}, status=500)
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 def _generate_seizure_interpretation(data: dict) -> str:
