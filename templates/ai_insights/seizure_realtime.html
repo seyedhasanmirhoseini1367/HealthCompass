@@ -2,72 +2,83 @@
 {% block title %}Live EEG Monitor — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-.rt-wrap{max-width:1100px;margin:0 auto}
-.rt-hero{background:linear-gradient(135deg,#0f172a,#1e3a5f,#0ea5e9);border-radius:20px;padding:2rem 2rem 1.75rem;color:white;margin-bottom:1.5rem;position:relative;overflow:hidden}
-.rt-hero::after{content:'';position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.05);pointer-events:none}
-.rt-hero h1{font-size:1.8rem;font-weight:800;margin-bottom:.35rem}
-.rt-hero p{opacity:.85;font-size:.9rem;max-width:560px;line-height:1.6}
-.rt-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(16,185,129,.25);border:1px solid rgba(16,185,129,.4);border-radius:20px;padding:.28rem .85rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.85rem;color:#6ee7b7}
+.rt-wrap{max-width:1200px;margin:0 auto}
+.rt-hero{background:linear-gradient(135deg,#0f172a,#1e3a5f,#0ea5e9);border-radius:20px;padding:1.5rem 2rem;color:white;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.rt-hero::after{content:'';position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05);pointer-events:none}
+.rt-hero h1{font-size:1.5rem;font-weight:800;margin-bottom:.25rem}
+.rt-hero p{opacity:.82;font-size:.85rem;max-width:500px;line-height:1.55;margin:0}
+.rt-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(16,185,129,.25);border:1px solid rgba(16,185,129,.4);border-radius:20px;padding:.25rem .8rem;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.6rem;color:#6ee7b7}
 
 /* Controls */
-.controls-card{background:white;border-radius:16px;border:1px solid var(--border);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
-.controls-row{display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap}
-.ctrl-group{display:flex;flex-direction:column;gap:.3rem;flex:1;min-width:140px}
-.ctrl-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-.ctrl-select,.ctrl-btn{padding:.5rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.88rem;font-family:inherit;background:white;color:var(--text);cursor:pointer;transition:all .18s}
+.controls-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1rem 1.25rem;margin-bottom:1rem}
+.controls-row{display:flex;align-items:flex-end;gap:.875rem;flex-wrap:wrap}
+.ctrl-group{display:flex;flex-direction:column;gap:.28rem;flex:1;min-width:130px}
+.ctrl-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.ctrl-select,.ctrl-btn{padding:.45rem .8rem;border-radius:9px;border:1.5px solid var(--border);font-size:.85rem;font-family:inherit;background:white;color:var(--text);cursor:pointer;transition:all .18s}
 .ctrl-select:focus,.ctrl-btn:focus{outline:none;border-color:var(--primary)}
 .ctrl-btn-primary{background:var(--primary);color:white;border-color:var(--primary);font-weight:700}
 .ctrl-btn-primary:hover:not(:disabled){background:var(--primary-dk);border-color:var(--primary-dk)}
 .ctrl-btn-primary:disabled{opacity:.45;cursor:not-allowed}
-.ctrl-btn-sample{background:linear-gradient(135deg,#10b981,#0ea5e9);color:white;border:none;font-weight:700}
-.ctrl-btn-sample:hover:not(:disabled){opacity:.88}
+.ctrl-btn-sample{background:linear-gradient(135deg,#059669,#0ea5e9);color:white;border:none;font-weight:700}
 .ctrl-btn-sample:disabled{opacity:.45;cursor:not-allowed}
-.ctrl-btn-danger{background:#fef2f2;color:#dc2626;border-color:#fca5a5}
-.ctrl-btn-danger:hover{background:#fee2e2}
-.upload-label{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem .85rem;border-radius:10px;border:1.5px dashed var(--border);font-size:.88rem;font-weight:600;cursor:pointer;color:var(--muted);transition:all .18s;white-space:nowrap}
+.upload-label{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .8rem;border-radius:9px;border:1.5px dashed var(--border);font-size:.85rem;font-weight:600;cursor:pointer;color:var(--muted);transition:all .18s;white-space:nowrap}
 .upload-label:hover{border-color:var(--primary);color:var(--primary)}
-.file-chosen{font-size:.8rem;color:#059669;font-weight:600;margin-top:.2rem}
 
 /* Status bar */
-.status-bar{background:white;border-radius:14px;border:1px solid var(--border);padding:.875rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap}
-.status-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s}
-.status-dot.live{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2);animation:pulse 1.5s infinite}
+.status-bar{background:white;border-radius:12px;border:1px solid var(--border);padding:.7rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.status-dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s}
+.status-dot.live{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2);animation:rtpulse 1.5s infinite}
 .status-dot.stopped{background:#f59e0b}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.2)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.05)}}
-.status-text{font-size:.85rem;font-weight:600;color:var(--text)}
-.status-time{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
-.progress-mini{flex:1;min-width:120px;height:4px;background:#f1f5f9;border-radius:99px;overflow:hidden}
+@keyframes rtpulse{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.2)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.05)}}
+.status-text{font-size:.83rem;font-weight:600;color:var(--text);flex:1}
+.status-time{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.progress-mini{flex:1;min-width:100px;max-width:200px;height:4px;background:#f1f5f9;border-radius:99px;overflow:hidden}
 .progress-mini-fill{height:100%;background:linear-gradient(90deg,#0ea5e9,#10b981);border-radius:99px;transition:width .1s linear;width:0%}
 
-/* Canvas */
-.canvas-card{background:#0f172a;border-radius:16px;overflow:hidden;margin-bottom:1.25rem;position:relative}
-.canvas-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.07)}
-.canvas-title{font-size:.8rem;font-weight:700;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase}
-.canvas-scale{font-size:.75rem;color:#475569}
-#eegCanvas{display:block;width:100%;cursor:default}
-.canvas-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;color:#475569}
-.canvas-placeholder svg{margin-bottom:1rem;opacity:.4}
+/* Two-column layout: canvas | prediction */
+.main-grid{display:grid;grid-template-columns:1fr 280px;gap:1rem;align-items:start}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}}
 
-/* Prediction panel */
-.pred-panel{background:white;border-radius:16px;border:1px solid var(--border);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
-.pred-panel-title{font-size:.85rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;color:var(--text)}
-.pred-current{display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap}
-.pred-badge{padding:.55rem 1.2rem;border-radius:12px;font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:.5rem;transition:all .3s}
-.pred-badge.seizure{background:#fef2f2;color:#dc2626;border:2px solid #fca5a5}
-.pred-badge.normal{background:#f0fdf4;color:#16a34a;border:2px solid #86efac}
-.pred-badge.waiting{background:#f8fafc;color:#94a3b8;border:2px solid #e2e8f0}
-.pred-conf{font-size:.85rem;color:var(--muted)}
-.pred-conf strong{color:var(--text)}
-.conf-bar{height:6px;background:#f1f5f9;border-radius:99px;overflow:hidden;width:160px;margin-top:.35rem}
-.conf-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#0ea5e9);transition:width .6s ease}
-.pred-history{margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap}
-.hist-chip{padding:.22rem .65rem;border-radius:20px;font-size:.73rem;font-weight:700;cursor:default}
-.hist-chip.s{background:#fee2e2;color:#b91c1c}
-.hist-chip.n{background:#d1fae5;color:#065f46}
+/* Canvas */
+.canvas-card{background:#0f172a;border-radius:14px;overflow:hidden}
+.canvas-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.07)}
+.canvas-title{font-size:.75rem;font-weight:700;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase}
+.canvas-scale{font-size:.72rem;color:#475569}
+#eegCanvas{display:block;width:100%}
+.canvas-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3.5rem 2rem;color:#475569}
+
+/* Prediction column */
+.pred-column{display:flex;flex-direction:column;gap:.875rem;position:sticky;top:1rem}
+
+/* Ensemble result */
+.ensemble-card{border-radius:14px;padding:1.1rem 1.2rem;transition:all .4s}
+.ensemble-card.waiting{background:#f8fafc;border:1.5px solid var(--border)}
+.ensemble-card.seizure{background:linear-gradient(135deg,#450a0a,#7f1d1d);border:1.5px solid #ef4444}
+.ensemble-card.normal{background:linear-gradient(135deg,#052e16,#14532d);border:1.5px solid #22c55e}
+.ens-label-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.6;margin-bottom:.35rem}
+.ens-label{font-size:1.3rem;font-weight:800;line-height:1.2;margin-bottom:.6rem}
+.ensemble-card.waiting .ens-label{color:var(--muted)}
+.ensemble-card.seizure .ens-label,.ensemble-card.normal .ens-label{color:white}
+.ens-conf-bar{height:5px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden;margin-bottom:.5rem}
+.ens-conf-fill{height:100%;border-radius:99px;background:rgba(255,255,255,.7);transition:width .6s ease}
+.ens-conf-text{font-size:.8rem;font-weight:600;opacity:.75;color:white}
+.ens-waiting-text{font-size:.82rem;color:var(--muted);line-height:1.5}
+
+/* Per-window history */
+.history-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1rem 1.1rem}
+.history-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;justify-content:space-between}
+.history-list{display:flex;flex-direction:column;gap:.4rem;max-height:280px;overflow-y:auto}
+.hist-row{display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;border-radius:8px;font-size:.8rem}
+.hist-row.s{background:#fef2f2}
+.hist-row.n{background:#f0fdf4}
+.hist-icon{font-size:.9rem;flex-shrink:0}
+.hist-label{flex:1;font-weight:600;color:var(--text)}
+.hist-conf{font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.hist-empty{font-size:.82rem;color:var(--muted);text-align:center;padding:.75rem 0}
 
 /* Disclaimer */
-.disclaimer{background:#fef9c3;border:1px solid #fde68a;border-radius:14px;padding:.9rem 1.2rem;font-size:.82rem;color:#78350f;line-height:1.6;display:flex;gap:.75rem;align-items:flex-start}
-.disclaimer i{margin-top:.05rem;flex-shrink:0;color:#d97706}
+.disclaimer{background:#fef9c3;border:1px solid #fde68a;border-radius:12px;padding:.8rem 1rem;font-size:.78rem;color:#78350f;line-height:1.55;display:flex;gap:.65rem;align-items:flex-start}
+.disclaimer i{flex-shrink:0;color:#d97706;margin-top:.1rem}
 </style>
 {% endblock %}
 
@@ -76,46 +87,40 @@
 
   <!-- Hero -->
   <div class="rt-hero">
-    <div class="rt-badge"><i class="fas fa-circle" style="font-size:.5rem"></i> Live Inference</div>
-    <h1>Live EEG Monitor</h1>
-    <p>Watch real-time EEG signal replay while the AI classifies every 10-second window for seizure activity. Upload a Parquet file or load the built-in demo recording.</p>
-  </div>
-
-  <!-- Disclaimer -->
-  <div class="disclaimer" style="margin-bottom:1.25rem">
-    <i class="fas fa-exclamation-triangle"></i>
-    <div><strong>Research &amp; educational use only.</strong>
-    This tool is not a medical device. Automated EEG analysis must always be reviewed by a qualified neurologist before any clinical decision.</div>
+    <div style="position:relative;z-index:1">
+      <div class="rt-badge"><span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;animation:rtpulse 1.4s infinite"></span> Live Inference</div>
+      <h1>Live EEG Monitor</h1>
+      <p>Real-time signal replay with per-window AI seizure classification. Demo loads automatically.</p>
+    </div>
+    <div class="disclaimer" style="max-width:360px;background:rgba(254,249,195,.1);border-color:rgba(253,230,138,.3);color:rgba(255,255,255,.75);position:relative;z-index:1">
+      <i class="fas fa-exclamation-triangle" style="color:#fbbf24"></i>
+      <div>Research use only — not a medical device. Always consult a neurologist.</div>
+    </div>
   </div>
 
   <!-- Controls -->
   <div class="controls-card">
     <div class="controls-row">
-      <!-- File upload -->
-      <div class="ctrl-group" style="flex:2;min-width:180px">
+      <div class="ctrl-group" style="flex:2;min-width:160px">
         <div class="ctrl-label">EEG File (.parquet)</div>
         <label class="upload-label" for="fileInput">
-          <i class="fas fa-file-medical"></i> Browse file
+          <i class="fas fa-file-medical"></i> <span id="uploadLabel">Browse file</span>
           <input type="file" id="fileInput" accept=".parquet" style="display:none">
         </label>
-        <div class="file-chosen" id="fileChosen" style="display:none"></div>
       </div>
-      <!-- Demo button -->
       <div class="ctrl-group" style="flex-shrink:0">
         <div class="ctrl-label">Demo</div>
         <button class="ctrl-btn ctrl-btn-sample" id="loadSampleBtn" onclick="loadSample()">
-          <i class="fas fa-flask"></i> Load Sample Data
+          <i class="fas fa-flask"></i> Load Sample
         </button>
       </div>
-      <!-- Model -->
       <div class="ctrl-group">
         <div class="ctrl-label">Model</div>
         <select class="ctrl-select" id="modelSelect">
-          <option value="ensemble">Ensemble (recommended)</option>
+          <option value="ensemble">Ensemble (all models)</option>
         </select>
       </div>
-      <!-- Stride -->
-      <div class="ctrl-group" style="flex-shrink:0;min-width:110px">
+      <div class="ctrl-group" style="flex-shrink:0;min-width:100px">
         <div class="ctrl-label">Predict every</div>
         <select class="ctrl-select" id="strideSelect">
           <option value="2">2 s</option>
@@ -124,14 +129,13 @@
           <option value="10">10 s</option>
         </select>
       </div>
-      <!-- Play / Stop -->
       <div class="ctrl-group" style="flex-shrink:0">
         <div class="ctrl-label">Playback</div>
-        <div style="display:flex;gap:.5rem">
+        <div style="display:flex;gap:.4rem">
           <button class="ctrl-btn ctrl-btn-primary" id="playBtn" onclick="togglePlay()" disabled>
             <i class="fas fa-play" id="playIcon"></i> <span id="playLabel">Play</span>
           </button>
-          <button class="ctrl-btn" id="resetBtn" onclick="resetPlayback()" disabled style="padding:.5rem .75rem">
+          <button class="ctrl-btn" id="resetBtn" onclick="resetPlayback()" disabled style="padding:.45rem .65rem">
             <i class="fas fa-redo"></i>
           </button>
         </div>
@@ -142,39 +146,57 @@
   <!-- Status bar -->
   <div class="status-bar">
     <div class="status-dot" id="statusDot"></div>
-    <div class="status-text" id="statusText">No file loaded — upload a .parquet file or use the demo</div>
+    <div class="status-text" id="statusText">Loading demo EEG recording…</div>
     <div class="status-time" id="statusTime"></div>
     <div class="progress-mini"><div class="progress-mini-fill" id="progressFill"></div></div>
   </div>
 
-  <!-- EEG canvas -->
-  <div class="canvas-card">
-    <div class="canvas-header">
-      <span class="canvas-title"><i class="fas fa-wave-square" style="color:#10b981;margin-right:.35rem"></i>EEG Waveform — 10-second window</span>
-      <span class="canvas-scale" id="canvasScale"></span>
-    </div>
-    <div id="canvasPlaceholder" class="canvas-placeholder">
-      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-        <path d="M4 32 Q12 12 20 32 Q28 52 36 32 Q44 12 52 32 Q58 42 60 36" stroke="#475569" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div style="font-size:.9rem;font-weight:600;color:#64748b">Load a file to begin</div>
-      <div style="font-size:.8rem;color:#94a3b8;margin-top:.3rem">EEG channels will appear here</div>
-    </div>
-    <canvas id="eegCanvas" style="display:none"></canvas>
-  </div>
+  <!-- Main grid: canvas + prediction sidebar -->
+  <div class="main-grid">
 
-  <!-- Prediction panel -->
-  <div class="pred-panel">
-    <div class="pred-panel-title"><i class="fas fa-brain" style="color:#6366f1"></i> Live Prediction</div>
-    <div class="pred-current">
-      <div class="pred-badge waiting" id="predBadge">
-        <i class="fas fa-hourglass-half"></i> Waiting…
+    <!-- Canvas -->
+    <div class="canvas-card">
+      <div class="canvas-header">
+        <span class="canvas-title"><i class="fas fa-wave-square" style="color:#10b981;margin-right:.35rem"></i>EEG Waveform — 10 s window</span>
+        <span class="canvas-scale" id="canvasScale"></span>
       </div>
-      <div class="pred-conf" id="predConf">
-        Prediction will appear once 10 s of data has played back.
+      <div id="canvasPlaceholder" class="canvas-placeholder">
+        <svg width="56" height="28" viewBox="0 0 56 28" fill="none" style="opacity:.35;margin-bottom:.75rem">
+          <path d="M2 14 Q8 4 14 14 Q20 24 26 14 Q32 4 38 14 Q44 24 50 14 Q53 9 54 12" stroke="#475569" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <div style="font-size:.875rem;font-weight:600;color:#64748b">Loading EEG data…</div>
       </div>
+      <canvas id="eegCanvas" style="display:none"></canvas>
     </div>
-    <div class="pred-history" id="predHistory"></div>
+
+    <!-- Prediction column -->
+    <div class="pred-column">
+
+      <!-- Ensemble result -->
+      <div class="ensemble-card waiting" id="ensembleCard">
+        <div class="ens-label-sub" id="ensLabelSub">Ensemble verdict</div>
+        <div class="ens-label" id="ensLabel">Waiting…</div>
+        <div id="ensConfWrap" style="display:none">
+          <div class="ens-conf-bar"><div class="ens-conf-fill" id="ensConfFill"></div></div>
+          <div class="ens-conf-text" id="ensConfText"></div>
+        </div>
+        <div class="ens-waiting-text" id="ensWaitText">
+          Prediction appears after 10 s of playback
+        </div>
+      </div>
+
+      <!-- History list -->
+      <div class="history-card">
+        <div class="history-title">
+          <span><i class="fas fa-history" style="margin-right:.35rem"></i>Window history</span>
+          <span id="histCount" style="font-weight:400;color:var(--muted)">0 windows</span>
+        </div>
+        <div class="history-list" id="histList">
+          <div class="hist-empty" id="histEmpty">No predictions yet</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </div>
@@ -182,30 +204,25 @@
 
 {% block extra_js %}
 <script>
-// ── Constants ─────────────────────────────────────────────────────────────────
-const TICK_MS       = 50;          // timer interval
-const TICK_SAMPLES  = 10;          // samples per tick (200 Hz → 10 per 50 ms)
-const DISPLAY_SAMP  = 2000;        // 10-second window at 200 Hz
-const MAX_CH        = 12;          // max channels to render
-const COLORS        = ['#10b981','#3b82f6','#f59e0b','#ef4444','#a78bfa',
-                       '#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6',
-                       '#8b5cf6','#e11d48'];
+// ── Constants ────────────────────────────────────────────────────────────────
+const TICK_MS      = 50;
+const TICK_SAMPLES = 10;
+const DISPLAY_SAMP = 2000;   // 10 s at 200 Hz
+const MAX_CH       = 10;
+const CH_HEIGHT    = 44;     // px per channel
+const COLORS = ['#10b981','#818cf8','#f59e0b','#34d399','#f472b6',
+                '#60a5fa','#a78bfa','#fb923c','#2dd4bf','#e879f9'];
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let eegData       = null;   // {columns, data, total_samples, sampling_rate}
-let channels      = [];     // subset of channel names to draw
-let currentSample = 0;
-let playing       = false;
-let tickTimer     = null;
-let lastPredSamp  = 0;
-let predHistory   = [];     // [{label, confidence, isSeizure}]
-let loadingFile   = false;
+// ── State ────────────────────────────────────────────────────────────────────
+let eegData = null, channels = [], currentSample = 0;
+let playing = false, tickTimer = null, lastPredSamp = 0;
+let history = [], loadingFile = false;
 
-const canvas   = document.getElementById('eegCanvas');
-const ctx      = canvas.getContext('2d');
-const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+const canvas = document.getElementById('eegCanvas');
+const ctx    = canvas.getContext('2d');
+const csrf   = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 
-// ── Models ────────────────────────────────────────────────────────────────────
+// ── Load models ──────────────────────────────────────────────────────────────
 (async () => {
   try {
     const r = await fetch('{% url "ai_insights:seizure_realtime_models" %}');
@@ -214,31 +231,31 @@ const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
     sel.innerHTML = '';
     (d.models || []).forEach(m => {
       const o = document.createElement('option');
-      o.value = m.variant;
-      o.textContent = m.title;
+      o.value = m.variant; o.textContent = m.title;
       if (m.variant === 'ensemble') o.selected = true;
       sel.appendChild(o);
     });
-  } catch(e) { /* fallback options already set */ }
+  } catch(e) {}
 })();
 
-// ── File input ────────────────────────────────────────────────────────────────
+// ── Auto-load demo on page visit ─────────────────────────────────────────────
+window.addEventListener('load', () => setTimeout(loadSample, 400));
+
+// ── File input ───────────────────────────────────────────────────────────────
 document.getElementById('fileInput').addEventListener('change', async function() {
-  if (!this.files.length) return;
-  await loadFiles(Array.from(this.files));
+  if (this.files.length) await loadFiles(Array.from(this.files));
 });
 
 async function loadSample() {
   if (loadingFile) return;
-  setStatus('loading', 'Fetching demo EEG recording…');
+  setStatus('loading', 'Loading demo EEG recording…');
   try {
     const resp = await fetch('/static/demo/eeg_sample.parquet');
-    if (!resp.ok) throw new Error('Sample file not found (HTTP ' + resp.status + ')');
+    if (!resp.ok) throw new Error('Sample file not available (HTTP ' + resp.status + ')');
     const blob = await resp.blob();
-    const file = new File([blob], 'eeg_sample.parquet', {type: 'application/octet-stream'});
-    await loadFiles([file]);
+    await loadFiles([new File([blob], 'eeg_sample.parquet', {type: 'application/octet-stream'})]);
   } catch(e) {
-    setStatus('idle', 'Could not load sample: ' + e.message);
+    setStatus('idle', e.message);
   }
 }
 
@@ -246,261 +263,232 @@ async function loadFiles(files) {
   if (loadingFile) return;
   loadingFile = true;
   document.getElementById('loadSampleBtn').disabled = true;
-  setStatus('loading', 'Uploading and parsing EEG file…');
-  resetPlayback();
+  document.getElementById('playBtn').disabled = true;
+  setStatus('loading', 'Uploading and parsing EEG…');
+  resetPlayback(false);
 
   const fd = new FormData();
   files.forEach(f => fd.append('files', f));
-
   try {
     const resp = await fetch('{% url "ai_insights:seizure_realtime_load" %}', {
-      method: 'POST',
-      body: fd,
-      headers: {'X-CSRFToken': csrfToken},
+      method: 'POST', body: fd, headers: {'X-CSRFToken': csrf},
     });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || 'Server error ' + resp.status);
-    }
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error||'Server error '+resp.status); }
     eegData = await resp.json();
     if (!eegData.columns || !eegData.data) throw new Error('Unexpected response format.');
 
     channels = eegData.columns.slice(0, MAX_CH);
-    document.getElementById('fileChosen').textContent = files[0].name + (eegData.file_count > 1 ? ` +${eegData.file_count-1} more` : '');
-    document.getElementById('fileChosen').style.display = 'block';
+    document.getElementById('uploadLabel').textContent = files[0].name;
 
-    const dur = eegData.duration_sec ? eegData.duration_sec.toFixed(1) + ' s' : eegData.total_samples + ' samples';
-    setStatus('stopped', `Loaded — ${dur} · ${eegData.total_samples.toLocaleString()} samples · ${channels.length} channels displayed`);
+    const dur = eegData.duration_sec ? eegData.duration_sec.toFixed(1)+' s' : eegData.total_samples+' samples';
+    setStatus('stopped', `Loaded — ${dur} · ${channels.length} channels`);
     document.getElementById('canvasPlaceholder').style.display = 'none';
     canvas.style.display = 'block';
-    resizeCanvas();
-    renderCanvas(0);
+    document.getElementById('canvasScale').textContent =
+      `${eegData.sampling_rate||200} Hz · ${channels.length}/${eegData.columns.length} ch`;
+    resizeCanvas(); renderFrame(0);
     document.getElementById('playBtn').disabled = false;
     document.getElementById('resetBtn').disabled = false;
-    document.getElementById('canvasScale').textContent =
-      `SR: ${eegData.sampling_rate || 200} Hz · ${channels.length}/${eegData.columns.length} ch`;
+    // Auto-start playback
+    setTimeout(startPlayback, 300);
   } catch(e) {
-    setStatus('idle', 'Load failed: ' + e.message);
+    setStatus('idle', 'Failed to load: ' + e.message);
   } finally {
     loadingFile = false;
     document.getElementById('loadSampleBtn').disabled = false;
   }
 }
 
-// ── Playback ──────────────────────────────────────────────────────────────────
-function togglePlay() {
-  if (!eegData) return;
-  if (playing) pausePlayback(); else startPlayback();
-}
+// ── Playback ─────────────────────────────────────────────────────────────────
+function togglePlay() { playing ? pausePlayback() : startPlayback(); }
 
 function startPlayback() {
+  if (!eegData) return;
   playing = true;
   document.getElementById('playIcon').className = 'fas fa-pause';
   document.getElementById('playLabel').textContent = 'Pause';
   document.getElementById('statusDot').className = 'status-dot live';
-  tickTimer = setInterval(tick, TICK_MS);
+  if (playing) tickTimer = setInterval(tick, TICK_MS);
 }
 
 function pausePlayback() {
-  playing = false;
-  clearInterval(tickTimer);
+  playing = false; clearInterval(tickTimer);
   document.getElementById('playIcon').className = 'fas fa-play';
   document.getElementById('playLabel').textContent = 'Play';
   document.getElementById('statusDot').className = 'status-dot stopped';
 }
 
-function resetPlayback() {
+function resetPlayback(fullReset = true) {
   pausePlayback();
-  currentSample = 0;
-  lastPredSamp  = 0;
-  predHistory   = [];
-  document.getElementById('predHistory').innerHTML = '';
-  setPredBadge(null, null);
-  if (eegData) { renderCanvas(0); updateProgress(); }
-  document.getElementById('playIcon').className = 'fas fa-play';
-  document.getElementById('playLabel').textContent = 'Play';
-  setStatus(eegData ? 'stopped' : 'idle', eegData
-    ? `Ready — ${channels.length} channels · ${eegData.total_samples.toLocaleString()} samples`
-    : 'No file loaded — upload a .parquet file or use the demo');
+  currentSample = 0; lastPredSamp = 0; history = [];
+  document.getElementById('histList').innerHTML = '<div class="hist-empty" id="histEmpty">No predictions yet</div>';
+  document.getElementById('histCount').textContent = '0 windows';
   document.getElementById('progressFill').style.width = '0%';
   document.getElementById('statusTime').textContent = '';
+  resetEnsemble();
+  if (eegData && fullReset) { renderFrame(0); setStatus('stopped', 'Ready'); }
 }
 
 function tick() {
   currentSample = Math.min(currentSample + TICK_SAMPLES, eegData.total_samples);
-  renderCanvas(currentSample);
-  updateProgress();
-
+  renderFrame(currentSample); updateProgress();
   if (currentSample >= DISPLAY_SAMP) {
     const stride = parseInt(document.getElementById('strideSelect').value) * 200;
-    if (currentSample - lastPredSamp >= stride) {
-      lastPredSamp = currentSample;
-      runPrediction(currentSample);
-    }
+    if (currentSample - lastPredSamp >= stride) { lastPredSamp = currentSample; runPrediction(currentSample); }
   }
-
-  if (currentSample >= eegData.total_samples) {
-    pausePlayback();
-    setStatus('stopped', 'Playback complete');
-  }
+  if (currentSample >= eegData.total_samples) { pausePlayback(); setStatus('stopped', 'Playback complete'); }
 }
 
 function updateProgress() {
   if (!eegData) return;
-  const pct = (currentSample / eegData.total_samples) * 100;
-  document.getElementById('progressFill').style.width = pct + '%';
-  const sr = eegData.sampling_rate || 200;
-  const elapsed = (currentSample / sr).toFixed(1);
-  const total   = (eegData.total_samples / sr).toFixed(1);
-  document.getElementById('statusTime').textContent = `${elapsed} / ${total} s`;
+  document.getElementById('progressFill').style.width = (currentSample/eegData.total_samples*100)+'%';
+  const sr = eegData.sampling_rate||200;
+  document.getElementById('statusTime').textContent =
+    `${(currentSample/sr).toFixed(1)} / ${(eegData.total_samples/sr).toFixed(1)} s`;
 }
 
-// ── Canvas rendering ──────────────────────────────────────────────────────────
+// ── Canvas ────────────────────────────────────────────────────────────────────
 function resizeCanvas() {
-  const card = canvas.parentElement;
-  const w = card.clientWidth;
-  const chHeight = 60;
+  const w = canvas.parentElement.clientWidth;
   canvas.width  = w;
-  canvas.height = channels.length * chHeight;
+  canvas.height = channels.length * CH_HEIGHT;
   canvas.style.height = canvas.height + 'px';
 }
 
-function renderCanvas(endSample) {
+function renderFrame(endSample) {
   if (!eegData || !channels.length) return;
-  const w = canvas.width;
-  const h = canvas.height;
-  const chH = h / channels.length;
+  const W = canvas.width, H = canvas.height, chH = CH_HEIGHT;
+  const sr = eegData.sampling_rate || 200;
 
   ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, W, H);
 
-  // Vertical grid (1s intervals)
-  const sr = eegData.sampling_rate || 200;
-  const samplesInWindow = Math.min(DISPLAY_SAMP, endSample || DISPLAY_SAMP);
-  const pixPerSamp = w / DISPLAY_SAMP;
-
-  ctx.strokeStyle = 'rgba(255,255,255,.05)';
-  ctx.lineWidth = 1;
-  for (let s = 0; s <= samplesInWindow; s += sr) {
-    const x = s * pixPerSamp;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  // 1-second vertical gridlines
+  ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1;
+  for (let s = 0; s <= DISPLAY_SAMP; s += sr) {
+    const x = (s / DISPLAY_SAMP) * W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
   }
-
-  // Horizontal channel dividers
-  ctx.strokeStyle = 'rgba(255,255,255,.04)';
-  for (let i = 1; i < channels.length; i++) {
-    const y = i * chH;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  // Time labels
+  ctx.fillStyle = '#334155'; ctx.font = '10px system-ui';
+  for (let s = sr; s < DISPLAY_SAMP; s += sr) {
+    const x = (s / DISPLAY_SAMP) * W;
+    ctx.fillText(`${s/sr}s`, x+3, H-4);
   }
 
   channels.forEach((ch, ci) => {
-    const data = eegData.data[ch];
-    if (!data) return;
-
-    const startSamp = Math.max(0, endSample - DISPLAY_SAMP);
-    const slice = data.slice(startSamp, endSample || DISPLAY_SAMP);
+    const raw = eegData.data[ch]; if (!raw) return;
+    const start = Math.max(0, endSample - DISPLAY_SAMP);
+    const slice = raw.slice(start, endSample || DISPLAY_SAMP);
     if (!slice.length) return;
 
     const yCenter = (ci + 0.5) * chH;
-    const amplitude = chH * 0.4;
-
-    // Auto-scale: use 95th-percentile of absolute values
-    const sorted = slice.map(Math.abs).sort((a,b) => a-b);
+    const sorted = slice.map(Math.abs).sort((a,b)=>a-b);
     const p95 = sorted[Math.floor(sorted.length * 0.95)] || 1;
-    const scale = p95 > 0 ? amplitude / p95 : amplitude;
+    const scale = p95 > 0 ? (chH * 0.42) / p95 : chH * 0.42;
+
+    // Channel separator
+    if (ci > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, ci*chH); ctx.lineTo(W, ci*chH); ctx.stroke();
+    }
 
     ctx.beginPath();
     ctx.strokeStyle = COLORS[ci % COLORS.length];
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = .88;
-
-    const step = Math.max(1, Math.floor(slice.length / w));
+    ctx.lineWidth = 1.1;
+    ctx.globalAlpha = .85;
+    const step = Math.max(1, Math.floor(slice.length / W));
     for (let i = 0; i < slice.length; i += step) {
-      const x = (i / DISPLAY_SAMP) * w;
+      const x = (i / DISPLAY_SAMP) * W;
       const y = yCenter - slice[i] * scale;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.stroke(); ctx.globalAlpha = 1;
 
     // Channel label
     ctx.fillStyle = COLORS[ci % COLORS.length];
-    ctx.globalAlpha = .7;
-    ctx.font = 'bold 11px system-ui';
-    ctx.fillText(ch, 6, ci * chH + 14);
+    ctx.globalAlpha = .65; ctx.font = 'bold 10px system-ui';
+    ctx.fillText(ch, 5, ci * chH + 12);
     ctx.globalAlpha = 1;
   });
 }
 
 // ── Prediction ────────────────────────────────────────────────────────────────
-async function runPrediction(upToSample) {
+async function runPrediction(upTo) {
   const model = document.getElementById('modelSelect').value;
   const chunk = {};
-  const startSamp = Math.max(0, upToSample - DISPLAY_SAMP);
-  channels.forEach(ch => {
-    const arr = eegData.data[ch];
-    chunk[ch] = arr ? arr.slice(startSamp, upToSample) : [];
-  });
-
+  const start = Math.max(0, upTo - DISPLAY_SAMP);
+  channels.forEach(ch => { chunk[ch] = eegData.data[ch]?.slice(start, upTo) || []; });
   try {
     const resp = await fetch('{% url "ai_insights:seizure_realtime_predict_chunk" %}', {
       method: 'POST',
       body: JSON.stringify({data: chunk, model_variant: model}),
-      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const d = await resp.json();
     if (d.error) throw new Error(d.error);
-
     const label = d.label || d.ensemble_label || '?';
-    const conf  = d.confidence;
-    const isSeizure = label.toLowerCase().includes('seizure') || label.toLowerCase().includes('ictal');
-    setPredBadge(label, conf, isSeizure);
-    predHistory.unshift({label, conf, isSeizure});
-    if (predHistory.length > 20) predHistory.pop();
-    renderHistory();
-  } catch(e) {
-    console.warn('Prediction error:', e);
+    const conf  = d.confidence ?? null;
+    const isSeiz = label.toLowerCase().includes('seizure') || label.toLowerCase().includes('ictal');
+    updateEnsemble(label, conf, isSeiz);
+    addHistory(label, conf, isSeiz);
+  } catch(e) { console.warn('Prediction error:', e.message); }
+}
+
+function updateEnsemble(label, conf, isSeiz) {
+  const card  = document.getElementById('ensembleCard');
+  const lbl   = document.getElementById('ensLabel');
+  const sub   = document.getElementById('ensLabelSub');
+  const wait  = document.getElementById('ensWaitText');
+  const wrap  = document.getElementById('ensConfWrap');
+  const fill  = document.getElementById('ensConfFill');
+  const text  = document.getElementById('ensConfText');
+
+  card.className = 'ensemble-card ' + (isSeiz ? 'seizure' : 'normal');
+  sub.textContent = isSeiz ? '⚡ Seizure Detected' : '✅ No Seizure';
+  lbl.textContent = label;
+  wait.style.display = 'none';
+  if (conf !== null) {
+    const pct = Math.round(conf * 100);
+    fill.style.width = pct + '%';
+    text.textContent = `Confidence: ${pct}%`;
+    wrap.style.display = 'block';
   }
 }
 
-function setPredBadge(label, conf, isSeizure) {
-  const badge = document.getElementById('predBadge');
-  const confEl = document.getElementById('predConf');
-  if (label === null) {
-    badge.className = 'pred-badge waiting';
-    badge.innerHTML = '<i class="fas fa-hourglass-half"></i> Waiting…';
-    confEl.textContent = 'Prediction will appear once 10 s of data has played back.';
-    return;
-  }
-  badge.className = 'pred-badge ' + (isSeizure ? 'seizure' : 'normal');
-  badge.innerHTML = (isSeizure ? '<i class="fas fa-bolt"></i> ' : '<i class="fas fa-check-circle"></i> ') + esc(label);
-  const pct = conf != null ? Math.round(conf * 100) : null;
-  confEl.innerHTML = pct != null
-    ? `Confidence: <strong>${pct}%</strong><div class="conf-bar"><div class="conf-bar-fill" style="width:${pct}%"></div></div>`
-    : 'Confidence: N/A';
+function resetEnsemble() {
+  document.getElementById('ensembleCard').className = 'ensemble-card waiting';
+  document.getElementById('ensLabel').textContent = 'Waiting…';
+  document.getElementById('ensLabelSub').textContent = 'Ensemble verdict';
+  document.getElementById('ensWaitText').style.display = 'block';
+  document.getElementById('ensConfWrap').style.display = 'none';
 }
 
-function renderHistory() {
-  const el = document.getElementById('predHistory');
-  el.innerHTML = predHistory.map(p => {
-    const cls = p.isSeizure ? 's' : 'n';
-    const pct = p.conf != null ? Math.round(p.conf*100) + '%' : '';
-    return `<span class="hist-chip ${cls}" title="${esc(p.label)}">${p.isSeizure?'⚡':'✅'} ${pct}</span>`;
-  }).join('');
+function addHistory(label, conf, isSeiz) {
+  history.unshift({label, conf, isSeiz});
+  if (history.length > 30) history.pop();
+  const list  = document.getElementById('histList');
+  const empty = document.getElementById('histEmpty');
+  if (empty) empty.remove();
+  document.getElementById('histCount').textContent = history.length + ' window' + (history.length!==1?'s':'');
+
+  const row = document.createElement('div');
+  row.className = 'hist-row ' + (isSeiz ? 's' : 'n');
+  const pct = conf !== null ? Math.round(conf*100)+'%' : '';
+  row.innerHTML = `<span class="hist-icon">${isSeiz?'⚡':'✅'}</span>
+    <span class="hist-label">${esc(label)}</span>
+    <span class="hist-conf">${pct}</span>`;
+  list.insertBefore(row, list.firstChild);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function setStatus(state, msg) {
   document.getElementById('statusText').textContent = msg;
   const dot = document.getElementById('statusDot');
-  dot.className = 'status-dot' + (state === 'live' ? ' live' : state === 'stopped' ? ' stopped' : '');
+  dot.className = 'status-dot' + ({live:' live',stopped:' stopped'}[state]||'');
 }
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-window.addEventListener('resize', () => { if (eegData) { resizeCanvas(); renderCanvas(currentSample); }});
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+window.addEventListener('resize', () => { if (eegData) { resizeCanvas(); renderFrame(currentSample); } });
 </script>
 {% endblock %}
