@@ -387,8 +387,14 @@ html,body{overflow-x:hidden}
         }
       }
     }
+    let animRunning = false;
     function loop(){ draw(); requestAnimationFrame(loop); }
-    loop();
+    // defer until layout is computed so offsetWidth is non-zero
+    function startLoop(){
+      if (cv.offsetWidth > 0){ animRunning = true; loop(); }
+      else requestAnimationFrame(startLoop);
+    }
+    requestAnimationFrame(startLoop);
   })();
   </script>
 

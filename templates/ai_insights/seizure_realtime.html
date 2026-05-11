@@ -209,9 +209,13 @@ const TICK_MS      = 50;
 const TICK_SAMPLES = 10;
 const DISPLAY_SAMP = 2000;   // 10 s at 200 Hz
 const MAX_CH       = 19;
-const CH_HEIGHT    = 52;     // px per channel
-const COLORS = ['#10b981','#818cf8','#f59e0b','#34d399','#f472b6',
-                '#60a5fa','#a78bfa','#fb923c','#2dd4bf','#e879f9'];
+let   CH_HEIGHT    = 52;     // recalculated in resizeCanvas
+const COLORS = [
+  '#10b981','#818cf8','#f59e0b','#34d399','#f472b6',
+  '#60a5fa','#a78bfa','#fb923c','#2dd4bf','#e879f9',
+  '#f43f5e','#06b6d4','#84cc16','#d946ef','#0ea5e9',
+  '#fbbf24','#a3e635','#38bdf8','#c084fc',
+];
 
 // ── State ────────────────────────────────────────────────────────────────────
 let eegData = null, channels = [], currentSample = 0;
@@ -349,8 +353,10 @@ function updateProgress() {
 // ── Canvas ────────────────────────────────────────────────────────────────────
 function resizeCanvas() {
   const w = canvas.parentElement.clientWidth;
+  const availH = Math.min(window.innerHeight * 0.78, 940);
+  CH_HEIGHT = Math.max(38, Math.floor(availH / (channels.length || 1)));
   canvas.width  = w;
-  canvas.height = channels.length * CH_HEIGHT;
+  canvas.height = CH_HEIGHT * channels.length;
   canvas.style.height = canvas.height + 'px';
 }
 
