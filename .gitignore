@@ -28,8 +28,8 @@ static_collected/
 # Vector store cache
 rag_vector_store/
 
-# PyTorch model weights (large binaries — deploy separately)
-ai_insights/models/*.pth
+# PyTorch model weights — committed (small, <2 MB each)
+# ai_insights/models/*.pth
 
 # IDE
 .vscode/
@@ -50,6 +50,8 @@ Thumbs.db
 *.pt
 *.pth
 *.onnx
+# Exception: EEG seizure models are small enough to ship in repo
+!ai_insights/models/*.pth
 
 # Analysis docs generated locally
 HEALTHCOMPASS_*.md
