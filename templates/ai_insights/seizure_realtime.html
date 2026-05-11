@@ -120,6 +120,15 @@
           <option value="ensemble">Ensemble (all models)</option>
         </select>
       </div>
+      <div class="ctrl-group" style="flex-shrink:0;min-width:90px">
+        <div class="ctrl-label">Speed</div>
+        <select class="ctrl-select" id="speedSelect">
+          <option value="0.25">0.25×</option>
+          <option value="0.5" selected>0.5×</option>
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+        </select>
+      </div>
       <div class="ctrl-group" style="flex-shrink:0;min-width:100px">
         <div class="ctrl-label">Predict every</div>
         <select class="ctrl-select" id="strideSelect">
@@ -205,8 +214,6 @@
 {% block extra_js %}
 <script>
 // ── Constants ────────────────────────────────────────────────────────────────
-const TICK_MS      = 50;
-const TICK_SAMPLES = 10;
 const DISPLAY_SAMP = 2000;   // 10 s at 200 Hz
 const MAX_CH       = 19;
 let   CH_HEIGHT    = 52;     // recalculated in resizeCanvas
@@ -219,7 +226,7 @@ const COLORS = [
 
 // ── State ────────────────────────────────────────────────────────────────────
 let eegData = null, channels = [], currentSample = 0;
-let playing = false, tickTimer = null, lastPredSamp = 0;
+let playing = false, rafId = null, rafLastTs = null, lastPredSamp = 0;
 let history = [], loadingFile = false;
 
 const canvas = document.getElementById('eegCanvas');
@@ -307,15 +314,16 @@ function togglePlay() { playing ? pausePlayback() : startPlayback(); }
 
 function startPlayback() {
   if (!eegData) return;
-  playing = true;
+  playing = true; rafLastTs = null;
   document.getElementById('playIcon').className = 'fas fa-pause';
   document.getElementById('playLabel').textContent = 'Pause';
   document.getElementById('statusDot').className = 'status-dot live';
-  if (playing) tickTimer = setInterval(tick, TICK_MS);
+  rafId = requestAnimationFrame(tick);
 }
 
 function pausePlayback() {
-  playing = false; clearInterval(tickTimer);
+  playing = false;
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   document.getElementById('playIcon').className = 'fas fa-play';
   document.getElementById('playLabel').textContent = 'Play';
   document.getElementById('statusDot').className = 'status-dot stopped';
@@ -332,14 +340,22 @@ function resetPlayback(fullReset = true) {
   if (eegData && fullReset) { renderFrame(0); setStatus('stopped', 'Ready'); }
 }
 
-function tick() {
-  currentSample = Math.min(currentSample + TICK_SAMPLES, eegData.total_samples);
+function tick(ts) {
+  if (!playing) return;
+  if (rafLastTs === null) rafLastTs = ts;
+  const dt = Math.min(ts - rafLastTs, 80); // cap at 80ms (handles tab switch)
+  rafLastTs = ts;
+  const speed = parseFloat(document.getElementById('speedSelect')?.value || '0.5');
+  const sr = eegData.sampling_rate || 200;
+  const add = Math.round(dt * sr / 1000 * speed);
+  currentSample = Math.min(currentSample + add, eegData.total_samples);
   renderFrame(currentSample); updateProgress();
   if (currentSample >= DISPLAY_SAMP) {
-    const stride = parseInt(document.getElementById('strideSelect').value) * 200;
+    const stride = parseInt(document.getElementById('strideSelect').value) * sr;
     if (currentSample - lastPredSamp >= stride) { lastPredSamp = currentSample; runPrediction(currentSample); }
   }
-  if (currentSample >= eegData.total_samples) { pausePlayback(); setStatus('stopped', 'Playback complete'); }
+  if (currentSample >= eegData.total_samples) { pausePlayback(); setStatus('stopped', 'Playback complete'); return; }
+  rafId = requestAnimationFrame(tick);
 }
 
 function updateProgress() {
@@ -430,7 +446,11 @@ async function runPrediction(upTo) {
       body: JSON.stringify({data: chunk, model_variant: model}),
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (!resp.ok) {
+      let msg = 'HTTP ' + resp.status;
+      try { const b = await resp.json(); if (b.error) msg = b.error; } catch {}
+      throw new Error(msg);
+    }
     const d = await resp.json();
     if (d.error) throw new Error(d.error);
     const label = d.label || d.ensemble_label || '?';
