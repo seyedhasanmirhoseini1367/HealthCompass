@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import AIModel, ModelPrediction
 from .forms import SubmitModelForm
@@ -310,12 +311,11 @@ def seizure_analysis(request):
 
 # ─── Real-time EEG inference (local, no proxy) ───────────────────────────────
 
-@login_required
 def seizure_realtime(request):
     return render(request, 'ai_insights/seizure_realtime.html', {})
 
 
-@login_required
+@csrf_exempt
 def seizure_realtime_load(request):
     """Parse uploaded parquet/csv and return raw signal as JSON."""
     if request.method != 'POST':
@@ -359,7 +359,6 @@ def seizure_realtime_load(request):
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-@login_required
 def seizure_realtime_models(request):
     """Return the three locally available model variants + ensemble."""
     return JsonResponse({'models': [
@@ -370,7 +369,7 @@ def seizure_realtime_models(request):
     ]})
 
 
-@login_required
+@csrf_exempt
 def seizure_realtime_predict_chunk(request):
     """Run local PyTorch inference on a 10-second EEG window."""
     if request.method != 'POST':
