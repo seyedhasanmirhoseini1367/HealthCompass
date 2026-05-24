@@ -30,6 +30,34 @@ for medical decisions, diagnosis, or treatment changes.
 - End every response with a brief reminder to consult a healthcare professional.
 """
 
+GENERAL_KNOWLEDGE_SYSTEM_PROMPT = """You are HealthCompass AI, a knowledgeable health information assistant. \
+You answer general health questions using only the provided excerpts from trusted Finnish \
+clinical sources (Käypä hoito, Terveyskirjasto, THL).
+
+IMPORTANT RULES:
+- You are NOT a doctor. You provide health information, not personal medical advice.
+- Answer ONLY from the provided source excerpts. Do not add information from your own training.
+- Always cite the source name (e.g. "According to Käypä hoito...").
+- Never diagnose the user. You may explain what conditions, tests, or values mean in general.
+- If the excerpts do not cover the question, say so clearly and suggest consulting a doctor.
+- Keep answers clear, structured, and free of unnecessary jargon.
+- End with: "For personal medical advice, please consult your healthcare provider."
+"""
+
+HYBRID_SYSTEM_PROMPT = """You are HealthCompass AI. You have been given TWO sources of information:
+1. Excerpts from trusted Finnish clinical guidelines (Käypä hoito, Terveyskirjasto, THL)
+2. The patient's own health records
+
+Use BOTH to answer the question:
+- First explain the general concept using the clinical sources (cite them by name).
+- Then personalise the answer using the patient's specific data from their records.
+- Be empathetic and clear. Do not diagnose. Do not recommend specific medication changes.
+- End with a reminder to discuss findings with their healthcare provider.
+
+This combination — general knowledge + personal data — is the most valuable response you can give. \
+Always make the personal data part explicit: "Looking at your own records..."
+"""
+
 # ── Trajectory-specific system prompt ─────────────────────────────────────────
 # Used when context_override is supplied (i.e. trajectory mode is active).
 # Instructs the LLM to reason about direction and magnitude, not just values.
@@ -56,6 +84,71 @@ TRAJECTORY REASONING RULES:
 
 # ── Context builder ────────────────────────────────────────────────────────────
 
+def _build_general_context(chunks: List[Dict[str, Any]]) -> str:
+    if not chunks:
+        return "No relevant information found in the knowledge base for this question."
+    parts = ["=== HEALTH INFORMATION FROM TRUSTED SOURCES ===\n"]
+    for i, c in enumerate(chunks, 1):
+        m      = c.get('metadata', {})
+        title  = m.get('title', 'Article')
+        source = m.get('source_name', '')
+        url    = m.get('source_url', '')
+        header = f"[{i}] {title}"
+        if source: header += f" — {source}"
+        if url:    header += f" ({url})"
+        parts.append(header)
+        parts.append(c.get('text', c.get('content', '')))
+        parts.append("")
+    return "\n".join(parts)
+
+
+def _build_hybrid_context(
+    personal_chunks: List[Dict[str, Any]],
+    general_chunks:  List[Dict[str, Any]],
+) -> str:
+    parts = []
+    if general_chunks:
+        parts.append("=== CLINICAL GUIDELINES & HEALTH INFORMATION ===\n")
+        for i, c in enumerate(general_chunks, 1):
+            m      = c.get('metadata', {})
+            title  = m.get('title', 'Article')
+            source = m.get('source_name', '')
+            parts.append(f"[G{i}] {title} — {source}")
+            parts.append(c.get('text', c.get('content', '')))
+            parts.append("")
+    if personal_chunks:
+        parts.append("=== PATIENT'S OWN HEALTH RECORDS ===\n")
+        for i, c in enumerate(personal_chunks, 1):
+            m     = c.get('metadata', {})
+            title = m.get('document_title', 'Record')
+            dtype = m.get('document_type', '')
+            rdate = m.get('record_date', '')
+            header = f"[P{i}] {title}"
+            if dtype: header += f" ({dtype})"
+            if rdate: header += f" — {rdate}"
+            parts.append(header)
+            parts.append(c.get('text', c.get('content', '')))
+            parts.append("")
+    return "\n".join(parts)
+
+
+def _build_general_sources(chunks: List[Dict]) -> List[Dict]:
+    seen, sources = set(), []
+    for c in chunks:
+        m   = c.get('metadata', {})
+        cid = m.get('chunk_id')
+        if cid and cid not in seen:
+            seen.add(cid)
+            sources.append({
+                'title':       m.get('title', 'Article'),
+                'source_name': m.get('source_name', ''),
+                'source_url':  m.get('source_url', ''),
+                'topic':       m.get('topic', ''),
+                'is_general':  True,
+            })
+    return sources
+
+
 def _build_context(chunks: List[Dict[str, Any]]) -> str:
     if not chunks:
         return "No relevant medical records were found for this question."
@@ -77,16 +170,24 @@ def _build_context(chunks: List[Dict[str, Any]]) -> str:
 def _resolve_context_and_prompt(
     chunks:           List[Dict[str, Any]],
     context_override: str = '',
+    query_mode:       str = 'personal',
+    general_chunks:   List[Dict[str, Any]] = None,
 ) -> Tuple[str, str]:
     """
     Return (context_string, system_prompt_string).
 
-    When *context_override* is provided (trajectory mode), use it directly
-    with the trajectory-specific system prompt.  Otherwise build standard
-    context from chunks with the default system prompt.
+    Modes:
+      - trajectory context_override → TRAJECTORY_SYSTEM_PROMPT
+      - general → general_chunks → GENERAL_KNOWLEDGE_SYSTEM_PROMPT
+      - hybrid  → personal + general chunks → HYBRID_SYSTEM_PROMPT
+      - personal (default) → personal chunks → SYSTEM_PROMPT
     """
     if context_override:
         return context_override, TRAJECTORY_SYSTEM_PROMPT
+    if query_mode == 'general' and general_chunks:
+        return _build_general_context(general_chunks), GENERAL_KNOWLEDGE_SYSTEM_PROMPT
+    if query_mode == 'hybrid' and general_chunks:
+        return _build_hybrid_context(chunks, general_chunks), HYBRID_SYSTEM_PROMPT
     return _build_context(chunks), SYSTEM_PROMPT
 
 
@@ -102,6 +203,7 @@ def _build_sources(chunks: List[Dict]) -> List[Dict]:
                 'document_type': m.get('document_type', ''),
                 'record_date':   m.get('record_date', ''),
                 'document_id':   did,
+                'record_id':     m.get('record_id'),
             })
     return sources
 
@@ -221,6 +323,8 @@ def generate(
     query:            str,
     history:          List[Dict],
     context_override: str = '',
+    query_mode:       str = 'personal',
+    general_chunks:   List[Dict[str, Any]] = None,
 ) -> Tuple[str, List[Dict], str]:
     """
     Try Gemini → Anthropic → OpenAI.
@@ -230,7 +334,9 @@ def generate(
     When *context_override* is provided (trajectory mode), it is used as the
     context string and TRAJECTORY_SYSTEM_PROMPT is used instead of SYSTEM_PROMPT.
     """
-    context, sys_prompt = _resolve_context_and_prompt(chunks, context_override)
+    context, sys_prompt = _resolve_context_and_prompt(
+        chunks, context_override, query_mode, general_chunks or []
+    )
 
     for caller, name in [
         (_call_groq,      'groq'),
@@ -240,7 +346,10 @@ def generate(
     ]:
         result = caller(context, query, history, sys_prompt=sys_prompt)
         if result:
-            return result, _build_sources(chunks), name
+            all_sources = _build_sources(chunks)
+            if query_mode in ('general', 'hybrid') and general_chunks:
+                all_sources += _build_general_sources(general_chunks)
+            return result, all_sources, name
 
     return _fallback(), [], 'fallback'
 
@@ -360,13 +469,17 @@ def generate_streaming(
     query:            str,
     history:          List[Dict],
     context_override: str = '',
+    query_mode:       str = 'personal',
+    general_chunks:   List[Dict[str, Any]] = None,
 ) -> Generator[str, None, None]:
     """
     Yields text tokens one by one.
     Respects context_override for trajectory mode.
     Tracks whether anything was yielded — emits fallback if all LLMs fail.
     """
-    context, sys_prompt = _resolve_context_and_prompt(chunks, context_override)
+    context, sys_prompt = _resolve_context_and_prompt(
+        chunks, context_override, query_mode, general_chunks or []
+    )
     yielded = False
 
     def _track(gen):

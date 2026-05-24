@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}AI Models — HealthCompass{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-hero{background:linear-gradient(135deg,#10b981,#059669);border-radius:0 0 28px 28px;padding:1.75rem 1.75rem 2.25rem;margin:-1.5rem -1.5rem 2rem;color:white;position:relative;overflow:hidden}
+.page-hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.page-hero-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.page-hero h1{font-size:1.55rem;font-weight:800;margin:0 0 .2rem;letter-spacing:-.02em}
+.page-hero p{opacity:.88;font-size:.87rem;margin:0}
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:.35rem .85rem;font-size:.78rem;font-weight:600;color:white;text-decoration:none;transition:background .15s;white-space:nowrap}
+.back-btn:hover{background:rgba(255,255,255,.28);color:white;text-decoration:none}
+
+.featured-row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.25rem}
+@media(max-width:560px){.featured-row{grid-template-columns:1fr}}
+.feat-card{display:flex;align-items:center;gap:.9rem;border-radius:14px;padding:1rem 1.2rem;color:white;text-decoration:none;transition:opacity .18s}
+.feat-card:hover{opacity:.88;text-decoration:none;color:white}
+.feat-emoji{font-size:1.75rem;flex-shrink:0}
+.feat-title{font-size:.9rem;font-weight:800}
+.feat-sub{font-size:.75rem;opacity:.82}
+.feat-arrow{margin-left:auto;font-weight:700;opacity:.85;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#6ee7b7;display:inline-block;animation:pulse 1.4s infinite;margin-right:.3rem}
+
+.models-toolbar{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.models-search{flex:1;min-width:180px;padding:.5rem .9rem;border:1.5px solid var(--border);border-radius:10px;font-size:.875rem;outline:none;font-family:inherit;transition:border .15s}
+.models-search:focus{border-color:var(--primary)}
+.models-sort{border:1px solid var(--border);border-radius:9px;padding:.4rem .65rem;font-size:.82rem;color:var(--text);outline:none;background:white}
+.cat-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.cat-chip{border:1.5px solid var(--border);background:white;border-radius:20px;padding:.28rem .8rem;font-size:.78rem;font-weight:600;color:#64748b;cursor:pointer;transition:all .18s}
+.cat-chip.active,.cat-chip:hover{border-color:#10b981;background:#d1fae5;color:#065f46}
+
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+.model-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.15rem 1.2rem;display:flex;flex-direction:column;gap:.6rem;cursor:pointer;position:relative;overflow:hidden;transition:all .2s}
+.model-card:hover{box-shadow:0 8px 24px rgba(0,0,0,.09);transform:translateY(-2px);border-color:#cbd5e1}
+.model-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.cat-cardiovascular::before{background:#ef4444}.cat-diabetes::before{background:#f59e0b}
+.cat-oncology::before{background:#8b5cf6}.cat-neurology::before{background:#6366f1}
+.cat-wearable::before{background:#10b981}.cat-general::before{background:#0ea5e9}.cat-other::before{background:#94a3b8}
+.model-cat-badge{display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:20px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cat-cardiovascular .model-cat-badge{background:#fee2e2;color:#b91c1c}
+.cat-diabetes .model-cat-badge{background:#fef3c7;color:#92400e}
+.cat-oncology .model-cat-badge{background:#ede9fe;color:#5b21b6}
+.cat-neurology .model-cat-badge{background:#e0e7ff;color:#3730a3}
+.cat-wearable .model-cat-badge{background:#d1fae5;color:#065f46}
+.cat-general .model-cat-badge{background:#dbeafe;color:#0369a1}
+.cat-other .model-cat-badge{background:#f1f5f9;color:#64748b}
+.model-name{font-size:.95rem;font-weight:700;color:var(--text)}
+.model-desc{font-size:.82rem;color:var(--muted);line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.model-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.6rem;border-top:1px solid #f1f5f9;margin-top:auto}
+.run-count{font-size:.75rem;color:var(--muted)}
+.run-btn{font-size:.76rem;padding:.28rem .8rem;background:var(--primary);color:white;border-radius:8px;font-weight:600}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1><i class="fas fa-robot" style="margin-right:.45rem;opacity:.9"></i>AI Models</h1>
+      <p>{{ total }} specialist models — browse, run, and explore predictions</p>
+    </div>
+    <a href="{% url 'ai_insights:list' %}" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+</div>
+
+<!-- featured -->
+<div class="featured-row">
+  <a href="{% url 'ai_insights:seizure_analysis' %}" class="feat-card" style="background:linear-gradient(135deg,#312e81,#4f46e5,#0ea5e9)">
+    <span class="feat-emoji">🧠</span>
+    <div>
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.12rem">Featured Tool</div>
+      <div class="feat-title">EEG Seizure Analysis</div>
+      <div class="feat-sub">Multi-model CNN, LSTM &amp; ensemble</div>
+    </div>
+    <span class="feat-arrow">Run →</span>
+  </a>
+  <a href="{% url 'ai_insights:seizure_realtime' %}" class="feat-card" style="background:linear-gradient(135deg,#052e16,#065f46,#10b981)">
+    <span class="feat-emoji">📡</span>
+    <div>
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.12rem;display:flex;align-items:center"><span class="live-dot"></span>Live Demo</div>
+      <div class="feat-title">Live EEG Monitor</div>
+      <div class="feat-sub">Real-time replay &amp; inference</div>
+    </div>
+    <span class="feat-arrow">Try →</span>
+  </a>
+</div>
+
+<!-- toolbar -->
+<div class="models-toolbar">
+  <input class="models-search" id="modelSearch" placeholder="🔍  Search models…" oninput="applyFilters()" autocomplete="off">
+  <select class="models-sort" id="sortSelect" onchange="applyFilters()">
+    <option value="runs">Most used</option>
+    <option value="name">Name A–Z</option>
+    <option value="newest">Newest</option>
+  </select>
+  {% if user.is_authenticated and user.is_data_scientist %}
+  <a href="{% url 'ai_insights:submit_model' %}" class="btn" style="background:var(--secondary);color:white;font-size:.82rem;padding:.42rem .9rem;white-space:nowrap"><i class="fas fa-plus"></i> Submit</a>
+  {% endif %}
+  {% if user.is_authenticated %}
+  <a href="{% url 'ai_insights:my_predictions' %}" class="btn btn-outline" style="font-size:.82rem;padding:.42rem .9rem;white-space:nowrap"><i class="fas fa-history"></i> History</a>
+  {% endif %}
+</div>
+
+<!-- category chips -->
+<div class="cat-chips">
+  <button class="cat-chip active" data-cat="" onclick="setCat(this,'')">All</button>
+  {% for value, label in categories %}
+  <button class="cat-chip" data-cat="{{ value }}" onclick="setCat(this,'{{ value }}')">{{ label }}</button>
+  {% endfor %}
+</div>
+
+<!-- model grid -->
+<div class="model-grid" id="modelGrid">
+  {% for m in models %}
+  <div class="model-card cat-{{ m.category }}"
+       data-cat="{{ m.category }}" data-name="{{ m.name|lower }}"
+       data-desc="{{ m.description|lower }}" data-runs="{{ m.run_count }}"
+       data-date="{{ m.created_at|date:'U' }}"
+       onclick="location.href='{% url 'ai_insights:model_detail' m.slug %}'">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.4rem">
+      <span class="model-cat-badge cat-{{ m.category }}">{{ m.get_category_display }}</span>
+      <span style="font-size:.68rem;color:var(--muted);background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:.15rem .5rem">
+        {% if m.input_type == 'tabular' %}<i class="fas fa-table"></i>
+        {% elif m.input_type == 'image' %}<i class="fas fa-image"></i>
+        {% elif m.input_type == 'eeg_csv' %}<i class="fas fa-wave-square"></i>
+        {% elif m.input_type == 'parquet' %}<i class="fas fa-file-csv"></i>
+        {% else %}<i class="fas fa-file"></i>{% endif %}
+        {{ m.get_input_type_display }}
+      </span>
+    </div>
+    <div class="model-name">{{ m.name }}</div>
+    <div class="model-desc">{{ m.description }}</div>
+    <div class="model-footer">
+      <span class="run-count"><i class="fas fa-play-circle"></i> {{ m.run_count }} runs</span>
+      <span class="run-btn">Run →</span>
+    </div>
+  </div>
+  {% empty %}
+  <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">
+    <div style="font-size:2.5rem;margin-bottom:.6rem">🤖</div>
+    <p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No models yet</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="noResults" style="display:none;text-align:center;padding:2.5rem;color:var(--muted)">
+  <div style="font-size:2rem;margin-bottom:.5rem">🔍</div>
+  <p style="font-weight:600;color:var(--text)">No models match</p>
+  <button onclick="resetFilters()" class="btn btn-primary" style="margin-top:.75rem;font-size:.83rem">Clear filters</button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const allCards = Array.from(document.querySelectorAll('.model-card'));
+let activeCat  = '';
+
+function setCat(btn, val) {
+  activeCat = val;
+  document.querySelectorAll('.cat-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q    = (document.getElementById('modelSearch')?.value || '').toLowerCase().trim();
+  const sort = document.getElementById('sortSelect')?.value;
+  let visible = allCards.filter(c => {
+    if (activeCat && c.dataset.cat !== activeCat) return false;
+    if (q && !c.dataset.name.includes(q) && !c.dataset.desc.includes(q)) return false;
+    return true;
+  });
+  visible.sort((a,b) => {
+    if (sort==='runs')   return parseInt(b.dataset.runs)-parseInt(a.dataset.runs);
+    if (sort==='name')   return a.dataset.name.localeCompare(b.dataset.name);
+    if (sort==='newest') return parseInt(b.dataset.date)-parseInt(a.dataset.date);
+    return 0;
+  });
+  const grid = document.getElementById('modelGrid');
+  allCards.forEach(c => c.style.display='none');
+  visible.forEach(c => { c.style.display='flex'; grid.appendChild(c); });
+  document.getElementById('noResults').style.display = visible.length===0 ? 'block' : 'none';
+}
+
+function resetFilters() {
+  activeCat = '';
+  document.getElementById('modelSearch').value = '';
+  document.querySelectorAll('.cat-chip').forEach(b => b.classList.remove('active'));
+  document.querySelector('.cat-chip[data-cat=""]').classList.add('active');
+  applyFilters();
+}
+
+document.addEventListener('DOMContentLoaded', () => applyFilters());
+</script>
+{% endblock %}

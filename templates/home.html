@@ -1,422 +1,312 @@
 {% extends 'base.html' %}
-{% block title %}HealthCompass — Your Health, Understood{% endblock %}
+{% load static %}
+{% block title %}HealthCompass — Data · Insight · Care{% endblock %}
+
 {% block extra_css %}
 <style>
-/* ── Full-bleed: break out of main's padding AND max-width on all screens ── */
 html,body{overflow-x:hidden}
 .pw{position:relative;left:50%;width:100vw;margin-left:-50vw;margin-top:-1.5rem;margin-bottom:-1.5rem}
-.inner{max-width:1080px;margin:0 auto;padding:0 2.5rem}
-@media(max-width:600px){.inner{padding:0 1.1rem}}
 
-/* ── HERO ── */
-.hero{
-  background:linear-gradient(135deg,#312e81 0%,#4f46e5 55%,#0ea5e9 100%);
-  color:white;padding:3.5rem 2rem 3rem;position:relative;overflow:hidden;
-}
-.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:380px;height:380px;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none}
-.hero::after{content:'';position:absolute;left:-50px;bottom:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
-.hero-inner{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1fr 340px;gap:3rem;align-items:center;position:relative;z-index:1}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);padding:.3rem .9rem;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:1rem}
-.hero h1{font-size:2.6rem;font-weight:800;line-height:1.1;margin-bottom:1rem;letter-spacing:-.02em}
-.hero h1 span{color:#a5f3fc}
-.hero-sub{font-size:.95rem;opacity:.88;line-height:1.75;max-width:460px;margin-bottom:1.75rem}
-.hero-btns{display:flex;gap:.75rem;flex-wrap:wrap}
-.btn-cta{padding:.75rem 2rem;border-radius:10px;font-weight:700;font-size:.95rem;transition:all .2s;display:inline-block}
-.btn-cta-primary{background:white;color:#312e81;box-shadow:0 4px 18px rgba(0,0,0,.2)}
-.btn-cta-primary:hover{background:#f0f9ff;transform:translateY(-2px);color:#312e81}
-.btn-cta-ghost{background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.35)}
-.btn-cta-ghost:hover{background:rgba(255,255,255,.22);color:white}
-/* Hero right side: visual stats panel */
-.hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-.hstat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:1rem 1.1rem;backdrop-filter:blur(6px)}
-.hstat-num{font-size:1.7rem;font-weight:800;line-height:1}
-.hstat-label{font-size:.72rem;opacity:.75;margin-top:.25rem;font-weight:600;letter-spacing:.02em}
-@media(max-width:880px){
-  .hero{padding:2.25rem 1.25rem 2rem}
-  .hero-inner{grid-template-columns:1fr;gap:1.5rem;text-align:center}
-  .hero h1{font-size:2rem}
-  .hero-sub{margin:0 auto 1.5rem}
-  .hero-btns{justify-content:center}
-  .hero-stats{grid-template-columns:repeat(4,1fr);gap:.5rem}
-  .hstat{padding:.65rem .75rem}
-  .hstat-num{font-size:1.2rem}
-}
-@media(max-width:560px){
-  .hero-stats{grid-template-columns:repeat(2,1fr)}
-}
+/* ── Proto banner ───────────────────────────────────────────────────────────── */
+.proto{background:#fefce8;border-bottom:1px solid #fde68a;padding:.45rem 1.5rem;
+  text-align:center;font-size:.75rem;color:#78350f;
+  display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap}
 
-/* ── TRUST STRIP ── */
-.trust{background:white;border-bottom:1px solid var(--border);padding:1.1rem 2rem}
-.trust-inner{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1.5rem 2.5rem}
-.trust-item{display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;color:var(--muted)}
-.trust-item i{color:#4f46e5;font-size:.9rem}
+/* ── HERO ───────────────────────────────────────────────────────────────────── */
+.hero{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 55%,#a855f7 100%);
+  padding:3.5rem 2rem 4.5rem;position:relative;overflow:hidden;color:white}
+.hero::before{content:'';position:absolute;inset:0;
+  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");pointer-events:none}
+.hero-grid{max-width:1100px;margin:0 auto;position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 400px;gap:3rem;align-items:center}
+@media(max-width:880px){.hero-grid{grid-template-columns:1fr;text-align:center}}
 
-/* ── SECTION SHARED ── */
-.section{padding:3.5rem 2rem}
-.section-alt{background:white}
-.section-title{font-size:1.5rem;font-weight:800;margin-bottom:.45rem;color:var(--text)}
-.section-title span{color:#4f46e5}
-.section-sub{font-size:.9rem;color:var(--muted);max-width:520px;line-height:1.7;margin-bottom:2rem}
-@media(max-width:600px){.section{padding:2.25rem 1rem}}
+.hero h1{font-size:2.6rem;font-weight:900;line-height:1.1;letter-spacing:-.03em;margin:0 0 .9rem}
+.hero h1 .accent{color:#bfdbfe}
+@media(max-width:880px){.hero-grid p{margin-left:auto;margin-right:auto}}
 
-/* ── MISSION ── */
-.mission-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
-.mission-text h2{font-size:1.55rem;font-weight:800;line-height:1.25;margin-bottom:.9rem;color:var(--text)}
-.mission-text h2 span{color:#4f46e5}
-.mission-text p{color:var(--muted);line-height:1.8;font-size:.9rem;margin-bottom:.9rem}
-.mission-stats{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
-.stat-box{background:var(--bg);border-radius:12px;padding:1.1rem 1.25rem;border:1px solid var(--border)}
-.stat-box .stat-num{font-size:1.6rem;font-weight:800;color:#4f46e5}
-.stat-box .stat-label{font-size:.75rem;color:var(--muted);font-weight:600;margin-top:.15rem}
-@media(max-width:700px){.mission-grid{grid-template-columns:1fr}.mission-stats{grid-template-columns:repeat(2,1fr)}}
+.hero-btns{display:flex;gap:.65rem;flex-wrap:wrap}
+@media(max-width:880px){.hero-btns{justify-content:center}}
+.btn-w{padding:.72rem 1.9rem;border-radius:11px;font-weight:700;font-size:.9rem;
+  background:white;color:#4f46e5;display:inline-flex;align-items:center;gap:.45rem;
+  transition:all .18s;box-shadow:0 4px 18px rgba(0,0,0,.18);text-decoration:none}
+.btn-w:hover{background:#f0f9ff;color:#3730a3;transform:translateY(-2px);text-decoration:none}
+.btn-o{padding:.72rem 1.6rem;border-radius:11px;font-weight:700;font-size:.9rem;
+  background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.3);
+  display:inline-flex;align-items:center;gap:.45rem;transition:all .18s;text-decoration:none}
+.btn-o:hover{background:rgba(255,255,255,.22);color:white;text-decoration:none}
+.btn-g{padding:.72rem 1.4rem;border-radius:11px;font-weight:700;font-size:.9rem;
+  background:transparent;color:rgba(255,255,255,.7);border:1.5px solid rgba(255,255,255,.18);
+  display:inline-flex;align-items:center;gap:.45rem;transition:all .18s;text-decoration:none}
+.btn-g:hover{color:white;border-color:rgba(255,255,255,.4);text-decoration:none}
 
-/* ── ROLES ── */
-.roles-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem}
-.role-card{background:var(--bg);border-radius:16px;padding:1.5rem;border:1.5px solid var(--border);transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
-.role-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;opacity:0;transition:opacity .2s}
-.role-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.08);border-color:#c7d2fe}
+.hero-img-wrap{display:flex;align-items:center;justify-content:center}
+@media(max-width:880px){.hero-img-wrap{order:-1;max-width:240px;margin:0 auto}}
+.hero-img{width:100%;max-width:360px;border-radius:28px;
+  filter:drop-shadow(0 20px 60px rgba(0,0,0,.35));
+  animation:floatImg 5s ease-in-out infinite}
+@keyframes floatImg{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero-img-fallback{width:280px;height:280px;border-radius:50%;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.5rem;color:rgba(255,255,255,.5);font-size:.85rem}
+
+/* ── Shared section helpers ─────────────────────────────────────────────────── */
+.sec{padding:4rem 2rem}
+.sec-inner{max-width:1100px;margin:0 auto}
+.sec-lbl{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+  padding:.22rem .75rem;border-radius:20px;display:inline-block;margin-bottom:.65rem}
+.sec-title{font-size:1.65rem;font-weight:900;color:#1e293b;margin:0 0 .4rem;line-height:1.15}
+.sec-title span{color:#6366f1}
+.sec-sub{font-size:.87rem;color:#64748b;line-height:1.75;max-width:560px;margin:0 0 2.25rem}
+
+/* ── SECTION 2 — Problem / Solution ────────────────────────────────────────── */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:3.5rem;align-items:center}
+@media(max-width:820px){.problem-grid{grid-template-columns:1fr}}
+.problem-text h2{font-size:1.85rem;font-weight:900;color:#1e293b;line-height:1.15;margin:0 0 .5rem}
+.problem-text h2 .fix{color:#6366f1}
+.problem-text p{font-size:.88rem;color:#64748b;line-height:1.8;margin:.75rem 0}
+.kanta-badge{display:inline-flex;align-items:center;gap:.5rem;background:#ede9fe;
+  border:1px solid #c4b5fd;border-radius:10px;padding:.45rem .9rem;
+  font-size:.8rem;font-weight:700;color:#5b21b6;margin-top:.25rem}
+.gaps-list{list-style:none;padding:0;margin:.75rem 0 0;display:flex;flex-direction:column;gap:.5rem}
+.gaps-list li{display:flex;align-items:flex-start;gap:.6rem;font-size:.84rem;color:#64748b}
+.gaps-list li::before{content:'✗';color:#ef4444;font-weight:900;flex-shrink:0;margin-top:.05rem}
+.gaps-list li span{color:#1e293b;font-weight:600}
+
+.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+.stat-card{background:#f8faff;border:1.5px solid #e0e7ff;border-radius:16px;padding:1.25rem 1.1rem}
+.stat-card .sv{font-size:1.75rem;font-weight:900;color:#4f46e5;line-height:1;margin-bottom:.3rem}
+.stat-card .sl{font-size:.8rem;color:#64748b;line-height:1.45}
+
+/* ── SECTION 3 — Roles ──────────────────────────────────────────────────────── */
+.roles-sec{background:#f8fafc}
+.roles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem}
+.role-card{background:white;border-radius:18px;border:1.5px solid var(--border);
+  padding:1.5rem 1.35rem 1.25rem;display:flex;flex-direction:column;gap:.7rem;
+  transition:all .22s;position:relative;overflow:hidden}
+.role-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3.5px;
+  border-radius:18px 18px 0 0;background:var(--rc-accent,#6366f1);opacity:0;transition:opacity .2s}
 .role-card:hover::before{opacity:1}
-.role-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:.9rem}
-.role-card h3{font-size:1rem;font-weight:700;margin-bottom:.35rem;color:var(--text)}
-.role-card p{font-size:.82rem;color:var(--muted);line-height:1.6}
-.role-patient .role-icon{background:#dbeafe}.role-patient::before{background:#3b82f6}
-.role-doctor .role-icon{background:#dcfce7}.role-doctor::before{background:#22c55e}
-.role-scientist .role-icon{background:#ede9fe}.role-scientist::before{background:#8b5cf6}
-.role-admin .role-icon{background:#fef3c7}.role-admin::before{background:#f59e0b}
-.role-tag{margin-top:.85rem;font-size:.7rem;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:.04em}
+.role-card:hover{border-color:var(--rc-accent,#6366f1);box-shadow:0 8px 28px rgba(0,0,0,.08);transform:translateY(-2px)}
+.role-icon-wrap{width:3rem;height:3rem;border-radius:14px;display:flex;align-items:center;
+  justify-content:center;font-size:1.55rem;background:var(--rc-bg,#ede9fe);flex-shrink:0}
+.role-card h3{font-size:.97rem;font-weight:800;color:#1e293b;margin:0}
+.role-card p{font-size:.8rem;color:#64748b;line-height:1.65;margin:0;flex:1}
+.role-cta{font-size:.75rem;font-weight:700;color:var(--rc-accent,#6366f1);
+  text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;
+  text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;transition:gap .15s}
+.role-cta:hover{gap:.55rem;text-decoration:none;color:var(--rc-accent,#6366f1)}
+.role-note{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 
-/* ── FEATURES ── */
-.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
-.feature{background:var(--bg);border-radius:14px;padding:1.35rem;border:1px solid var(--border);display:flex;gap:.9rem;align-items:flex-start;transition:box-shadow .2s}
-.feature:hover{box-shadow:0 6px 20px rgba(0,0,0,.07)}
-.feature-icon{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#4f46e5,#0ea5e9);display:flex;align-items:center;justify-content:center;color:white;font-size:1rem;flex-shrink:0}
-.feature h3{font-size:.9rem;font-weight:700;margin-bottom:.25rem;color:var(--text)}
-.feature p{font-size:.8rem;color:var(--muted);line-height:1.6}
+/* ── SECTION 4 — How to use ─────────────────────────────────────────────────── */
+.steps-flow{display:flex;align-items:flex-start;gap:0;position:relative;flex-wrap:wrap}
+.step-item{flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;
+  text-align:center;padding:0 1rem;position:relative}
+.step-connector{display:flex;align-items:center;padding-top:2rem;flex-shrink:0}
+@media(max-width:700px){.step-connector{display:none}.step-item{min-width:45%}}
+.step-arrow{font-size:1.4rem;color:#c4b5fd;font-weight:900}
+.step-num-wrap{position:relative;margin-bottom:1rem}
+.step-circle{width:3.5rem;height:3.5rem;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:1.5rem;
+  background:linear-gradient(135deg,var(--st-a,#6366f1),var(--st-b,#8b5cf6));
+  box-shadow:0 6px 20px rgba(99,102,241,.3);position:relative;z-index:1}
+.step-num{position:absolute;top:-.2rem;right:-.2rem;width:1.25rem;height:1.25rem;
+  border-radius:50%;background:white;border:2px solid var(--st-a,#6366f1);
+  font-size:.62rem;font-weight:900;color:var(--st-a,#6366f1);
+  display:flex;align-items:center;justify-content:center}
+.step-title{font-size:.95rem;font-weight:800;color:#1e293b;margin-bottom:.4rem}
+.step-desc{font-size:.79rem;color:#64748b;line-height:1.6;max-width:160px;margin:0 auto}
 
-/* ── STORIES ── */
-.stories-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.story-card{background:white;border-radius:13px;padding:1.15rem;border:1px solid var(--border);cursor:pointer;transition:all .2s}
-.story-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.07)}
-.story-meta{font-size:.7rem;color:var(--muted);margin-bottom:.45rem;text-transform:uppercase;letter-spacing:.04em}
-.story-card h4{font-size:.92rem;font-weight:700;margin-bottom:.35rem;color:var(--text);line-height:1.4}
-.story-card p{font-size:.8rem;color:var(--muted);line-height:1.55}
-
-/* ── CTA ── */
-.cta-section{background:linear-gradient(135deg,#1e1b4b,#312e81);padding:3.5rem 2rem;text-align:center;color:white}
-.cta-section h2{font-size:1.8rem;font-weight:800;margin-bottom:.65rem;letter-spacing:-.02em}
-.cta-section h2 span{color:#a5f3fc}
-.cta-section p{opacity:.72;font-size:.9rem;margin-bottom:1.75rem;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
-.cta-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="pw">
 
-  <!-- ── PROTOTYPE NOTICE ── -->
-  <div style="background:#fefce8;border-bottom:1px solid #fde68a;padding:.6rem 2rem;text-align:center;font-size:.82rem;color:#78350f;display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap">
-    <span style="font-size:1rem">🚧</span>
-    <strong>Prototype &amp; Portfolio Project</strong>
-    <span style="color:#92400e">—</span>
-    This is an MVP built for learning and portfolio purposes. It is not a real healthcare service. Do not use it for actual medical decisions.
+  <!-- proto notice -->
+  <div class="proto">
+    🚧 <strong>Research Prototype</strong> — AI for Good Hack 2026 · Aalto AI × Microsoft. Not a real healthcare service.
   </div>
 
-  <!-- ── HERO ── -->
+  <!-- ══ HERO ══════════════════════════════════════════════════════════════════ -->
   <section class="hero">
-    <div class="hero-inner">
+    <div class="hero-grid">
       <div>
-        <div class="hero-eyebrow"><i class="fas fa-shield-halved"></i> Private &amp; Secure Health Platform</div>
-        <h1>Your health,<br><span>finally understood</span></h1>
-        <p class="hero-sub">HealthCompass brings together your medical records, wearable data, and AI-powered insights — giving you and your care team a complete picture of your health.</p>
+        <h1 style="font-size:3rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .75rem;color:white">HealthCompass</h1>
+        <p style="font-size:1.05rem;line-height:1.65;margin:0 0 1.75rem;color:rgba(255,255,255,.88);max-width:480px">
+          Transforming Fragmented Medical Records into<br>
+          <strong style="color:#bfdbfe">Integrated, Insightful, and Interactive Health Trajectories</strong>
+        </p>
         <div class="hero-btns">
           {% if user.is_authenticated %}
-          <a href="/dashboard/" class="btn-cta btn-cta-primary">Go to Dashboard</a>
+          <a href="/dashboard/" class="btn-w"><i class="fas fa-th-large"></i> Dashboard</a>
+          <a href="/assistant/" class="btn-o"><i class="fas fa-robot"></i> AI Assistant</a>
           {% else %}
-          <a href="/accounts/register/" class="btn-cta btn-cta-primary">Create Free Account</a>
-          <a href="/accounts/login/" class="btn-cta btn-cta-ghost">Log In</a>
+          <a href="/accounts/register/" class="btn-w"><i class="fas fa-user-plus"></i> Get Started — Free</a>
+          <a href="/accounts/login/" class="btn-o"><i class="fas fa-sign-in-alt"></i> Log In</a>
+          <a href="#how-to-use" class="btn-g"><i class="fas fa-map-signs"></i> How to use</a>
           {% endif %}
         </div>
       </div>
-      <div class="hero-stats">
-        <div class="hstat">
-          <div class="hstat-num">4+</div>
-          <div class="hstat-label">AI Models</div>
-        </div>
-        <div class="hstat">
-          <div class="hstat-num">100%</div>
-          <div class="hstat-label">Private Data</div>
-        </div>
-        <div class="hstat">
-          <div class="hstat-num">Kanta</div>
-          <div class="hstat-label">Records Supported</div>
-        </div>
-        <div class="hstat">
-          <div class="hstat-num">Free</div>
-          <div class="hstat-label">To Get Started</div>
+      <div class="hero-img-wrap">
+        <img src="{% static 'images/compass.jpg' %}" alt="HealthCompass" class="hero-img"
+             onerror="this.style.display='none';document.getElementById('compass-fallback').style.display='flex'">
+        <div class="hero-img-fallback" id="compass-fallback" style="display:none">
+          <i class="fas fa-compass" style="font-size:4rem;opacity:.4"></i>
+          <span style="font-weight:700">HealthCompass</span>
+          <span style="font-size:.72rem">Data · Insight · Care</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── LIVE EEG DEMO ── -->
-  <section style="background:linear-gradient(135deg,#0a0f1e,#0f172a,#1e3a5f);padding:3.5rem 2rem">
-    <div class="inner">
-      <div style="display:grid;grid-template-columns:1fr 420px;gap:3rem;align-items:center">
-        <div>
-          <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);border-radius:20px;padding:.28rem .9rem;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6ee7b7;margin-bottom:.9rem">
-            <span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;animation:hdemopulse 1.4s infinite"></span> Live AI Demo
-          </div>
-          <h2 style="font-size:1.85rem;font-weight:800;color:white;margin-bottom:.75rem;line-height:1.2">
-            Watch AI classify EEG<br>in real time
-          </h2>
-          <p style="color:rgba(255,255,255,.7);font-size:.9rem;line-height:1.8;max-width:420px;margin-bottom:1.6rem">
-            The live monitor replays EEG signals at 200 Hz and runs a neural network on every 10-second window — classifying each as seizure or no seizure, right in your browser.
-          </p>
-          <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.75rem">
-            <a href="{% url 'ai_insights:seizure_realtime' %}"
-               style="display:inline-flex;align-items:center;gap:.5rem;padding:.72rem 1.7rem;background:#10b981;color:white;border-radius:11px;font-weight:700;font-size:.92rem;text-decoration:none;transition:opacity .18s"
-               onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-              <i class="fas fa-play"></i> Open Live Monitor
-            </a>
-            <a href="{% url 'ai_insights:seizure_analysis' %}"
-               style="display:inline-flex;align-items:center;gap:.5rem;padding:.72rem 1.7rem;background:rgba(255,255,255,.08);color:white;border:1.5px solid rgba(255,255,255,.22);border-radius:11px;font-weight:700;font-size:.92rem;text-decoration:none;transition:opacity .18s"
-               onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-              <i class="fas fa-brain"></i> Full Analysis
-            </a>
-          </div>
-          <div style="display:flex;gap:1.25rem;flex-wrap:wrap">
-            <div style="font-size:.8rem;color:rgba(255,255,255,.5)"><span style="color:#6ee7b7;font-weight:700">CNN · GRU</span> · Transformer · Ensemble</div>
-            <div style="font-size:.8rem;color:rgba(255,255,255,.5)"><span style="color:#6ee7b7;font-weight:700">200 Hz</span> · 10 s window · no upload needed</div>
-          </div>
-        </div>
-        <!-- Animated EEG preview -->
-        <div style="position:relative">
-          <div style="background:#0f172a;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.5)">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid rgba(255,255,255,.07)">
-              <span style="font-size:.72rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em"><i class="fas fa-wave-square" style="color:#10b981;margin-right:.35rem"></i>Live EEG Preview</span>
-              <span style="display:flex;align-items:center;gap:.35rem;font-size:.7rem;color:#10b981;font-weight:700">
-                <span style="width:6px;height:6px;border-radius:50%;background:#10b981;animation:hdemopulse 1.4s infinite"></span> Live
-              </span>
-            </div>
-            <canvas id="homeEegCanvas" style="display:block;width:100%;height:220px"></canvas>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-top:1px solid rgba(255,255,255,.07)">
-              <span style="font-size:.75rem;color:#334155">Ensemble verdict</span>
-              <span style="background:#052e16;color:#4ade80;border:1px solid #16a34a;border-radius:20px;padding:.22rem .75rem;font-size:.75rem;font-weight:700" id="homePredBadge2">✅ No Seizure — 94%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-  <style>
-  @keyframes hdemopulse{0%,100%{opacity:1}50%{opacity:.2}}
-  @media(max-width:820px){
-    .inner > div[style*="grid-template-columns:1fr 420px"]{grid-template-columns:1fr !important;gap:1.75rem !important}
-    #homeEegCanvas{height:160px !important}
-  }
-  </style>
-  <script>
-  (function(){
-    const cv = document.getElementById('homeEegCanvas');
-    if (!cv) return;
-    const cx = cv.getContext('2d');
-    const CHNAMES = ['Fp1','F3','C3','P3','O1','F7','T3','T5'];
-    const COLORS  = ['#10b981','#818cf8','#f59e0b','#34d399','#f472b6','#60a5fa','#a78bfa','#fb923c'];
-    const phases  = CHNAMES.map(() => Math.random() * Math.PI * 2);
-    const freqs   = CHNAMES.map(() => 8 + Math.random() * 4);
-    const amps    = CHNAMES.map(() => 0.5 + Math.random() * 0.5);
-    let t = 0;
-    const badges = [
-      {text:'✅ No Seizure — 94%', bg:'#052e16', color:'#4ade80', border:'#16a34a'},
-      {text:'✅ No Seizure — 91%', bg:'#052e16', color:'#4ade80', border:'#16a34a'},
-      {text:'⚡ Seizure — 87%',   bg:'#450a0a', color:'#f87171', border:'#dc2626'},
-      {text:'✅ No Seizure — 96%', bg:'#052e16', color:'#4ade80', border:'#16a34a'},
-    ];
-    let badgeIdx = 0, badgeTick = 0;
-    function draw() {
-      const W = cv.offsetWidth, H = 220;
-      if (!W) return;
-      cv.width = W; cv.height = H;
-      const chH = H / CHNAMES.length;
-      cx.fillStyle = '#0f172a'; cx.fillRect(0, 0, W, H);
-      cx.strokeStyle = 'rgba(255,255,255,.04)'; cx.lineWidth = 1;
-      for (let i = 1; i < CHNAMES.length; i++) {
-        cx.beginPath(); cx.moveTo(0, i*chH); cx.lineTo(W, i*chH); cx.stroke();
-      }
-      CHNAMES.forEach((ch, ci) => {
-        cx.beginPath();
-        cx.strokeStyle = COLORS[ci]; cx.lineWidth = 1.1; cx.globalAlpha = .82;
-        const yc = (ci + 0.5) * chH;
-        for (let x = 0; x < W; x++) {
-          const tSec = t + x / W * 10;
-          const y = yc - amps[ci] * chH * 0.35 * (
-            Math.sin(2*Math.PI*freqs[ci]*tSec/60 + phases[ci]) +
-            0.3 * Math.sin(2*Math.PI*freqs[ci]*2*tSec/60 + phases[ci]*1.3) +
-            0.15 * (Math.random() - 0.5)
-          );
-          x === 0 ? cx.moveTo(x, y) : cx.lineTo(x, y);
-        }
-        cx.stroke(); cx.globalAlpha = 1;
-        cx.fillStyle = COLORS[ci]; cx.globalAlpha = .6;
-        cx.font = 'bold 9px system-ui'; cx.fillText(ch, 4, ci*chH+11);
-        cx.globalAlpha = 1;
-      });
-      t += 0.05;
-      badgeTick++;
-      if (badgeTick % 180 === 0) {
-        badgeIdx = (badgeIdx + 1) % badges.length;
-        const b = badges[badgeIdx];
-        const el = document.getElementById('homePredBadge2');
-        if (el) { el.textContent = b.text; el.style.background = b.bg; el.style.color = b.color; el.style.borderColor = b.border; }
-      }
-    }
-    function loop(){ draw(); requestAnimationFrame(loop); }
-    function startLoop(){ if (cv.offsetWidth > 0){ loop(); } else requestAnimationFrame(startLoop); }
-    requestAnimationFrame(startLoop);
-  })();
-  </script>
 
-  <!-- ── TRUST STRIP ── -->
-  <div class="trust">
-    <div class="trust-inner">
-      <div class="trust-item"><i class="fas fa-lock"></i> Your data stays private — only you control access</div>
-      <div class="trust-item"><i class="fas fa-brain"></i> AI insights powered by multiple models</div>
-      <div class="trust-item"><i class="fas fa-user-doctor"></i> Built for patients, doctors &amp; researchers</div>
-      <div class="trust-item"><i class="fas fa-circle-check"></i> Free to use</div>
-    </div>
-  </div>
+  <!-- ══ SECTION 2 — Problem / Solution ═══════════════════════════════════════ -->
+  <section class="sec" style="background:white">
+    <div class="sec-inner">
+      <div class="problem-grid">
 
-  <!-- ── MISSION ── -->
-  <section class="section section-alt">
-    <div class="inner">
-      <div class="mission-grid">
-        <div class="mission-text">
-          <h2>Healthcare data is fragmented.<br><span>We fix that.</span></h2>
-          <p>Your medical records are scattered across hospitals, apps, and paper documents. Your doctor sees only part of the picture. AI stays locked away in research papers.</p>
-          <p>HealthCompass connects all of it — your Kanta records, wearable data, lab results, and AI models — in one secure, private platform designed for real healthcare workflows.</p>
+        <!-- Left: copy -->
+        <div class="problem-text">
+          <div class="sec-lbl" style="background:#fee2e2;color:#b91c1c">The Problem</div>
+          <h2>Healthcare data is fragmented<br>and not insightful.<br><span class="fix">We fix that.</span></h2>
+
+          <p>Your medical records are scattered across hospitals, apps, labs and paper documents. Your doctor sees only part of the picture. AI stays locked away in research papers.</p>
+
+          <ul class="gaps-list">
+            <li><span>Siloed records</span> — labs in one system, prescriptions in another, wearables nowhere</li>
+            <li><span>No longitudinal view</span> — trends invisible across visits and providers</li>
+            <li><span>AI inaccessible</span> — powerful models exist but patients can't use them</li>
+            <li><span>No plain-language answers</span> — results given without context or explanation</li>
+          </ul>
+
+          <p style="margin-top:1.1rem;color:#1e293b;font-weight:600;font-size:.88rem">HealthCompass connects all of it — including</p>
+          <div class="kanta-badge"><i class="fas fa-database"></i> Kanta — Finnish national health records supported</div>
         </div>
-        <div class="mission-stats">
-          <div class="stat-box">
-            <div class="stat-num">4+</div>
-            <div class="stat-label">AI models for health prediction</div>
+
+        <!-- Right: stat cards -->
+        <div class="stat-cards">
+          <div class="stat-card">
+            <div class="sv">4+</div>
+            <div class="sl">Specialist AI models for health prediction and analysis</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-num">100%</div>
-            <div class="stat-label">Private — you control who sees your data</div>
+          <div class="stat-card">
+            <div class="sv">100%</div>
+            <div class="sl">Private — your data stays yours, processed locally</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-num">Kanta</div>
-            <div class="stat-label">Finnish health records supported</div>
+          <div class="stat-card">
+            <div class="sv">Kanta</div>
+            <div class="sl">Finnish national health records — natively supported</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-num">∞</div>
-            <div class="stat-label">Records, uploads &amp; insights</div>
+          <div class="stat-card">
+            <div class="sv" style="font-size:1.5rem">∞</div>
+            <div class="sl">Records, uploads, AI questions and health insights</div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- ── WHO IS IT FOR ── -->
-  <section class="section" id="how-it-works">
-    <div class="inner">
-      <h2 class="section-title">Built for <span>everyone in healthcare</span></h2>
-      <p class="section-sub">Whether you're managing your own health or caring for others, HealthCompass adapts to your role.</p>
+
+  <!-- ══ SECTION 3 — Roles ═════════════════════════════════════════════════════ -->
+  <section class="sec roles-sec">
+    <div class="sec-inner">
+      <div class="sec-lbl" style="background:#dbeafe;color:#1d4ed8">Who Is It For</div>
+      <h2 class="sec-title">Built for <span>everyone in healthcare</span></h2>
+      <p class="sec-sub">Whether you're managing your own health or caring for others, HealthCompass adapts to your role.</p>
+
       <div class="roles-grid">
-        <div class="role-card role-patient" onclick="location.href='/accounts/register/'">
-          <div class="role-icon">🏥</div>
+
+        <div class="role-card" style="--rc-accent:#6366f1;--rc-bg:#ede9fe">
+          <div class="role-icon-wrap">🏥</div>
           <h3>Patients</h3>
-          <p>Upload lab results, prescriptions, and wearable data. Get plain-language AI insights on your health trends.</p>
-          <div class="role-tag">Get started free →</div>
+          <p>Upload lab results, prescriptions and wearable data. Ask questions in plain language. Get cited, AI-powered insights on your health trends — all private.</p>
+          <a href="/accounts/register/" class="role-cta">Get started free <i class="fas fa-arrow-right"></i></a>
         </div>
-        <div class="role-card role-doctor" onclick="location.href='/accounts/register/'">
-          <div class="role-icon">👨‍⚕️</div>
+
+        <div class="role-card" style="--rc-accent:#0ea5e9;--rc-bg:#e0f2fe">
+          <div class="role-icon-wrap">👨‍⚕️</div>
           <h3>Doctors &amp; Nurses</h3>
-          <p>Access your patients' records and AI analytics to support better, faster clinical decisions.</p>
-          <div class="role-tag">Requires admin approval →</div>
+          <p>Access your patients' records and AI analytics to support faster, better clinical decisions. See longitudinal trends across visits at a glance.</p>
+          <span class="role-note">Requires admin approval</span>
         </div>
-        <div class="role-card role-scientist" onclick="location.href='/accounts/register/'">
-          <div class="role-icon">🔬</div>
+
+        <div class="role-card" style="--rc-accent:#8b5cf6;--rc-bg:#f3e8ff">
+          <div class="role-icon-wrap">🔬</div>
           <h3>Data Scientists</h3>
-          <p>Publish ML models for health prediction. Your models run on real, anonymised patient data.</p>
-          <div class="role-tag">Requires admin approval →</div>
+          <p>Publish ML models for health prediction. Your models run on real, anonymised patient data and become available to the whole platform.</p>
+          <span class="role-note">Requires admin approval</span>
         </div>
-        <div class="role-card role-admin" onclick="location.href='/accounts/register/'">
-          <div class="role-icon">🏨</div>
+
+        <div class="role-card" style="--rc-accent:#f59e0b;--rc-bg:#fef3c7">
+          <div class="role-icon-wrap">🏛️</div>
           <h3>Hospital Admins</h3>
-          <p>Manage patient–doctor relationships within your hospital securely and efficiently.</p>
-          <div class="role-tag">Requires admin approval →</div>
+          <p>Manage patient–doctor relationships within your hospital securely and efficiently. Monitor platform usage and oversee model deployments.</p>
+          <span class="role-note">Requires admin approval</span>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- ── FEATURES ── -->
-  <section class="section section-alt">
-    <div class="inner">
-      <h2 class="section-title">Everything you need, <span>in one place</span></h2>
-      <p class="section-sub">A complete toolkit for understanding and managing health data — from upload to AI-powered insight.</p>
-      <div class="features-grid">
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-file-medical"></i></div>
-          <div><h3>Import from Kanta</h3><p>Upload your Kanta XML export and we automatically parse prescriptions, lab results, diagnoses and more.</p></div>
+
+  <!-- ══ SECTION 4 — How to use ════════════════════════════════════════════════ -->
+  <section class="sec" id="how-to-use" style="background:white">
+    <div class="sec-inner">
+      <div class="sec-lbl" style="background:#d1fae5;color:#065f46">Get Started</div>
+      <h2 class="sec-title">How to use <span>HealthCompass</span></h2>
+      <p class="sec-sub">Four simple steps — from sign-up to your first AI health insight.</p>
+
+      <div class="steps-flow">
+
+        <div class="step-item">
+          <div class="step-num-wrap">
+            <div class="step-circle" style="--st-a:#6366f1;--st-b:#818cf8">🔐</div>
+            <div class="step-num" style="border-color:#6366f1;color:#6366f1">1</div>
+          </div>
+          <div class="step-title">Create account</div>
+          <div class="step-desc">Sign up for free and select your role — patient, doctor, or researcher.</div>
         </div>
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-watch"></i></div>
-          <div><h3>Wearable Data</h3><p>Import CSV exports from Fitbit, Garmin, Oura or Apple Health. Track heart rate, sleep, steps and more.</p></div>
+
+        <div class="step-connector"><div class="step-arrow">→</div></div>
+
+        <div class="step-item">
+          <div class="step-num-wrap">
+            <div class="step-circle" style="--st-a:#0ea5e9;--st-b:#38bdf8">📁</div>
+            <div class="step-num" style="border-color:#0ea5e9;color:#0ea5e9">2</div>
+          </div>
+          <div class="step-title">Upload your records</div>
+          <div class="step-desc">Import lab results, prescriptions, wearable data, or connect via Kanta.</div>
         </div>
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-robot"></i></div>
-          <div><h3>AI Assistant</h3><p>Chat with an AI that knows your records. Ask about trends, medications, or get plain-language explanations.</p></div>
+
+        <div class="step-connector"><div class="step-arrow">→</div></div>
+
+        <div class="step-item">
+          <div class="step-num-wrap">
+            <div class="step-circle" style="--st-a:#10b981;--st-b:#34d399">🤖</div>
+            <div class="step-num" style="border-color:#10b981;color:#10b981">3</div>
+          </div>
+          <div class="step-title">Ask the AI</div>
+          <div class="step-desc">Type any health question. Get a cited, plain-language answer grounded in your own records.</div>
         </div>
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
-          <div><h3>AI &amp; Analytics</h3><p>Run published ML models on your data — cardiovascular risk, seizure detection, diabetes prediction, and more.</p></div>
+
+        <div class="step-connector"><div class="step-arrow">→</div></div>
+
+        <div class="step-item">
+          <div class="step-num-wrap">
+            <div class="step-circle" style="--st-a:#a855f7;--st-b:#c084fc">📊</div>
+            <div class="step-num" style="border-color:#a855f7;color:#a855f7">4</div>
+          </div>
+          <div class="step-title">Explore insights</div>
+          <div class="step-desc">View biomarker trends, compare with population data, and run specialist AI models.</div>
         </div>
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-bell"></i></div>
-          <div><h3>Smart Alerts</h3><p>Get instant notifications when AI detects critical values in your records or test results.</p></div>
-        </div>
-        <div class="feature">
-          <div class="feature-icon"><i class="fas fa-shield-halved"></i></div>
-          <div><h3>Private &amp; Secure</h3><p>Your data is yours. Only you and doctors you explicitly link to can view your records.</p></div>
-        </div>
+
       </div>
     </div>
   </section>
 
-  <!-- ── RECENT STORIES ── -->
-  {% if recent_stories %}
-  <section class="section">
-    <div class="inner">
-      <h2 class="section-title">Latest <span>Health News</span></h2>
-      <p class="section-sub">Stories from the HealthCompass community and healthcare world.</p>
-      <div class="stories-grid">
-        {% for story in recent_stories %}
-        <div class="story-card" onclick="location.href='/stories/{{ story.slug }}/'">
-          <div class="story-meta">{{ story.published_at|date:"M d, Y" }} &nbsp;·&nbsp; {{ story.read_time_minutes }} min read</div>
-          <h4>{{ story.title }}</h4>
-          <p>{{ story.excerpt|truncatewords:20 }}</p>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
-  {% endif %}
-
-  <!-- ── CTA ── -->
-  <section class="cta-section">
-    <h2>Ready to understand<br><span>your health?</span></h2>
-    <p>Join patients, doctors, and researchers already using HealthCompass. Free to start, no credit card required.</p>
-    <div class="cta-btns">
-      {% if user.is_authenticated %}
-      <a href="/dashboard/" class="btn-cta btn-cta-primary">Go to Dashboard</a>
-      {% else %}
-      <a href="/accounts/register/" class="btn-cta btn-cta-primary">Create Free Account</a>
-      <a href="/accounts/login/" class="btn-cta" style="background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.3)">Log In</a>
-      {% endif %}
-    </div>
-  </section>
 
 </div>
 {% endblock %}

@@ -63,6 +63,29 @@ class MedicalChunk(models.Model):
         return f'Chunk {self.chunk_index} of {self.document.title}'
 
 
+class GeneralKnowledgeChunk(models.Model):
+    """A chunk from a curated public health source (Käypä hoito, Terveyskirjasto, THL)."""
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title       = models.CharField(max_length=300)
+    source_name = models.CharField(max_length=100)
+    source_url  = models.URLField(blank=True, default='')
+    topic       = models.CharField(max_length=100, blank=True, default='')
+    content     = models.TextField()
+    chunk_index = models.IntegerField(default=0)
+    embedding   = models.BinaryField(null=True, blank=True)
+    metadata    = models.JSONField(default=dict, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['topic']),
+            models.Index(fields=['source_name']),
+        ]
+
+    def __str__(self):
+        return f'{self.title} [{self.source_name}] chunk {self.chunk_index}'
+
+
 class ChatSession(models.Model):
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -91,6 +114,19 @@ class QueryLog(models.Model):
     retrieved_chunks_count = models.PositiveSmallIntegerField(
                               null=True, blank=True,
                               help_text='Number of chunks passed to the LLM as context')
+    # Impact Measurement Agent fields (Agent 5)
+    safety_routed         = models.BooleanField(
+                              default=False,
+                              help_text='True when the safety gate intercepted this query before retrieval')
+    triggered_rules       = models.JSONField(
+                              default=list, blank=True,
+                              help_text='Guardrail rule names fired on the response')
+    query_mode            = models.CharField(
+                              max_length=20, blank=True, default='personal',
+                              help_text='personal | general | hybrid | emergency')
+    chart_data            = models.JSONField(
+                              null=True, blank=True,
+                              help_text='Chart.js-ready payload for trajectory queries')
     created_at            = models.DateTimeField(auto_now_add=True)
 
     class Meta:

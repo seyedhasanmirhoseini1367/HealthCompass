@@ -11,24 +11,243 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import AIModel, ModelPrediction
+from .models import AIModel, ModelPrediction, HealthAlert
 from .forms import SubmitModelForm
 from .runner import run_model, generate_interpretation
 
 logger = logging.getLogger(__name__)
 
 
-# ─── Public model catalog ─────────────────────────────────────────────────────
+# ─── Public model catalog + analytics hub ────────────────────────────────────
 
 def model_list(request):
-    models      = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
-    categories  = AIModel.Category.choices
-    input_types = AIModel.InputType.choices
-    return render(request, 'ai_insights/list.html', {
-        'models':      models,
-        'categories':  categories,
-        'input_types': input_types,
-        'total':       models.count(),
+    """Landing page — 3 navigation cards only."""
+    total_models = AIModel.objects.filter(status='active').count()
+    return render(request, 'ai_insights/list.html', {'total_models': total_models})
+
+
+# ─── My Health analytics ──────────────────────────────────────────────────────
+
+def _build_pop_biomarker_data(biomarker_names=None):
+    """
+    Returns (pop_trending, pop_latest, pop_avg, pop_unit) computed
+    from all patients' ParsedLabValue rows.
+    pop_trending : {name: [{date, value, count, unit}, ...]}  monthly averages
+    pop_latest   : {name: {value, unit, count}}               latest month avg
+    pop_avg      : {name: float}                              overall avg (>=3 pts)
+    """
+    from medical_records.models import ParsedLabValue
+
+    qs = ParsedLabValue.objects.select_related('record').values(
+        'parameter_name', 'value', 'unit',
+        'record__record_date', 'record__uploaded_at',
+    )
+    if biomarker_names:
+        qs = qs.filter(parameter_name__in=biomarker_names)
+
+    pop_monthly = defaultdict(lambda: defaultdict(list))
+    pop_unit    = {}
+
+    for lv in qs:
+        try:
+            numeric = float(lv['value'])
+        except (ValueError, TypeError):
+            continue
+        date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
+        month_key = date_val.strftime('%Y-%m')
+        name      = lv['parameter_name']
+        pop_monthly[name][month_key].append(numeric)
+        if name not in pop_unit and lv.get('unit'):
+            pop_unit[name] = lv['unit']
+
+    pop_trending, pop_latest, pop_avg = {}, {}, {}
+    for name, months in pop_monthly.items():
+        all_vals = [v for vs in months.values() for v in vs]
+        sorted_months = sorted(months.keys())
+        series = [
+            {'date': m, 'value': round(sum(months[m])/len(months[m]), 2),
+             'count': len(months[m]), 'unit': pop_unit.get(name, '')}
+            for m in sorted_months if months[m]
+        ]
+        if len(series) >= 2:
+            pop_trending[name] = series
+        if series:
+            last = series[-1]
+            pop_latest[name] = {'value': last['value'], 'unit': pop_unit.get(name, ''), 'count': last['count']}
+        if len(all_vals) >= 3:
+            pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
+
+    return pop_trending, pop_latest, pop_avg, pop_unit
+
+
+@login_required
+def health_view(request):
+    from medical_records.models import MedicalRecord, ParsedLabValue
+
+    patient = request.user
+
+    lab_qs = (
+        ParsedLabValue.objects
+        .filter(record__patient=patient)
+        .select_related('record')
+        .order_by('record__record_date', 'record__uploaded_at')
+    )
+    biomarker_map = defaultdict(list)
+    for lv in lab_qs:
+        try:
+            numeric = float(lv.value)
+        except (ValueError, TypeError):
+            continue
+        date_val = lv.record.record_date or lv.record.uploaded_at.date()
+        biomarker_map[lv.parameter_name].append({
+            'date':     str(date_val),
+            'value':    numeric,
+            'unit':     lv.unit or '',
+            'abnormal': lv.is_abnormal,
+            'critical': lv.is_critical,
+            'ref':      lv.reference_range or '',
+        })
+
+    trending_biomarkers = {k: v for k, v in biomarker_map.items() if len(v) >= 2}
+    latest_values       = {name: pts[-1] for name, pts in biomarker_map.items()}
+
+    # Population average per biomarker (for chart overlay on personal page)
+    _, _, pop_avg, _ = _build_pop_biomarker_data(
+        biomarker_names=list(biomarker_map.keys()) or None
+    )
+
+    records_by_type = list(
+        MedicalRecord.objects.filter(patient=patient)
+        .values('record_type').annotate(count=Count('id')).order_by('-count')
+    )
+    monthly_uploads = list(
+        MedicalRecord.objects.filter(patient=patient)
+        .annotate(month=TruncMonth('uploaded_at'))
+        .values('month').annotate(count=Count('id')).order_by('month')
+    )
+    upload_labels = [r['month'].strftime('%b %Y') for r in monthly_uploads]
+    upload_counts = [r['count']                   for r in monthly_uploads]
+
+    alerts_summary = {
+        'critical': HealthAlert.objects.filter(patient=patient, severity='critical').count(),
+        'warning':  HealthAlert.objects.filter(patient=patient, severity='warning').count(),
+        'info':     HealthAlert.objects.filter(patient=patient, severity='info').count(),
+    }
+
+    predictions = list(
+        ModelPrediction.objects
+        .filter(patient=patient, risk_score__isnull=False)
+        .order_by('created_at')
+        .values('created_at', 'risk_score')
+    )
+    pred_labels = [p['created_at'].strftime('%b %d') for p in predictions]
+    pred_scores = [round(float(p['risk_score']) * 100, 1) for p in predictions]
+    latest_risk = pred_scores[-1] if pred_scores else None
+
+    total_records    = MedicalRecord.objects.filter(patient=patient).count()
+    total_biomarkers = len(biomarker_map)
+    unread_alerts    = HealthAlert.objects.filter(patient=patient, is_read=False).count()
+    last_record_date = (
+        MedicalRecord.objects.filter(patient=patient, record_date__isnull=False)
+        .order_by('-record_date').values_list('record_date', flat=True).first()
+    )
+
+    return render(request, 'ai_insights/health.html', {
+        'trending_json':       json.dumps(trending_biomarkers),
+        'pop_avg_json':        json.dumps(pop_avg),
+        'latest_values':       latest_values,
+        'records_type_json':   json.dumps(records_by_type),
+        'upload_labels_json':  json.dumps(upload_labels),
+        'upload_counts_json':  json.dumps(upload_counts),
+        'alerts_summary_json': json.dumps(alerts_summary),
+        'pred_labels_json':    json.dumps(pred_labels),
+        'pred_scores_json':    json.dumps(pred_scores),
+        'latest_risk':         latest_risk,
+        'total_records':       total_records,
+        'total_biomarkers':    total_biomarkers,
+        'unread_alerts':       unread_alerts,
+        'last_record_date':    last_record_date,
+        'has_data':            total_records > 0,
+    })
+
+
+# ─── Population insights ──────────────────────────────────────────────────────
+
+@login_required
+def population_view(request):
+    from medical_records.models import MedicalRecord
+
+    User = get_user_model()
+
+    # Biomarker data aggregated across all patients
+    pop_trending, pop_latest, _, _ = _build_pop_biomarker_data()
+
+    total_patients   = User.objects.filter(is_active=True).count()
+    total_biomarkers = len(pop_latest)
+
+    # Alerts across all patients
+    alerts_summary = {
+        'critical': HealthAlert.objects.filter(severity='critical').count(),
+        'warning':  HealthAlert.objects.filter(severity='warning').count(),
+        'info':     HealthAlert.objects.filter(severity='info').count(),
+    }
+    total_alerts = sum(alerts_summary.values())
+
+    # Records by type across all patients
+    records_by_type = list(
+        MedicalRecord.objects.values('record_type')
+        .annotate(count=Count('id')).order_by('-count')
+    )
+    total_records = MedicalRecord.objects.count()
+
+    # Upload activity across all patients (monthly)
+    monthly_uploads = list(
+        MedicalRecord.objects.annotate(month=TruncMonth('uploaded_at'))
+        .values('month').annotate(count=Count('id')).order_by('month')
+    )
+    upload_labels = [r['month'].strftime('%b %Y') for r in monthly_uploads]
+    upload_counts = [r['count']                   for r in monthly_uploads]
+
+    # Risk score distribution across all patients
+    all_scores = list(
+        ModelPrediction.objects.filter(risk_score__isnull=False)
+        .values_list('risk_score', flat=True)
+    )
+    risk_buckets = {'Low (0–30%)': 0, 'Moderate (30–70%)': 0, 'High (70–100%)': 0}
+    for rs in all_scores:
+        s = float(rs) * 100
+        if s < 30:   risk_buckets['Low (0–30%)']      += 1
+        elif s < 70: risk_buckets['Moderate (30–70%)'] += 1
+        else:        risk_buckets['High (70–100%)']    += 1
+    pop_avg_risk = round(sum(float(r)*100 for r in all_scores) / len(all_scores), 1) if all_scores else None
+
+    return render(request, 'ai_insights/population.html', {
+        'trending_json':       json.dumps(pop_trending),
+        'latest_values':       pop_latest,
+        'alerts_summary_json': json.dumps(alerts_summary),
+        'records_type_json':   json.dumps(records_by_type),
+        'upload_labels_json':  json.dumps(upload_labels),
+        'upload_counts_json':  json.dumps(upload_counts),
+        'risk_labels_json':    json.dumps(list(risk_buckets.keys())),
+        'risk_counts_json':    json.dumps(list(risk_buckets.values())),
+        'pop_avg_risk':        pop_avg_risk,
+        'total_patients':      total_patients,
+        'total_biomarkers':    total_biomarkers,
+        'total_alerts':        total_alerts,
+        'total_records':       total_records,
+        'has_data':            total_records > 0,
+    })
+
+
+# ─── AI Models catalog ────────────────────────────────────────────────────────
+
+def models_view(request):
+    ai_models  = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
+    categories = AIModel.Category.choices
+    return render(request, 'ai_insights/models.html', {
+        'models':     ai_models,
+        'categories': categories,
+        'total':      ai_models.count(),
     })
 
 
@@ -570,6 +789,56 @@ def patient_analytics(request):
         .order_by('-record_date').values_list('record_date', flat=True).first()
     )
 
+    # ── Population Insights (anonymised aggregates) ───────────────────────────
+    from rag_assistant.models import QueryLog, ChatSession, GeneralKnowledgeChunk
+    from django.utils import timezone
+    import datetime
+
+    User = get_user_model()
+
+    # Query mode distribution
+    pop_mode_dist = list(
+        QueryLog.objects.values('query_mode')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+
+    # Monthly query volume (last 6 months)
+    six_months_ago = timezone.now() - datetime.timedelta(days=182)
+    monthly_queries = list(
+        QueryLog.objects.filter(created_at__gte=six_months_ago)
+        .annotate(month=TruncMonth('created_at'))
+        .values('month').annotate(count=Count('id'))
+        .order_by('month')
+    )
+    pop_query_labels = [r['month'].strftime('%b %Y') for r in monthly_queries]
+    pop_query_counts = [r['count'] for r in monthly_queries]
+
+    # Knowledge base topic distribution
+    pop_topics = list(
+        GeneralKnowledgeChunk.objects.exclude(topic='')
+        .values('topic').annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+
+    # Safety interventions per month (last 6 months)
+    monthly_safety = list(
+        QueryLog.objects.filter(created_at__gte=six_months_ago, safety_routed=True)
+        .annotate(month=TruncMonth('created_at'))
+        .values('month').annotate(count=Count('id'))
+        .order_by('month')
+    )
+    pop_safety_labels = [r['month'].strftime('%b %Y') for r in monthly_safety]
+    pop_safety_counts = [r['count'] for r in monthly_safety]
+
+    # System-wide summary stats
+    pop_total_users    = User.objects.filter(is_active=True).count()
+    pop_total_queries  = QueryLog.objects.count()
+    pop_total_sessions = ChatSession.objects.count()
+    pop_safety_total   = QueryLog.objects.filter(safety_routed=True).count()
+    pop_kb_chunks      = GeneralKnowledgeChunk.objects.count()
+    pop_safety_pct     = round(pop_safety_total / max(pop_total_queries, 1) * 100, 1)
+
     ctx = {
         'trending_json':       json.dumps(trending_biomarkers),
         'latest_values':       latest_values,
@@ -586,5 +855,18 @@ def patient_analytics(request):
         'unread_alerts':       unread_alerts,
         'last_record_date':    last_record_date,
         'has_data':            total_records > 0,
+        # population
+        'pop_mode_dist_json':    json.dumps(pop_mode_dist),
+        'pop_query_labels_json': json.dumps(pop_query_labels),
+        'pop_query_counts_json': json.dumps(pop_query_counts),
+        'pop_topics_json':       json.dumps(pop_topics),
+        'pop_safety_labels_json':json.dumps(pop_safety_labels),
+        'pop_safety_counts_json':json.dumps(pop_safety_counts),
+        'pop_total_users':       pop_total_users,
+        'pop_total_queries':     pop_total_queries,
+        'pop_total_sessions':    pop_total_sessions,
+        'pop_kb_chunks':         pop_kb_chunks,
+        'pop_safety_pct':        pop_safety_pct,
+        'pop_safety_total':      pop_safety_total,
     }
     return render(request, 'ai_insights/patient_analytics.html', ctx)

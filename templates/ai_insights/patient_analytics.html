@@ -1,8 +1,16 @@
 {% extends 'base.html' %}
-{% block title %}My Health Analytics — HealthCompass{% endblock %}
+{% block title %}AI & Analytics — HealthCompass{% endblock %}
 
 {% block extra_css %}
 <style>
+/* ── Tab switcher ─────────────────────────────────────────────────────────── */
+.dual-tab-bar{display:flex;gap:.5rem;background:#f1f5f9;border-radius:14px;padding:.35rem;margin-bottom:1.75rem}
+.dual-tab-btn{flex:1;border:none;background:transparent;padding:.6rem 1rem;font-size:.88rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .2s;color:#64748b;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.dual-tab-btn.active{background:white;color:#6366f1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.dual-tab-btn i{font-size:.95rem}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 .analytics-header{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 60%,#a855f7 100%);color:white;border-radius:0 0 32px 32px;padding:2rem 1.5rem 2.5rem;margin:-1.5rem -1.5rem 2rem}
 .analytics-header h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
@@ -73,188 +81,320 @@
 .risk-low   {border-color:#22c55e;color:#16a34a;background:#f0fdf4}
 .risk-medium{border-color:#f59e0b;color:#d97706;background:#fffbeb}
 .risk-high  {border-color:#ef4444;color:#dc2626;background:#fef2f2}
+
+/* ── Population tab extras ───────────────────────────────────────────────── */
+.pop-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
+.pop-stat{background:white;border-radius:14px;padding:1.25rem 1rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
+.pop-stat .pop-num{font-size:1.9rem;font-weight:800;line-height:1.1}
+.pop-stat .pop-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.3rem}
+.pop-stat .pop-sub{font-size:.75rem;color:#94a3b8;margin-top:.2rem}
+
+.mode-legend{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem}
+.mode-pill{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:600;padding:.25rem .7rem;border-radius:999px}
+.mode-personal  {background:#ede9fe;color:#7c3aed}
+.mode-general   {background:#dbeafe;color:#1d4ed8}
+.mode-hybrid    {background:#d1fae5;color:#065f46}
+.mode-trajectory{background:#fef3c7;color:#92400e}
+.mode-unknown   {background:#f1f5f9;color:#64748b}
+
+.topic-bar-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.55rem}
+.topic-bar-label{font-size:.8rem;color:#475569;min-width:120px;text-align:right;text-transform:capitalize}
+.topic-bar-track{flex:1;background:#f1f5f9;border-radius:999px;height:10px;overflow:hidden}
+.topic-bar-fill{height:10px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#a855f7);transition:width .6s ease}
+.topic-bar-count{font-size:.75rem;color:#94a3b8;min-width:28px;text-align:right}
+
+.privacy-notice{display:flex;align-items:center;gap:.6rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;font-size:.82rem;color:#0369a1;margin-bottom:1.5rem}
+.privacy-notice i{flex-shrink:0;font-size:1rem}
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <div class="analytics-header">
-  <h1><i class="fas fa-chart-line" style="margin-right:.5rem"></i>My Health Analytics</h1>
-  <p>Visual overview of your health data, biomarker trends, and AI risk assessments</p>
+  <h1><i class="fas fa-chart-line" style="margin-right:.5rem"></i>AI & Analytics</h1>
+  <p>Your personal health trends and anonymised population benchmarks</p>
 </div>
 
-<!-- ── Summary stats ───────────────────────────────────────────────────────── -->
-<div class="stat-grid">
-  <div class="stat-card">
-    <div class="num" style="color:var(--primary-dk)">{{ total_records }}</div>
-    <div class="lbl">Total Records</div>
-  </div>
-  <div class="stat-card">
-    <div class="num" style="color:#6366f1">{{ total_biomarkers }}</div>
-    <div class="lbl">Biomarkers Tracked</div>
-  </div>
-  <div class="stat-card">
-    <div class="num" style="color:{% if unread_alerts > 0 %}var(--danger){% else %}var(--success){% endif %}">{{ unread_alerts }}</div>
-    <div class="lbl">Unread Alerts</div>
-  </div>
-  <div class="stat-card">
-    <div class="num" style="color:#64748b;font-size:1.1rem;padding-top:.3rem">
-      {% if last_record_date %}{{ last_record_date|date:"M d, Y" }}{% else %}—{% endif %}
+<!-- ── Tab switcher ─────────────────────────────────────────────────────────── -->
+<div class="dual-tab-bar">
+  <button class="dual-tab-btn active" data-tab="personal">
+    <i class="fas fa-user-circle"></i> My Health
+  </button>
+  <button class="dual-tab-btn" data-tab="population">
+    <i class="fas fa-users"></i> Population Insights
+  </button>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB 1 — My Health                                                      -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-personal" class="tab-pane active">
+
+  <!-- ── Summary stats ──────────────────────────────────────────────────── -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="num" style="color:var(--primary-dk)">{{ total_records }}</div>
+      <div class="lbl">Total Records</div>
     </div>
-    <div class="lbl">Last Record</div>
-  </div>
-</div>
-
-{% if not has_data %}
-<!-- ── No data state ──────────────────────────────────────────────────────── -->
-<div class="card">
-  <div class="no-data-msg">
-    <i class="fas fa-flask"></i>
-    <div>
-      <strong>No health records yet</strong><br>
-      <span style="font-size:.85rem">Upload your lab results to see your biomarker trends and analytics here.</span>
+    <div class="stat-card">
+      <div class="num" style="color:#6366f1">{{ total_biomarkers }}</div>
+      <div class="lbl">Biomarkers Tracked</div>
     </div>
-    <a href="/records/" class="btn btn-primary" style="margin-top:.5rem"><i class="fas fa-upload"></i> Upload Records</a>
-  </div>
-</div>
-
-{% else %}
-
-<!-- ── Biomarker Trend Charts ──────────────────────────────────────────────── -->
-{% if trending_json != '{}' %}
-<div class="section-title"><i class="fas fa-chart-line"></i> Biomarker Trends</div>
-<div class="chart-grid" id="trend-charts-container">
-  <!-- Populated by JS below -->
-</div>
-{% endif %}
-
-<!-- ── Latest Values Snapshot ─────────────────────────────────────────────── -->
-{% if latest_values %}
-<div class="section-title"><i class="fas fa-vial"></i> Latest Lab Values</div>
-<div class="snapshot-grid">
-  {% for name, pt in latest_values.items %}
-  <div class="snap-card">
-    <div class="bioname">{{ name }}</div>
-    <div>
-      <span class="biovalue {% if pt.critical %}critical{% elif pt.abnormal %}abnormal{% endif %}"
-            style="color:{% if pt.critical %}#dc2626{% elif pt.abnormal %}#d97706{% else %}#16a34a{% endif %}">
-        {{ pt.value }}
-      </span>
-      {% if pt.unit %}<span class="biounit">{{ pt.unit }}</span>{% endif %}
+    <div class="stat-card">
+      <div class="num" style="color:{% if unread_alerts > 0 %}var(--danger){% else %}var(--success){% endif %}">{{ unread_alerts }}</div>
+      <div class="lbl">Unread Alerts</div>
     </div>
-    {% if pt.ref %}<div class="bioref">Ref: {{ pt.ref }}</div>{% endif %}
-    <div>
-      {% if pt.critical %}
-        <span class="biostatus status-critical"><i class="fas fa-exclamation-circle"></i> Critical</span>
-      {% elif pt.abnormal %}
-        <span class="biostatus status-abnormal"><i class="fas fa-exclamation-triangle"></i> Abnormal</span>
-      {% else %}
-        <span class="biostatus status-normal"><i class="fas fa-check-circle"></i> Normal</span>
-      {% endif %}
-    </div>
-    <div style="font-size:.72rem;color:#94a3b8;margin-top:.3rem">{{ pt.date }}</div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- ── Row: Alerts + Record Types ─────────────────────────────────────────── -->
-<div class="two-col">
-
-  <!-- Alerts breakdown -->
-  <div class="card">
-    <div class="card-header"><i class="fas fa-bell" style="color:#f59e0b"></i> Health Alerts</div>
-    <div class="card-body">
-      <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.25rem">
-        <div style="text-align:center">
-          <div style="font-size:1.6rem;font-weight:800;color:#ef4444" id="cnt-critical">0</div>
-          <div style="font-size:.75rem;color:var(--muted)">Critical</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:1.6rem;font-weight:800;color:#f59e0b" id="cnt-warning">0</div>
-          <div style="font-size:.75rem;color:var(--muted)">Warning</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:1.6rem;font-weight:800;color:#3b82f6" id="cnt-info">0</div>
-          <div style="font-size:.75rem;color:var(--muted)">Info</div>
-        </div>
+    <div class="stat-card">
+      <div class="num" style="color:#64748b;font-size:1.1rem;padding-top:.3rem">
+        {% if last_record_date %}{{ last_record_date|date:"M d, Y" }}{% else %}—{% endif %}
       </div>
-      <div style="position:relative;height:140px">
-        <canvas id="alerts-chart"></canvas>
-      </div>
+      <div class="lbl">Last Record</div>
     </div>
   </div>
 
-  <!-- Record types donut -->
+  {% if not has_data %}
   <div class="card">
-    <div class="card-header"><i class="fas fa-folder-medical" style="color:var(--primary)"></i> Records by Type</div>
-    <div class="card-body" style="display:flex;align-items:center;justify-content:center">
-      <div style="position:relative;height:180px;width:260px">
-        <canvas id="records-type-chart"></canvas>
+    <div class="no-data-msg">
+      <i class="fas fa-flask"></i>
+      <div>
+        <strong>No health records yet</strong><br>
+        <span style="font-size:.85rem">Upload your lab results to see your biomarker trends and analytics here.</span>
       </div>
+      <a href="/records/" class="btn btn-primary" style="margin-top:.5rem"><i class="fas fa-upload"></i> Upload Records</a>
     </div>
   </div>
 
-</div>
+  {% else %}
 
-<!-- ── Upload Activity + Risk ─────────────────────────────────────────────── -->
-<div class="two-col">
+  <!-- ── Biomarker Trend Charts ──────────────────────────────────────────── -->
+  {% if trending_json != '{}' %}
+  <div class="section-title"><i class="fas fa-chart-line"></i> Biomarker Trends</div>
+  <div class="chart-grid" id="trend-charts-container"></div>
+  {% endif %}
 
-  <!-- Upload activity bar chart -->
-  <div class="card">
-    <div class="card-header"><i class="fas fa-calendar-check" style="color:#10b981"></i> Upload Activity</div>
-    <div class="card-body">
-      <div style="position:relative;height:140px">
-        <canvas id="upload-chart"></canvas>
+  <!-- ── Latest Values Snapshot ─────────────────────────────────────────── -->
+  {% if latest_values %}
+  <div class="section-title"><i class="fas fa-vial"></i> Latest Lab Values</div>
+  <div class="snapshot-grid">
+    {% for name, pt in latest_values.items %}
+    <div class="snap-card">
+      <div class="bioname">{{ name }}</div>
+      <div>
+        <span class="biovalue {% if pt.critical %}critical{% elif pt.abnormal %}abnormal{% endif %}"
+              style="color:{% if pt.critical %}#dc2626{% elif pt.abnormal %}#d97706{% else %}#16a34a{% endif %}">
+          {{ pt.value }}
+        </span>
+        {% if pt.unit %}<span class="biounit">{{ pt.unit }}</span>{% endif %}
       </div>
+      {% if pt.ref %}<div class="bioref">Ref: {{ pt.ref }}</div>{% endif %}
+      <div>
+        {% if pt.critical %}
+          <span class="biostatus status-critical"><i class="fas fa-exclamation-circle"></i> Critical</span>
+        {% elif pt.abnormal %}
+          <span class="biostatus status-abnormal"><i class="fas fa-exclamation-triangle"></i> Abnormal</span>
+        {% else %}
+          <span class="biostatus status-normal"><i class="fas fa-check-circle"></i> Normal</span>
+        {% endif %}
+      </div>
+      <div style="font-size:.72rem;color:#94a3b8;margin-top:.3rem">{{ pt.date }}</div>
     </div>
+    {% endfor %}
   </div>
+  {% endif %}
 
-  <!-- AI Risk score -->
-  <div class="card">
-    <div class="card-header"><i class="fas fa-brain" style="color:#8b5cf6"></i> AI Risk Assessment</div>
-    <div class="card-body">
-      {% if latest_risk is not None %}
-      <div style="display:flex;align-items:center;gap:1.5rem;margin-bottom:1rem">
-        <div class="risk-ring {% if latest_risk >= 70 %}risk-high{% elif latest_risk >= 30 %}risk-medium{% else %}risk-low{% endif %}">
-          {{ latest_risk|floatformat:0 }}<span style="font-size:.7rem;font-weight:600">%</span>
-        </div>
-        <div>
-          <div style="font-weight:700;font-size:.95rem">
-            {% if latest_risk >= 70 %}High Risk{% elif latest_risk >= 30 %}Moderate Risk{% else %}Low Risk{% endif %}
+  <!-- ── Row: Alerts + Record Types ─────────────────────────────────────── -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-bell" style="color:#f59e0b"></i> Health Alerts</div>
+      <div class="card-body">
+        <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.25rem">
+          <div style="text-align:center">
+            <div style="font-size:1.6rem;font-weight:800;color:#ef4444" id="cnt-critical">0</div>
+            <div style="font-size:.75rem;color:var(--muted)">Critical</div>
           </div>
-          <div style="font-size:.8rem;color:var(--muted)">Latest AI prediction</div>
+          <div style="text-align:center">
+            <div style="font-size:1.6rem;font-weight:800;color:#f59e0b" id="cnt-warning">0</div>
+            <div style="font-size:.75rem;color:var(--muted)">Warning</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:1.6rem;font-weight:800;color:#3b82f6" id="cnt-info">0</div>
+            <div style="font-size:.75rem;color:var(--muted)">Info</div>
+          </div>
+        </div>
+        <div style="position:relative;height:140px">
+          <canvas id="alerts-chart"></canvas>
         </div>
       </div>
-      <div style="position:relative;height:120px">
-        <canvas id="risk-chart"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="fas fa-folder-medical" style="color:var(--primary)"></i> Records by Type</div>
+      <div class="card-body" style="display:flex;align-items:center;justify-content:center">
+        <div style="position:relative;height:180px;width:260px">
+          <canvas id="records-type-chart"></canvas>
+        </div>
       </div>
-      {% else %}
-      <div class="no-data-msg" style="padding:1.5rem">
-        <i class="fas fa-robot"></i>
-        <span style="font-size:.85rem">No AI predictions yet.<br>Run an AI model from the Insights section.</span>
-      </div>
-      {% endif %}
     </div>
   </div>
 
-</div>
+  <!-- ── Upload Activity + Risk ─────────────────────────────────────────── -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-calendar-check" style="color:#10b981"></i> Upload Activity</div>
+      <div class="card-body">
+        <div style="position:relative;height:140px">
+          <canvas id="upload-chart"></canvas>
+        </div>
+      </div>
+    </div>
 
-{% endif %}{# end has_data #}
+    <div class="card">
+      <div class="card-header"><i class="fas fa-brain" style="color:#8b5cf6"></i> AI Risk Assessment</div>
+      <div class="card-body">
+        {% if latest_risk is not None %}
+        <div style="display:flex;align-items:center;gap:1.5rem;margin-bottom:1rem">
+          <div class="risk-ring {% if latest_risk >= 70 %}risk-high{% elif latest_risk >= 30 %}risk-medium{% else %}risk-low{% endif %}">
+            {{ latest_risk|floatformat:0 }}<span style="font-size:.7rem;font-weight:600">%</span>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:.95rem">
+              {% if latest_risk >= 70 %}High Risk{% elif latest_risk >= 30 %}Moderate Risk{% else %}Low Risk{% endif %}
+            </div>
+            <div style="font-size:.8rem;color:var(--muted)">Latest AI prediction</div>
+          </div>
+        </div>
+        <div style="position:relative;height:120px">
+          <canvas id="risk-chart"></canvas>
+        </div>
+        {% else %}
+        <div class="no-data-msg" style="padding:1.5rem">
+          <i class="fas fa-robot"></i>
+          <span style="font-size:.85rem">No AI predictions yet.<br>Run an AI model from the Insights section.</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 
-<!-- Action bar -->
-<div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap">
-  <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
-  <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI</a>
-  <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
-  <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>
-</div>
+  {% endif %}{# end has_data #}
+
+  <!-- Action bar -->
+  <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap">
+    <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
+    <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI</a>
+    <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>
+  </div>
+
+</div>{# end tab-personal #}
+
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB 2 — Population Insights                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-population" class="tab-pane">
+
+  <div class="privacy-notice">
+    <i class="fas fa-shield-alt"></i>
+    All statistics below are fully anonymised aggregates. No individual patient data is ever exposed.
+  </div>
+
+  <!-- ── System-wide summary ─────────────────────────────────────────────── -->
+  <div class="pop-stat-grid">
+    <div class="pop-stat">
+      <div class="pop-num" style="color:#6366f1">{{ pop_total_users }}</div>
+      <div class="pop-lbl">Active Users</div>
+    </div>
+    <div class="pop-stat">
+      <div class="pop-num" style="color:#0ea5e9">{{ pop_total_queries }}</div>
+      <div class="pop-lbl">Total Queries</div>
+    </div>
+    <div class="pop-stat">
+      <div class="pop-num" style="color:#10b981">{{ pop_total_sessions }}</div>
+      <div class="pop-lbl">Chat Sessions</div>
+    </div>
+    <div class="pop-stat">
+      <div class="pop-num" style="color:#f59e0b">{{ pop_safety_total }}</div>
+      <div class="pop-lbl">Safety Interceptions</div>
+      <div class="pop-sub">{{ pop_safety_pct }}% of queries</div>
+    </div>
+    <div class="pop-stat">
+      <div class="pop-num" style="color:#8b5cf6">{{ pop_kb_chunks }}</div>
+      <div class="pop-lbl">Knowledge Base Articles</div>
+      <div class="pop-sub">curated health sources</div>
+    </div>
+  </div>
+
+  <!-- ── Row: Query mode donut + Monthly volume ─────────────────────────── -->
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-header"><i class="fas fa-route" style="color:#6366f1"></i> Query Mode Distribution</div>
+      <div class="card-body">
+        <div style="position:relative;height:200px">
+          <canvas id="pop-mode-chart"></canvas>
+        </div>
+        <div class="mode-legend" id="pop-mode-legend"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="fas fa-chart-bar" style="color:#0ea5e9"></i> Monthly Query Volume</div>
+      <div class="card-body">
+        <div style="position:relative;height:200px">
+          <canvas id="pop-volume-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Knowledge base topic coverage ──────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-header"><i class="fas fa-book-medical" style="color:#10b981"></i> Knowledge Base Topic Coverage</div>
+    <div class="card-body" id="pop-topics-bars">
+      <div class="no-data-msg" style="padding:1.5rem"><i class="fas fa-spinner fa-spin"></i><span>Loading…</span></div>
+    </div>
+  </div>
+
+  <!-- ── Safety interventions over time ─────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-header"><i class="fas fa-shield-alt" style="color:#ef4444"></i> Safety Interventions Over Time</div>
+    <div class="card-body">
+      <div style="position:relative;height:160px">
+        <canvas id="pop-safety-chart"></canvas>
+      </div>
+      <p style="font-size:.78rem;color:#94a3b8;margin-top:.5rem;margin-bottom:0">
+        Queries automatically routed to safety protocols (emergency symptoms, crisis language, dangerous advice requests).
+      </p>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap">
+    <a href="/assistant/" class="btn btn-primary"><i class="fas fa-robot"></i> Ask AI Assistant</a>
+    <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>
+  </div>
+
+</div>{# end tab-population #}
 
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.dual-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dual-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
 // ── Data from Django ──────────────────────────────────────────────────────────
 const TRENDING    = {{ trending_json|safe }};
 const ALERTS_DATA = {{ alerts_summary_json|safe }};
@@ -263,6 +403,13 @@ const UPL_LABELS  = {{ upload_labels_json|safe }};
 const UPL_COUNTS  = {{ upload_counts_json|safe }};
 const PRED_LABELS = {{ pred_labels_json|safe }};
 const PRED_SCORES = {{ pred_scores_json|safe }};
+
+const POP_MODE_DIST    = {{ pop_mode_dist_json|safe }};
+const POP_QUERY_LABELS = {{ pop_query_labels_json|safe }};
+const POP_QUERY_COUNTS = {{ pop_query_counts_json|safe }};
+const POP_TOPICS       = {{ pop_topics_json|safe }};
+const POP_SAFETY_LABELS= {{ pop_safety_labels_json|safe }};
+const POP_SAFETY_COUNTS= {{ pop_safety_counts_json|safe }};
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
 function ptColor(pt) {
@@ -275,21 +422,25 @@ function bioColor(idx) {
   return palette[idx % palette.length];
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// TAB 1 — Personal charts
+// ────────────────────────────────────────────────────────────────────────────
+
 // ── Trend line charts ─────────────────────────────────────────────────────────
 const container = document.getElementById('trend-charts-container');
 if (container) {
   let idx = 0;
   for (const [biomarker, points] of Object.entries(TRENDING)) {
-    const labels   = points.map(p => p.date);
-    const values   = points.map(p => p.value);
-    const colors   = points.map(p => ptColor(p));
-    const unit     = points[0]?.unit || '';
-    const latest   = points[points.length - 1];
-    const prev     = points[points.length - 2];
-    const delta    = latest.value - prev.value;
-    const pct      = prev.value ? ((delta / prev.value) * 100).toFixed(1) : 0;
-    const isUp     = delta > 0;
-    const isDown   = delta < 0;
+    const labels  = points.map(p => p.date);
+    const values  = points.map(p => p.value);
+    const colors  = points.map(p => ptColor(p));
+    const unit    = points[0]?.unit || '';
+    const latest  = points[points.length - 1];
+    const prev    = points[points.length - 2];
+    const delta   = latest.value - prev.value;
+    const pct     = prev.value ? ((delta / prev.value) * 100).toFixed(1) : 0;
+    const isUp    = delta > 0;
+    const isDown  = delta < 0;
 
     const statusClass = latest.critical ? 'critical' : (latest.abnormal ? 'abnormal' : 'normal');
     const trendClass  = isUp ? 'trend-up' : (isDown ? 'trend-down' : 'trend-stable');
@@ -336,11 +487,7 @@ if (container) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.parsed.y} ${unit}`
-            }
-          }
+          tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} ${unit}` } }
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 10 } } },
@@ -367,19 +514,11 @@ if (alertsCtx && (ALERTS_DATA.critical + ALERTS_DATA.warning + ALERTS_DATA.info)
     type: 'doughnut',
     data: {
       labels: ['Critical','Warning','Info'],
-      datasets: [{
-        data: [ALERTS_DATA.critical, ALERTS_DATA.warning, ALERTS_DATA.info],
-        backgroundColor: ['#ef4444','#f59e0b','#3b82f6'],
-        borderWidth: 2,
-        borderColor: '#fff',
-      }]
+      datasets: [{ data: [ALERTS_DATA.critical, ALERTS_DATA.warning, ALERTS_DATA.info],
+        backgroundColor: ['#ef4444','#f59e0b','#3b82f6'], borderWidth: 2, borderColor: '#fff' }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '65%',
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
   });
 } else if (alertsCtx) {
   alertsCtx.parentElement.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:.85rem"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#22c55e;display:block;margin-bottom:.5rem"></i>No alerts yet</div>';
@@ -388,26 +527,15 @@ if (alertsCtx && (ALERTS_DATA.critical + ALERTS_DATA.warning + ALERTS_DATA.info)
 // ── Record types donut ────────────────────────────────────────────────────────
 const recTypeCtx = document.getElementById('records-type-chart');
 if (recTypeCtx && REC_TYPES.length) {
-  const rtLabels = REC_TYPES.map(r => r.record_type.replace('_',' '));
-  const rtCounts = REC_TYPES.map(r => r.count);
   const rtColors = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
   new Chart(recTypeCtx, {
     type: 'doughnut',
     data: {
-      labels: rtLabels,
-      datasets: [{
-        data: rtCounts,
-        backgroundColor: rtColors,
-        borderWidth: 2,
-        borderColor: '#fff',
-      }]
+      labels: REC_TYPES.map(r => r.record_type.replace('_',' ')),
+      datasets: [{ data: REC_TYPES.map(r => r.count), backgroundColor: rtColors, borderWidth: 2, borderColor: '#fff' }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '55%',
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } } }
   });
 }
 
@@ -418,24 +546,13 @@ if (uplCtx) {
     type: 'bar',
     data: {
       labels: UPL_LABELS.length ? UPL_LABELS : ['No data'],
-      datasets: [{
-        label: 'Records uploaded',
-        data: UPL_COUNTS.length ? UPL_COUNTS : [0],
-        backgroundColor: '#6366f120',
-        borderColor: '#6366f1',
-        borderWidth: 2,
-        borderRadius: 6,
-      }]
+      datasets: [{ label: 'Records uploaded', data: UPL_COUNTS.length ? UPL_COUNTS : [0],
+        backgroundColor: '#6366f120', borderColor: '#6366f1', borderWidth: 2, borderRadius: 6 }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
+    options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } }
-      }
-    }
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } } } }
   });
 }
 
@@ -446,26 +563,151 @@ if (riskCtx && PRED_SCORES.length) {
     type: 'line',
     data: {
       labels: PRED_LABELS,
-      datasets: [{
-        label: 'Risk %',
-        data: PRED_SCORES,
-        borderColor: '#8b5cf6',
+      datasets: [{ label: 'Risk %', data: PRED_SCORES, borderColor: '#8b5cf6',
         backgroundColor: '#8b5cf620',
         pointBackgroundColor: PRED_SCORES.map(s => s >= 70 ? '#ef4444' : s >= 30 ? '#f59e0b' : '#22c55e'),
+        pointRadius: 5, tension: 0.35, fill: true }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `Risk: ${ctx.parsed.y}%` } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { min: 0, max: 100, grid: { color: '#f1f5f9' }, ticks: { callback: v => v+'%', font: { size: 10 } } } } }
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TAB 2 — Population charts
+// ────────────────────────────────────────────────────────────────────────────
+
+const MODE_COLORS = {
+  personal:   '#7c3aed',
+  general:    '#1d4ed8',
+  hybrid:     '#065f46',
+  trajectory: '#92400e',
+  '':         '#64748b',
+};
+const MODE_BG = {
+  personal:   '#ede9fe',
+  general:    '#dbeafe',
+  hybrid:     '#d1fae5',
+  trajectory: '#fef3c7',
+  '':         '#f1f5f9',
+};
+const MODE_LABELS = {
+  personal:   'Personal',
+  general:    'General Knowledge',
+  hybrid:     'Hybrid',
+  trajectory: 'Trend Analysis',
+  '':         'Unknown',
+};
+
+// ── Query mode donut ──────────────────────────────────────────────────────────
+const modeCtx = document.getElementById('pop-mode-chart');
+if (modeCtx && POP_MODE_DIST.length) {
+  const modeLabels = POP_MODE_DIST.map(d => MODE_LABELS[d.query_mode] || d.query_mode || 'Unknown');
+  const modeCounts = POP_MODE_DIST.map(d => d.count);
+  const modeColors = POP_MODE_DIST.map(d => MODE_COLORS[d.query_mode] || '#64748b');
+  const modeBgs    = POP_MODE_DIST.map(d => MODE_BG[d.query_mode] || '#f1f5f9');
+
+  new Chart(modeCtx, {
+    type: 'doughnut',
+    data: {
+      labels: modeLabels,
+      datasets: [{ data: modeCounts, backgroundColor: modeColors, borderWidth: 3, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} queries` } } }
+    }
+  });
+
+  // Legend pills
+  const legend = document.getElementById('pop-mode-legend');
+  if (legend) {
+    const total = modeCounts.reduce((a, b) => a + b, 0);
+    POP_MODE_DIST.forEach((d, i) => {
+      const pct = total ? Math.round(d.count / total * 100) : 0;
+      const pill = document.createElement('span');
+      pill.className = 'mode-pill mode-' + (d.query_mode || 'unknown');
+      pill.textContent = `${modeLabels[i]} ${pct}%`;
+      legend.appendChild(pill);
+    });
+  }
+} else if (modeCtx) {
+  modeCtx.parentElement.innerHTML = '<div style="text-align:center;padding:2rem;color:#94a3b8;font-size:.85rem">No queries yet</div>';
+}
+
+// ── Monthly query volume bar chart ────────────────────────────────────────────
+const volCtx = document.getElementById('pop-volume-chart');
+if (volCtx) {
+  new Chart(volCtx, {
+    type: 'bar',
+    data: {
+      labels: POP_QUERY_LABELS.length ? POP_QUERY_LABELS : ['No data'],
+      datasets: [{
+        label: 'Queries',
+        data: POP_QUERY_COUNTS.length ? POP_QUERY_COUNTS : [0],
+        backgroundColor: '#6366f130',
+        borderColor: '#6366f1',
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ── Knowledge base topic bars ─────────────────────────────────────────────────
+const topicContainer = document.getElementById('pop-topics-bars');
+if (topicContainer && POP_TOPICS.length) {
+  const maxCount = Math.max(...POP_TOPICS.map(t => t.count));
+  topicContainer.innerHTML = POP_TOPICS.map(t => {
+    const pct = Math.round(t.count / maxCount * 100);
+    return `<div class="topic-bar-row">
+      <span class="topic-bar-label">${t.topic || 'General'}</span>
+      <div class="topic-bar-track">
+        <div class="topic-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="topic-bar-count">${t.count}</span>
+    </div>`;
+  }).join('');
+} else if (topicContainer) {
+  topicContainer.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:.85rem">No topics indexed yet.<br>Run <code>python manage.py load_knowledge_base</code></div>';
+}
+
+// ── Safety interventions line chart ──────────────────────────────────────────
+const safetyCtx = document.getElementById('pop-safety-chart');
+if (safetyCtx) {
+  new Chart(safetyCtx, {
+    type: 'line',
+    data: {
+      labels: POP_SAFETY_LABELS.length ? POP_SAFETY_LABELS : ['No data'],
+      datasets: [{
+        label: 'Safety Interceptions',
+        data: POP_SAFETY_COUNTS.length ? POP_SAFETY_COUNTS : [0],
+        borderColor: '#ef4444',
+        backgroundColor: '#ef444418',
+        pointBackgroundColor: '#ef4444',
         pointRadius: 5,
         tension: 0.35,
         fill: true,
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `Risk: ${ctx.parsed.y}%` } }
-      },
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { min: 0, max: 100, grid: { color: '#f1f5f9' }, ticks: { callback: v => v+'%', font: { size: 10 } } }
+        y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } }
       }
     }
   });

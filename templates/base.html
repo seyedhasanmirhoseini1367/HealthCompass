@@ -108,11 +108,14 @@
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
         <li><a href="/stories/">Health News</a></li>
-        <li><a href="/insights/">AI &amp; Analytics</a></li>
         {% if user.is_authenticated %}
+        <li><a href="/insights/">AI &amp; Analytics</a></li>
         <li><a href="/assistant/">AI Assistant</a></li>
         <li><a href="/records/">My Records</a></li>
         <li><a href="/dashboard/">Dashboard</a></li>
+        {% else %}
+        <li><a href="/accounts/login/?next=/insights/">AI &amp; Analytics</a></li>
+        <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
         {% endif %}
     </ul>
     <div class="nav-right">
@@ -146,8 +149,8 @@
     <div id="mobileMenu" class="mobile-menu">
       <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
       <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
-      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       {% if user.is_authenticated %}
+      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> My Records</a>
       <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
@@ -155,6 +158,8 @@
       <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
+      <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
+      <a href="/accounts/login/?next=/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <div class="mm-divider"></div>
       <div style="display:flex;gap:.75rem;padding:.25rem 0">
         <a href="/accounts/login/" class="btn btn-outline" style="flex:1;justify-content:center">Log In</a>

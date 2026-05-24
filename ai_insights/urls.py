@@ -5,6 +5,9 @@ app_name = 'ai_insights'
 
 urlpatterns = [
     path('', views.model_list, name='list'),
+    path('health/', views.health_view, name='health'),
+    path('population/', views.population_view, name='population'),
+    path('models/', views.models_view, name='models'),
     path('analytics/', views.patient_analytics, name='patient_analytics'),
     path('submit/', views.submit_model, name='submit_model'),
     path('my-models/', views.my_models, name='my_models'),
