@@ -26,16 +26,27 @@ def chat_view(request):
         if not session:
             session = ChatSession.objects.create(patient=request.user, title='My Health Chat')
 
-    chat_messages = session.messages.all()
+    chat_messages = list(session.messages.all())
     sessions = ChatSession.objects.filter(patient=request.user)[:10]
 
     has_records = request.user.medical_records.exists()
 
+    # Per-message data for JS (mode badge, sources, chart) — avoids attribute escaping issues
+    history_data = [
+        {
+            'query_mode': m.query_mode or 'personal',
+            'sources':    m.sources or [],
+            'chart_data': m.chart_data,
+        }
+        for m in chat_messages
+    ]
+
     return render(request, 'rag_assistant/chat.html', {
-        'session': session,
-        'chat_messages': chat_messages,
-        'sessions': sessions,
-        'has_records': has_records,
+        'session':          session,
+        'chat_messages':    chat_messages,
+        'sessions':         sessions,
+        'has_records':      has_records,
+        'history_data_json': json.dumps(history_data),
     })
 
 
@@ -80,7 +91,7 @@ def send_message(request):
     history.reverse()
 
     # Call RAG service
-    response_text, sources, provider, chunks_count = RAGService().ask(
+    response_text, sources, provider, chunks_count, safety_routed, triggered_rules = RAGService().ask(
         request.user, query, history
     )
 
@@ -89,7 +100,7 @@ def send_message(request):
         session.title = query[:60]
         session.save(update_fields=['title'])
 
-    # Save to DB — include observability fields
+    # Save to DB — include observability + impact measurement fields
     log = QueryLog.objects.create(
         session                = session,
         query                  = query,
@@ -97,6 +108,8 @@ def send_message(request):
         sources                = sources,
         llm_provider           = provider,
         retrieved_chunks_count = chunks_count,
+        safety_routed          = safety_routed,
+        triggered_rules        = triggered_rules,
     )
 
     return JsonResponse({
@@ -185,10 +198,14 @@ def stream_message(request):
     history.reverse()
 
     def _event_stream():
-        collected_tokens   = []
-        collected_sources  = []
-        collected_provider = ''
-        collected_chunks   = 0
+        collected_tokens          = []
+        collected_sources         = []
+        collected_provider        = ''
+        collected_chunks          = 0
+        collected_safety_routed   = False
+        collected_triggered_rules = []
+        collected_mode            = 'personal'
+        collected_chart_data      = None
 
         try:
             for event_str in RAGService().stream_ask(
@@ -209,9 +226,14 @@ def stream_message(request):
                             collected_tokens.append(payload.get('content', ''))
                         elif t == 'sources':
                             collected_sources.extend(payload.get('sources', []))
+                        elif t == 'chart':
+                            collected_chart_data = payload.get('chart')
                         elif t == 'meta':
-                            collected_provider = payload.get('provider', '')
-                            collected_chunks   = payload.get('chunks', 0)
+                            collected_provider        = payload.get('provider', '')
+                            collected_chunks          = payload.get('chunks', 0)
+                            collected_safety_routed   = payload.get('safety_routed', False)
+                            collected_triggered_rules = payload.get('triggered_rules', [])
+                            collected_mode            = payload.get('mode', 'personal')
                 except Exception:
                     pass  # parsing failure doesn't break the stream
 
@@ -230,6 +252,10 @@ def stream_message(request):
                     sources                = collected_sources,
                     llm_provider           = collected_provider,
                     retrieved_chunks_count = collected_chunks,
+                    safety_routed          = collected_safety_routed,
+                    triggered_rules        = collected_triggered_rules,
+                    query_mode             = collected_mode,
+                    chart_data             = collected_chart_data,
                 )
             except Exception as exc:
                 logger.exception('Failed to save streamed QueryLog: %s', exc)

@@ -423,6 +423,137 @@ class TrajectoryService:
             f"— {significance}."
         )
 
+    # ── Chart data export ──────────────────────────────────────────────────────
+
+    def get_chart_data(self, patient, query: str) -> Optional[Dict]:
+        """
+        Return a Chart.js-ready dict for the biomarker trend in *query*, or None
+        if no plottable data is available.
+
+        Shape:
+          {
+            'biomarker':       'creatinine',
+            'display_name':    'Creatinine',
+            'unit':            'µmol/L',
+            'labels':          ['Jan 2024', 'Nov 2024', 'Mar 2025'],
+            'values':          [118.0, 138.0, 145.0],
+            'trend_direction': 'INCREASING',          # INCREASING | DECREASING | STABLE
+            'pct_change':      23.0,
+            'slope_per_month': 2.52,
+            'delta_score':     1.85,
+            'reference_low':   None,                  # optional clinical reference band
+            'reference_high':  None,
+          }
+        """
+        biomarker = self.detect_biomarker(query)
+        if not biomarker:
+            return None
+
+        aliases = _BIOMARKERS[biomarker]
+        trajectory_points, _ = self._load_trajectory(patient, aliases)
+
+        # Need at least 2 numeric points to draw a meaningful chart
+        numeric = [p for p in trajectory_points if p['value'] is not None]
+        if len(numeric) < 2:
+            return None
+
+        labels = [
+            p['date'].strftime('%b %Y') if isinstance(p['date'], date) else p['date_str']
+            for p in numeric
+        ]
+        values = [p['value'] for p in numeric]
+        unit   = numeric[-1]['unit'] or ''
+
+        # Reuse existing trend computation
+        trend_summary = self._compute_trend([
+            (p['date'], p['value'], p['unit']) for p in numeric
+        ])
+
+        # Parse direction and slope from the summary string
+        direction      = 'INCREASING' if 'INCREASING' in trend_summary else (
+                         'DECREASING' if 'DECREASING' in trend_summary else 'STABLE')
+        first_v, last_v = values[0], values[-1]
+        pct_change = ((last_v - first_v) / first_v * 100) if first_v else 0.0
+
+        slope_match = re.search(r'slope:\s*[+\-]?(\d+\.?\d*)', trend_summary)
+        slope_per_month = float(slope_match.group(1)) if slope_match else 0.0
+        if 'DECREASING' in trend_summary and slope_per_month > 0:
+            slope_per_month = -slope_per_month
+
+        delta_match = re.search(r'Δ\(D,t,s\)\s*=\s*([+\-]?\d+\.?\d*)', trend_summary)
+        delta_score = float(delta_match.group(1)) if delta_match else 0.0
+
+        # Unit-aware reference bands (Finnish labs). Pick the range that
+        # matches the unit actually found in the patient's data so the chart
+        # Y-axis stays on the same scale as the plotted values.
+        ref_low, ref_high = self._get_ref_band(biomarker, unit)
+
+        return {
+            'biomarker':       biomarker,
+            'display_name':    biomarker.replace('_', ' ').title(),
+            'unit':            unit,
+            'labels':          labels,
+            'values':          values,
+            'trend_direction': direction,
+            'pct_change':      round(pct_change, 1),
+            'slope_per_month': round(slope_per_month, 3),
+            'delta_score':     round(delta_score, 3),
+            'reference_low':   ref_low,
+            'reference_high':  ref_high,
+        }
+
+    # ── Unit-aware reference band lookup ──────────────────────────────────────
+
+    def _get_ref_band(self, biomarker: str, unit: str) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Return (low, high) clinical reference limits in the same unit as the data.
+        Uses the unit string extracted from the patient's record to select the
+        correct scale (e.g. mg/dL vs µmol/L for creatinine).
+        Returns (None, None) when no band is defined.
+        """
+        u = unit.lower()
+
+        if biomarker == 'creatinine':
+            if 'umol' in u or 'µmol' in u or 'μmol' in u:
+                return (44, 115)      # µmol/L  (Finnish lab reference)
+            return (0.5, 1.2)         # mg/dL   (default when unit unrecognised)
+
+        if biomarker == 'hba1c':
+            if '%' in u or 'percent' in u or 'ngsp' in u:
+                return (None, 6.5)    # %  NGSP
+            return (None, 48)         # mmol/mol  IFCC
+
+        if biomarker == 'egfr':
+            return (60, None)         # mL/min/1.73 m²  (always same unit)
+
+        if biomarker == 'glucose':
+            if 'mg' in u:
+                return (70, 110)      # mg/dL
+            return (3.9, 6.1)         # mmol/L
+
+        if biomarker == 'cholesterol':
+            if 'mg' in u:
+                return (None, 200)    # mg/dL
+            return (None, 5.0)        # mmol/L
+
+        if biomarker == 'tsh':
+            return (0.4, 4.0)         # mIU/L
+
+        if biomarker == 'vitamin_d':
+            if 'ng' in u:
+                return (20, 50)       # ng/mL
+            return (50, 125)          # nmol/L
+
+        if biomarker == 'hemoglobin':
+            if 'g/dl' in u or 'gdl' in u:
+                return (11.7, 17.5)   # g/dL
+            return (117, 175)         # g/L
+
+        if biomarker == 'blood_pressure':
+            return (None, 140)        # mmHg systolic
+
+        return (None, None)
+
     # ── Fallback: no specific biomarker found ──────────────────────────────────
 
     def _general_temporal_context(self, patient) -> Tuple[str, List[Dict]]:

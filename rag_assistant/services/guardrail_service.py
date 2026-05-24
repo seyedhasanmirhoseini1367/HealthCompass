@@ -36,9 +36,15 @@ logger = logging.getLogger(__name__)
 _PRE_QUERY_EMERGENCY_RE = re.compile(
     r'\b('
     r"chest pain|chest tightness|shortness of breath|can't breathe|cannot breathe|"
-    r'heart attack|stroke|seizure|loss of consciousness|unconscious|fainted|fainting|'
-    r'severe bleeding|bleeding heavily|overdose|accidental poisoning|'
-    r'suicidal|want to die|kill myself|end my life|hurt myself|'
+    r"can't seem to breathe|struggling to breathe|"
+    r'heart attack|stroke|seizure|'
+    r'loss of consciousness|lost consciousness|unconscious|fainted|fainting|'
+    r'severe bleeding|bleeding heavily|'
+    r'overdose|overdosed|accidental poisoning|'
+    r'suicidal|want to die|kill myself|'
+    r'end my life|ending my life|'
+    r'hurt myself|hurting myself|harm myself|harming myself|'
+    r"don't want to be alive|do not want to be alive|"
     r'self.?harm|self harm|cutting myself|'
     r'need an ambulance|call an ambulance'
     r')\b',

@@ -78,6 +78,20 @@
 .msg-assistant .msg-time{text-align:left}
 .sources-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem}
 .source-chip{font-size:.7rem;background:white;border:1px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--muted)}
+.source-chip.general{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.source-chip.general a{color:#1d4ed8;text-decoration:none}
+.mode-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;padding:.15rem .55rem;border-radius:10px;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.05em}
+.mode-badge.personal{background:#ede9fe;color:#6d28d9}
+.mode-badge.general{background:#dbeafe;color:#1d4ed8}
+.mode-badge.hybrid{background:#d1fae5;color:#065f46}
+.mode-badge.trajectory{background:#fef3c7;color:#92400e}
+.chart-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem 1.1rem;margin-top:.65rem;max-width:480px}
+.chart-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem}
+.chart-card-title{font-size:.78rem;font-weight:800;color:#1e1b4b}
+.chart-trend-up{color:#ef4444;font-size:.72rem;font-weight:700}
+.chart-trend-down{color:#16a34a;font-size:.72rem;font-weight:700}
+.chart-trend-stable{color:#64748b;font-size:.72rem;font-weight:700}
+.chart-canvas-wrap{position:relative;height:140px}
 .chat-input-area{margin-top:.75rem;display:flex;gap:.6rem;align-items:flex-end}
 .chat-input{flex:1;padding:.65rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;resize:none;outline:none;font-family:inherit;transition:border .15s;max-height:120px}
 .chat-input:focus{border-color:var(--primary)}
@@ -196,18 +210,12 @@ footer{display:none!important}
           <div class="bubble bubble-user">{{ msg.query }}</div>
           <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
         </div>
-        <div class="msg-assistant">
+        <div class="msg-assistant" data-history-idx="{{ forloop.counter0 }}">
           <div class="bubble bubble-assistant" data-raw="{{ msg.response }}">
             <button class="copy-btn" onclick="copyMsg(this)" title="Copy"><i class="fas fa-copy"></i></button>
             <div class="md-content"></div>
           </div>
-          {% if msg.sources %}
-          <div class="sources-row">
-            {% for src in msg.sources %}
-            <a href="/records/{{ src.pk }}/" class="source-chip">📎 {{ src.title|truncatechars:25 }}</a>
-            {% endfor %}
-          </div>
-          {% endif %}
+          <div class="sources-row"></div>
           <div class="msg-time">{{ msg.created_at|date:"H:i" }}</div>
         </div>
         {% endfor %}
@@ -240,15 +248,26 @@ footer{display:none!important}
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const SESSION_ID = "{{ session.pk }}";
 const STREAM_URL = "{% url 'rag_assistant:stream_message' %}";
 const CSRF = "{{ csrf_token }}";
+const HISTORY_DATA = {{ history_data_json|safe }};
 
-// Render existing messages
+// ── Initialise history messages (markdown + mode badge + sources + chart) ────
 document.querySelectorAll('.bubble-assistant[data-raw]').forEach(bubble => {
-  const raw = bubble.getAttribute('data-raw');
-  bubble.querySelector('.md-content').innerHTML = marked.parse(raw);
+  bubble.querySelector('.md-content').innerHTML = marked.parse(bubble.getAttribute('data-raw'));
+});
+
+document.querySelectorAll('.msg-assistant[data-history-idx]').forEach(wrap => {
+  const idx  = parseInt(wrap.getAttribute('data-history-idx'), 10);
+  const data = HISTORY_DATA[idx];
+  if (!data) return;
+
+  if (data.query_mode) renderModeBadge(wrap, data.query_mode);
+  if (data.sources && data.sources.length) renderSources(wrap, data.sources);
+  if (data.chart_data) renderChart(wrap, data.chart_data);
 });
 
 function handleKey(e) {
@@ -340,6 +359,12 @@ async function sendMessage() {
         } else if (payload.type === 'sources') {
           renderSources(assistantWrap, payload.sources || []);
 
+        } else if (payload.type === 'chart') {
+          renderChart(assistantWrap, payload.chart);
+
+        } else if (payload.type === 'meta') {
+          renderModeBadge(assistantWrap, payload.mode || 'personal');
+
         } else if (payload.type === 'error') {
           typing.style.display = 'none';
           if (firstToken) area.appendChild(assistantWrap);
@@ -421,12 +446,152 @@ function renderSources(wrap, sources) {
   if (!row) return;
   row.innerHTML = '';
   sources.forEach(s => {
-    const chip = document.createElement('a');
-    chip.className = 'source-chip';
-    // sources from SSE use document_id, not pk
-    chip.href = s.document_id ? `/records/${s.document_id}/` : '#';
-    chip.textContent = `📎 ${(s.title || 'Record').substring(0, 25)}`;
+    const chip = document.createElement('span');
+    if (s.is_general) {
+      chip.className = 'source-chip general';
+      const icon = s.source_url ? `<a href="${s.source_url}" target="_blank" rel="noopener">🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}</a>` : `🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}`;
+      chip.innerHTML = icon;
+    } else {
+      chip.className = 'source-chip';
+      const link = document.createElement('a');
+      link.href = s.record_id ? `/records/${s.record_id}/` : '#';
+      link.style.color = 'inherit';
+      link.textContent = `📎 ${(s.title || 'Record').substring(0, 25)}`;
+      chip.appendChild(link);
+    }
     row.appendChild(chip);
+  });
+}
+
+function renderModeBadge(wrap, mode) {
+  const labels = {
+    personal:   ['🔒 Your records', 'personal'],
+    general:    ['🌐 General knowledge', 'general'],
+    hybrid:     ['✨ Records + Guidelines', 'hybrid'],
+    trajectory: ['📈 Health trend', 'trajectory'],
+    emergency:  ['🚨 Emergency', 'personal'],
+  };
+  const [label, cls] = labels[mode] || ['', 'personal'];
+  if (!label) return;
+  const existing = wrap.querySelector('.mode-badge');
+  if (existing) return;
+  const badge = document.createElement('div');
+  badge.className = `mode-badge ${cls}`;
+  badge.textContent = label;
+  const sourcesRow = wrap.querySelector('.sources-row');
+  if (sourcesRow) wrap.insertBefore(badge, sourcesRow);
+}
+
+function renderChart(wrap, data) {
+  if (!data || !data.values || data.values.length < 2) return;
+
+  const dir   = data.trend_direction || 'STABLE';
+  const color = dir === 'INCREASING' ? '#ef4444' : dir === 'DECREASING' ? '#16a34a' : '#6366f1';
+  const arrow = dir === 'INCREASING' ? '↑' : dir === 'DECREASING' ? '↓' : '→';
+  const cls   = dir === 'INCREASING' ? 'chart-trend-up' : dir === 'DECREASING' ? 'chart-trend-down' : 'chart-trend-stable';
+  const pct   = (data.pct_change >= 0 ? '+' : '') + data.pct_change + '%';
+
+  const card = document.createElement('div');
+  card.className = 'chart-card';
+  card.innerHTML = `
+    <div class="chart-card-header">
+      <span class="chart-card-title">📈 ${data.display_name} · ${data.unit}</span>
+      <span class="${cls}">${arrow} ${pct} over ${data.labels.length} readings</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="chart-${Date.now()}"></canvas></div>
+  `;
+
+  const bubble = wrap.querySelector('.bubble-assistant');
+  if (bubble) bubble.after(card);
+  else wrap.appendChild(card);
+
+  const canvas = card.querySelector('canvas');
+
+  // ── Guard against unit-mismatch scale distortion ─────────────────────────
+  // Only show a reference line if it's within 5× of the actual data range.
+  const dataMin = Math.min(...data.values);
+  const dataMax = Math.max(...data.values);
+  const dataRange = Math.max(dataMax - dataMin, dataMax * 0.05, 0.001);
+  const scale5x  = dataMax * 5;
+
+  const rawLow  = data.reference_low  != null ? data.reference_low  : null;
+  const rawHigh = data.reference_high != null ? data.reference_high : null;
+  const refLow  = (rawLow  != null && rawLow  < scale5x) ? rawLow  : null;
+  const refHigh = (rawHigh != null && rawHigh < scale5x) ? rawHigh : null;
+
+  // Y-axis bounds: fit data + small padding; include ref lines if they're sane
+  const candidates = [dataMin, dataMax];
+  if (refLow  != null) candidates.push(refLow);
+  if (refHigh != null) candidates.push(refHigh);
+  const yMin = Math.min(...candidates) - dataRange * 0.15;
+  const yMax = Math.max(...candidates) + dataRange * 0.15;
+
+  // Point colours: red if above high ref, orange if below low ref, else match trend
+  const ptColors = data.values.map(v => {
+    if (refHigh != null && v > refHigh) return '#ef4444';
+    if (refLow  != null && v < refLow)  return '#f59e0b';
+    return color;
+  });
+
+  const datasets = [{
+    label: data.display_name,
+    data:  data.values,
+    borderColor: color,
+    backgroundColor: color + '18',
+    borderWidth: 2.5,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+    pointBackgroundColor: ptColors,
+    pointBorderColor: ptColors,
+    tension: 0.35,
+    fill: true,
+  }];
+
+  if (refHigh != null) {
+    datasets.push({
+      label: 'Upper limit',
+      data: data.labels.map(() => refHigh),
+      borderColor: '#fbbf24',
+      borderWidth: 1.5,
+      borderDash: [5, 4],
+      pointRadius: 0,
+      fill: false,
+    });
+  }
+  if (refLow != null) {
+    datasets.push({
+      label: 'Lower limit',
+      data: data.labels.map(() => refLow),
+      borderColor: '#94a3b8',
+      borderWidth: 1.5,
+      borderDash: [4, 4],
+      pointRadius: 0,
+      fill: false,
+    });
+  }
+
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels: data.labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { font: { size: 10 }, boxWidth: 14 } },
+        tooltip: {
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} ${data.unit}` },
+        },
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+        y: {
+          min: yMin,
+          max: yMax,
+          ticks: { font: { size: 10 }, callback: v => v + (data.unit ? ' ' + data.unit : '') },
+          grid: { color: '#f1f5f9' },
+        },
+      },
+    },
   });
 }
 

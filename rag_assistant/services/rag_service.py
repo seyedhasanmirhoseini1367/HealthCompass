@@ -57,9 +57,10 @@ class RAGService:
         history:       List[Dict]    = None,
         document_type: Optional[str] = None,
         top_k:         Optional[int] = None,
-    ) -> Tuple[str, List[Dict], str, int]:
+    ) -> Tuple[str, List[Dict], str, int, bool, List]:
         """
-        Returns (response_text, sources, llm_provider, retrieved_chunks_count).
+        Returns (response_text, sources, llm_provider, retrieved_chunks_count,
+                 safety_routed, triggered_rules).
         """
         from django.conf import settings
         from rag_assistant.services.generation_service import generate
@@ -68,13 +69,13 @@ class RAGService:
         # ── Pre-query safety gate (before anything else) ──────────────────────
         is_emergency, emergency_response = GuardrailService.check_pre_query(query)
         if is_emergency:
-            return emergency_response, [], 'safety_gate', 0
+            return emergency_response, [], 'safety_gate', 0, True, []
 
         # ── Cold-start check ──────────────────────────────────────────────────
         if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
             cold = self._cold_start_response(patient, query)
             if cold:
-                return cold, [], 'cold_start', 0
+                return cold, [], 'cold_start', 0, False, []
 
         chunks = self.ret_svc.retrieve(
             patient       = patient,
@@ -89,7 +90,7 @@ class RAGService:
         if rules_fired:
             logger.info('ask() guardrail rules fired: %s', rules_fired)
 
-        return response, sources, provider, len(chunks)
+        return response, sources, provider, len(chunks), False, rules_fired
 
     # ── Streaming ask ──────────────────────────────────────────────────────────
 
@@ -116,77 +117,86 @@ class RAGService:
         import json
         from django.conf import settings
         from rag_assistant.services.generation_service import (
-            generate_streaming, _build_sources, active_stream_provider,
+            generate_streaming, _build_sources, _build_general_sources,
+            active_stream_provider,
         )
-        from rag_assistant.services.guardrail_service  import GuardrailService
-        from rag_assistant.services.trajectory_service import TrajectoryService
+        from rag_assistant.services.guardrail_service        import GuardrailService
+        from rag_assistant.services.trajectory_service       import TrajectoryService
+        from rag_assistant.services.general_knowledge_service import (
+            GeneralKnowledgeService, classify_query_mode,
+        )
 
         try:
-            # ── Pre-query safety gate (before anything else) ──────────────────
+            # ── Pre-query safety gate ─────────────────────────────────────────
             is_emergency, emergency_response = GuardrailService.check_pre_query(query)
             if is_emergency:
                 yield f'data: {json.dumps({"type": "token", "content": emergency_response})}\n\n'
                 yield 'data: {"type": "sources", "sources": []}\n\n'
-                yield f'data: {json.dumps({"type": "meta", "provider": "safety_gate", "chunks": 0, "mode": "emergency"})}\n\n'
+                yield f'data: {json.dumps({"type": "meta", "provider": "safety_gate", "chunks": 0, "mode": "emergency", "safety_routed": True, "triggered_rules": []})}\n\n'
                 yield 'data: {"type": "done"}\n\n'
                 return
 
-            # ── Cold-start check ──────────────────────────────────────────────
-            if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
-                cold = self._cold_start_response(patient, query)
-                if cold:
-                    yield f'data: {json.dumps({"type": "token", "content": cold})}\n\n'
-                    yield 'data: {"type": "sources", "sources": []}\n\n'
-                    yield f'data: {json.dumps({"type": "meta", "provider": "cold_start", "chunks": 0, "mode": "cold_start"})}\n\n'
-                    yield 'data: {"type": "done"}\n\n'
-                    return
+            # ── Mode classification (Router Agent) ────────────────────────────
+            query_mode = classify_query_mode(query)
+            logger.info('stream_ask: query_mode=%s query=%r', query_mode, query[:60])
 
-            # ── Trajectory detection (PhD proposal Gap 1) ─────────────────────
-            traj_svc           = TrajectoryService()
-            trajectory_context = ''
-            mode               = 'standard'
+            general_chunks: List[Dict] = []
+            chunks:         List[Dict] = []
+            trajectory_context         = ''
+            mode                       = query_mode
 
-            if (
-                settings.RAG_CONFIG.get('TRAJECTORY_ENABLED', True)
-                and traj_svc.is_temporal_query(query)
-            ):
-                trajectory_context, chunks = traj_svc.get_trajectory_context(patient, query)
-                if trajectory_context:
-                    mode = 'trajectory'
-                    logger.info(
-                        'stream_ask: trajectory mode — %d source chunks, %d chars context',
-                        len(chunks), len(trajectory_context),
-                    )
-                else:
-                    # Temporal query but no trajectory data found — use standard retrieval
-                    chunks = self.ret_svc.retrieve(
-                        patient       = patient,
-                        query         = query,
-                        document_type = document_type,
-                        query_intent  = 'temporal',
-                    )
-            else:
-                # Standard adaptive retrieval
+            gk_svc = GeneralKnowledgeService()
+
+            if query_mode == 'general':
+                # ── General knowledge only — no patient data touched ──────────
+                general_chunks = gk_svc.retrieve(query)
+
+            elif query_mode == 'hybrid':
+                # ── Both sources ──────────────────────────────────────────────
+                general_chunks = gk_svc.retrieve(query)
                 intent = self.ret_svc.classify_query_intent(query)
                 chunks = self.ret_svc.retrieve(
-                    patient       = patient,
-                    query         = query,
-                    document_type = document_type,
-                    query_intent  = intent,
+                    patient=patient, query=query,
+                    document_type=document_type, query_intent=intent,
                 )
 
-            # ── Follow-up fallback ────────────────────────────────────────────
-            # When retrieval returns nothing AND the user has asked a follow-up
-            # (short query like "give me more details", "what does that mean?"),
-            # the LLM would incorrectly say "I have no records". Instead, signal
-            # it to answer from the conversation history already in its context.
-            if not chunks and not trajectory_context and history:
-                trajectory_context = (
-                    "No additional records were retrieved for this follow-up question. "
-                    "Please answer based on the conversation history above. "
-                    "Reference specific values or findings you mentioned previously."
-                )
-                mode = 'history_followup'
+            else:
+                # ── Personal mode — original pipeline ─────────────────────────
+                if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
+                    cold = self._cold_start_response(patient, query)
+                    if cold:
+                        yield f'data: {json.dumps({"type": "token", "content": cold})}\n\n'
+                        yield 'data: {"type": "sources", "sources": []}\n\n'
+                        yield f'data: {json.dumps({"type": "meta", "provider": "cold_start", "chunks": 0, "mode": "cold_start"})}\n\n'
+                        yield 'data: {"type": "done"}\n\n'
+                        return
+
+                traj_svc = TrajectoryService()
+                if (
+                    settings.RAG_CONFIG.get('TRAJECTORY_ENABLED', True)
+                    and traj_svc.is_temporal_query(query)
+                ):
+                    trajectory_context, chunks = traj_svc.get_trajectory_context(patient, query)
+                    if trajectory_context:
+                        mode = 'trajectory'
+                    else:
+                        chunks = self.ret_svc.retrieve(
+                            patient=patient, query=query,
+                            document_type=document_type, query_intent='temporal',
+                        )
+                else:
+                    intent = self.ret_svc.classify_query_intent(query)
+                    chunks = self.ret_svc.retrieve(
+                        patient=patient, query=query,
+                        document_type=document_type, query_intent=intent,
+                    )
+
+                if not chunks and not trajectory_context and history:
+                    trajectory_context = (
+                        "No additional records were retrieved for this follow-up question. "
+                        "Please answer based on the conversation history above."
+                    )
+                    mode = 'history_followup'
 
             # ── Streaming generation ──────────────────────────────────────────
             collected_tokens: List[str] = []
@@ -195,6 +205,8 @@ class RAGService:
                 query,
                 history or [],
                 context_override=trajectory_context,
+                query_mode=query_mode,
+                general_chunks=general_chunks,
             ):
                 collected_tokens.append(token)
                 yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
@@ -205,13 +217,24 @@ class RAGService:
             if len(safe_response) > len(full_response):
                 extra = safe_response[len(full_response):]
                 yield f'data: {json.dumps({"type": "token", "content": extra})}\n\n'
-                if rules_fired:
-                    logger.info('stream_ask() guardrail rules fired: %s', rules_fired)
 
+            # ── Sources: merge personal + general ─────────────────────────────
             sources  = _build_sources(chunks)
+            if general_chunks:
+                sources += _build_general_sources(general_chunks)
             provider = active_stream_provider()
             yield f'data: {json.dumps({"type": "sources", "sources": sources})}\n\n'
-            yield f'data: {json.dumps({"type": "meta", "provider": provider, "chunks": len(chunks), "mode": mode})}\n\n'
+            yield f'data: {json.dumps({"type": "meta", "provider": provider, "chunks": len(chunks) + len(general_chunks), "mode": mode, "safety_routed": False, "triggered_rules": rules_fired})}\n\n'
+
+            # ── Inline chart for trajectory answers ───────────────────────────
+            if mode == 'trajectory':
+                try:
+                    chart_data = traj_svc.get_chart_data(patient, query)
+                    if chart_data:
+                        yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
+                except Exception as _chart_err:
+                    logger.warning('chart_data generation failed: %s', _chart_err)
+
             yield 'data: {"type": "done"}\n\n'
 
         except Exception as exc:

@@ -1,0 +1,504 @@
+{% extends 'base.html' %}
+{% block title %}My Health — HealthCompass{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-hero{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:0 0 28px 28px;padding:1.75rem 1.75rem 2.25rem;margin:-1.5rem -1.5rem 2rem;color:white;position:relative;overflow:hidden}
+.page-hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.page-hero-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.page-hero h1{font-size:1.55rem;font-weight:800;margin:0 0 .2rem;letter-spacing:-.02em}
+.page-hero p{opacity:.88;font-size:.87rem;margin:0}
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:.35rem .85rem;font-size:.78rem;font-weight:600;color:white;text-decoration:none;transition:background .15s;white-space:nowrap}
+.back-btn:hover{background:rgba(255,255,255,.28);color:white;text-decoration:none}
+
+/* stat strip */
+.stat-strip{display:flex;gap:.75rem;margin-bottom:1.75rem;overflow-x:auto;padding-bottom:.25rem}
+.stat-chip{display:flex;align-items:center;gap:.6rem;background:white;border:1px solid var(--border);border-radius:12px;padding:.65rem 1rem;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.stat-chip .sc-num{font-size:1.2rem;font-weight:800;line-height:1}
+.stat-chip .sc-lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+
+/* section selector cards */
+.section-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.1rem;margin-bottom:1.75rem}
+.sc-card{background:white;border-radius:18px;border:1.5px solid var(--border);padding:1.4rem 1.35rem 1.1rem;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:.55rem}
+.sc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3.5px;border-radius:18px 18px 0 0;background:var(--sc-accent,#6366f1);opacity:0;transition:opacity .2s}
+.sc-card:hover::before,.sc-card.open::before{opacity:1}
+.sc-card:hover{border-color:var(--sc-accent,#6366f1);box-shadow:0 6px 22px rgba(0,0,0,.09);transform:translateY(-2px)}
+.sc-card.open{border-color:var(--sc-accent,#6366f1);background:#fafbff}
+.sc-card-top{display:flex;align-items:center;gap:.75rem}
+.sc-num{width:2rem;height:2rem;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:white;flex-shrink:0;background:var(--sc-accent,#6366f1)}
+.sc-icon{font-size:1.3rem;line-height:1;flex-shrink:0}
+.sc-title{font-weight:700;font-size:.95rem;color:#1e293b;line-height:1.2}
+.sc-desc{font-size:.8rem;color:#64748b;line-height:1.5;flex:1}
+.sc-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.sc-tag{display:inline-flex;align-items:center;gap:.25rem;font-size:.69rem;font-weight:600;padding:.18rem .55rem;border-radius:999px;white-space:nowrap}
+
+/* section panels */
+.section-panel{display:none;background:white;border-radius:18px;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.07);margin-bottom:1.5rem;overflow:hidden;animation:slideDown .22s ease}
+.section-panel.open{display:block}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.sp-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:#fafafa}
+.sp-header h3{font-size:.95rem;font-weight:700;color:#1e293b;margin:0;display:flex;align-items:center;gap:.5rem}
+.sp-close{border:none;background:#f1f5f9;border-radius:8px;padding:.3rem .65rem;font-size:.78rem;color:#64748b;cursor:pointer;font-weight:600;transition:all .15s}
+.sp-close:hover{background:#e2e8f0;color:#1e293b}
+
+/* biomarker browser */
+.bio-browser{display:grid;grid-template-columns:220px 1fr;gap:0;min-height:360px}
+@media(max-width:680px){.bio-browser{grid-template-columns:1fr}}
+.bio-list{border-right:1px solid var(--border);overflow-y:auto;max-height:440px;padding:.5rem}
+.bio-item{display:flex;align-items:center;gap:.65rem;padding:.55rem .75rem;border-radius:10px;cursor:pointer;transition:all .16s;font-size:.85rem;font-weight:500;color:#475569}
+.bio-item:hover{background:#f1f5f9}
+.bio-item.active{background:#ede9fe;color:#6d28d9;font-weight:700}
+.bio-item .bio-arrow{font-size:.75rem;margin-left:auto;flex-shrink:0}
+.bio-arrow.up{color:#ef4444}.bio-arrow.down{color:#16a34a}.bio-arrow.stable{color:#94a3b8}
+.bio-search{width:100%;padding:.45rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.82rem;outline:none;font-family:inherit;margin-bottom:.4rem;transition:border .15s;box-sizing:border-box}
+.bio-search:focus{border-color:#6366f1}
+.bio-panel{padding:1.25rem;display:flex;flex-direction:column;gap:1rem}
+.bio-chart-wrap{position:relative;height:220px}
+.bio-stat-row{display:flex;gap:1.25rem;flex-wrap:wrap}
+.bio-stat{text-align:center}
+.bio-stat .bsn{font-size:1.4rem;font-weight:800;line-height:1}
+.bio-stat .bsl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.15rem}
+.trend-pill{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .7rem;border-radius:999px;font-size:.78rem;font-weight:700}
+.tp-up{background:#fee2e2;color:#b91c1c}.tp-down{background:#dcfce7;color:#15803d}.tp-stable{background:#f1f5f9;color:#475569}
+.no-bio-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--muted);gap:.5rem;font-size:.87rem}
+
+/* lab snapshot */
+.snap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.9rem;padding:1.25rem}
+.snap-card{background:#fafcff;border-radius:12px;padding:.9rem 1rem;border:1px solid var(--border)}
+.snap-name{font-size:.73rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem}
+.snap-val{font-size:1.35rem;font-weight:800;line-height:1}
+.snap-unit{font-size:.77rem;color:var(--muted);font-weight:400;margin-left:.12rem}
+.snap-ref{font-size:.7rem;color:#94a3b8;margin-top:.25rem}
+.snap-badge{display:inline-block;font-size:.67rem;font-weight:600;padding:.1rem .42rem;border-radius:999px;margin-top:.3rem}
+.bn{background:#dcfce7;color:#16a34a}.ba{background:#fef3c7;color:#d97706}.bc{background:#fee2e2;color:#dc2626}
+
+/* alerts panel */
+.alerts-layout{display:grid;grid-template-columns:auto 1fr;gap:1.5rem;align-items:center;padding:1.25rem}
+@media(max-width:600px){.alerts-layout{grid-template-columns:1fr}}
+.alert-counts{display:flex;gap:1.5rem}
+.alert-count-item{text-align:center}
+.alert-count-item .acn{font-size:1.8rem;font-weight:800}
+.alert-count-item .acl{font-size:.72rem;color:var(--muted)}
+.alert-donut-wrap{position:relative;height:150px;width:220px}
+
+/* risk */
+.risk-layout{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.risk-ring{width:72px;height:72px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;border:4px solid;flex-shrink:0}
+.risk-low{border-color:#22c55e;color:#16a34a;background:#f0fdf4}
+.risk-medium{border-color:#f59e0b;color:#d97706;background:#fffbeb}
+.risk-high{border-color:#ef4444;color:#dc2626;background:#fef2f2}
+.no-data-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;color:var(--muted);text-align:center;gap:.5rem;font-size:.85rem}
+.no-data-small{text-align:center;padding:1.5rem;color:#94a3b8;font-size:.83rem}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1><i class="fas fa-user-circle" style="margin-right:.45rem;opacity:.9"></i>My Health</h1>
+      <p>Your personal biomarker trends, lab values, alerts and AI predictions</p>
+    </div>
+    <a href="{% url 'ai_insights:list' %}" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+</div>
+
+{% if not has_data %}
+<div style="background:white;border-radius:18px;border:1px solid var(--border);padding:3rem;text-align:center;color:var(--muted)">
+  <i class="fas fa-flask" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
+  <strong style="color:var(--text)">No health records yet</strong>
+  <p style="font-size:.85rem;margin:.4rem 0 1rem">Upload your lab results to see biomarker trends and analytics.</p>
+  <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
+</div>
+
+{% else %}
+
+<!-- stat strip -->
+<div class="stat-strip">
+  <div class="stat-chip">
+    <div><div class="sc-num" style="color:#6366f1">{{ total_records }}</div><div class="sc-lbl">Records</div></div>
+  </div>
+  <div class="stat-chip">
+    <div><div class="sc-num" style="color:#0ea5e9">{{ total_biomarkers }}</div><div class="sc-lbl">Biomarkers</div></div>
+  </div>
+  <div class="stat-chip">
+    <div><div class="sc-num" style="color:{% if unread_alerts > 0 %}#ef4444{% else %}#22c55e{% endif %}">{{ unread_alerts }}</div><div class="sc-lbl">Alerts</div></div>
+  </div>
+  <div class="stat-chip">
+    <div>
+      <div class="sc-num" style="color:#64748b;font-size:.95rem;padding-top:.1rem">{% if last_record_date %}{{ last_record_date|date:"M d" }}{% else %}—{% endif %}</div>
+      <div class="sc-lbl">Last Record</div>
+    </div>
+  </div>
+</div>
+
+<!-- section selector cards -->
+<div class="section-grid">
+
+  <div class="sc-card" id="sc-biomarkers" style="--sc-accent:#6366f1" onclick="toggleSection('biomarkers')">
+    <div class="sc-card-top"><span class="sc-num">1</span><span class="sc-icon">📈</span><div class="sc-title">Biomarker Trends</div></div>
+    <div class="sc-desc">Track how your lab values change over time. Search and compare any biomarker with an interactive chart.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#ede9fe;color:#6d28d9">Trend Analysis</span>
+      <span class="sc-tag" style="background:#dbeafe;color:#1d4ed8" id="sc-bio-count">{{ total_biomarkers }} biomarkers</span>
+    </div>
+  </div>
+
+  <div class="sc-card" id="sc-labvalues" style="--sc-accent:#0ea5e9" onclick="toggleSection('labvalues')">
+    <div class="sc-card-top"><span class="sc-num" style="background:#0ea5e9">2</span><span class="sc-icon">🧪</span><div class="sc-title">Latest Lab Values</div></div>
+    <div class="sc-desc">See your most recent result for every measured parameter — with normal / abnormal / critical status at a glance.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#e0f2fe;color:#0369a1">Snapshot</span>
+      <span class="sc-tag" style="background:#f0fdf4;color:#16a34a">{{ latest_values|length }} values</span>
+    </div>
+  </div>
+
+  <div class="sc-card" id="sc-alerts" style="--sc-accent:#f59e0b" onclick="toggleSection('alerts')">
+    <div class="sc-card-top"><span class="sc-num" style="background:#f59e0b">3</span><span class="sc-icon">🔔</span><div class="sc-title">Health Alerts</div></div>
+    <div class="sc-desc">AI-generated alerts when a value is outside reference range. Severity breakdown and trend over time.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#fef3c7;color:#92400e">AI-generated</span>
+      {% if unread_alerts > 0 %}<span class="sc-tag" style="background:#fee2e2;color:#b91c1c">{{ unread_alerts }} unread</span>
+      {% else %}<span class="sc-tag" style="background:#f0fdf4;color:#16a34a">All clear</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="sc-card" id="sc-records" style="--sc-accent:#10b981" onclick="toggleSection('records')">
+    <div class="sc-card-top"><span class="sc-num" style="background:#10b981">4</span><span class="sc-icon">📁</span><div class="sc-title">Records by Type</div></div>
+    <div class="sc-desc">A breakdown of your uploaded records by category — labs, medications, wearable data, imaging, and more.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#d1fae5;color:#065f46">Distribution</span>
+      <span class="sc-tag" style="background:#f0fdf4;color:#16a34a">{{ total_records }} total</span>
+    </div>
+  </div>
+
+  <div class="sc-card" id="sc-activity" style="--sc-accent:#8b5cf6" onclick="toggleSection('activity')">
+    <div class="sc-card-top"><span class="sc-num" style="background:#8b5cf6">5</span><span class="sc-icon">📅</span><div class="sc-title">Upload Activity</div></div>
+    <div class="sc-desc">Monthly record upload history — track how consistently you're keeping your health data up to date.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#ede9fe;color:#5b21b6">Monthly view</span>
+      <span class="sc-tag" style="background:#f5f3ff;color:#7c3aed">Timeline</span>
+    </div>
+  </div>
+
+  <div class="sc-card" id="sc-risk" style="--sc-accent:#ec4899" onclick="toggleSection('risk')">
+    <div class="sc-card-top"><span class="sc-num" style="background:#ec4899">6</span><span class="sc-icon">🤖</span><div class="sc-title">AI Risk Score</div></div>
+    <div class="sc-desc">Predictive risk scores generated by AI models run on your data. See how your risk has changed over time.</div>
+    <div class="sc-tags">
+      <span class="sc-tag" style="background:#fce7f3;color:#9d174d">Prediction</span>
+      {% if latest_risk is not None %}
+      <span class="sc-tag" style="background:{% if latest_risk >= 70 %}#fee2e2;color:#b91c1c{% elif latest_risk >= 30 %}#fef3c7;color:#92400e{% else %}#d1fae5;color:#065f46{% endif %}">{{ latest_risk|floatformat:0 }}% risk</span>
+      {% else %}<span class="sc-tag" style="background:#f1f5f9;color:#64748b">No data yet</span>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── Section panels ───────────────────────────────────────────────────────── -->
+
+<!-- 1. Biomarker Trends -->
+<div class="section-panel" id="sp-biomarkers">
+  <div class="sp-header">
+    <h3><i class="fas fa-chart-line" style="color:#6366f1"></i> Biomarker Trends</h3>
+    <button class="sp-close" onclick="toggleSection('biomarkers')">✕ Close</button>
+  </div>
+  <div class="bio-browser">
+    <div class="bio-list" id="bio-list-container">
+      <input class="bio-search" id="bio-search" placeholder="🔍 Filter…" oninput="filterBioList(this.value)">
+    </div>
+    <div class="bio-panel" id="bio-panel">
+      <div class="no-bio-msg" id="bio-placeholder">
+        <i class="fas fa-chart-line" style="font-size:2rem;opacity:.25"></i>
+        <span>Select a biomarker from the list</span>
+      </div>
+      <div id="bio-chart-content" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:1rem;font-weight:700;color:#1e293b" id="bio-title">—</div>
+            <div style="font-size:.78rem;color:var(--muted)" id="bio-subtitle">—</div>
+          </div>
+          <span class="trend-pill" id="bio-trend-pill"></span>
+        </div>
+        <div class="bio-chart-wrap"><canvas id="bio-main-chart"></canvas></div>
+        <div class="bio-stat-row" id="bio-stats"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Latest Lab Values -->
+<div class="section-panel" id="sp-labvalues">
+  <div class="sp-header">
+    <h3><i class="fas fa-vial" style="color:#0ea5e9"></i> Latest Lab Values</h3>
+    <button class="sp-close" onclick="toggleSection('labvalues')">✕ Close</button>
+  </div>
+  <div class="snap-grid">
+    {% for name, pt in latest_values.items %}
+    <div class="snap-card">
+      <div class="snap-name">{{ name }}</div>
+      <div>
+        <span class="snap-val" style="color:{% if pt.critical %}#dc2626{% elif pt.abnormal %}#d97706{% else %}#16a34a{% endif %}">{{ pt.value }}</span>
+        {% if pt.unit %}<span class="snap-unit">{{ pt.unit }}</span>{% endif %}
+      </div>
+      {% if pt.ref %}<div class="snap-ref">Ref: {{ pt.ref }}</div>{% endif %}
+      {% if pt.critical %}<span class="snap-badge bc"><i class="fas fa-exclamation-circle"></i> Critical</span>
+      {% elif pt.abnormal %}<span class="snap-badge ba"><i class="fas fa-exclamation-triangle"></i> Abnormal</span>
+      {% else %}<span class="snap-badge bn"><i class="fas fa-check-circle"></i> Normal</span>{% endif %}
+      <div style="font-size:.7rem;color:#94a3b8;margin-top:.3rem">{{ pt.date }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- 3. Health Alerts -->
+<div class="section-panel" id="sp-alerts">
+  <div class="sp-header">
+    <h3><i class="fas fa-bell" style="color:#f59e0b"></i> Health Alerts</h3>
+    <button class="sp-close" onclick="toggleSection('alerts')">✕ Close</button>
+  </div>
+  <div class="alerts-layout">
+    <div class="alert-counts">
+      <div class="alert-count-item"><div class="acn" style="color:#ef4444" id="cnt-critical">0</div><div class="acl">Critical</div></div>
+      <div class="alert-count-item"><div class="acn" style="color:#f59e0b" id="cnt-warning">0</div><div class="acl">Warning</div></div>
+      <div class="alert-count-item"><div class="acn" style="color:#3b82f6" id="cnt-info">0</div><div class="acl">Info</div></div>
+    </div>
+    <div class="alert-donut-wrap"><canvas id="alerts-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- 4. Records by Type -->
+<div class="section-panel" id="sp-records">
+  <div class="sp-header">
+    <h3><i class="fas fa-folder-open" style="color:#10b981"></i> Records by Type</h3>
+    <button class="sp-close" onclick="toggleSection('records')">✕ Close</button>
+  </div>
+  <div style="display:flex;justify-content:center;padding:1.25rem">
+    <div style="position:relative;height:220px;width:300px"><canvas id="rec-type-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- 5. Upload Activity -->
+<div class="section-panel" id="sp-activity">
+  <div class="sp-header">
+    <h3><i class="fas fa-calendar-check" style="color:#8b5cf6"></i> Upload Activity</h3>
+    <button class="sp-close" onclick="toggleSection('activity')">✕ Close</button>
+  </div>
+  <div style="padding:1.25rem">
+    <div style="position:relative;height:180px"><canvas id="upload-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- 6. AI Risk -->
+<div class="section-panel" id="sp-risk">
+  <div class="sp-header">
+    <h3><i class="fas fa-brain" style="color:#ec4899"></i> AI Risk Assessment</h3>
+    <button class="sp-close" onclick="toggleSection('risk')">✕ Close</button>
+  </div>
+  <div style="padding:1.25rem">
+    {% if latest_risk is not None %}
+    <div class="risk-layout">
+      <div class="risk-ring {% if latest_risk >= 70 %}risk-high{% elif latest_risk >= 30 %}risk-medium{% else %}risk-low{% endif %}">
+        {{ latest_risk|floatformat:0 }}<span style="font-size:.62rem;font-weight:600">%</span>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:.95rem">{% if latest_risk >= 70 %}High Risk{% elif latest_risk >= 30 %}Moderate Risk{% else %}Low Risk{% endif %}</div>
+        <div style="font-size:.8rem;color:var(--muted)">Latest AI prediction</div>
+      </div>
+    </div>
+    <div style="position:relative;height:140px"><canvas id="risk-chart"></canvas></div>
+    {% else %}
+    <div class="no-data-msg"><i class="fas fa-robot"></i><span>No predictions yet. <a href="{% url 'ai_insights:models' %}">Run an AI model</a></span></div>
+    {% endif %}
+  </div>
+</div>
+
+{% endif %}{# has_data #}
+
+<div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.5rem">
+  <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
+  <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI</a>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const TRENDING    = {{ trending_json|safe }};
+const POP_AVG     = {{ pop_avg_json|safe }};
+const ALERTS_DATA = {{ alerts_summary_json|safe }};
+const REC_TYPES   = {{ records_type_json|safe }};
+const UPL_LABELS  = {{ upload_labels_json|safe }};
+const UPL_COUNTS  = {{ upload_counts_json|safe }};
+const PRED_LABELS = {{ pred_labels_json|safe }};
+const PRED_SCORES = {{ pred_scores_json|safe }};
+const PALETTE = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+function ptColor(pt){ return pt.critical?'#ef4444':pt.abnormal?'#f59e0b':'#22c55e'; }
+
+const openSections   = new Set();
+const chartInstances = {};
+
+function toggleSection(id) {
+  const panel = document.getElementById('sp-' + id);
+  const card  = document.getElementById('sc-' + id);
+  if (!panel) return;
+  if (openSections.has(id)) {
+    openSections.delete(id);
+    panel.classList.remove('open');
+    card && card.classList.remove('open');
+  } else {
+    openSections.add(id);
+    panel.classList.add('open');
+    card && card.classList.add('open');
+    initSection(id);
+  }
+}
+
+function initSection(id) {
+  if (chartInstances[id]) return;
+  if (id === 'biomarkers') { buildBioList(); return; }
+  if (id === 'alerts') {
+    document.getElementById('cnt-critical').textContent = ALERTS_DATA.critical || 0;
+    document.getElementById('cnt-warning').textContent  = ALERTS_DATA.warning  || 0;
+    document.getElementById('cnt-info').textContent     = ALERTS_DATA.info     || 0;
+    const ctx = document.getElementById('alerts-chart');
+    const total = (ALERTS_DATA.critical||0)+(ALERTS_DATA.warning||0)+(ALERTS_DATA.info||0);
+    if (total > 0) {
+      chartInstances[id] = new Chart(ctx, {
+        type:'doughnut',
+        data:{labels:['Critical','Warning','Info'],datasets:[{data:[ALERTS_DATA.critical,ALERTS_DATA.warning,ALERTS_DATA.info],backgroundColor:['#ef4444','#f59e0b','#3b82f6'],borderWidth:2,borderColor:'#fff'}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
+      });
+    } else {
+      ctx.parentElement.innerHTML='<div class="no-data-small"><i class="fas fa-check-circle" style="color:#22c55e;font-size:1.4rem"></i><br>No alerts yet</div>';
+    }
+    return;
+  }
+  if (id === 'records') {
+    const ctx = document.getElementById('rec-type-chart');
+    if (REC_TYPES.length) {
+      chartInstances[id] = new Chart(ctx, {
+        type:'doughnut',
+        data:{labels:REC_TYPES.map(r=>r.record_type.replace('_',' ')),datasets:[{data:REC_TYPES.map(r=>r.count),backgroundColor:PALETTE,borderWidth:2,borderColor:'#fff'}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}}}
+      });
+    }
+    return;
+  }
+  if (id === 'activity') {
+    chartInstances[id] = new Chart(document.getElementById('upload-chart'), {
+      type:'bar',
+      data:{labels:UPL_LABELS.length?UPL_LABELS:['No data'],datasets:[{label:'Uploads',data:UPL_COUNTS.length?UPL_COUNTS:[0],backgroundColor:'#6366f120',borderColor:'#6366f1',borderWidth:2,borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f1f5f9'},ticks:{stepSize:1,font:{size:9}}}}}
+    });
+    return;
+  }
+  if (id === 'risk') {
+    const ctx = document.getElementById('risk-chart');
+    if (ctx && PRED_SCORES.length) {
+      chartInstances[id] = new Chart(ctx, {
+        type:'line',
+        data:{labels:PRED_LABELS,datasets:[{label:'Risk %',data:PRED_SCORES,borderColor:'#ec4899',backgroundColor:'#ec489920',pointBackgroundColor:PRED_SCORES.map(s=>s>=70?'#ef4444':s>=30?'#f59e0b':'#22c55e'),pointRadius:5,tension:0.35,fill:true}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Risk: ${c.parsed.y}%`}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{callback:v=>v+'%',font:{size:9}}}}}
+      });
+    }
+  }
+}
+
+// biomarker browser
+let activeBio    = null;
+let bioChartInst = null;
+const bioKeys    = Object.keys(TRENDING);
+
+function buildBioList() {
+  const container = document.getElementById('bio-list-container');
+  container.querySelectorAll('.bio-item').forEach(el => el.remove());
+  bioKeys.forEach(bio => {
+    const pts  = TRENDING[bio];
+    const last = pts[pts.length-1], prev = pts[pts.length-2];
+    const d    = last.value - prev.value;
+    const arrow = d>0?'↑':d<0?'↓':'→', cls = d>0?'up':d<0?'down':'stable';
+    const item = document.createElement('div');
+    item.className='bio-item'; item.dataset.bio=bio;
+    item.innerHTML=`<span>${bio}</span><span class="bio-arrow ${cls}">${arrow}</span>`;
+    item.onclick=()=>selectBio(bio);
+    container.appendChild(item);
+  });
+  if (bioKeys.length>0) selectBio(bioKeys[0]);
+}
+
+function filterBioList(q) {
+  document.querySelectorAll('.bio-item').forEach(el=>{
+    el.style.display=el.dataset.bio.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+
+function selectBio(bio) {
+  activeBio=bio;
+  document.querySelectorAll('.bio-item').forEach(el=>el.classList.toggle('active',el.dataset.bio===bio));
+  const pts=TRENDING[bio], labels=pts.map(p=>p.date), values=pts.map(p=>p.value), colors=pts.map(p=>ptColor(p));
+  const unit=pts[0]?.unit||'', latest=pts[pts.length-1], first=pts[0];
+  const delta=latest.value-first.value, pct=first.value?((delta/first.value)*100).toFixed(1):0;
+  const dir=delta>0?'up':delta<0?'down':'stable', arrow=delta>0?'↑':delta<0?'↓':'→';
+  const color=delta>0?'#ef4444':delta<0?'#16a34a':'#6366f1';
+  document.getElementById('bio-placeholder').style.display='none';
+  document.getElementById('bio-chart-content').style.display='block';
+  document.getElementById('bio-title').textContent=bio+(unit?' · '+unit:'');
+  document.getElementById('bio-subtitle').textContent=pts.length+' readings · '+labels[0]+' → '+labels[labels.length-1];
+  const pill=document.getElementById('bio-trend-pill');
+  pill.className=`trend-pill tp-${dir}`;
+  pill.textContent=`${arrow} ${(delta>=0?'+':'')+pct}% overall`;
+
+  // Population average stat (only if available)
+  const popAvg = POP_AVG[bio] != null ? POP_AVG[bio] : null;
+  const popStat = popAvg != null
+    ? `<div class="bio-stat"><div class="bsn" style="color:#94a3b8">${popAvg} <span style="font-size:.8rem;font-weight:400">${unit}</span></div><div class="bsl">Pop. avg</div></div>`
+    : '';
+
+  const sClass=latest.critical?'#dc2626':latest.abnormal?'#d97706':'#16a34a';
+  document.getElementById('bio-stats').innerHTML=`
+    <div class="bio-stat"><div class="bsn" style="color:${sClass}">${latest.value} <span style="font-size:.8rem;font-weight:400">${unit}</span></div><div class="bsl">My latest</div></div>
+    <div class="bio-stat"><div class="bsn" style="color:#64748b">${first.value} <span style="font-size:.8rem;font-weight:400">${unit}</span></div><div class="bsl">First</div></div>
+    <div class="bio-stat"><div class="bsn" style="color:${color}">${(delta>=0?'+':'')+pct}%</div><div class="bsl">Total change</div></div>
+    ${popStat}
+    <div class="bio-stat"><div class="bsn" style="color:#8b5cf6">${pts.length}</div><div class="bsl">Readings</div></div>`;
+
+  // Build datasets — personal + optional population average line
+  const datasets = [{
+    label: 'My values',
+    data: values,
+    borderColor: color, backgroundColor: color+'18',
+    pointBackgroundColor: colors, pointBorderColor: colors,
+    pointRadius: 5, pointHoverRadius: 7, tension: 0.35, fill: true,
+  }];
+  if (popAvg != null) {
+    datasets.push({
+      label: 'Population avg',
+      data: values.map(() => popAvg),
+      borderColor: '#94a3b8', borderDash: [6, 4], borderWidth: 2,
+      backgroundColor: 'transparent',
+      pointRadius: 0, pointHoverRadius: 4, tension: 0, fill: false,
+    });
+  }
+
+  if (bioChartInst){bioChartInst.destroy();bioChartInst=null;}
+  bioChartInst=new Chart(document.getElementById('bio-main-chart'),{
+    type:'line',
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display: popAvg != null, labels:{font:{size:10},boxWidth:14,usePointStyle:true}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y} ${unit}`}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40}},
+        y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},callback:v=>v+(unit?' '+unit:'')}}
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

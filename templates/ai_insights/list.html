@@ -1,453 +1,117 @@
 {% extends 'base.html' %}
-{% block title %}AI Models — HealthCompass{% endblock %}
+{% block title %}AI & Analytics — HealthCompass{% endblock %}
+
 {% block extra_css %}
 <style>
-/* ── Layout ─────────────────────────────────────────────────────────────────── */
-.ai-layout{display:grid;grid-template-columns:240px 1fr;gap:1.5rem;align-items:start}
-@media(max-width:780px){
-  .ai-layout{grid-template-columns:1fr}
-  .ai-sidebar{display:none !important}
-  .mobile-search-bar{display:block !important}
-  .main-header h1{font-size:1.1rem}
-  .main-header-sub{display:none}
-  .header-actions .btn{font-size:.78rem;padding:.38rem .75rem}
-  .sort-bar{font-size:.78rem;flex-wrap:wrap;gap:.4rem}
-  .results-count{margin-left:0}
-}
-.mobile-search-bar{display:none;margin-bottom:1rem}
-.mobile-search-input{width:100%;padding:.6rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;outline:none;font-family:inherit;transition:border .15s}
-.mobile-search-input:focus{border-color:var(--primary)}
+.hub-hero{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 55%,#a855f7 100%);border-radius:0 0 32px 32px;padding:2.5rem 1.75rem 3rem;margin:-1.5rem -1.5rem 2.5rem;color:white;position:relative;overflow:hidden;text-align:center}
+.hub-hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.hub-hero-inner{position:relative;z-index:1}
+.hub-hero h1{font-size:2rem;font-weight:800;margin:0 0 .5rem;letter-spacing:-.025em}
+.hub-hero p{opacity:.88;font-size:.95rem;margin:0 auto;max-width:480px}
 
-/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
-.ai-sidebar{position:sticky;top:1.25rem;background:white;border:1px solid var(--border);border-radius:16px;padding:1.25rem;display:flex;flex-direction:column;gap:1.25rem}
-.sidebar-section-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.5rem}
-.sidebar-search{width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:10px;font-size:.85rem;outline:none;font-family:inherit;transition:border .15s;box-sizing:border-box}
-.sidebar-search:focus{border-color:var(--primary)}
-.filter-chip{display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;border-radius:9px;font-size:.82rem;color:var(--text);cursor:pointer;transition:all .15s;border:none;background:transparent;width:100%;text-align:left}
-.filter-chip:hover{background:#f1f5f9}
-.filter-chip.active{background:#dbeafe;color:#0369a1;font-weight:600}
-.filter-chip .chip-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.filter-chip .chip-count{margin-left:auto;font-size:.72rem;background:#f1f5f9;padding:.1rem .45rem;border-radius:20px;color:var(--muted)}
-.filter-chip.active .chip-count{background:#bae6fd;color:#0369a1}
-.sidebar-divider{border:none;border-top:1px solid var(--border);margin:0}
-.stats-row{display:flex;flex-direction:column;gap:.35rem}
-.stat-item{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
-.stat-item strong{color:var(--text)}
+.nav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem;max-width:960px;margin:0 auto}
 
-/* ── Main ─────────────────────────────────────────────────────────────────────── */
-.ai-main{}
-.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem}
-.main-header h1{font-size:1.3rem;font-weight:800;color:var(--text);margin:0}
-.main-header-sub{font-size:.83rem;color:var(--muted);margin-top:.2rem}
-.header-actions{display:flex;gap:.5rem;flex-wrap:wrap}
-.sort-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;font-size:.83rem;color:var(--muted)}
-.sort-bar select{border:1px solid var(--border);border-radius:8px;padding:.3rem .6rem;font-size:.82rem;color:var(--text);outline:none;background:white}
-.results-count{margin-left:auto;font-size:.8rem;color:var(--muted)}
+.nav-card{background:white;border-radius:20px;border:1.5px solid var(--border);padding:1.75rem 1.5rem 1.35rem;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:.7rem;text-decoration:none;color:inherit}
+.nav-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:20px 20px 0 0;background:var(--nc-accent,#6366f1);opacity:0;transition:opacity .2s}
+.nav-card:hover::before{opacity:1}
+.nav-card:hover{border-color:var(--nc-accent,#6366f1);box-shadow:0 10px 32px rgba(0,0,0,.1);transform:translateY(-3px);color:inherit;text-decoration:none}
 
-/* ── Cards ───────────────────────────────────────────────────────────────────── */
-.model-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem}
-@media(max-width:900px){.model-grid{grid-template-columns:1fr}}
-.model-card{background:white;border-radius:16px;border:1px solid var(--border);padding:1.25rem 1.3rem;display:flex;flex-direction:column;gap:.65rem;transition:all .22s;cursor:pointer;position:relative;overflow:hidden}
-.model-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.09);transform:translateY(-2px);border-color:#cbd5e1}
-.model-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0}
-.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem}
-.model-cat-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .65rem;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
-.input-type-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:8px;font-size:.7rem;font-weight:600;background:#f8fafc;border:1px solid var(--border);color:var(--muted);flex-shrink:0}
-.model-name{font-size:.975rem;font-weight:700;color:var(--text);line-height:1.3}
-.model-desc{font-size:.83rem;color:var(--muted);line-height:1.55;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.65rem;border-top:1px solid #f1f5f9;margin-top:auto}
-.run-count{font-size:.77rem;color:var(--muted);display:flex;align-items:center;gap:.3rem}
-.run-btn{font-size:.78rem;padding:.3rem .85rem;background:var(--primary);color:white;border-radius:8px;font-weight:600;white-space:nowrap}
-
-/* Category colour palette */
-.cat-cardiovascular::before,.cat-cardiovascular .chip-dot{background:#ef4444}
-.cat-cardiovascular .model-cat-badge{background:#fee2e2;color:#b91c1c}
-.cat-diabetes::before,.cat-diabetes .chip-dot{background:#f59e0b}
-.cat-diabetes .model-cat-badge{background:#fef3c7;color:#92400e}
-.cat-oncology::before,.cat-oncology .chip-dot{background:#8b5cf6}
-.cat-oncology .model-cat-badge{background:#ede9fe;color:#5b21b6}
-.cat-neurology::before,.cat-neurology .chip-dot{background:#6366f1}
-.cat-neurology .model-cat-badge{background:#e0e7ff;color:#3730a3}
-.cat-wearable::before,.cat-wearable .chip-dot{background:#10b981}
-.cat-wearable .model-cat-badge{background:#d1fae5;color:#065f46}
-.cat-general::before,.cat-general .chip-dot{background:#0ea5e9}
-.cat-general .model-cat-badge{background:#dbeafe;color:#0369a1}
-.cat-other::before,.cat-other .chip-dot{background:#94a3b8}
-.cat-other .model-cat-badge{background:#f1f5f9;color:#64748b}
-
-/* ── Show More ──────────────────────────────────────────────────────────────── */
-.show-more-wrap{text-align:center;margin-top:1.25rem}
-.show-more-btn{padding:.6rem 2rem;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:.88rem;font-weight:600;color:var(--text);cursor:pointer;transition:all .18s}
-.show-more-btn:hover{border-color:var(--primary);color:var(--primary);background:#e0f2fe}
-.show-more-btn:disabled{opacity:.4;cursor:not-allowed}
-
-/* ── Empty ──────────────────────────────────────────────────────────────────── */
-.empty-state{text-align:center;padding:3.5rem 1rem;color:var(--muted);grid-column:1/-1}
-.hidden-card{display:none}
+.nc-top{display:flex;align-items:center;gap:.85rem}
+.nc-num{width:2.2rem;height:2.2rem;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:white;flex-shrink:0;background:var(--nc-accent,#6366f1)}
+.nc-icon{font-size:1.5rem;line-height:1;flex-shrink:0}
+.nc-title{font-weight:800;font-size:1.05rem;color:#1e293b;line-height:1.2}
+.nc-desc{font-size:.83rem;color:#64748b;line-height:1.6;flex:1}
+.nc-tags{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.15rem}
+.nc-tag{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:999px;white-space:nowrap}
+.nc-footer{display:flex;align-items:center;justify-content:flex-end;padding-top:.75rem;border-top:1px solid #f1f5f9;margin-top:auto}
+.nc-cta{font-size:.8rem;font-weight:700;color:var(--nc-accent,#6366f1);display:flex;align-items:center;gap:.3rem;transition:gap .15s}
+.nav-card:hover .nc-cta{gap:.55rem}
 </style>
 {% endblock %}
+
 {% block content %}
 
-<div class="ai-layout">
-
-  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
-  <aside class="ai-sidebar">
-
-    <!-- My Analytics nav (patients only) -->
-    {% if user.is_authenticated and user.is_patient or user.is_staff %}
-    <a href="{% url 'ai_insights:patient_analytics' %}"
-       class="analytics-nav-btn"
-       style="display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:12px;background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;font-size:.875rem;font-weight:700;text-decoration:none;transition:opacity .15s"
-       onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-      <i class="fas fa-chart-line" style="font-size:.95rem"></i>
-      My Analytics
-      <i class="fas fa-arrow-right" style="margin-left:auto;font-size:.75rem;opacity:.8"></i>
-    </a>
-    <hr class="sidebar-divider">
-    {% endif %}
-
-    <!-- EEG tools -->
-    <div style="display:flex;flex-direction:column;gap:.5rem">
-      <a href="{% url 'ai_insights:seizure_analysis' %}"
-         style="display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:12px;background:linear-gradient(135deg,#312e81,#4f46e5);color:white;font-size:.875rem;font-weight:700;text-decoration:none;transition:opacity .15s"
-         onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-        <i class="fas fa-brain" style="font-size:.95rem"></i>
-        EEG Seizure Analysis
-        <i class="fas fa-arrow-right" style="margin-left:auto;font-size:.75rem;opacity:.8"></i>
-      </a>
-      <a href="{% url 'ai_insights:seizure_realtime' %}"
-         style="display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:12px;background:linear-gradient(135deg,#065f46,#10b981);color:white;font-size:.875rem;font-weight:700;text-decoration:none;transition:opacity .15s"
-         onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-        <i class="fas fa-circle" style="font-size:.55rem"></i>
-        Live EEG Monitor
-        <i class="fas fa-arrow-right" style="margin-left:auto;font-size:.75rem;opacity:.8"></i>
-      </a>
-    </div>
-    <hr class="sidebar-divider">
-
-    <!-- Search -->
-    <div>
-      <div class="sidebar-section-title">Search</div>
-      <input class="sidebar-search" id="sidebarSearch"
-             placeholder="Model name or keyword…"
-             oninput="applyFilters()" autocomplete="off">
-    </div>
-
-    <hr class="sidebar-divider">
-
-    <!-- Category filter -->
-    <div>
-      <div class="sidebar-section-title">Category</div>
-      <button class="filter-chip active" data-cat="" onclick="setCat(this,'')">
-        <span class="chip-dot" style="background:#94a3b8"></span>
-        All categories
-        <span class="chip-count" id="count-cat-all">{{ total }}</span>
-      </button>
-      {% for value, label in categories %}
-      <button class="filter-chip" data-cat="{{ value }}" onclick="setCat(this,'{{ value }}')">
-        <span class="chip-dot cat-{{ value }}" style="display:inline-block;width:9px;height:9px;border-radius:50%"></span>
-        {{ label }}
-        <span class="chip-count" id="count-cat-{{ value }}">0</span>
-      </button>
-      {% endfor %}
-    </div>
-
-    <hr class="sidebar-divider">
-
-    <!-- Input type filter -->
-    <div>
-      <div class="sidebar-section-title">Input Type</div>
-      <button class="filter-chip active" data-itype="" onclick="setItype(this,'')">
-        All types
-        <span class="chip-count" id="count-itype-all">{{ total }}</span>
-      </button>
-      {% for value, label in input_types %}
-      <button class="filter-chip" data-itype="{{ value }}" onclick="setItype(this,'{{ value }}')">
-        <span>{{ label }}</span>
-        <span class="chip-count" id="count-itype-{{ value }}">0</span>
-      </button>
-      {% endfor %}
-    </div>
-
-    <hr class="sidebar-divider">
-
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="sidebar-section-title">Stats</div>
-      <div class="stat-item"><span>Total models</span><strong>{{ total }}</strong></div>
-      <div class="stat-item"><span>Categories</span><strong>{{ categories|length }}</strong></div>
-      <div class="stat-item"><span>Showing</span><strong id="statsShowing">{{ total }}</strong></div>
-    </div>
-
-  </aside>
-
-  <!-- ── Main ─────────────────────────────────────────────────────────────── -->
-  <div class="ai-main">
-
-    <!-- Mobile-only search (sidebar hidden on mobile) -->
-    <div class="mobile-search-bar">
-      <input class="mobile-search-input" placeholder="🔍  Search AI models…"
-             oninput="document.getElementById('sidebarSearch').value=this.value;applyFilters()"
-             autocomplete="off">
-    </div>
-
-    <div class="main-header">
-      <div>
-        <h1>AI Models</h1>
-        <div class="main-header-sub">
-          Clinical AI tools for patients and healthcare providers
-        </div>
-      </div>
-      <div class="header-actions">
-        {% if user.is_authenticated and user.is_data_scientist %}
-        <a href="{% url 'ai_insights:submit_model' %}" class="btn"
-           style="background:var(--secondary);color:white;font-size:.84rem;padding:.45rem 1rem">
-          <i class="fas fa-plus"></i> Submit Model
-        </a>
-        {% endif %}
-        {% if user.is_authenticated %}
-        <a href="{% url 'ai_insights:my_predictions' %}" class="btn"
-           style="background:#f1f5f9;color:var(--text);font-size:.84rem;padding:.45rem 1rem">
-          <i class="fas fa-history"></i> My Predictions
-        </a>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="sort-bar">
-      <span>Sort by</span>
-      <select id="sortSelect" onchange="applyFilters()">
-        <option value="runs">Most used</option>
-        <option value="name">Name A–Z</option>
-        <option value="newest">Newest</option>
-      </select>
-      <span class="results-count" id="resultsCount"></span>
-    </div>
-
-    <!-- Featured: EEG tools -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.1rem">
-      <a href="{% url 'ai_insights:seizure_analysis' %}"
-         style="display:flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#312e81,#4f46e5,#0ea5e9);border-radius:16px;padding:1.1rem 1.4rem;color:white;text-decoration:none;transition:opacity .18s;flex-wrap:wrap"
-         onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <div style="font-size:2rem;line-height:1">🧠</div>
-        <div style="flex:1;min-width:120px">
-          <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.2rem">Featured Tool</div>
-          <div style="font-size:.95rem;font-weight:800;margin-bottom:.15rem">EEG Seizure Analysis</div>
-          <div style="font-size:.78rem;opacity:.82">Multi-model CNN, LSTM, GRU &amp; ensemble</div>
-        </div>
-        <div style="font-size:.82rem;font-weight:700;opacity:.88;white-space:nowrap">Run →</div>
-      </a>
-      <a href="{% url 'ai_insights:seizure_realtime' %}"
-         style="display:flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#052e16,#065f46,#10b981);border-radius:16px;padding:1.1rem 1.4rem;color:white;text-decoration:none;transition:opacity .18s;flex-wrap:wrap"
-         onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <div style="font-size:2rem;line-height:1">📡</div>
-        <div style="flex:1;min-width:120px">
-          <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:.2rem;display:flex;align-items:center;gap:.3rem"><span style="width:6px;height:6px;border-radius:50%;background:#6ee7b7;display:inline-block;animation:rtpulse 1.4s infinite"></span>Live Demo</div>
-          <div style="font-size:.95rem;font-weight:800;margin-bottom:.15rem">Live EEG Monitor</div>
-          <div style="font-size:.78rem;opacity:.82">Real-time replay &amp; per-window inference</div>
-        </div>
-        <div style="font-size:.82rem;font-weight:700;opacity:.88;white-space:nowrap">Try →</div>
-      </a>
-    </div>
-    <style>@keyframes rtpulse{0%,100%{opacity:1}50%{opacity:.3}}</style>
-
-    <div class="model-grid" id="modelGrid">
-      {% for m in models %}
-      <div class="model-card cat-{{ m.category }}"
-           data-cat="{{ m.category }}"
-           data-itype="{{ m.input_type }}"
-           data-name="{{ m.name|lower }}"
-           data-desc="{{ m.description|lower }}"
-           data-runs="{{ m.run_count }}"
-           data-date="{{ m.created_at|date:'U' }}"
-           onclick="location.href='{% url 'ai_insights:model_detail' m.slug %}'">
-        <div class="card-top">
-          <span class="model-cat-badge cat-{{ m.category }}">
-            {{ m.get_category_display }}
-          </span>
-          <span class="input-type-badge">
-            {% if m.input_type == 'tabular' %}<i class="fas fa-table"></i>
-            {% elif m.input_type == 'image' %}<i class="fas fa-image"></i>
-            {% elif m.input_type == 'eeg_csv' %}<i class="fas fa-wave-square"></i>
-            {% elif m.input_type == 'parquet' %}<i class="fas fa-file-csv"></i>
-            {% elif m.input_type == 'audio' %}<i class="fas fa-microphone"></i>
-            {% else %}<i class="fas fa-file"></i>{% endif %}
-            {{ m.get_input_type_display }}
-          </span>
-        </div>
-        <div class="model-name">{{ m.name }}</div>
-        <div class="model-desc">{{ m.description }}</div>
-        <div class="card-footer">
-          <span class="run-count">
-            <i class="fas fa-play-circle"></i> {{ m.run_count }} runs
-          </span>
-          <span class="run-btn">Run →</span>
-        </div>
-      </div>
-      {% empty %}
-      <div class="empty-state">
-        <div style="font-size:3rem;margin-bottom:.75rem">🤖</div>
-        <p style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:.5rem">No models yet</p>
-        <p style="font-size:.875rem">Data scientists are working on publishing models.</p>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- No results message -->
-    <div id="noResults" style="display:none;text-align:center;padding:3rem 1rem;color:var(--muted)">
-      <div style="font-size:2.5rem;margin-bottom:.75rem">🔍</div>
-      <p style="font-weight:600;color:var(--text);margin-bottom:.4rem">No models match your filters</p>
-      <p style="font-size:.85rem">Try a different category, input type, or search term.</p>
-      <button onclick="resetFilters()" class="btn"
-              style="margin-top:1rem;background:var(--primary);color:white;font-size:.85rem">
-        Clear filters
-      </button>
-    </div>
-
-    <div class="show-more-wrap" id="showMoreWrap" style="display:none">
-      <button class="show-more-btn" id="showMoreBtn" onclick="showMore()">
-        Show more models <span id="showMoreCount"></span>
-      </button>
-    </div>
-
+<div class="hub-hero">
+  <div class="hub-hero-inner">
+    <h1><i class="fas fa-brain" style="margin-right:.5rem;opacity:.9"></i>AI &amp; Analytics</h1>
+    <p>Your personal health intelligence hub — choose where to go</p>
   </div>
 </div>
 
-{% endblock %}
-{% block extra_js %}
-<script>
-const CARDS_PER_PAGE = 8;
+<div class="nav-grid">
 
-// Build card data from DOM on load
-const allCards   = Array.from(document.querySelectorAll('.model-card'));
-let   visible    = [];
-let   activeCat  = '';
-let   activeItype = '';
-let   showCount  = CARDS_PER_PAGE;
+  <!-- 1 · My Health -->
+  {% if user.is_authenticated %}
+  <a href="{% url 'ai_insights:health' %}" class="nav-card" style="--nc-accent:#6366f1">
+    <div class="nc-top">
+      <span class="nc-num">1</span>
+      <span class="nc-icon">🩺</span>
+      <div class="nc-title">My Health</div>
+    </div>
+    <div class="nc-desc">Your personal biomarker trends, latest lab values, health alerts, and AI risk score — all in one place.</div>
+    <div class="nc-tags">
+      <span class="nc-tag" style="background:#ede9fe;color:#6d28d9">Trend Analysis</span>
+      <span class="nc-tag" style="background:#dbeafe;color:#1d4ed8">Lab Values</span>
+      <span class="nc-tag" style="background:#fef3c7;color:#92400e">AI Alerts</span>
+    </div>
+    <div class="nc-footer"><span class="nc-cta">Open <i class="fas fa-arrow-right"></i></span></div>
+  </a>
+  {% else %}
+  <a href="{% url 'account_login' %}?next={% url 'ai_insights:health' %}" class="nav-card" style="--nc-accent:#6366f1">
+    <div class="nc-top">
+      <span class="nc-num">1</span>
+      <span class="nc-icon">🩺</span>
+      <div class="nc-title">My Health</div>
+    </div>
+    <div class="nc-desc">Your personal biomarker trends, latest lab values, health alerts, and AI risk score — all in one place.</div>
+    <div class="nc-tags">
+      <span class="nc-tag" style="background:#ede9fe;color:#6d28d9">Trend Analysis</span>
+      <span class="nc-tag" style="background:#dbeafe;color:#1d4ed8">Lab Values</span>
+      <span class="nc-tag" style="background:#fef3c7;color:#92400e">AI Alerts</span>
+    </div>
+    <div class="nc-footer"><span class="nc-cta"><i class="fas fa-lock" style="font-size:.75rem"></i> Sign in to access</span></div>
+  </a>
+  {% endif %}
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  buildCounts();
-  applyFilters();
-});
+  <!-- 2 · Population Insights -->
+  {% if user.is_authenticated %}
+  <a href="{% url 'ai_insights:population' %}" class="nav-card" style="--nc-accent:#0ea5e9">
+  {% else %}
+  <a href="{% url 'account_login' %}?next={% url 'ai_insights:population' %}" class="nav-card" style="--nc-accent:#0ea5e9">
+  {% endif %}
+    <div class="nc-top">
+      <span class="nc-num" style="background:#0ea5e9">2</span>
+      <span class="nc-icon">🌍</span>
+      <div class="nc-title">Population Insights</div>
+    </div>
+    <div class="nc-desc">Anonymised aggregate statistics across all users — query patterns, safety interventions, and knowledge base coverage.</div>
+    <div class="nc-tags">
+      <span class="nc-tag" style="background:#e0f2fe;color:#0369a1">Anonymised</span>
+      <span class="nc-tag" style="background:#d1fae5;color:#065f46">Usage Stats</span>
+      <span class="nc-tag" style="background:#f0fdf4;color:#16a34a">Safety</span>
+    </div>
+    <div class="nc-footer">
+      <span class="nc-cta">
+        {% if user.is_authenticated %}Open{% else %}<i class="fas fa-lock" style="font-size:.75rem"></i> Sign in{% endif %}
+        <i class="fas fa-arrow-right"></i>
+      </span>
+    </div>
+  </a>
 
-// ── Count badges ──────────────────────────────────────────────────────────────
-function buildCounts() {
-  const catMap   = {};
-  const itypeMap = {};
-  allCards.forEach(c => {
-    const cat   = c.dataset.cat;
-    const itype = c.dataset.itype;
-    catMap[cat]     = (catMap[cat]   || 0) + 1;
-    itypeMap[itype] = (itypeMap[itype] || 0) + 1;
-  });
-  // Category
-  document.querySelectorAll('[id^="count-cat-"]').forEach(el => {
-    const key = el.id.replace('count-cat-', '');
-    el.textContent = key === 'all' ? allCards.length : (catMap[key] || 0);
-  });
-  // Input type
-  document.querySelectorAll('[id^="count-itype-"]').forEach(el => {
-    const key = el.id.replace('count-itype-', '');
-    el.textContent = key === 'all' ? allCards.length : (itypeMap[key] || 0);
-  });
-}
+  <!-- 3 · AI Models -->
+  <a href="{% url 'ai_insights:models' %}" class="nav-card" style="--nc-accent:#10b981">
+    <div class="nc-top">
+      <span class="nc-num" style="background:#10b981">3</span>
+      <span class="nc-icon">🤖</span>
+      <div class="nc-title">AI Models</div>
+    </div>
+    <div class="nc-desc">Browse and run {{ total_models }} specialist AI models — from EEG seizure analysis to cardiovascular risk prediction.</div>
+    <div class="nc-tags">
+      <span class="nc-tag" style="background:#d1fae5;color:#065f46">{{ total_models }} models</span>
+      <span class="nc-tag" style="background:#fce7f3;color:#9d174d">EEG · Cardio · Diabetes</span>
+    </div>
+    <div class="nc-footer"><span class="nc-cta">Browse <i class="fas fa-arrow-right"></i></span></div>
+  </a>
 
-// ── Filter setters ─────────────────────────────────────────────────────────────
-function setCat(btn, val) {
-  activeCat = val;
-  document.querySelectorAll('[data-cat]').forEach(b => {
-    if (b.classList.contains('filter-chip')) b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  showCount = CARDS_PER_PAGE;
-  applyFilters();
-}
-
-function setItype(btn, val) {
-  activeItype = val;
-  document.querySelectorAll('[data-itype]').forEach(b => {
-    if (b.classList.contains('filter-chip')) b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  showCount = CARDS_PER_PAGE;
-  applyFilters();
-}
-
-function resetFilters() {
-  activeCat   = '';
-  activeItype = '';
-  document.getElementById('sidebarSearch').value = '';
-  document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('[data-cat=""]').forEach(b => b.classList.add('active'));
-  document.querySelectorAll('[data-itype=""]').forEach(b => b.classList.add('active'));
-  showCount = CARDS_PER_PAGE;
-  applyFilters();
-}
-
-// ── Core filter + sort ─────────────────────────────────────────────────────────
-function applyFilters() {
-  const q     = (document.getElementById('sidebarSearch').value || '').toLowerCase().trim();
-  const sort  = document.getElementById('sortSelect').value;
-
-  visible = allCards.filter(c => {
-    if (activeCat   && c.dataset.cat   !== activeCat)   return false;
-    if (activeItype && c.dataset.itype !== activeItype) return false;
-    if (q && !c.dataset.name.includes(q) && !c.dataset.desc.includes(q)) return false;
-    return true;
-  });
-
-  // Sort
-  visible.sort((a, b) => {
-    if (sort === 'runs')   return parseInt(b.dataset.runs) - parseInt(a.dataset.runs);
-    if (sort === 'name')   return a.dataset.name.localeCompare(b.dataset.name);
-    if (sort === 'newest') return parseInt(b.dataset.date) - parseInt(a.dataset.date);
-    return 0;
-  });
-
-  renderGrid();
-}
-
-// ── Render ─────────────────────────────────────────────────────────────────────
-function renderGrid() {
-  const grid = document.getElementById('modelGrid');
-
-  // Hide all first
-  allCards.forEach(c => c.style.display = 'none');
-
-  // Show sliced visible set
-  const toShow = visible.slice(0, showCount);
-  toShow.forEach(c => {
-    c.style.display = 'flex';
-    grid.appendChild(c);   // re-order in DOM for sort
-  });
-
-  // Results count
-  document.getElementById('resultsCount').textContent =
-    visible.length === allCards.length
-      ? `${allCards.length} models`
-      : `${visible.length} of ${allCards.length} models`;
-
-  // Showing stat
-  document.getElementById('statsShowing').textContent = Math.min(showCount, visible.length);
-
-  // No results
-  document.getElementById('noResults').style.display = visible.length === 0 ? 'block' : 'none';
-
-  // Show More button
-  const remaining = visible.length - showCount;
-  const wrap      = document.getElementById('showMoreWrap');
-  if (remaining > 0) {
-    wrap.style.display = 'block';
-    document.getElementById('showMoreCount').textContent = `(${remaining} remaining)`;
-  } else {
-    wrap.style.display = 'none';
-  }
-}
-
-function showMore() {
-  showCount += CARDS_PER_PAGE;
-  renderGrid();
-}
-</script>
+</div>
 {% endblock %}
