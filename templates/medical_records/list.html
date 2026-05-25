@@ -28,17 +28,18 @@
   padding: 0 .25rem;
 }
 .upload-card {
-  border-radius: 16px;
-  padding: 1.1rem 1rem .95rem;
+  border-radius: 12px;
+  padding: .6rem .75rem;
   display: flex;
-  flex-direction: column;
-  gap: .5rem;
+  flex-direction: row;
+  align-items: center;
+  gap: .65rem;
   border: 1.5px solid transparent;
   transition: transform .18s, box-shadow .18s;
 }
 .upload-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 22px rgba(0,0,0,.1);
+  box-shadow: 0 4px 14px rgba(0,0,0,.09);
 }
 .upload-card.kanta { background: linear-gradient(135deg,#e0f2fe,#f0f7ff); border-color: #bae6fd; }
 .upload-card.wear  { background: linear-gradient(135deg,#ede9fe,#f5f3ff); border-color: #c4b5fd; }
@@ -46,27 +47,26 @@
 .upload-card.txt   { background: linear-gradient(135deg,#fff7ed,#fef9c3); border-color: #fde68a; }
 
 .uc-icon {
-  width: 44px; height: 44px;
-  border-radius: 12px;
+  width: 34px; height: 34px;
+  border-radius: 9px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; color: white;
+  font-size: 1rem; color: white;
 }
 .kanta .uc-icon { background: #0ea5e9; }
 .wear  .uc-icon { background: #7c3aed; }
 .pdf   .uc-icon { background: #10b981; }
 .txt   .uc-icon { background: #f59e0b; }
 
-.uc-title { font-size: .92rem; font-weight: 800; color: var(--text); }
-.uc-desc  { font-size: .76rem; color: #64748b; line-height: 1.45; }
+.uc-info { flex: 1; min-width: 0; }
+.uc-title { font-size: .83rem; font-weight: 800; color: var(--text); }
+.uc-desc  { font-size: .68rem; color: #64748b; line-height: 1.35; margin-top: .1rem; }
 
 .uc-btn {
-  display: inline-flex; align-items: center; gap: .35rem;
-  padding: .36rem .8rem;
-  border-radius: 8px;
-  font-size: .78rem; font-weight: 700;
-  text-decoration: none;
-  width: fit-content;
-  margin-top: .15rem;
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .28rem .65rem;
+  border-radius: 7px;
+  font-size: .73rem; font-weight: 700;
+  text-decoration: none; flex-shrink: 0;
   transition: opacity .15s;
   color: white;
 }
@@ -193,42 +193,86 @@
 }
 .clear-link:hover { background: #ffe4e6; }
 
-/* ── Record 2-column grid ────────────────────────────────────────────────── */
-.record-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: .85rem;
+/* ── Compact record list ─────────────────────────────────────────────────── */
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
 }
-@media (max-width: 860px) { .record-grid { grid-template-columns: 1fr; } }
 
-.rec-card {
-  background: white; border-radius: 14px; border: 1px solid var(--border);
-  padding: 1.1rem 1.15rem; display: flex; align-items: flex-start; gap: .85rem;
-  transition: all .2s; cursor: pointer;
+.rec-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .65rem 1rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .15s;
 }
-.rec-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: #cbd5e1; }
-.rec-card.flagged { border-left: 4px solid #f59e0b; }
-.rec-icon {
-  width: 42px; height: 42px; border-radius: 11px;
+.rec-row:last-child { border-bottom: none; }
+.rec-row:hover { background: #f8fafc; }
+.rec-row.flagged { border-left: 3px solid #f59e0b; }
+
+.rec-icon-sm {
+  width: 34px; height: 34px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.15rem; flex-shrink: 0;
+  font-size: 1rem; flex-shrink: 0;
 }
-.rec-body { flex: 1; min-width: 0; }
+
+.rec-info { flex: 1; min-width: 0; }
 .rec-title {
-  font-size: .92rem; font-weight: 700; color: var(--text);
-  margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .87rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: .15rem;
 }
-.rec-meta {
-  font-size: .77rem; color: var(--muted);
-  display: flex; gap: .55rem; flex-wrap: wrap; margin-top: .2rem;
+.rec-meta-row {
+  display: flex; gap: .5rem; flex-wrap: wrap;
+  font-size: .72rem; color: var(--muted);
 }
-.rec-actions { display: flex; gap: .45rem; margin-top: .65rem; }
+.rec-badge {
+  display: inline-flex; align-items: center;
+  padding: .1rem .45rem; border-radius: 4px;
+  font-size: .7rem; font-weight: 600; white-space: nowrap;
+  background: #f1f5f9; color: #64748b;
+}
+.rec-badge.warn { background: #fef3c7; color: #92400e; }
+
+.rec-row-actions { display: flex; gap: .35rem; flex-shrink: 0; }
+.row-btn {
+  padding: .22rem .6rem; border-radius: 6px; font-size: .73rem; font-weight: 700;
+  text-decoration: none; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: .25rem;
+  transition: opacity .15s;
+}
+.row-btn:hover { opacity: .82; }
+.row-btn.view   { background: #eff6ff; color: #2563eb; }
+.row-btn.delete { background: #fee2e2; color: #dc2626; }
 
 .empty-state {
   text-align: center; padding: 3rem 1rem; color: var(--muted);
-  grid-column: 1 / -1;
 }
 .empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
+
+/* ── Pagination ──────────────────────────────────────────────────────────── */
+.pagination-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 1rem; padding: .5rem .25rem;
+  font-size: .82rem; color: var(--muted);
+}
+.pg-info { font-size: .8rem; }
+.pg-controls { display: flex; gap: .35rem; }
+.pg-btn {
+  padding: .3rem .7rem; border-radius: 7px; border: 1.5px solid var(--border);
+  background: white; color: var(--text); font-size: .8rem; font-weight: 600;
+  text-decoration: none; display: inline-flex; align-items: center; gap: .25rem;
+  transition: all .15s; cursor: pointer;
+}
+.pg-btn:hover:not(.disabled) { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+.pg-btn.current { background: #6366f1; color: white; border-color: #6366f1; }
+.pg-btn.disabled { opacity: .4; pointer-events: none; }
 
 /* ── Responsive stack ────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -240,7 +284,6 @@
   .upload-sidebar  { gap: .5rem; }
   .upload-card     { min-width: 100%; flex: unset; }
   .sidebar-heading { font-size: .8rem; }
-  .record-grid     { grid-template-columns: 1fr; }
 }
 </style>
 {% endblock %}
@@ -254,37 +297,45 @@
 
     <div class="upload-card kanta">
       <div class="uc-icon"><i class="fas fa-file-code"></i></div>
-      <div class="uc-title">Kanta XML</div>
-      <div class="uc-desc">Import your Finnish health records directly from the Kanta patient data repository. Supports lab results, prescriptions, and diagnoses.</div>
+      <div class="uc-info">
+        <div class="uc-title">Kanta XML</div>
+        <div class="uc-desc">Import Finnish health records — labs, prescriptions &amp; diagnoses.</div>
+      </div>
       <a href="{% url 'medical_records:upload_kanta' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload Kanta
-      </a>
-    </div>
-
-    <div class="upload-card wear">
-      <div class="uc-icon"><i class="fas fa-watch"></i></div>
-      <div class="uc-title">Wearable CSV</div>
-      <div class="uc-desc">Sync health data from Apple Watch, Fitbit, Garmin, or any device that exports CSV — steps, heart rate, sleep, SpO₂ and more.</div>
-      <a href="{% url 'medical_records:upload_wearable' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload CSV
-      </a>
-    </div>
-
-    <div class="upload-card pdf">
-      <div class="uc-icon"><i class="fas fa-file-pdf"></i></div>
-      <div class="uc-title">PDF / Document</div>
-      <div class="uc-desc">Upload lab reports, discharge summaries, prescriptions, or any medical PDF. AI extracts structured data automatically.</div>
-      <a href="{% url 'medical_records:upload_pdf' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload PDF
+        <i class="fas fa-upload"></i> Upload
       </a>
     </div>
 
     <div class="upload-card txt">
       <div class="uc-icon"><i class="fas fa-paste"></i></div>
-      <div class="uc-title">Paste Text</div>
-      <div class="uc-desc">Copy-paste lab results, doctor notes, prescriptions or any medical text. AI auto-parses and stores structured data.</div>
+      <div class="uc-info">
+        <div class="uc-title">Paste Text</div>
+        <div class="uc-desc">Paste any lab result or note — AI parses it automatically.</div>
+      </div>
       <a href="{% url 'medical_records:upload_text' %}" class="uc-btn">
-        <i class="fas fa-magic"></i> Paste & Parse
+        <i class="fas fa-magic"></i> Paste
+      </a>
+    </div>
+
+    <div class="upload-card pdf">
+      <div class="uc-icon"><i class="fas fa-file-pdf"></i></div>
+      <div class="uc-info">
+        <div class="uc-title">PDF / Document</div>
+        <div class="uc-desc">Upload lab reports, prescriptions or discharge summaries.</div>
+      </div>
+      <a href="{% url 'medical_records:upload_pdf' %}" class="uc-btn">
+        <i class="fas fa-upload"></i> Upload
+      </a>
+    </div>
+
+    <div class="upload-card wear">
+      <div class="uc-icon"><i class="fas fa-watch"></i></div>
+      <div class="uc-info">
+        <div class="uc-title">Wearable CSV</div>
+        <div class="uc-desc">Sync Apple Watch, Fitbit or Garmin — steps, HR, sleep &amp; more.</div>
+      </div>
+      <a href="{% url 'medical_records:upload_wearable' %}" class="uc-btn">
+        <i class="fas fa-upload"></i> Upload
       </a>
     </div>
 
@@ -386,14 +437,14 @@
       {% endif %}
     </div>
 
-    <!-- Record cards -->
+    <!-- Record list -->
     {% if records %}
-    <div class="record-grid">
+    <div class="record-list">
       {% for rec in records %}
       {% with rtype=rec.record_type %}
-      <div class="rec-card {% if rec.is_flagged %}flagged{% endif %}"
+      <div class="rec-row {% if rec.is_flagged %}flagged{% endif %}"
            onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
-        <div class="rec-icon"
+        <div class="rec-icon-sm"
              style="background:{% if rtype == 'lab_result' %}#dbeafe{% elif rtype == 'prescription' %}#dcfce7{% elif rtype == 'diagnosis' %}#fce7f3{% elif rtype == 'vaccination' %}#fef9c3{% elif rtype == 'imaging' %}#ede9fe{% elif rtype == 'wearable' %}#ecfdf5{% elif rtype == 'discharge' %}#fff7ed{% else %}#f1f5f9{% endif %}">
           {% if rtype == 'lab_result' %}🧪
           {% elif rtype == 'prescription' %}💊
@@ -404,42 +455,76 @@
           {% elif rtype == 'discharge' %}📄
           {% else %}📁{% endif %}
         </div>
-        <div class="rec-body">
+        <div class="rec-info">
           <div class="rec-title">{{ rec.title }}</div>
-          <div class="rec-meta">
-            <span>{{ rec.get_record_type_display }}</span>
-            <span>{{ rec.get_source_display }}</span>
+          <div class="rec-meta-row">
+            <span class="rec-badge">{{ rec.get_record_type_display }}</span>
+            <span class="rec-badge">{{ rec.get_source_display }}</span>
             {% if rec.record_date %}<span>{{ rec.record_date|date:"M d, Y" }}</span>{% endif %}
             <span>Uploaded {{ rec.uploaded_at|date:"M d, Y" }}</span>
-            {% if rec.is_flagged %}<span style="color:#f59e0b;font-weight:700">⚠️ Abnormal</span>{% endif %}
+            {% if rec.is_flagged %}<span class="rec-badge warn">⚠️ Abnormal</span>{% endif %}
           </div>
-          <div class="rec-actions" onclick="event.stopPropagation()">
-            <a href="{% url 'medical_records:detail' rec.pk %}" class="btn" style="font-size:.78rem;padding:.28rem .7rem">View</a>
-            <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline">
-              {% csrf_token %}
-              <button type="button" class="btn" style="font-size:.78rem;padding:.28rem .7rem;background:#fee2e2;color:#dc2626;border:none;cursor:pointer"
-                onclick="openDeleteModal('Delete &ldquo;{{ rec.title|escapejs }}&rdquo; permanently?', () => document.getElementById('del-rec-{{ rec.pk }}').submit(), 'Delete Record')">Delete</button>
-            </form>
-          </div>
+        </div>
+        <div class="rec-row-actions" onclick="event.stopPropagation()">
+          <a href="{% url 'medical_records:detail' rec.pk %}" class="row-btn view">View</a>
+          <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="button" class="row-btn delete"
+              onclick="openDeleteModal('Delete &ldquo;{{ rec.title|escapejs }}&rdquo; permanently?', () => document.getElementById('del-rec-{{ rec.pk }}').submit(), 'Delete Record')">Delete</button>
+          </form>
         </div>
       </div>
       {% endwith %}
       {% endfor %}
     </div>
 
-    {% else %}
-    <div class="record-grid">
-      <div class="empty-state">
-        <div class="icon">📁</div>
-        <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records found</p>
-        <p style="font-size:.875rem">
-          {% if active_type or active_period or active_q %}
-            Try adjusting your filters, or <a href="{% url 'medical_records:list' %}">clear them</a>.
-          {% else %}
-            Upload your first record using one of the sources on the left.
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="pagination-bar">
+      <span class="pg-info">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        &nbsp;·&nbsp; {{ page_obj.paginator.count }} records total
+      </span>
+      <div class="pg-controls">
+        {% if page_obj.has_previous %}
+        <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
+          <i class="fas fa-chevron-left" style="font-size:.65rem"></i> Prev
+        </a>
+        {% else %}
+        <span class="pg-btn disabled"><i class="fas fa-chevron-left" style="font-size:.65rem"></i> Prev</span>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+          {% if num == page_obj.number %}
+          <span class="pg-btn current">{{ num }}</span>
+          {% elif num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+          <a class="pg-btn" href="?page={{ num }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">{{ num }}</a>
+          {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
+          <span class="pg-btn disabled" style="border:none;padding:.3rem .2rem">…</span>
           {% endif %}
-        </p>
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a class="pg-btn" href="?page={{ page_obj.next_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
+          Next <i class="fas fa-chevron-right" style="font-size:.65rem"></i>
+        </a>
+        {% else %}
+        <span class="pg-btn disabled">Next <i class="fas fa-chevron-right" style="font-size:.65rem"></i></span>
+        {% endif %}
       </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">📁</div>
+      <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records found</p>
+      <p style="font-size:.875rem">
+        {% if active_type or active_period or active_q %}
+          Try adjusting your filters, or <a href="{% url 'medical_records:list' %}">clear them</a>.
+        {% else %}
+          Upload your first record using one of the sources on the left.
+        {% endif %}
+      </p>
     </div>
     {% endif %}
 

@@ -50,6 +50,11 @@ _TEMPORAL_KEYWORDS = [
     'should i be worried', 'is this serious', 'is this concerning',
 ]
 
+_CHART_KEYWORDS = [
+    'diagram', 'chart', 'graph', 'plot', 'visuali', 'visualise',
+    'show me a', 'show my', 'draw', 'display my data', 'show a',
+]
+
 
 # ── Biomarker canonical name → synonym list ────────────────────────────────────
 # Keys are canonical snake_case names; values are text substrings to search for.
@@ -112,6 +117,11 @@ class TrajectoryService:
         """Return True when the query asks about change/trend over time."""
         q = query.lower()
         return any(kw in q for kw in _TEMPORAL_KEYWORDS)
+
+    def is_chart_request(self, query: str) -> bool:
+        """Return True when the query explicitly asks for a chart/diagram/graph."""
+        q = query.lower()
+        return any(kw in q for kw in _CHART_KEYWORDS)
 
     def detect_biomarker(self, query: str) -> Optional[str]:
         """
@@ -446,8 +456,18 @@ class TrajectoryService:
           }
         """
         biomarker = self.detect_biomarker(query)
+
         if not biomarker:
-            return None
+            # No specific biomarker named — pick the one with the most numeric readings
+            best, best_count = None, 0
+            for canonical, aliases in _BIOMARKERS.items():
+                pts, _ = self._load_trajectory(patient, aliases)
+                numeric_count = sum(1 for p in pts if p['value'] is not None)
+                if numeric_count > best_count:
+                    best, best_count = canonical, numeric_count
+            if not best:
+                return None
+            biomarker = best
 
         aliases = _BIOMARKERS[biomarker]
         trajectory_points, _ = self._load_trajectory(patient, aliases)

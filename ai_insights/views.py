@@ -32,9 +32,15 @@ def _build_pop_biomarker_data(biomarker_names=None):
     """
     Returns (pop_trending, pop_latest, pop_avg, pop_unit) computed
     from all patients' ParsedLabValue rows.
+
+    Groups by (parameter_name, unit) to avoid mixing incompatible units
+    (e.g. µmol/L vs mg/dL for Creatinine). For each biomarker name the
+    unit group with the most data points wins.
+
     pop_trending : {name: [{date, value, count, unit}, ...]}  monthly averages
     pop_latest   : {name: {value, unit, count}}               latest month avg
     pop_avg      : {name: float}                              overall avg (>=3 pts)
+    pop_unit     : {name: str}                                canonical unit
     """
     from medical_records.models import ParsedLabValue
 
@@ -45,8 +51,8 @@ def _build_pop_biomarker_data(biomarker_names=None):
     if biomarker_names:
         qs = qs.filter(parameter_name__in=biomarker_names)
 
-    pop_monthly = defaultdict(lambda: defaultdict(list))
-    pop_unit    = {}
+    # key: (name, unit) → {month_key: [values]}
+    per_unit_monthly = defaultdict(lambda: defaultdict(list))
 
     for lv in qs:
         try:
@@ -55,25 +61,31 @@ def _build_pop_biomarker_data(biomarker_names=None):
             continue
         date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
         month_key = date_val.strftime('%Y-%m')
-        name      = lv['parameter_name']
-        pop_monthly[name][month_key].append(numeric)
-        if name not in pop_unit and lv.get('unit'):
-            pop_unit[name] = lv['unit']
+        key       = (lv['parameter_name'], lv.get('unit') or '')
+        per_unit_monthly[key][month_key].append(numeric)
 
-    pop_trending, pop_latest, pop_avg = {}, {}, {}
-    for name, months in pop_monthly.items():
-        all_vals = [v for vs in months.values() for v in vs]
-        sorted_months = sorted(months.keys())
+    # For each biomarker name pick the unit group with the most total data points
+    by_name = defaultdict(list)
+    for (name, unit), months in per_unit_monthly.items():
+        total = sum(len(vs) for vs in months.values())
+        by_name[name].append((unit, total, months))
+
+    pop_trending, pop_latest, pop_avg, pop_unit = {}, {}, {}, {}
+    for name, groups in by_name.items():
+        best_unit, _, best_months = max(groups, key=lambda x: x[1])
+        all_vals      = [v for vs in best_months.values() for v in vs]
+        sorted_months = sorted(best_months.keys())
         series = [
-            {'date': m, 'value': round(sum(months[m])/len(months[m]), 2),
-             'count': len(months[m]), 'unit': pop_unit.get(name, '')}
-            for m in sorted_months if months[m]
+            {'date': m, 'value': round(sum(best_months[m]) / len(best_months[m]), 2),
+             'count': len(best_months[m]), 'unit': best_unit}
+            for m in sorted_months if best_months[m]
         ]
+        pop_unit[name] = best_unit
         if len(series) >= 2:
             pop_trending[name] = series
         if series:
             last = series[-1]
-            pop_latest[name] = {'value': last['value'], 'unit': pop_unit.get(name, ''), 'count': last['count']}
+            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count']}
         if len(all_vals) >= 3:
             pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
 
@@ -111,10 +123,19 @@ def health_view(request):
     trending_biomarkers = {k: v for k, v in biomarker_map.items() if len(v) >= 2}
     latest_values       = {name: pts[-1] for name, pts in biomarker_map.items()}
 
-    # Population average per biomarker (for chart overlay on personal page)
-    _, _, pop_avg, _ = _build_pop_biomarker_data(
+    # Population trend + average — only shown when units match personal data
+    pop_trending_raw, _, pop_avg_raw, pop_unit = _build_pop_biomarker_data(
         biomarker_names=list(biomarker_map.keys()) or None
     )
+    user_unit = {name: pts[-1]['unit'] for name, pts in biomarker_map.items() if pts}
+    pop_avg = {
+        name: val for name, val in pop_avg_raw.items()
+        if pop_unit.get(name, '') == user_unit.get(name, '')
+    }
+    pop_trending_personal = {
+        name: series for name, series in pop_trending_raw.items()
+        if pop_unit.get(name, '') == user_unit.get(name, '')
+    }
 
     records_by_type = list(
         MedicalRecord.objects.filter(patient=patient)
@@ -153,8 +174,9 @@ def health_view(request):
     )
 
     return render(request, 'ai_insights/health.html', {
-        'trending_json':       json.dumps(trending_biomarkers),
-        'pop_avg_json':        json.dumps(pop_avg),
+        'trending_json':          json.dumps(trending_biomarkers),
+        'pop_avg_json':           json.dumps(pop_avg),
+        'pop_trending_json':      json.dumps(pop_trending_personal),
         'latest_values':       latest_values,
         'records_type_json':   json.dumps(records_by_type),
         'upload_labels_json':  json.dumps(upload_labels),

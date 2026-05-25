@@ -67,8 +67,14 @@ def record_list(request):
     flagged_count  = MedicalRecord.objects.filter(patient=request.user, is_flagged=True).count()
     filtered_count = qs.count()
 
+    from django.core.paginator import Paginator
+    paginator   = Paginator(qs, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj    = paginator.get_page(page_number)
+
     return render(request, 'medical_records/list.html', {
-        'records':        qs,
+        'records':        page_obj,
+        'page_obj':       page_obj,
         'record_types':   MedicalRecord.RecordType.choices,
         'active_type':    rtype,
         'active_period':  period,

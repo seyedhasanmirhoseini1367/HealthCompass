@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'stories',
     'notifications',
     'integrations',
+    'treatments',
 ]
 
 MIDDLEWARE = [
