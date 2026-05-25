@@ -1,0 +1,477 @@
+{% extends 'base.html' %}
+{% block title %}{{ course.name }} — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.detail-page { max-width: 960px; margin: 0 auto; display: flex; gap: 1.5rem; align-items: flex-start; }
+.detail-main { flex: 1; min-width: 0; }
+.detail-sidebar { width: 270px; flex-shrink: 0; }
+@media (max-width: 780px) {
+  .detail-page     { flex-direction: column; }
+  .detail-sidebar  { width: 100%; }
+}
+
+/* ── Course header card ──────────────────────────────────────────────────── */
+.course-header {
+  background: white; border: 1px solid var(--border); border-radius: 16px;
+  padding: 1.3rem 1.5rem; margin-bottom: 1.25rem;
+}
+.ch-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.ch-name { font-size: 1.25rem; font-weight: 800; color: var(--text); margin-bottom: .2rem; }
+.ch-condition { font-size: .88rem; color: var(--muted); margin-bottom: .6rem; }
+.ch-badges { display: flex; gap: .45rem; flex-wrap: wrap; }
+.ch-badge {
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .2rem .6rem; border-radius: 20px;
+  font-size: .72rem; font-weight: 700; background: #f1f5f9; color: #64748b;
+}
+.ch-badge.active    { background: #dcfce7; color: #15803d; }
+.ch-badge.paused    { background: #fef9c3; color: #854d0e; }
+.ch-badge.completed { background: #e0f2fe; color: #0369a1; }
+.ch-badge.cancelled { background: #fee2e2; color: #b91c1c; }
+
+/* Progress */
+.ch-progress { margin-top: .9rem; }
+.ch-prog-labels { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-bottom: .28rem; }
+.prog-track { height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 4px; background: #6366f1; transition: width .4s; }
+.prog-fill.done    { background: #10b981; }
+.prog-fill.overdue { background: #ef4444; }
+
+/* Status controls */
+.status-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.s-btn {
+  padding: .28rem .7rem; border-radius: 7px; font-size: .74rem; font-weight: 700;
+  border: 1.5px solid var(--border); background: white; color: var(--text);
+  cursor: pointer; transition: all .15s;
+}
+.s-btn:hover { border-color: #6366f1; color: #6366f1; }
+.s-btn.danger { border-color: #fecaca; color: #dc2626; background: #fff1f2; }
+.s-btn.danger:hover { background: #fee2e2; }
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+.timeline-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .85rem; flex-wrap: wrap; gap: .5rem;
+}
+.timeline-title { font-size: .95rem; font-weight: 800; color: var(--text); }
+.add-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .35rem .9rem; border-radius: 8px;
+  background: #6366f1; color: white; font-size: .78rem; font-weight: 700;
+  border: none; cursor: pointer; text-decoration: none; transition: opacity .15s;
+}
+.add-btn:hover { opacity: .87; }
+
+.timeline { position: relative; padding-left: 1.6rem; }
+.timeline::before {
+  content: ''; position: absolute; left: .55rem; top: 0; bottom: 0;
+  width: 2px; background: var(--border); border-radius: 1px;
+}
+.tl-item { position: relative; margin-bottom: 1.15rem; }
+.tl-dot {
+  position: absolute; left: -1.6rem; top: .35rem;
+  width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;
+  box-shadow: 0 0 0 2px var(--border);
+}
+.tl-dot.visit      { background: #6366f1; box-shadow: 0 0 0 2px #6366f1; }
+.tl-dot.lab_test   { background: #0ea5e9; box-shadow: 0 0 0 2px #0ea5e9; }
+.tl-dot.med_change { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+.tl-dot.symptom    { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
+.tl-dot.other      { background: #94a3b8; box-shadow: 0 0 0 2px #94a3b8; }
+
+.tl-card {
+  background: white; border: 1px solid var(--border); border-radius: 12px;
+  padding: .85rem 1rem;
+}
+.tl-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.tl-title { font-size: .88rem; font-weight: 700; color: var(--text); }
+.tl-date  { font-size: .72rem; color: var(--muted); flex-shrink: 0; }
+.tl-meta  { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .35rem; }
+.tl-badge {
+  padding: .12rem .45rem; border-radius: 4px; font-size: .68rem; font-weight: 700;
+  background: #f1f5f9; color: #64748b;
+}
+.tl-badge.improved { background: #dcfce7; color: #15803d; }
+.tl-badge.worsened { background: #fee2e2; color: #dc2626; }
+.tl-badge.pending  { background: #fef9c3; color: #854d0e; }
+.tl-note { font-size: .8rem; color: var(--muted); margin-top: .4rem; line-height: 1.5; }
+.tl-record-link {
+  font-size: .73rem; color: #6366f1; text-decoration: none; font-weight: 600;
+  display: inline-flex; align-items: center; gap: .25rem; margin-top: .3rem;
+}
+.tl-del-btn {
+  padding: .18rem .45rem; border-radius: 5px; font-size: .7rem; font-weight: 700;
+  border: 1px solid #fecaca; background: #fff1f2; color: #dc2626; cursor: pointer;
+  transition: background .12s; flex-shrink: 0;
+}
+.tl-del-btn:hover { background: #fee2e2; }
+
+.empty-timeline {
+  text-align: center; padding: 2.5rem 1rem; color: var(--muted);
+  background: white; border: 1px dashed var(--border); border-radius: 12px;
+}
+
+/* ── Add milestone modal / inline form ──────────────────────────────────── */
+.add-milestone-form {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 13px;
+  padding: 1.1rem 1.2rem; margin-bottom: 1.25rem; display: none;
+}
+.add-milestone-form.open { display: block; }
+.amf-title { font-size: .82rem; font-weight: 800; color: var(--text); margin-bottom: .85rem; }
+.amf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 540px) { .amf-grid { grid-template-columns: 1fr; } }
+.amf-grid .full { grid-column: 1 / -1; }
+.amf-label { font-size: .75rem; font-weight: 700; color: var(--text); margin-bottom: .25rem; display: block; }
+.amf-input {
+  width: 100%; padding: .45rem .75rem; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: .82rem; outline: none; background: white; box-sizing: border-box;
+}
+.amf-input:focus { border-color: #6366f1; }
+.amf-actions { display: flex; gap: .55rem; margin-top: .85rem; }
+.amf-submit { padding: .38rem .95rem; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.amf-cancel { padding: .38rem .8rem; border-radius: 8px; border: 1.5px solid var(--border); background: white; color: var(--text); font-size: .8rem; font-weight: 600; cursor: pointer; }
+
+/* ── Sidebar cards ───────────────────────────────────────────────────────── */
+.sidebar-card {
+  background: white; border: 1px solid var(--border); border-radius: 14px;
+  padding: 1rem 1.1rem; margin-bottom: 1rem;
+}
+.sc-title {
+  font-size: .72rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); margin-bottom: .75rem;
+}
+
+/* Monitor rows */
+.mon-row {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .5rem 0; border-bottom: 1px solid var(--border);
+}
+.mon-row:last-of-type { border-bottom: none; }
+.mon-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #10b981; }
+.mon-dot.due      { background: #ef4444; }
+.mon-dot.due-soon { background: #f59e0b; }
+.mon-info { flex: 1; min-width: 0; }
+.mon-name { font-size: .82rem; font-weight: 700; color: var(--text); }
+.mon-due  { font-size: .7rem; color: var(--muted); }
+.mon-actions { display: flex; gap: .3rem; flex-shrink: 0; }
+.mon-btn {
+  padding: .18rem .45rem; border-radius: 5px; font-size: .68rem; font-weight: 700;
+  border: 1px solid var(--border); background: white; color: var(--text); cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: .2rem;
+  transition: all .12s;
+}
+.mon-btn.check { border-color: #bbf7d0; color: #15803d; background: #f0fdf4; }
+.mon-btn.check:hover { background: #dcfce7; }
+.mon-btn.del   { border-color: #fecaca; color: #dc2626; background: #fff1f2; }
+.mon-btn.del:hover { background: #fee2e2; }
+
+/* Add monitor form */
+.add-mon-form { margin-top: .8rem; display: none; }
+.add-mon-form.open { display: block; }
+.amf2-row { display: grid; grid-template-columns: 1fr 80px; gap: .5rem; margin-bottom: .5rem; }
+.amf2-input {
+  width: 100%; padding: .4rem .65rem; border: 1.5px solid var(--border);
+  border-radius: 7px; font-size: .78rem; outline: none; background: #f8fafc; box-sizing: border-box;
+}
+.amf2-input:focus { border-color: #6366f1; background: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-page">
+
+  <!-- ════════ MAIN ════════ -->
+  <div class="detail-main">
+
+    <!-- Back link -->
+    <div style="margin-bottom:.85rem">
+      <a href="{% url 'treatments:list' %}" style="font-size:.82rem;color:var(--muted);text-decoration:none">
+        ← My Treatments
+      </a>
+    </div>
+
+    <!-- Course header -->
+    <div class="course-header">
+      <div class="ch-top">
+        <div>
+          <div class="ch-name">{{ course.name }}</div>
+          <div class="ch-condition">
+            {{ course.condition }}
+            {% if course.doctor_name %} · <strong>{{ course.doctor_name }}</strong>{% endif %}
+          </div>
+          <div class="ch-badges">
+            <span class="ch-badge {{ course.status }}">
+              {% if course.status == 'active' %}● Active
+              {% elif course.status == 'paused' %}⏸ Paused
+              {% elif course.status == 'completed' %}✓ Completed
+              {% else %}✕ Cancelled{% endif %}
+            </span>
+            <span class="ch-badge"><i class="fas fa-stethoscope" style="font-size:.62rem"></i> {{ course.get_specialty_display }}</span>
+            <span class="ch-badge"><i class="fas fa-calendar" style="font-size:.62rem"></i> {{ course.start_date|date:"M d, Y" }}</span>
+            {% if course.medications %}
+            <span class="ch-badge"><i class="fas fa-pills" style="font-size:.62rem"></i> {{ course.medications|truncatechars:40 }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Status actions -->
+        <div class="status-btns">
+          {% if course.status == 'active' %}
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="status" value="paused">
+            <button type="submit" class="s-btn">⏸ Pause</button>
+          </form>
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="status" value="completed">
+            <button type="submit" class="s-btn">✓ Complete</button>
+          </form>
+          {% elif course.status == 'paused' %}
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="status" value="active">
+            <button type="submit" class="s-btn">▶ Resume</button>
+          </form>
+          {% elif course.status == 'completed' %}
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="status" value="active">
+            <button type="submit" class="s-btn">↩ Reopen</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{% url 'treatments:delete' course.pk %}" style="display:inline"
+            onsubmit="return confirm('Delete this course and all its milestones?')">
+            {% csrf_token %}
+            <button type="submit" class="s-btn danger"><i class="fas fa-trash" style="font-size:.68rem"></i></button>
+          </form>
+        </div>
+      </div>
+
+      {% if course.progress_pct is not None %}
+      <div class="ch-progress">
+        <div class="ch-prog-labels">
+          <span>{{ course.days_elapsed }} day{{ course.days_elapsed|pluralize }} elapsed</span>
+          <span>
+            {% if course.is_overdue %}
+              <span style="color:#ef4444">⚠ Past expected end ({{ course.expected_end_date|date:"M d, Y" }})</span>
+            {% else %}
+              {{ course.progress_pct }}% — ends {{ course.expected_end_date|date:"M d, Y" }}
+            {% endif %}
+          </span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill {% if course.is_overdue %}overdue{% elif course.status == 'completed' %}done{% endif %}"
+               style="width:{{ course.progress_pct }}%"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if course.notes %}
+      <div style="margin-top:.85rem;font-size:.82rem;color:#475569;line-height:1.55;background:#f8fafc;border-radius:9px;padding:.65rem .85rem">
+        {{ course.notes }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Timeline header + toggle form -->
+    <div class="timeline-header">
+      <div class="timeline-title">📅 Timeline</div>
+      <button class="add-btn" onclick="toggleMilestoneForm()">
+        <i class="fas fa-plus"></i> Add milestone
+      </button>
+    </div>
+
+    <!-- Add milestone inline form -->
+    <div class="add-milestone-form" id="add-ms-form">
+      <div class="amf-title">New Milestone</div>
+      <form method="post" action="{% url 'treatments:add_milestone' course.pk %}">
+        {% csrf_token %}
+        <div class="amf-grid">
+          <div>
+            <label class="amf-label">Title <span style="color:#ef4444">*</span></label>
+            <input class="amf-input" type="text" name="title" placeholder="e.g. Month 1 blood test" required>
+          </div>
+          <div>
+            <label class="amf-label">Date</label>
+            <input class="amf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}">
+          </div>
+          <div>
+            <label class="amf-label">Type</label>
+            <select class="amf-input" name="milestone_type">
+              {% for val, lbl in milestone_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="amf-label">Outcome</label>
+            <select class="amf-input" name="outcome">
+              {% for val, lbl in outcome_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="full">
+            <label class="amf-label">Link to a record <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <select class="amf-input" name="linked_record">
+              <option value="">— none —</option>
+              {% for rec in user_records %}
+              <option value="{{ rec.pk }}">{{ rec.title }} ({{ rec.record_date|date:"M d, Y" }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="full">
+            <label class="amf-label">Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <textarea class="amf-input" name="note" rows="2" placeholder="What happened, how you felt, any doctor comments…"></textarea>
+          </div>
+        </div>
+        <div class="amf-actions">
+          <button type="submit" class="amf-submit"><i class="fas fa-check"></i> Save</button>
+          <button type="button" class="amf-cancel" onclick="toggleMilestoneForm()">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Timeline -->
+    {% if milestones %}
+    <div class="timeline">
+      {% for ms in milestones %}
+      <div class="tl-item">
+        <div class="tl-dot {{ ms.milestone_type }}"></div>
+        <div class="tl-card">
+          <div class="tl-top">
+            <div class="tl-title">{{ ms.title }}</div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+              <span class="tl-date">{{ ms.date|date:"M d, Y" }}</span>
+              <form method="post" action="{% url 'treatments:delete_milestone' course.pk ms.pk %}" style="display:inline"
+                    onsubmit="return confirm('Remove this milestone?')">
+                {% csrf_token %}
+                <button type="submit" class="tl-del-btn"><i class="fas fa-xmark"></i></button>
+              </form>
+            </div>
+          </div>
+          <div class="tl-meta">
+            <span class="tl-badge">{{ ms.get_milestone_type_display }}</span>
+            <span class="tl-badge {{ ms.outcome }}">{{ ms.get_outcome_display }}</span>
+          </div>
+          {% if ms.note %}
+          <div class="tl-note">{{ ms.note }}</div>
+          {% endif %}
+          {% if ms.linked_record %}
+          <a href="{% url 'medical_records:detail' ms.linked_record.pk %}" class="tl-record-link">
+            <i class="fas fa-file-medical" style="font-size:.65rem"></i> {{ ms.linked_record.title }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-timeline">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">📅</div>
+      <p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No milestones yet</p>
+      <p style="font-size:.82rem">Record your first visit, test, or observation above.</p>
+    </div>
+    {% endif %}
+
+  </div><!-- /detail-main -->
+
+  <!-- ════════ SIDEBAR ════════ -->
+  <aside class="detail-sidebar">
+
+    <!-- Biomarker monitors -->
+    <div class="sidebar-card">
+      <div class="sc-title"><i class="fas fa-flask"></i> Lab Checks</div>
+
+      {% for m in monitors %}
+      <div class="mon-row">
+        <span class="mon-dot {% if m.is_due %}due{% elif m.is_due_soon %}due-soon{% endif %}"></span>
+        <div class="mon-info">
+          <div class="mon-name">{{ m.biomarker_name }}</div>
+          <div class="mon-due">
+            Every {{ m.frequency_days }}d ·
+            {% if m.is_due %}
+              <span style="color:#ef4444;font-weight:700">Overdue</span>
+            {% elif m.is_due_soon %}
+              <span style="color:#f59e0b;font-weight:700">Due in {{ m.days_until_due }}d</span>
+            {% else %}
+              Next: {{ m.next_due|date:"M d" }}
+            {% endif %}
+          </div>
+          {% if m.note %}<div style="font-size:.67rem;color:var(--muted)">{{ m.note }}</div>{% endif %}
+        </div>
+        <div class="mon-actions">
+          <form method="post" action="{% url 'treatments:check_monitor' course.pk m.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="mon-btn check" title="Mark checked today">✓</button>
+          </form>
+          <form method="post" action="{% url 'treatments:delete_monitor' course.pk m.pk %}" style="display:inline"
+                onsubmit="return confirm('Remove this monitor?')">
+            {% csrf_token %}
+            <button type="submit" class="mon-btn del" title="Remove"><i class="fas fa-xmark" style="font-size:.65rem"></i></button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if not monitors %}
+      <p style="font-size:.78rem;color:var(--muted);text-align:center;padding:.5rem 0">No monitors yet.</p>
+      {% endif %}
+
+      <!-- Add monitor form -->
+      <div style="margin-top:.75rem">
+        <button class="add-btn" style="font-size:.74rem;padding:.3rem .75rem" onclick="toggleMonForm()">
+          <i class="fas fa-plus"></i> Add check
+        </button>
+        <div class="add-mon-form" id="add-mon-form">
+          <form method="post" action="{% url 'treatments:add_monitor' course.pk %}" style="margin-top:.65rem">
+            {% csrf_token %}
+            <div class="amf2-row">
+              <input class="amf2-input" type="text" name="biomarker_name" placeholder="e.g. ALT (Liver)" required>
+              <input class="amf2-input" type="number" name="frequency_days" placeholder="Days" min="1" required title="Frequency in days">
+            </div>
+            <input class="amf2-input" type="text" name="note" placeholder="Why (optional)" style="margin-bottom:.55rem">
+            <div style="display:flex;gap:.45rem">
+              <button type="submit" class="amf-submit" style="font-size:.75rem;padding:.32rem .8rem">Add</button>
+              <button type="button" class="amf-cancel" style="font-size:.75rem;padding:.32rem .7rem" onclick="toggleMonForm()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary widget -->
+    <div class="sidebar-card">
+      <div class="sc-title"><i class="fas fa-circle-info"></i> Summary</div>
+      <div style="font-size:.8rem;color:var(--text);display:flex;flex-direction:column;gap:.45rem">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Milestones</span>
+          <strong>{{ milestones.count }}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Days elapsed</span>
+          <strong>{{ course.days_elapsed }}</strong>
+        </div>
+        {% if course.expected_end_date %}
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Expected end</span>
+          <strong>{{ course.expected_end_date|date:"M d, Y" }}</strong>
+        </div>
+        {% endif %}
+        {% if course.medications %}
+        <div style="border-top:1px solid var(--border);padding-top:.4rem;margin-top:.15rem">
+          <span style="color:var(--muted);font-size:.72rem;display:block;margin-bottom:.2rem">Medications</span>
+          <span>{{ course.medications }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleMilestoneForm() {
+  document.getElementById('add-ms-form').classList.toggle('open');
+}
+function toggleMonForm() {
+  document.getElementById('add-mon-form').classList.toggle('open');
+}
+</script>
+{% endblock %}

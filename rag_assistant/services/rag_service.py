@@ -226,10 +226,13 @@ class RAGService:
             yield f'data: {json.dumps({"type": "sources", "sources": sources})}\n\n'
             yield f'data: {json.dumps({"type": "meta", "provider": provider, "chunks": len(chunks) + len(general_chunks), "mode": mode, "safety_routed": False, "triggered_rules": rules_fired})}\n\n'
 
-            # ── Inline chart for trajectory answers ───────────────────────────
-            if mode == 'trajectory':
+            # ── Inline chart: trajectory answers OR explicit chart requests ─────
+            _traj_svc_ref = locals().get('traj_svc') or TrajectoryService()
+            if mode == 'trajectory' or (
+                patient is not None and _traj_svc_ref.is_chart_request(query)
+            ):
                 try:
-                    chart_data = traj_svc.get_chart_data(patient, query)
+                    chart_data = _traj_svc_ref.get_chart_data(patient, query)
                     if chart_data:
                         yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
                 except Exception as _chart_err:

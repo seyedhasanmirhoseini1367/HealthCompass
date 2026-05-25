@@ -326,8 +326,9 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const TRENDING    = {{ trending_json|safe }};
-const POP_AVG     = {{ pop_avg_json|safe }};
+const TRENDING     = {{ trending_json|safe }};
+const POP_AVG      = {{ pop_avg_json|safe }};
+const POP_TRENDING = {{ pop_trending_json|safe }};
 const ALERTS_DATA = {{ alerts_summary_json|safe }};
 const REC_TYPES   = {{ records_type_json|safe }};
 const UPL_LABELS  = {{ upload_labels_json|safe }};
@@ -451,7 +452,25 @@ function selectBio(bio) {
   pill.className=`trend-pill tp-${dir}`;
   pill.textContent=`${arrow} ${(delta>=0?'+':'')+pct}% overall`;
 
-  // Population average stat (only if available)
+  // Match each personal data point to the nearest population monthly average
+  const popSeries = POP_TRENDING[bio] || null;
+  function nearestPopValue(dateStr, series) {
+    if (!series || !series.length) return null;
+    const month = dateStr.substring(0, 7);
+    const exact = series.find(p => p.date === month);
+    if (exact) return exact.value;
+    const t = new Date(dateStr).getTime();
+    let best = null, bestDist = Infinity;
+    for (const p of series) {
+      const dist = Math.abs(new Date(p.date + '-01').getTime() - t);
+      if (dist < bestDist) { bestDist = dist; best = p; }
+    }
+    return best ? best.value : null;
+  }
+  const popValues = popSeries ? pts.map(p => nearestPopValue(p.date, popSeries)) : null;
+  const hasPopTrend = popValues && popValues.some(v => v !== null);
+
+  // Pop avg stat (overall mean, for the stats row)
   const popAvg = POP_AVG[bio] != null ? POP_AVG[bio] : null;
   const popStat = popAvg != null
     ? `<div class="bio-stat"><div class="bsn" style="color:#94a3b8">${popAvg} <span style="font-size:.8rem;font-weight:400">${unit}</span></div><div class="bsl">Pop. avg</div></div>`
@@ -465,7 +484,7 @@ function selectBio(bio) {
     ${popStat}
     <div class="bio-stat"><div class="bsn" style="color:#8b5cf6">${pts.length}</div><div class="bsl">Readings</div></div>`;
 
-  // Build datasets — personal + optional population average line
+  // Build datasets — personal + optional population trend line
   const datasets = [{
     label: 'My values',
     data: values,
@@ -473,13 +492,15 @@ function selectBio(bio) {
     pointBackgroundColor: colors, pointBorderColor: colors,
     pointRadius: 5, pointHoverRadius: 7, tension: 0.35, fill: true,
   }];
-  if (popAvg != null) {
+  if (hasPopTrend) {
     datasets.push({
-      label: 'Population avg',
-      data: values.map(() => popAvg),
-      borderColor: '#94a3b8', borderDash: [6, 4], borderWidth: 2,
+      label: 'Population trend',
+      data: popValues,
+      borderColor: '#94a3b8', borderDash: [5, 4], borderWidth: 2,
       backgroundColor: 'transparent',
-      pointRadius: 0, pointHoverRadius: 4, tension: 0, fill: false,
+      pointRadius: 3, pointHoverRadius: 5,
+      pointBackgroundColor: '#94a3b8', pointBorderColor: '#94a3b8',
+      tension: 0.35, fill: false,
     });
   }
 
@@ -490,12 +511,12 @@ function selectBio(bio) {
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{
-        legend:{display: popAvg != null, labels:{font:{size:10},boxWidth:14,usePointStyle:true}},
+        legend:{display: hasPopTrend, labels:{font:{size:10},boxWidth:14,usePointStyle:true}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y} ${unit}`}}
       },
       scales:{
         x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40}},
-        y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},callback:v=>v+(unit?' '+unit:'')}}
+        y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},callback:v=>(+v.toFixed(2))+(unit?' '+unit:'')}}
       }
     }
   });

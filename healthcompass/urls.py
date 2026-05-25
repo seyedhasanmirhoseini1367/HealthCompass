@@ -26,6 +26,7 @@ urlpatterns = [
     path('stories/', include('stories.urls')),
     path('notifications/', include('notifications.urls')),
     path('integrations/', include('integrations.urls')),
+    path('treatments/', include('treatments.urls')),
     re_path(r'^media/(?P<path>.+)$', serve_media),
 ]
 if settings.DEBUG:
