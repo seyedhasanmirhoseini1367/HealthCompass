@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% block title %}Health Goals — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.goals-page { max-width:860px; margin:0 auto; }
+.goals-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; flex-wrap:wrap; gap:.65rem; }
+.goals-header h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0; }
+
+.goals-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:.9rem; }
+
+/* Goal card */
+.goal-card { background:white; border:1px solid var(--border); border-radius:14px; padding:1.1rem 1.1rem; }
+.gc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:.65rem; }
+.gc-icon { font-size:1.6rem; line-height:1; }
+.gc-badges { display:flex; flex-direction:column; align-items:flex-end; gap:.28rem; }
+.gc-badge { font-size:.65rem; font-weight:700; padding:.12rem .45rem; border-radius:4px; }
+.s-active   { background:#eff6ff; color:#1d4ed8; }
+.s-achieved { background:#f0fdf4; color:#15803d; }
+.s-paused   { background:#f8fafc; color:#64748b; }
+.s-abandoned{ background:#fef2f2; color:#b91c1c; }
+
+.gc-title { font-size:.92rem; font-weight:800; color:var(--text); margin-bottom:.12rem; }
+.gc-desc  { font-size:.75rem; color:var(--muted); margin-bottom:.65rem; }
+
+/* Progress bar */
+.prog-wrap { margin-bottom:.7rem; }
+.prog-bar  { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
+.prog-fill { height:100%; border-radius:4px; transition:width .4s ease; }
+.prog-labels { display:flex; justify-content:space-between; font-size:.68rem; color:var(--muted); margin-top:.22rem; }
+
+/* Value display */
+.gc-values { display:flex; gap:.65rem; margin-bottom:.75rem; flex-wrap:wrap; }
+.gc-val-box { background:#f8fafc; border-radius:8px; padding:.4rem .65rem; text-align:center; }
+.gc-val-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.gc-val-num { font-size:1.1rem; font-weight:800; color:var(--text); }
+
+/* Chart */
+.gc-chart-wrap { height:120px; position:relative; margin-bottom:.75rem; display:none; }
+.gc-chart-wrap.open { display:block; }
+
+/* Log form */
+.gc-log-form { background:#f8fafc; border-radius:9px; padding:.65rem .8rem; display:none; }
+.gc-log-form.open { display:block; }
+.lf-row { display:flex; gap:.5rem; align-items:flex-end; }
+.lf-input { flex:1; padding:.38rem .65rem; border:1.5px solid var(--border); border-radius:7px; font-size:.8rem; outline:none; background:white; }
+.lf-input:focus { border-color:#6366f1; }
+.lf-submit { padding:.38rem .8rem; border-radius:7px; border:none; background:#6366f1; color:white; font-size:.78rem; font-weight:700; cursor:pointer; flex-shrink:0; }
+
+/* Goal actions */
+.gc-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
+.btn-xs { padding:.2rem .55rem; border-radius:6px; font-size:.7rem; font-weight:700; border:1px solid var(--border); background:white; cursor:pointer; color:var(--text); transition:all .12s; }
+.btn-xs:hover { background:#f8fafc; }
+.btn-xs.primary { background:#6366f1; color:white; border-color:#6366f1; }
+.btn-xs.danger  { border-color:#fecaca; color:#dc2626; }
+.btn-xs.success { border-color:#bbf7d0; color:#15803d; }
+
+/* Add form */
+.add-form { background:#f8fafc; border:1px solid var(--border); border-radius:13px; padding:1.1rem 1.2rem; margin-bottom:1.2rem; display:none; }
+.add-form.open { display:block; }
+.af-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.65rem; }
+@media(max-width:580px){ .af-grid { grid-template-columns:1fr; } }
+.af-full { grid-column:1/-1; }
+.af-label { font-size:.72rem; font-weight:700; color:var(--text); margin-bottom:.22rem; display:block; }
+.af-input { width:100%; padding:.42rem .7rem; border:1.5px solid var(--border); border-radius:8px; font-size:.8rem; outline:none; background:white; box-sizing:border-box; }
+.af-input:focus { border-color:#6366f1; }
+.af-actions { display:flex; gap:.5rem; margin-top:.75rem; }
+.af-submit { padding:.38rem 1rem; border-radius:7px; border:none; background:#6366f1; color:white; font-size:.8rem; font-weight:700; cursor:pointer; }
+.af-cancel { padding:.38rem .85rem; border-radius:7px; border:1.5px solid var(--border); background:white; font-size:.8rem; font-weight:600; cursor:pointer; }
+
+.on-track    { color:#15803d; }
+.off-track   { color:#b91c1c; }
+
+.empty-box { text-align:center; padding:3rem 1rem; color:var(--muted); background:white; border:1px dashed var(--border); border-radius:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="goals-page">
+  <div class="goals-header">
+    <h1>🎯 Health Goals</h1>
+    <button class="btn-xs primary" style="font-size:.78rem;padding:.35rem .9rem" onclick="toggleForm('add-goal-form')">
+      <i class="fas fa-plus"></i> New goal
+    </button>
+  </div>
+
+  {% if messages %}{% for msg in messages %}
+  <div class="alert alert-{% if msg.tags == 'error' %}danger{% else %}{{ msg.tags }}{% endif %}" style="margin-bottom:.75rem">{{ msg }}</div>
+  {% endfor %}{% endif %}
+
+  <!-- Add goal form -->
+  <div class="add-form" id="add-goal-form">
+    <div style="font-size:.85rem;font-weight:800;color:var(--text);margin-bottom:.85rem">New Health Goal</div>
+    <form method="post" action="{% url 'goals:add' %}">{% csrf_token %}
+      <div class="af-grid">
+        <div style="grid-column:span 2">
+          <label class="af-label">Goal title <span style="color:#ef4444">*</span></label>
+          <input class="af-input" type="text" name="title" placeholder="e.g. Reduce pain to under 3/10" required>
+        </div>
+        <div>
+          <label class="af-label">Type</label>
+          <select class="af-input" name="goal_type">
+            {% for val,lbl in type_choices %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="af-label">Target value <span style="color:#ef4444">*</span></label>
+          <input class="af-input" type="number" step="any" name="target_value" placeholder="75" required>
+        </div>
+        <div>
+          <label class="af-label">Unit</label>
+          <input class="af-input" type="text" name="unit" placeholder="kg / steps / hours">
+        </div>
+        <div>
+          <label class="af-label">Starting value</label>
+          <input class="af-input" type="number" step="any" name="start_value" placeholder="Current value">
+        </div>
+        <div>
+          <label class="af-label">Start date</label>
+          <input class="af-input" type="date" name="start_date" value="{{ today|date:'Y-m-d' }}">
+        </div>
+        <div>
+          <label class="af-label">Target date <span style="font-weight:400;color:var(--muted)">(opt)</span></label>
+          <input class="af-input" type="date" name="target_date">
+        </div>
+        <div class="af-full" style="display:flex;align-items:center;gap:.5rem">
+          <input type="checkbox" name="lower_is_better" id="lower-chk" style="accent-color:#6366f1">
+          <label for="lower-chk" style="font-size:.8rem;cursor:pointer">Lower value = better (e.g. weight-loss, reduce pain)</label>
+        </div>
+        <div class="af-full">
+          <label class="af-label">Description <span style="font-weight:400;color:var(--muted)">(opt)</span></label>
+          <input class="af-input" type="text" name="description" placeholder="Why this goal matters">
+        </div>
+      </div>
+      <div class="af-actions">
+        <button type="submit" class="af-submit"><i class="fas fa-check"></i> Create goal</button>
+        <button type="button" class="af-cancel" onclick="toggleForm('add-goal-form')">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  {% if goals_data %}
+  <div class="goals-grid">
+    {% for item in goals_data %}
+    {% with goal=item.goal %}
+    <div class="goal-card">
+      <div class="gc-header">
+        <div class="gc-icon">{{ goal.goal_icon }}</div>
+        <div class="gc-badges">
+          <span class="gc-badge s-{{ goal.status }}">{{ goal.get_status_display }}</span>
+          {% if goal.is_on_track is not None %}
+            {% if goal.is_on_track %}<span class="gc-badge on-track" style="background:#dcfce7">On track</span>
+            {% else %}<span class="gc-badge off-track" style="background:#fee2e2">Behind</span>{% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="gc-title">{{ goal.title }}</div>
+      {% if goal.description %}<div class="gc-desc">{{ goal.description }}</div>{% endif %}
+
+      <!-- Values -->
+      <div class="gc-values">
+        {% with latest=goal.latest_entry %}
+        {% if latest %}
+        <div class="gc-val-box">
+          <div class="gc-val-label">Current</div>
+          <div class="gc-val-num" style="color:#6366f1">{{ latest.value|floatformat:1 }} <span style="font-size:.7rem;font-weight:400">{{ goal.unit }}</span></div>
+        </div>
+        {% endif %}
+        <div class="gc-val-box">
+          <div class="gc-val-label">Target</div>
+          <div class="gc-val-num">{{ goal.target_value|floatformat:1 }} <span style="font-size:.7rem;font-weight:400">{{ goal.unit }}</span></div>
+        </div>
+        {% if goal.days_remaining is not None %}
+        <div class="gc-val-box">
+          <div class="gc-val-label">Days left</div>
+          <div class="gc-val-num {% if goal.days_remaining < 0 %}off-track{% elif goal.days_remaining <= 7 %}on-track{% endif %}">
+            {% if goal.days_remaining < 0 %}{{ goal.days_remaining|add:"0"|slice:"1:" }} over{% else %}{{ goal.days_remaining }}{% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+      </div>
+
+      <!-- Progress bar -->
+      {% if goal.start_value is not None %}
+      <div class="prog-wrap">
+        <div class="prog-bar">
+          <div class="prog-fill" style="width:{{ goal.progress_pct }}%;background:{% if goal.progress_pct >= 100 %}#15803d{% elif goal.progress_pct >= 60 %}#6366f1{% elif goal.progress_pct >= 30 %}#f59e0b{% else %}#e2e8f0{% endif %}"></div>
+        </div>
+        <div class="prog-labels"><span>Start: {{ goal.start_value|floatformat:1 }}</span><span>{{ goal.progress_pct }}%</span><span>Target: {{ goal.target_value|floatformat:1 }}</span></div>
+      </div>
+      {% endif %}
+
+      <!-- Mini chart toggle -->
+      {% if item.chart_json != '{"labels": [], "values": [], "target": ' and goal.entries.count > 1 %}
+      <div class="gc-chart-wrap" id="chart-{{ goal.pk }}">
+        <canvas id="canvas-{{ goal.pk }}"></canvas>
+      </div>
+      {% endif %}
+
+      <!-- Log entry form -->
+      <div class="gc-log-form" id="log-{{ goal.pk }}">
+        <form method="post" action="{% url 'goals:add_entry' goal.pk %}">{% csrf_token %}
+          <div class="lf-row">
+            <input class="lf-input" type="number" step="any" name="value" placeholder="Value ({{ goal.unit }})" required>
+            <input class="lf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}" style="max-width:130px">
+            <button type="submit" class="lf-submit"><i class="fas fa-check"></i></button>
+          </div>
+          <input class="lf-input" type="text" name="note" placeholder="Optional note" style="margin-top:.4rem;width:100%">
+        </form>
+      </div>
+
+      <!-- Actions -->
+      <div class="gc-actions" style="margin-top:.75rem">
+        <button class="btn-xs primary" onclick="toggleLog({{ goal.pk }})"><i class="fas fa-plus"></i> Log</button>
+        {% if goal.entries.count > 1 %}
+        <button class="btn-xs" onclick="toggleChart({{ goal.pk }}, {{ item.chart_json }})"><i class="fas fa-chart-line"></i> Chart</button>
+        {% endif %}
+        {% if goal.status != 'achieved' %}
+        <form method="post" action="{% url 'goals:update_status' goal.pk %}" style="display:inline">{% csrf_token %}
+          <input type="hidden" name="status" value="achieved">
+          <button type="submit" class="btn-xs success"><i class="fas fa-trophy"></i> Achieved</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'goals:delete' goal.pk %}" style="display:inline" onsubmit="return confirm('Delete goal?')">{% csrf_token %}
+          <button type="submit" class="btn-xs danger"><i class="fas fa-xmark"></i></button>
+        </form>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-box">
+    <div style="font-size:3rem;margin-bottom:.5rem">🎯</div>
+    <p style="font-weight:700;font-size:1rem;color:var(--text)">No health goals yet</p>
+    <p style="font-size:.82rem">Set a target for weight, pain, sleep, or anything you want to improve — then log your progress over time.</p>
+    <button class="af-submit" style="margin-top:.85rem" onclick="toggleForm('add-goal-form')"><i class="fas fa-plus"></i> Create first goal</button>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function toggleForm(id){ document.getElementById(id).classList.toggle('open'); }
+
+function toggleLog(pk){
+  const el = document.getElementById('log-'+pk);
+  el.classList.toggle('open');
+  if(el.classList.contains('open')) el.querySelector('input').focus();
+}
+
+const chartInstances = {};
+function toggleChart(pk, data){
+  const wrap = document.getElementById('chart-'+pk);
+  if(!wrap) return;
+  wrap.classList.toggle('open');
+  if(wrap.classList.contains('open') && !chartInstances[pk]){
+    const ctx = document.getElementById('canvas-'+pk);
+    chartInstances[pk] = new Chart(ctx, {
+      type:'line',
+      data:{
+        labels: data.labels,
+        datasets:[
+          { label:'Value', data:data.values, borderColor:'#6366f1', backgroundColor:'#6366f122',
+            tension:.35, pointRadius:4 },
+          { label:'Target', data:Array(data.labels.length).fill(data.target),
+            borderColor:'#15803d', borderDash:[5,5], pointRadius:0,
+            borderWidth:1.5 },
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ grid:{ color:'#f1f5f9' } }, x:{ ticks:{ maxTicksLimit:6 } } },
+        plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:10 } } } }
+      }
+    });
+  }
+}
+</script>
+{% endblock %}

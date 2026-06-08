@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>I'm Fine — HealthCompass</title>
+<link rel="icon" type="image/svg+xml" href="/static/healthcompass-favicon.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:white;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#1e293b;border-radius:20px;padding:2.5rem 2rem;text-align:center;max-width:380px;width:100%;border:1px solid #334155}
+.big-icon{font-size:5rem;margin-bottom:1rem;line-height:1}
+.title{font-size:1.5rem;font-weight:800;margin-bottom:.5rem}
+.sub{font-size:.95rem;color:#94a3b8;line-height:1.6;margin-bottom:1.5rem}
+.name{color:#6ee7b7;font-weight:700}
+.badge{display:inline-flex;align-items:center;gap:.5rem;background:#15803d22;border:1px solid #15803d55;border-radius:10px;padding:.55rem 1rem;font-size:.85rem;font-weight:700;color:#86efac;margin-bottom:1.5rem}
+.info-box{background:#0f172a;border-radius:10px;padding:.9rem 1rem;font-size:.8rem;color:#64748b;line-height:1.55;text-align:left}
+.info-box strong{color:#94a3b8}
+.already{color:#fbbf24}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  {% if already_full %}
+  <!-- Already completed a full check-in -->
+  <div class="big-icon">✅</div>
+  <div class="title">Already checked in!</div>
+  <div class="sub">
+    <span class="name">{{ patient_name }}</span> already completed a full check-in today.
+    No action needed.
+  </div>
+  <div class="info-box">
+    Your family can see your detailed scores on the Care Dashboard.
+  </div>
+
+  {% elif created %}
+  <!-- Successfully created quick check-in -->
+  <div class="big-icon" style="animation:pop .5s ease">💚</div>
+  <div class="title">Great — you're okay!</div>
+  <div class="sub">
+    We've recorded that <span class="name">{{ patient_name }}</span> is fine today.<br>
+    Your family will be notified.
+  </div>
+  <div class="badge">
+    <span>✓</span> Quick check-in recorded
+  </div>
+  <div class="info-box">
+    <strong>What happens next?</strong><br>
+    Any pending alerts to your family have been paused for today.
+    If you want to add more detail (how you feel, pain, sleep), open the full HealthCompass app.
+  </div>
+
+  {% else %}
+  <!-- Token hit the same day, is_quick already exists -->
+  <div class="big-icon">👍</div>
+  <div class="title">Already recorded!</div>
+  <div class="sub">
+    <span class="name">{{ patient_name }}</span>'s check-in for today was already recorded.
+  </div>
+  <div class="info-box">
+    Nothing more to do. Your family can see your status on the Care Dashboard.
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+@keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+</style>
+
+</body>
+</html>

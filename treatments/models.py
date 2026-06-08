@@ -152,3 +152,40 @@ class CourseMonitor(models.Model):
     def is_due_soon(self):
         """Due within the next 7 days."""
         return 0 < self.days_until_due <= 7
+
+
+class TreatmentPhoto(models.Model):
+    """A dated progress photo attached to a treatment course."""
+    course     = models.ForeignKey(TreatmentCourse, on_delete=models.CASCADE,
+                     related_name='photos')
+    image      = models.ImageField(upload_to='treatment_photos/%Y/%m/')
+    date       = models.DateField(default=datetime.date.today)
+    caption    = models.CharField(max_length=200, blank=True)
+    body_area  = models.CharField(max_length=100, blank=True,
+                     help_text='e.g. "Face", "Left arm", "Back"')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'created_at']
+
+    def __str__(self):
+        return f'Photo {self.date} — {self.course.name}'
+
+
+class SymptomLog(models.Model):
+    """A single dated symptom severity rating (1–10) for a treatment course."""
+    course        = models.ForeignKey(TreatmentCourse, on_delete=models.CASCADE,
+                        related_name='symptom_logs')
+    date          = models.DateField(default=datetime.date.today)
+    symptom_name  = models.CharField(max_length=100,
+                        help_text='e.g. "Redness", "Pain", "Itch"')
+    severity      = models.PositiveSmallIntegerField(
+                        help_text='1 (minimal) — 10 (severe)')
+    note          = models.CharField(max_length=300, blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'created_at']
+
+    def __str__(self):
+        return f'{self.symptom_name} {self.severity}/10 on {self.date}'

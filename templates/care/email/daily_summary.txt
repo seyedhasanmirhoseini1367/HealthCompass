@@ -1,0 +1,27 @@
+HealthCompass — Daily Summary for {{ patient_name }}
+======================================================
+
+Hi {{ caregiver_name }},
+
+{% if has_checkin %}✅ {{ patient_name }} CHECKED IN today.
+{% elif checkin and checkin.is_quick %}✅ {{ patient_name }} sent a quick "I'm fine" today.
+{% else %}⏳ {{ patient_name }} has NOT checked in today.{% endif %}
+
+{% if has_checkin and checkin %}
+Today's scores:
+{% if checkin.feeling_score %}  Feeling   : {{ checkin.feeling_score }}/10{% endif %}
+{% if checkin.pain_score is not None %}  Pain      : {{ checkin.pain_score }}/10{% endif %}
+{% if checkin.sleep_score %}  Sleep     : {{ checkin.sleep_score }}/10{% endif %}
+{% if checkin.mood %}  Mood      : {{ checkin.get_mood_display }}{% endif %}
+{% if checkin.medications_taken is not None %}  Meds taken: {% if checkin.medications_taken %}Yes{% else %}No{% endif %}{% endif %}
+{% if checkin.symptoms %}
+Notes: {{ checkin.symptoms }}{% endif %}
+{% if checkin.is_flagged %}
+⚠️ Flagged: {{ checkin.flag_reason }}{% endif %}
+{% endif %}
+
+View full dashboard:
+  {{ dashboard_url }}
+
+---
+HealthCompass daily summary — automated message.

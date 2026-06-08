@@ -27,6 +27,9 @@ urlpatterns = [
     path('notifications/', include('notifications.urls')),
     path('integrations/', include('integrations.urls')),
     path('treatments/', include('treatments.urls')),
+    path('care/', include('care.urls')),
+    path('appointments/', include('appointments.urls')),
+    path('goals/', include('goals.urls')),
     re_path(r'^media/(?P<path>.+)$', serve_media),
 ]
 if settings.DEBUG:

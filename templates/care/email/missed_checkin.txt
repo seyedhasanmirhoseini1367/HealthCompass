@@ -1,0 +1,26 @@
+{{ tier_emoji }} HealthCompass Care Alert — {{ patient_name }}
+========================================================
+
+Hi {{ caregiver_name }},
+
+{{ patient_name }} has NOT submitted today's check-in.
+
+Alert level : {{ tier_label }}
+Date        : {{ checkin_date }}
+
+----- IF YOU'VE ALREADY SPOKEN TO THEM -----
+Click this link to mark the alert as resolved:
+
+  {{ ack_url }}
+
+----- VIEW THEIR CARE DASHBOARD -----
+  {{ dashboard_url }}
+
+----- QUICK "I'M FINE" LINK (forward to {{ patient_name }}) -----
+One tap checks them in — no login needed:
+
+  {{ quick_url }}
+
+---
+You are receiving this because you are listed as a caregiver in HealthCompass.
+This is an automated alert sent when no daily check-in is recorded.

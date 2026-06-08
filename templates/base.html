@@ -93,6 +93,19 @@
     .mm-link:hover{background:var(--bg);color:var(--primary-dk)}
     .mm-link i{width:16px;text-align:center;color:var(--primary)}
     .mm-divider{height:1px;background:var(--border);margin:.4rem 0}
+    .mm-section-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:.5rem .75rem .2rem;display:block}
+    /* More ▾ dropdown */
+    .nav-more-wrap{position:relative}
+    .nav-more-btn{display:flex;align-items:center;gap:.28rem;padding:.45rem .85rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;transition:all .2s;white-space:nowrap}
+    .nav-more-btn:hover{color:var(--primary-dk);background:#e0f2fe}
+    .nav-more-btn i.chevron{font-size:.6rem;transition:transform .18s}
+    .nav-more-btn.open i.chevron{transform:rotate(180deg)}
+    .nav-more-menu{display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.13);min-width:210px;z-index:300;overflow:hidden;padding:.35rem 0}
+    .nav-more-menu.open{display:block}
+    .nav-more-item{display:flex;align-items:center;gap:.6rem;padding:.62rem 1rem;font-size:.875rem;color:var(--text);transition:background .15s;white-space:nowrap}
+    .nav-more-item:hover{background:var(--bg);color:var(--primary-dk)}
+    .nav-more-item i{width:16px;text-align:center;color:var(--primary);flex-shrink:0}
+    .nav-more-divider{height:1px;background:var(--border);margin:.3rem 0}
     @media(max-width:768px){
       .nav-links{display:none}
       .nav-hamburger{display:flex}
@@ -105,20 +118,37 @@
 <body>
 <nav class="navbar">
     <a href="/" class="nav-brand"><img src="/static/healthcompass-horizontal.svg" alt="HealthCompass" style="height:38px;width:auto"></a>
+
+    <!-- Desktop nav links -->
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
-        <li><a href="/stories/">Health News</a></li>
         {% if user.is_authenticated %}
         <li><a href="/insights/">AI &amp; Analytics</a></li>
         <li><a href="/assistant/">AI Assistant</a></li>
         <li><a href="/records/">My Records</a></li>
-        <li><a href="/treatments/">Treatments</a></li>
         <li><a href="/dashboard/">Dashboard</a></li>
+        <!-- More ▾ dropdown -->
+        <li class="nav-more-wrap">
+            <button class="nav-more-btn" id="moreBtn" onclick="toggleMoreMenu(event)">
+                More <i class="fas fa-chevron-down chevron"></i>
+            </button>
+            <div class="nav-more-menu" id="moreMenu">
+                <a href="/treatments/" class="nav-more-item"><i class="fas fa-stethoscope"></i> Treatments</a>
+                <a href="/care/" class="nav-more-item"><i class="fas fa-heart-pulse"></i> Care Hub</a>
+                <a href="/appointments/" class="nav-more-item"><i class="fas fa-calendar-check"></i> Appointments</a>
+                <a href="/goals/" class="nav-more-item"><i class="fas fa-bullseye"></i> Goals</a>
+                <div class="nav-more-divider"></div>
+                <a href="/stories/" class="nav-more-item"><i class="fas fa-newspaper"></i> Health News</a>
+                <a href="/accounts/emergency-card/" class="nav-more-item"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
+            </div>
+        </li>
         {% else %}
         <li><a href="/accounts/login/?next=/insights/">AI &amp; Analytics</a></li>
         <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
+        <li><a href="/stories/">Health News</a></li>
         {% endif %}
     </ul>
+
     <div class="nav-right">
         <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>
         {% if user.is_authenticated %}
@@ -136,11 +166,12 @@
             <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}</span>
             <i class="fas fa-chevron-down" style="font-size:.65rem;color:var(--muted)"></i>
         </div>
-        <div id="userMenu" style="display:none;position:absolute;top:56px;right:1.5rem;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:180px;z-index:200;overflow:hidden">
+        <div id="userMenu" style="display:none;position:absolute;top:56px;right:1.5rem;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:190px;z-index:200;overflow:hidden">
             <a href="/dashboard/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-bottom:1px solid var(--border)"><i class="fas fa-tachometer-alt" style="color:var(--primary);width:16px"></i> Dashboard</a>
             <a href="/accounts/profile/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user" style="color:var(--primary);width:16px"></i> My Profile</a>
             <a href="/accounts/profile/edit/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-edit" style="color:var(--primary);width:16px"></i> Edit Profile</a>
             <a href="/accounts/password/change/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-lock" style="color:var(--primary);width:16px"></i> Change Password</a>
+            <a href="/accounts/emergency-card/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-top:1px solid var(--border)"><i class="fas fa-id-card-clip" style="color:#ef4444;width:16px"></i> Emergency Card</a>
             <a href="/accounts/logout/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:#dc2626;border-top:1px solid var(--border)"><i class="fas fa-sign-out-alt" style="width:16px"></i> Log out</a>
         </div>
         {% else %}
@@ -148,19 +179,28 @@
         <a href="/accounts/register/" class="btn-nav-solid">Get Started</a>
         {% endif %}
     </div>
+
+    <!-- Mobile menu -->
     <div id="mobileMenu" class="mobile-menu">
       <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
-      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
       {% if user.is_authenticated %}
       <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> My Records</a>
-      <a href="/treatments/" class="mm-link"><i class="fas fa-stethoscope"></i> Treatments</a>
       <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
       <div class="mm-divider"></div>
+      <span class="mm-section-label">Tools</span>
+      <a href="/treatments/" class="mm-link"><i class="fas fa-stethoscope"></i> Treatments</a>
+      <a href="/care/" class="mm-link"><i class="fas fa-heart-pulse"></i> Care Hub</a>
+      <a href="/appointments/" class="mm-link"><i class="fas fa-calendar-check"></i> Appointments</a>
+      <a href="/goals/" class="mm-link"><i class="fas fa-bullseye"></i> Goals</a>
+      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
+      <div class="mm-divider"></div>
       <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
+      <a href="/accounts/emergency-card/" class="mm-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
+      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
       <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       <a href="/accounts/login/?next=/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <div class="mm-divider"></div>
@@ -198,9 +238,31 @@
 function toggleUserMenu() {
   const m = document.getElementById('userMenu');
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
+  // close More if open
+  closeMoreMenu();
 }
 function toggleMobileMenu() {
   document.getElementById('mobileMenu').classList.toggle('open');
+}
+function toggleMoreMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('moreMenu');
+  const btn  = document.getElementById('moreBtn');
+  const isOpen = menu && menu.classList.contains('open');
+  closeMoreMenu();
+  if (!isOpen) {
+    menu && menu.classList.add('open');
+    btn  && btn.classList.add('open');
+  }
+  // close user menu if open
+  const um = document.getElementById('userMenu');
+  if (um) um.style.display = 'none';
+}
+function closeMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  const btn  = document.getElementById('moreBtn');
+  menu && menu.classList.remove('open');
+  btn  && btn.classList.remove('open');
 }
 let _deleteCallback = null;
 function openDeleteModal(message, onConfirm, title) {
@@ -224,6 +286,10 @@ document.addEventListener('click', function(e) {
   if (!document.getElementById('navUserBtn')?.contains(e.target)) {
     const m = document.getElementById('userMenu');
     if (m) m.style.display = 'none';
+  }
+  if (!document.getElementById('moreBtn')?.contains(e.target) &&
+      !document.getElementById('moreMenu')?.contains(e.target)) {
+    closeMoreMenu();
   }
   const btn = document.getElementById('hamburgerBtn');
   const mm = document.getElementById('mobileMenu');

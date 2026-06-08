@@ -1,5 +1,5 @@
 import logging
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -132,6 +132,63 @@ def change_password(request):
         form = PasswordChangeForm(request.user)
     return render(request, "accounts/change_password.html", {"form": form})
 
+
+
+# ── Emergency card ────────────────────────────────────────────────────────────
+
+@login_required
+def emergency_card(request):
+    """Patient's own emergency card view with QR code."""
+    import base64, io
+    import qrcode
+    from django.conf import settings as s
+    from care.models import MedicationSchedule
+    from treatments.models import TreatmentCourse
+
+    profile, _ = PatientProfile.objects.get_or_create(user=request.user)
+    site_url = getattr(s, 'SITE_URL', request.build_absolute_uri('/').rstrip('/'))
+    public_url = f'{site_url}/accounts/emergency/{profile.emergency_token}/'
+
+    # Generate QR code as base64 PNG
+    qr = qrcode.QRCode(box_size=5, border=3,
+                       error_correction=qrcode.constants.ERROR_CORRECT_H)
+    qr.add_data(public_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    medications = MedicationSchedule.objects.filter(
+        patient=request.user, is_active=True)
+    treatments  = TreatmentCourse.objects.filter(
+        patient=request.user, status='active')
+
+    return render(request, 'accounts/emergency_card.html', {
+        'profile':     profile,
+        'medications': medications,
+        'treatments':  treatments,
+        'qr_b64':      qr_b64,
+        'public_url':  public_url,
+    })
+
+
+def emergency_card_public(request, token):
+    """No-login public emergency card — scannable by paramedics or doctors."""
+    from care.models import MedicationSchedule
+    from treatments.models import TreatmentCourse
+
+    profile = get_object_or_404(PatientProfile, emergency_token=token)
+    user = profile.user
+    medications = MedicationSchedule.objects.filter(patient=user, is_active=True)
+    treatments  = TreatmentCourse.objects.filter(patient=user, status='active')
+
+    return render(request, 'accounts/emergency_card_public.html', {
+        'profile':     profile,
+        'patient':     user,
+        'medications': medications,
+        'treatments':  treatments,
+    })
 
 
 @login_required
