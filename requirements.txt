@@ -2,6 +2,7 @@ django>=5.2
 pillow
 python-decouple
 google-genai
+onnxruntime-cpu
 rank-bm25
 openai
 scikit-learn
