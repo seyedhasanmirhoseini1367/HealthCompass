@@ -3,192 +3,242 @@
 {% block extra_css %}
 <style>
 /* ── Layout ──────────────────────────────────────────────────────────────── */
-.detail-page { max-width: 960px; margin: 0 auto; display: flex; gap: 1.5rem; align-items: flex-start; }
+.detail-page { max-width: 980px; margin: 0 auto; display: flex; gap: 1.5rem; align-items: flex-start; }
 .detail-main { flex: 1; min-width: 0; }
-.detail-sidebar { width: 270px; flex-shrink: 0; }
-@media (max-width: 780px) {
-  .detail-page     { flex-direction: column; }
-  .detail-sidebar  { width: 100%; }
-}
+.detail-sidebar { width: 265px; flex-shrink: 0; }
+@media (max-width: 780px) { .detail-page { flex-direction: column; } .detail-sidebar { width: 100%; } }
 
-/* ── Course header card ──────────────────────────────────────────────────── */
+/* ── Course header ───────────────────────────────────────────────────────── */
 .course-header {
   background: white; border: 1px solid var(--border); border-radius: 16px;
-  padding: 1.3rem 1.5rem; margin-bottom: 1.25rem;
+  padding: 1.2rem 1.4rem; margin-bottom: 1.1rem;
 }
 .ch-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.ch-name { font-size: 1.25rem; font-weight: 800; color: var(--text); margin-bottom: .2rem; }
-.ch-condition { font-size: .88rem; color: var(--muted); margin-bottom: .6rem; }
-.ch-badges { display: flex; gap: .45rem; flex-wrap: wrap; }
+.ch-name { font-size: 1.2rem; font-weight: 800; color: var(--text); margin-bottom: .18rem; }
+.ch-condition { font-size: .85rem; color: var(--muted); margin-bottom: .55rem; }
+.ch-badges { display: flex; gap: .4rem; flex-wrap: wrap; }
 .ch-badge {
-  display: inline-flex; align-items: center; gap: .28rem;
-  padding: .2rem .6rem; border-radius: 20px;
-  font-size: .72rem; font-weight: 700; background: #f1f5f9; color: #64748b;
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .18rem .55rem; border-radius: 20px;
+  font-size: .7rem; font-weight: 700; background: #f1f5f9; color: #64748b;
 }
 .ch-badge.active    { background: #dcfce7; color: #15803d; }
 .ch-badge.paused    { background: #fef9c3; color: #854d0e; }
 .ch-badge.completed { background: #e0f2fe; color: #0369a1; }
 .ch-badge.cancelled { background: #fee2e2; color: #b91c1c; }
-
-/* Progress */
-.ch-progress { margin-top: .9rem; }
-.ch-prog-labels { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-bottom: .28rem; }
-.prog-track { height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-.prog-fill { height: 100%; border-radius: 4px; background: #6366f1; transition: width .4s; }
-.prog-fill.done    { background: #10b981; }
-.prog-fill.overdue { background: #ef4444; }
-
-/* Status controls */
-.status-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.status-btns { display: flex; gap: .35rem; flex-wrap: wrap; }
 .s-btn {
-  padding: .28rem .7rem; border-radius: 7px; font-size: .74rem; font-weight: 700;
-  border: 1.5px solid var(--border); background: white; color: var(--text);
-  cursor: pointer; transition: all .15s;
+  padding: .26rem .65rem; border-radius: 7px; font-size: .73rem; font-weight: 700;
+  border: 1.5px solid var(--border); background: white; color: var(--text); cursor: pointer;
+  transition: all .15s;
 }
 .s-btn:hover { border-color: #6366f1; color: #6366f1; }
 .s-btn.danger { border-color: #fecaca; color: #dc2626; background: #fff1f2; }
 .s-btn.danger:hover { background: #fee2e2; }
+.prog-wrap { margin-top: .85rem; }
+.prog-labels { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); margin-bottom: .25rem; }
+.prog-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+.prog-fill  { height: 100%; border-radius: 3px; background: #6366f1; transition: width .4s; }
+.prog-fill.overdue { background: #ef4444; }
+.prog-fill.done    { background: #10b981; }
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: 0; background: white;
+  border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; margin-bottom: 1.1rem;
+}
+.tab-btn {
+  flex: 1; padding: .65rem .5rem; font-size: .82rem; font-weight: 700;
+  border: none; background: none; color: var(--muted); cursor: pointer;
+  border-right: 1px solid var(--border); transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: .35rem;
+}
+.tab-btn:last-child { border-right: none; }
+.tab-btn:hover { background: #f8fafc; color: var(--text); }
+.tab-btn.active { background: #6366f1; color: white; }
+.tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.25); color: inherit;
+  font-size: .65rem; font-weight: 800; min-width: 18px; height: 18px;
+  border-radius: 9px; padding: 0 .3rem;
+}
+.tab-btn:not(.active) .tab-count { background: #e2e8f0; color: #64748b; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 /* ── Timeline ────────────────────────────────────────────────────────────── */
-.timeline-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: .85rem; flex-wrap: wrap; gap: .5rem;
-}
-.timeline-title { font-size: .95rem; font-weight: 800; color: var(--text); }
+.tl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .85rem; flex-wrap: wrap; gap: .5rem; }
+.tl-title  { font-size: .92rem; font-weight: 800; color: var(--text); }
 .add-btn {
   display: inline-flex; align-items: center; gap: .35rem;
-  padding: .35rem .9rem; border-radius: 8px;
+  padding: .32rem .85rem; border-radius: 8px;
   background: #6366f1; color: white; font-size: .78rem; font-weight: 700;
   border: none; cursor: pointer; text-decoration: none; transition: opacity .15s;
 }
 .add-btn:hover { opacity: .87; }
-
-.timeline { position: relative; padding-left: 1.6rem; }
+.timeline { position: relative; padding-left: 1.5rem; }
 .timeline::before {
-  content: ''; position: absolute; left: .55rem; top: 0; bottom: 0;
+  content: ''; position: absolute; left: .5rem; top: 0; bottom: 0;
   width: 2px; background: var(--border); border-radius: 1px;
 }
-.tl-item { position: relative; margin-bottom: 1.15rem; }
+.tl-item { position: relative; margin-bottom: 1.05rem; }
 .tl-dot {
-  position: absolute; left: -1.6rem; top: .35rem;
-  width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;
-  box-shadow: 0 0 0 2px var(--border);
+  position: absolute; left: -1.5rem; top: .35rem;
+  width: 11px; height: 11px; border-radius: 50%; border: 2px solid white;
 }
 .tl-dot.visit      { background: #6366f1; box-shadow: 0 0 0 2px #6366f1; }
 .tl-dot.lab_test   { background: #0ea5e9; box-shadow: 0 0 0 2px #0ea5e9; }
 .tl-dot.med_change { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
 .tl-dot.symptom    { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
 .tl-dot.other      { background: #94a3b8; box-shadow: 0 0 0 2px #94a3b8; }
-
-.tl-card {
-  background: white; border: 1px solid var(--border); border-radius: 12px;
-  padding: .85rem 1rem;
-}
-.tl-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
-.tl-title { font-size: .88rem; font-weight: 700; color: var(--text); }
-.tl-date  { font-size: .72rem; color: var(--muted); flex-shrink: 0; }
-.tl-meta  { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .35rem; }
-.tl-badge {
-  padding: .12rem .45rem; border-radius: 4px; font-size: .68rem; font-weight: 700;
-  background: #f1f5f9; color: #64748b;
-}
+.tl-card { background: white; border: 1px solid var(--border); border-radius: 11px; padding: .8rem 1rem; }
+.tl-top  { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.tl-title-text { font-size: .86rem; font-weight: 700; color: var(--text); }
+.tl-date { font-size: .7rem; color: var(--muted); flex-shrink: 0; }
+.tl-meta { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; }
+.tl-badge { padding: .1rem .42rem; border-radius: 4px; font-size: .67rem; font-weight: 700; background: #f1f5f9; color: #64748b; }
 .tl-badge.improved { background: #dcfce7; color: #15803d; }
 .tl-badge.worsened { background: #fee2e2; color: #dc2626; }
 .tl-badge.pending  { background: #fef9c3; color: #854d0e; }
-.tl-note { font-size: .8rem; color: var(--muted); margin-top: .4rem; line-height: 1.5; }
-.tl-record-link {
-  font-size: .73rem; color: #6366f1; text-decoration: none; font-weight: 600;
-  display: inline-flex; align-items: center; gap: .25rem; margin-top: .3rem;
-}
-.tl-del-btn {
-  padding: .18rem .45rem; border-radius: 5px; font-size: .7rem; font-weight: 700;
-  border: 1px solid #fecaca; background: #fff1f2; color: #dc2626; cursor: pointer;
-  transition: background .12s; flex-shrink: 0;
-}
-.tl-del-btn:hover { background: #fee2e2; }
+.tl-note { font-size: .78rem; color: var(--muted); margin-top: .38rem; line-height: 1.5; }
+.tl-record-link { font-size: .72rem; color: #6366f1; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: .22rem; margin-top: .28rem; }
+.del-btn { padding: .16rem .42rem; border-radius: 5px; font-size: .68rem; font-weight: 700; border: 1px solid #fecaca; background: #fff1f2; color: #dc2626; cursor: pointer; flex-shrink: 0; }
+.del-btn:hover { background: #fee2e2; }
+.empty-panel { text-align: center; padding: 2.5rem 1rem; color: var(--muted); background: white; border: 1px dashed var(--border); border-radius: 12px; }
 
-.empty-timeline {
-  text-align: center; padding: 2.5rem 1rem; color: var(--muted);
-  background: white; border: 1px dashed var(--border); border-radius: 12px;
-}
-
-/* ── Add milestone modal / inline form ──────────────────────────────────── */
-.add-milestone-form {
-  background: #f8fafc; border: 1px solid var(--border); border-radius: 13px;
-  padding: 1.1rem 1.2rem; margin-bottom: 1.25rem; display: none;
-}
-.add-milestone-form.open { display: block; }
-.amf-title { font-size: .82rem; font-weight: 800; color: var(--text); margin-bottom: .85rem; }
-.amf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+/* Inline add-milestone form */
+.add-ms-form { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; display: none; }
+.add-ms-form.open { display: block; }
+.amf-title { font-size: .8rem; font-weight: 800; color: var(--text); margin-bottom: .75rem; }
+.amf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
 @media (max-width: 540px) { .amf-grid { grid-template-columns: 1fr; } }
-.amf-grid .full { grid-column: 1 / -1; }
-.amf-label { font-size: .75rem; font-weight: 700; color: var(--text); margin-bottom: .25rem; display: block; }
-.amf-input {
-  width: 100%; padding: .45rem .75rem; border: 1.5px solid var(--border);
-  border-radius: 8px; font-size: .82rem; outline: none; background: white; box-sizing: border-box;
-}
+.amf-grid .full { grid-column: 1/-1; }
+.amf-label { font-size: .73rem; font-weight: 700; color: var(--text); margin-bottom: .22rem; display: block; }
+.amf-input { width: 100%; padding: .42rem .72rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: .8rem; outline: none; background: white; box-sizing: border-box; }
 .amf-input:focus { border-color: #6366f1; }
-.amf-actions { display: flex; gap: .55rem; margin-top: .85rem; }
-.amf-submit { padding: .38rem .95rem; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: .8rem; font-weight: 700; cursor: pointer; }
-.amf-cancel { padding: .38rem .8rem; border-radius: 8px; border: 1.5px solid var(--border); background: white; color: var(--text); font-size: .8rem; font-weight: 600; cursor: pointer; }
+.amf-actions { display: flex; gap: .5rem; margin-top: .75rem; }
+.amf-submit { padding: .35rem .9rem; border-radius: 7px; border: none; background: #6366f1; color: white; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.amf-cancel { padding: .35rem .75rem; border-radius: 7px; border: 1.5px solid var(--border); background: white; color: var(--text); font-size: .78rem; font-weight: 600; cursor: pointer; }
 
-/* ── Sidebar cards ───────────────────────────────────────────────────────── */
-.sidebar-card {
-  background: white; border: 1px solid var(--border); border-radius: 14px;
-  padding: 1rem 1.1rem; margin-bottom: 1rem;
-}
-.sc-title {
-  font-size: .72rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--muted); margin-bottom: .75rem;
-}
+/* ── Photo gallery ───────────────────────────────────────────────────────── */
+.photo-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: .9rem; flex-wrap: wrap; gap: .5rem; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .85rem; }
+@media (max-width: 600px) { .photo-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Monitor rows */
-.mon-row {
-  display: flex; align-items: center; gap: .6rem;
-  padding: .5rem 0; border-bottom: 1px solid var(--border);
+.photo-card {
+  background: white; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; position: relative; cursor: pointer;
+  transition: box-shadow .2s;
 }
+.photo-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+.photo-card img {
+  width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;
+}
+.photo-info {
+  padding: .55rem .65rem;
+}
+.photo-date { font-size: .7rem; font-weight: 700; color: var(--muted); }
+.photo-caption { font-size: .75rem; color: var(--text); margin-top: .12rem; line-height: 1.3; }
+.photo-area { font-size: .68rem; color: #6366f1; font-weight: 600; }
+.photo-del {
+  position: absolute; top: .45rem; right: .45rem;
+  background: rgba(0,0,0,.55); color: white; border: none;
+  border-radius: 6px; width: 26px; height: 26px; font-size: .72rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity .15s;
+}
+.photo-card:hover .photo-del { opacity: 1; }
+
+/* Upload form */
+.photo-upload-form { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; display: none; }
+.photo-upload-form.open { display: block; }
+.upload-drop {
+  border: 2px dashed #cbd5e1; border-radius: 10px; padding: 1.5rem;
+  text-align: center; cursor: pointer; transition: border-color .18s;
+  background: white; margin-bottom: .75rem;
+}
+.upload-drop:hover, .upload-drop.drag { border-color: #6366f1; background: #eef2ff; }
+.upload-drop input[type=file] { display: none; }
+.upload-drop-icon { font-size: 1.8rem; margin-bottom: .4rem; }
+.upload-drop-text { font-size: .82rem; color: var(--muted); }
+.upload-drop-text strong { color: #6366f1; cursor: pointer; }
+.upload-preview { display: none; margin-bottom: .75rem; }
+.upload-preview img { max-height: 160px; border-radius: 8px; border: 1px solid var(--border); }
+.puf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+@media (max-width: 540px) { .puf-grid { grid-template-columns: 1fr; } }
+
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 90vw; max-height: 80vh; border-radius: 10px; object-fit: contain; }
+.lightbox-info { margin-top: .85rem; text-align: center; color: white; }
+.lightbox-date { font-size: .85rem; opacity: .75; }
+.lightbox-caption { font-size: 1rem; font-weight: 600; margin-top: .25rem; }
+.lb-close { position: absolute; top: 1rem; right: 1.2rem; font-size: 1.75rem; color: white; background: none; border: none; cursor: pointer; opacity: .75; }
+.lb-close:hover { opacity: 1; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.15); border: none; color: white; font-size: 1.5rem; padding: .6rem .9rem; border-radius: 10px; cursor: pointer; transition: background .15s; }
+.lb-nav:hover { background: rgba(255,255,255,.3); }
+.lb-prev { left: 1rem; }
+.lb-next { right: 1rem; }
+
+/* ── Symptom chart ───────────────────────────────────────────────────────── */
+.symptom-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: .9rem; flex-wrap: wrap; gap: .5rem; }
+.chart-wrap { background: white; border: 1px solid var(--border); border-radius: 13px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+.chart-canvas-wrap { position: relative; height: 280px; }
+.symptom-log-form { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; display: none; }
+.symptom-log-form.open { display: block; }
+.slf-grid { display: grid; grid-template-columns: 1fr 100px 100px 1fr; gap: .65rem; align-items: end; }
+@media (max-width: 600px) { .slf-grid { grid-template-columns: 1fr 1fr; } }
+
+/* Severity slider */
+.severity-wrap { display: flex; flex-direction: column; gap: .3rem; }
+.severity-slider { width: 100%; accent-color: #6366f1; }
+.severity-labels { display: flex; justify-content: space-between; font-size: .65rem; color: var(--muted); }
+
+/* Symptom log table */
+.log-table { width: 100%; border-collapse: collapse; margin-top: .85rem; font-size: .8rem; }
+.log-table th { text-align: left; padding: .45rem .65rem; font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 2px solid var(--border); }
+.log-table td { padding: .45rem .65rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.log-table tr:last-child td { border-bottom: none; }
+.sev-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: .75rem; font-weight: 800; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar-card { background: white; border: 1px solid var(--border); border-radius: 13px; padding: .95rem 1.05rem; margin-bottom: .9rem; }
+.sc-title { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: .7rem; }
+.mon-row { display: flex; align-items: center; gap: .55rem; padding: .45rem 0; border-bottom: 1px solid var(--border); }
 .mon-row:last-of-type { border-bottom: none; }
 .mon-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #10b981; }
-.mon-dot.due      { background: #ef4444; }
+.mon-dot.due { background: #ef4444; }
 .mon-dot.due-soon { background: #f59e0b; }
 .mon-info { flex: 1; min-width: 0; }
-.mon-name { font-size: .82rem; font-weight: 700; color: var(--text); }
-.mon-due  { font-size: .7rem; color: var(--muted); }
-.mon-actions { display: flex; gap: .3rem; flex-shrink: 0; }
-.mon-btn {
-  padding: .18rem .45rem; border-radius: 5px; font-size: .68rem; font-weight: 700;
-  border: 1px solid var(--border); background: white; color: var(--text); cursor: pointer;
-  text-decoration: none; display: inline-flex; align-items: center; gap: .2rem;
-  transition: all .12s;
-}
+.mon-name { font-size: .8rem; font-weight: 700; color: var(--text); }
+.mon-due  { font-size: .68rem; color: var(--muted); }
+.mon-actions { display: flex; gap: .28rem; flex-shrink: 0; }
+.mon-btn { padding: .16rem .42rem; border-radius: 5px; font-size: .68rem; font-weight: 700; border: 1px solid var(--border); background: white; color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .2rem; transition: all .12s; }
 .mon-btn.check { border-color: #bbf7d0; color: #15803d; background: #f0fdf4; }
 .mon-btn.check:hover { background: #dcfce7; }
 .mon-btn.del   { border-color: #fecaca; color: #dc2626; background: #fff1f2; }
 .mon-btn.del:hover { background: #fee2e2; }
-
-/* Add monitor form */
-.add-mon-form { margin-top: .8rem; display: none; }
+.add-mon-form { margin-top: .7rem; display: none; }
 .add-mon-form.open { display: block; }
-.amf2-row { display: grid; grid-template-columns: 1fr 80px; gap: .5rem; margin-bottom: .5rem; }
-.amf2-input {
-  width: 100%; padding: .4rem .65rem; border: 1.5px solid var(--border);
-  border-radius: 7px; font-size: .78rem; outline: none; background: #f8fafc; box-sizing: border-box;
-}
+.amf2-row { display: grid; grid-template-columns: 1fr 72px; gap: .45rem; margin-bottom: .45rem; }
+.amf2-input { width: 100%; padding: .38rem .6rem; border: 1.5px solid var(--border); border-radius: 7px; font-size: .76rem; outline: none; background: #f8fafc; box-sizing: border-box; }
 .amf2-input:focus { border-color: #6366f1; background: white; }
+.sum-row { display: flex; justify-content: space-between; font-size: .79rem; padding: .22rem 0; }
+.sum-row + .sum-row { border-top: 1px solid var(--border); margin-top: .2rem; padding-top: .22rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="detail-page">
 
-  <!-- ════════ MAIN ════════ -->
+  <!-- ═══════════════════ MAIN ═══════════════════ -->
   <div class="detail-main">
 
-    <!-- Back link -->
-    <div style="margin-bottom:.85rem">
-      <a href="{% url 'treatments:list' %}" style="font-size:.82rem;color:var(--muted);text-decoration:none">
-        ← My Treatments
-      </a>
+    <div style="margin-bottom:.8rem">
+      <a href="{% url 'treatments:list' %}" style="font-size:.8rem;color:var(--muted);text-decoration:none">← My Treatments</a>
     </div>
 
     <!-- Course header -->
@@ -196,282 +246,453 @@
       <div class="ch-top">
         <div>
           <div class="ch-name">{{ course.name }}</div>
-          <div class="ch-condition">
-            {{ course.condition }}
-            {% if course.doctor_name %} · <strong>{{ course.doctor_name }}</strong>{% endif %}
-          </div>
+          <div class="ch-condition">{{ course.condition }}{% if course.doctor_name %} · <strong>{{ course.doctor_name }}</strong>{% endif %}</div>
           <div class="ch-badges">
             <span class="ch-badge {{ course.status }}">
-              {% if course.status == 'active' %}● Active
-              {% elif course.status == 'paused' %}⏸ Paused
-              {% elif course.status == 'completed' %}✓ Completed
-              {% else %}✕ Cancelled{% endif %}
+              {% if course.status == 'active' %}● Active{% elif course.status == 'paused' %}⏸ Paused{% elif course.status == 'completed' %}✓ Completed{% else %}✕ Cancelled{% endif %}
             </span>
-            <span class="ch-badge"><i class="fas fa-stethoscope" style="font-size:.62rem"></i> {{ course.get_specialty_display }}</span>
-            <span class="ch-badge"><i class="fas fa-calendar" style="font-size:.62rem"></i> {{ course.start_date|date:"M d, Y" }}</span>
-            {% if course.medications %}
-            <span class="ch-badge"><i class="fas fa-pills" style="font-size:.62rem"></i> {{ course.medications|truncatechars:40 }}</span>
-            {% endif %}
+            <span class="ch-badge"><i class="fas fa-stethoscope" style="font-size:.6rem"></i> {{ course.get_specialty_display }}</span>
+            <span class="ch-badge"><i class="fas fa-calendar" style="font-size:.6rem"></i> {{ course.start_date|date:"M d, Y" }}</span>
+            {% if course.medications %}<span class="ch-badge"><i class="fas fa-pills" style="font-size:.6rem"></i> {{ course.medications|truncatechars:38 }}</span>{% endif %}
           </div>
         </div>
-
-        <!-- Status actions -->
         <div class="status-btns">
           {% if course.status == 'active' %}
-          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
-            {% csrf_token %}<input type="hidden" name="status" value="paused">
-            <button type="submit" class="s-btn">⏸ Pause</button>
-          </form>
-          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
-            {% csrf_token %}<input type="hidden" name="status" value="completed">
-            <button type="submit" class="s-btn">✓ Complete</button>
-          </form>
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="status" value="paused"><button class="s-btn">⏸ Pause</button></form>
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="status" value="completed"><button class="s-btn">✓ Complete</button></form>
           {% elif course.status == 'paused' %}
-          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
-            {% csrf_token %}<input type="hidden" name="status" value="active">
-            <button type="submit" class="s-btn">▶ Resume</button>
-          </form>
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="status" value="active"><button class="s-btn">▶ Resume</button></form>
           {% elif course.status == 'completed' %}
-          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">
-            {% csrf_token %}<input type="hidden" name="status" value="active">
-            <button type="submit" class="s-btn">↩ Reopen</button>
-          </form>
+          <form method="post" action="{% url 'treatments:set_status' course.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="status" value="active"><button class="s-btn">↩ Reopen</button></form>
           {% endif %}
-          <form method="post" action="{% url 'treatments:delete' course.pk %}" style="display:inline"
-            onsubmit="return confirm('Delete this course and all its milestones?')">
-            {% csrf_token %}
-            <button type="submit" class="s-btn danger"><i class="fas fa-trash" style="font-size:.68rem"></i></button>
-          </form>
+          <form method="post" action="{% url 'treatments:delete' course.pk %}" style="display:inline" onsubmit="return confirm('Delete this course and all data?')">{% csrf_token %}<button class="s-btn danger"><i class="fas fa-trash" style="font-size:.65rem"></i></button></form>
         </div>
       </div>
-
       {% if course.progress_pct is not None %}
-      <div class="ch-progress">
-        <div class="ch-prog-labels">
+      <div class="prog-wrap">
+        <div class="prog-labels">
           <span>{{ course.days_elapsed }} day{{ course.days_elapsed|pluralize }} elapsed</span>
-          <span>
-            {% if course.is_overdue %}
-              <span style="color:#ef4444">⚠ Past expected end ({{ course.expected_end_date|date:"M d, Y" }})</span>
-            {% else %}
-              {{ course.progress_pct }}% — ends {{ course.expected_end_date|date:"M d, Y" }}
-            {% endif %}
-          </span>
+          <span>{% if course.is_overdue %}<span style="color:#ef4444">⚠ Past end ({{ course.expected_end_date|date:"M d, Y" }})</span>{% else %}{{ course.progress_pct }}% · ends {{ course.expected_end_date|date:"M d, Y" }}{% endif %}</span>
         </div>
-        <div class="prog-track">
-          <div class="prog-fill {% if course.is_overdue %}overdue{% elif course.status == 'completed' %}done{% endif %}"
-               style="width:{{ course.progress_pct }}%"></div>
-        </div>
+        <div class="prog-track"><div class="prog-fill {% if course.is_overdue %}overdue{% elif course.status == 'completed' %}done{% endif %}" style="width:{{ course.progress_pct }}%"></div></div>
       </div>
       {% endif %}
-
-      {% if course.notes %}
-      <div style="margin-top:.85rem;font-size:.82rem;color:#475569;line-height:1.55;background:#f8fafc;border-radius:9px;padding:.65rem .85rem">
-        {{ course.notes }}
-      </div>
-      {% endif %}
+      {% if course.notes %}<div style="margin-top:.8rem;font-size:.8rem;color:#475569;line-height:1.5;background:#f8fafc;border-radius:8px;padding:.6rem .8rem">{{ course.notes }}</div>{% endif %}
     </div>
 
-    <!-- Timeline header + toggle form -->
-    <div class="timeline-header">
-      <div class="timeline-title">📅 Timeline</div>
-      <button class="add-btn" onclick="toggleMilestoneForm()">
-        <i class="fas fa-plus"></i> Add milestone
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('timeline',this)">
+        <i class="fas fa-timeline"></i> Timeline
+        <span class="tab-count">{{ milestones.count }}</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('photos',this)">
+        <i class="fas fa-images"></i> Photos
+        <span class="tab-count">{{ photos.count }}</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('symptoms',this)">
+        <i class="fas fa-chart-line"></i> Symptoms
+        <span class="tab-count">{{ symptom_logs.count }}</span>
       </button>
     </div>
 
-    <!-- Add milestone inline form -->
-    <div class="add-milestone-form" id="add-ms-form">
-      <div class="amf-title">New Milestone</div>
-      <form method="post" action="{% url 'treatments:add_milestone' course.pk %}">
-        {% csrf_token %}
-        <div class="amf-grid">
-          <div>
-            <label class="amf-label">Title <span style="color:#ef4444">*</span></label>
-            <input class="amf-input" type="text" name="title" placeholder="e.g. Month 1 blood test" required>
+    <!-- ══ TAB: TIMELINE ══ -->
+    <div class="tab-panel active" id="tab-timeline">
+      <div class="tl-header">
+        <div class="tl-title">Milestones</div>
+        <button class="add-btn" onclick="toggleForm('add-ms-form')"><i class="fas fa-plus"></i> Add milestone</button>
+      </div>
+
+      <div class="add-ms-form" id="add-ms-form">
+        <div class="amf-title">New Milestone</div>
+        <form method="post" action="{% url 'treatments:add_milestone' course.pk %}">
+          {% csrf_token %}
+          <div class="amf-grid">
+            <div><label class="amf-label">Title <span style="color:#ef4444">*</span></label><input class="amf-input" type="text" name="title" placeholder="e.g. Month 1 blood test" required></div>
+            <div><label class="amf-label">Date</label><input class="amf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}"></div>
+            <div><label class="amf-label">Type</label><select class="amf-input" name="milestone_type">{% for val,lbl in milestone_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}</select></div>
+            <div><label class="amf-label">Outcome</label><select class="amf-input" name="outcome">{% for val,lbl in outcome_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}</select></div>
+            <div class="full"><label class="amf-label">Link to record <span style="font-weight:400;color:var(--muted)">(optional)</span></label><select class="amf-input" name="linked_record"><option value="">— none —</option>{% for rec in user_records %}<option value="{{ rec.pk }}">{{ rec.title }} ({{ rec.record_date|date:"M d, Y" }})</option>{% endfor %}</select></div>
+            <div class="full"><label class="amf-label">Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea class="amf-input" name="note" rows="2" placeholder="What happened, how you felt, doctor's comments…"></textarea></div>
           </div>
-          <div>
-            <label class="amf-label">Date</label>
-            <input class="amf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}">
-          </div>
-          <div>
-            <label class="amf-label">Type</label>
-            <select class="amf-input" name="milestone_type">
-              {% for val, lbl in milestone_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
-            </select>
-          </div>
-          <div>
-            <label class="amf-label">Outcome</label>
-            <select class="amf-input" name="outcome">
-              {% for val, lbl in outcome_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="full">
-            <label class="amf-label">Link to a record <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
-            <select class="amf-input" name="linked_record">
-              <option value="">— none —</option>
-              {% for rec in user_records %}
-              <option value="{{ rec.pk }}">{{ rec.title }} ({{ rec.record_date|date:"M d, Y" }})</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="full">
-            <label class="amf-label">Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
-            <textarea class="amf-input" name="note" rows="2" placeholder="What happened, how you felt, any doctor comments…"></textarea>
+          <div class="amf-actions"><button type="submit" class="amf-submit"><i class="fas fa-check"></i> Save</button><button type="button" class="amf-cancel" onclick="toggleForm('add-ms-form')">Cancel</button></div>
+        </form>
+      </div>
+
+      {% if milestones %}
+      <div class="timeline">
+        {% for ms in milestones %}
+        <div class="tl-item">
+          <div class="tl-dot {{ ms.milestone_type }}"></div>
+          <div class="tl-card">
+            <div class="tl-top">
+              <div class="tl-title-text">{{ ms.title }}</div>
+              <div style="display:flex;align-items:center;gap:.45rem;flex-shrink:0">
+                <span class="tl-date">{{ ms.date|date:"M d, Y" }}</span>
+                <form method="post" action="{% url 'treatments:delete_milestone' course.pk ms.pk %}" style="display:inline" onsubmit="return confirm('Remove this milestone?')">{% csrf_token %}<button type="submit" class="del-btn"><i class="fas fa-xmark"></i></button></form>
+              </div>
+            </div>
+            <div class="tl-meta">
+              <span class="tl-badge">{{ ms.get_milestone_type_display }}</span>
+              <span class="tl-badge {{ ms.outcome }}">{{ ms.get_outcome_display }}</span>
+            </div>
+            {% if ms.note %}<div class="tl-note">{{ ms.note }}</div>{% endif %}
+            {% if ms.linked_record %}<a href="{% url 'medical_records:detail' ms.linked_record.pk %}" class="tl-record-link"><i class="fas fa-file-medical" style="font-size:.63rem"></i> {{ ms.linked_record.title }}</a>{% endif %}
           </div>
         </div>
-        <div class="amf-actions">
-          <button type="submit" class="amf-submit"><i class="fas fa-check"></i> Save</button>
-          <button type="button" class="amf-cancel" onclick="toggleMilestoneForm()">Cancel</button>
-        </div>
-      </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-panel"><div style="font-size:2.5rem;margin-bottom:.5rem">📅</div><p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No milestones yet</p><p style="font-size:.82rem">Record your first visit, test, or observation above.</p></div>
+      {% endif %}
     </div>
 
-    <!-- Timeline -->
-    {% if milestones %}
-    <div class="timeline">
-      {% for ms in milestones %}
-      <div class="tl-item">
-        <div class="tl-dot {{ ms.milestone_type }}"></div>
-        <div class="tl-card">
-          <div class="tl-top">
-            <div class="tl-title">{{ ms.title }}</div>
-            <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
-              <span class="tl-date">{{ ms.date|date:"M d, Y" }}</span>
-              <form method="post" action="{% url 'treatments:delete_milestone' course.pk ms.pk %}" style="display:inline"
-                    onsubmit="return confirm('Remove this milestone?')">
-                {% csrf_token %}
-                <button type="submit" class="tl-del-btn"><i class="fas fa-xmark"></i></button>
-              </form>
+    <!-- ══ TAB: PHOTOS ══ -->
+    <div class="tab-panel" id="tab-photos">
+      <div class="photo-toolbar">
+        <div style="font-size:.92rem;font-weight:800;color:var(--text)">Progress Photos</div>
+        <button class="add-btn" onclick="toggleForm('photo-upload-form')"><i class="fas fa-camera"></i> Add photo</button>
+      </div>
+
+      <!-- Upload form -->
+      <div class="photo-upload-form" id="photo-upload-form">
+        <form method="post" action="{% url 'treatments:add_photo' course.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="upload-drop" id="drop-zone" onclick="document.getElementById('photo-file').click()">
+            <input type="file" id="photo-file" name="image" accept="image/*" onchange="previewPhoto(this)">
+            <div class="upload-drop-icon">📷</div>
+            <div class="upload-drop-text">Drag & drop or <strong>click to select</strong> a photo</div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:.3rem">JPG, PNG, WebP · max 10 MB</div>
+          </div>
+          <div class="upload-preview" id="upload-preview">
+            <img id="preview-img" src="" alt="preview">
+          </div>
+          <div class="puf-grid">
+            <div><label class="amf-label">Date taken</label><input class="amf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}"></div>
+            <div><label class="amf-label">Body area <span style="font-weight:400;color:var(--muted)">(opt)</span></label><input class="amf-input" type="text" name="body_area" placeholder="e.g. Face, Left arm"></div>
+            <div style="grid-column:1/-1"><label class="amf-label">Caption <span style="font-weight:400;color:var(--muted)">(opt)</span></label><input class="amf-input" type="text" name="caption" placeholder="e.g. Week 3 — redness reducing"></div>
+          </div>
+          <div class="amf-actions" style="margin-top:.65rem">
+            <button type="submit" class="amf-submit"><i class="fas fa-upload"></i> Upload</button>
+            <button type="button" class="amf-cancel" onclick="toggleForm('photo-upload-form')">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      {% if photos %}
+      <div class="photo-grid">
+        {% for photo in photos %}
+        <div class="photo-card" onclick="openLightbox({{ forloop.counter0 }})">
+          <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Progress photo' }}" loading="lazy">
+          <div class="photo-info">
+            <div class="photo-date">{{ photo.date|date:"M d, Y" }}</div>
+            {% if photo.body_area %}<div class="photo-area"><i class="fas fa-map-pin" style="font-size:.6rem"></i> {{ photo.body_area }}</div>{% endif %}
+            {% if photo.caption %}<div class="photo-caption">{{ photo.caption }}</div>{% endif %}
+          </div>
+          <form method="post" action="{% url 'treatments:delete_photo' course.pk photo.pk %}" style="display:inline" onsubmit="event.stopPropagation();return confirm('Delete this photo permanently?')">
+            {% csrf_token %}
+            <button type="submit" class="photo-del" onclick="event.stopPropagation()"><i class="fas fa-trash" style="font-size:.65rem"></i></button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-panel"><div style="font-size:2.5rem;margin-bottom:.5rem">📷</div><p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No photos yet</p><p style="font-size:.82rem">Upload your first progress photo to start your visual timeline.</p></div>
+      {% endif %}
+    </div>
+
+    <!-- ══ TAB: SYMPTOMS ══ -->
+    <div class="tab-panel" id="tab-symptoms">
+      <div class="symptom-toolbar">
+        <div style="font-size:.92rem;font-weight:800;color:var(--text)">Symptom Tracker</div>
+        <button class="add-btn" onclick="toggleForm('symptom-log-form')"><i class="fas fa-plus"></i> Log symptom</button>
+      </div>
+
+      <!-- Log form -->
+      <div class="symptom-log-form" id="symptom-log-form">
+        <div class="amf-title">New Symptom Entry</div>
+        <form method="post" action="{% url 'treatments:add_symptom' course.pk %}">
+          {% csrf_token %}
+          <div class="slf-grid">
+            <div>
+              <label class="amf-label">Symptom name <span style="color:#ef4444">*</span></label>
+              {% if symptom_names %}
+              <input class="amf-input" type="text" name="symptom_name" list="symptom-list" placeholder="e.g. Redness, Pain, Itch" required>
+              <datalist id="symptom-list">{% for s in symptom_names %}<option value="{{ s }}">{% endfor %}</datalist>
+              {% else %}
+              <input class="amf-input" type="text" name="symptom_name" placeholder="e.g. Redness, Pain, Itch" required>
+              {% endif %}
+            </div>
+            <div>
+              <label class="amf-label">Date</label>
+              <input class="amf-input" type="date" name="date" value="{{ today|date:'Y-m-d' }}">
+            </div>
+            <div class="severity-wrap">
+              <label class="amf-label">Severity: <strong id="sev-display">5</strong>/10</label>
+              <input class="severity-slider" type="range" name="severity" min="1" max="10" value="5"
+                     oninput="document.getElementById('sev-display').textContent=this.value">
+              <div class="severity-labels"><span>1 Minimal</span><span>10 Severe</span></div>
+            </div>
+            <div>
+              <label class="amf-label">Note <span style="font-weight:400;color:var(--muted)">(opt)</span></label>
+              <input class="amf-input" type="text" name="note" placeholder="Any context…">
             </div>
           </div>
-          <div class="tl-meta">
-            <span class="tl-badge">{{ ms.get_milestone_type_display }}</span>
-            <span class="tl-badge {{ ms.outcome }}">{{ ms.get_outcome_display }}</span>
-          </div>
-          {% if ms.note %}
-          <div class="tl-note">{{ ms.note }}</div>
-          {% endif %}
-          {% if ms.linked_record %}
-          <a href="{% url 'medical_records:detail' ms.linked_record.pk %}" class="tl-record-link">
-            <i class="fas fa-file-medical" style="font-size:.65rem"></i> {{ ms.linked_record.title }}
-          </a>
-          {% endif %}
+          <div class="amf-actions"><button type="submit" class="amf-submit"><i class="fas fa-check"></i> Save</button><button type="button" class="amf-cancel" onclick="toggleForm('symptom-log-form')">Cancel</button></div>
+        </form>
+      </div>
+
+      {% if symptom_logs %}
+      <!-- Chart -->
+      <div class="chart-wrap">
+        <div style="font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.6rem">Severity over time (1 = minimal · 10 = severe)</div>
+        <div class="chart-canvas-wrap">
+          <canvas id="symptom-chart"></canvas>
         </div>
       </div>
-      {% endfor %}
+
+      <!-- Log table -->
+      <table class="log-table">
+        <thead><tr><th>Date</th><th>Symptom</th><th>Severity</th><th>Note</th><th></th></tr></thead>
+        <tbody>
+        {% for log in symptom_logs reversed %}
+        <tr>
+          <td style="white-space:nowrap">{{ log.date|date:"M d, Y" }}</td>
+          <td style="font-weight:600">{{ log.symptom_name }}</td>
+          <td>
+            <span class="sev-badge" style="background:{% if log.severity <= 3 %}#dcfce7;color:#15803d{% elif log.severity <= 6 %}#fef9c3;color:#854d0e{% else %}#fee2e2;color:#b91c1c{% endif %}">{{ log.severity }}</span>
+          </td>
+          <td style="color:var(--muted);font-size:.75rem">{{ log.note|default:"—" }}</td>
+          <td>
+            <form method="post" action="{% url 'treatments:delete_symptom' course.pk log.pk %}" style="display:inline" onsubmit="return confirm('Remove this entry?')">
+              {% csrf_token %}<button type="submit" class="del-btn"><i class="fas fa-xmark"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-panel"><div style="font-size:2.5rem;margin-bottom:.5rem">📊</div><p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No symptom logs yet</p><p style="font-size:.82rem">Rate symptoms like pain, redness, or itch (1–10) to track improvement over time.</p></div>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="empty-timeline">
-      <div style="font-size:2.5rem;margin-bottom:.5rem">📅</div>
-      <p style="font-weight:600;color:var(--text);margin-bottom:.3rem">No milestones yet</p>
-      <p style="font-size:.82rem">Record your first visit, test, or observation above.</p>
-    </div>
-    {% endif %}
 
   </div><!-- /detail-main -->
 
-  <!-- ════════ SIDEBAR ════════ -->
+  <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
   <aside class="detail-sidebar">
 
-    <!-- Biomarker monitors -->
+    <!-- Lab checks -->
     <div class="sidebar-card">
       <div class="sc-title"><i class="fas fa-flask"></i> Lab Checks</div>
-
       {% for m in monitors %}
       <div class="mon-row">
         <span class="mon-dot {% if m.is_due %}due{% elif m.is_due_soon %}due-soon{% endif %}"></span>
         <div class="mon-info">
           <div class="mon-name">{{ m.biomarker_name }}</div>
-          <div class="mon-due">
-            Every {{ m.frequency_days }}d ·
-            {% if m.is_due %}
-              <span style="color:#ef4444;font-weight:700">Overdue</span>
-            {% elif m.is_due_soon %}
-              <span style="color:#f59e0b;font-weight:700">Due in {{ m.days_until_due }}d</span>
-            {% else %}
-              Next: {{ m.next_due|date:"M d" }}
-            {% endif %}
+          <div class="mon-due">Every {{ m.frequency_days }}d ·
+            {% if m.is_due %}<span style="color:#ef4444;font-weight:700">Overdue</span>
+            {% elif m.is_due_soon %}<span style="color:#f59e0b;font-weight:700">Due in {{ m.days_until_due }}d</span>
+            {% else %}Next: {{ m.next_due|date:"M d" }}{% endif %}
           </div>
-          {% if m.note %}<div style="font-size:.67rem;color:var(--muted)">{{ m.note }}</div>{% endif %}
+          {% if m.note %}<div style="font-size:.65rem;color:var(--muted)">{{ m.note }}</div>{% endif %}
         </div>
         <div class="mon-actions">
-          <form method="post" action="{% url 'treatments:check_monitor' course.pk m.pk %}" style="display:inline">
-            {% csrf_token %}
-            <button type="submit" class="mon-btn check" title="Mark checked today">✓</button>
-          </form>
-          <form method="post" action="{% url 'treatments:delete_monitor' course.pk m.pk %}" style="display:inline"
-                onsubmit="return confirm('Remove this monitor?')">
-            {% csrf_token %}
-            <button type="submit" class="mon-btn del" title="Remove"><i class="fas fa-xmark" style="font-size:.65rem"></i></button>
-          </form>
+          <form method="post" action="{% url 'treatments:check_monitor' course.pk m.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="mon-btn check" title="Mark checked today">✓</button></form>
+          <form method="post" action="{% url 'treatments:delete_monitor' course.pk m.pk %}" style="display:inline" onsubmit="return confirm('Remove this monitor?')">{% csrf_token %}<button type="submit" class="mon-btn del"><i class="fas fa-xmark" style="font-size:.63rem"></i></button></form>
         </div>
       </div>
       {% endfor %}
-
-      {% if not monitors %}
-      <p style="font-size:.78rem;color:var(--muted);text-align:center;padding:.5rem 0">No monitors yet.</p>
-      {% endif %}
-
-      <!-- Add monitor form -->
-      <div style="margin-top:.75rem">
-        <button class="add-btn" style="font-size:.74rem;padding:.3rem .75rem" onclick="toggleMonForm()">
-          <i class="fas fa-plus"></i> Add check
-        </button>
+      {% if not monitors %}<p style="font-size:.76rem;color:var(--muted);text-align:center;padding:.4rem 0">No monitors yet.</p>{% endif %}
+      <div style="margin-top:.65rem">
+        <button class="add-btn" style="font-size:.72rem;padding:.28rem .7rem" onclick="toggleForm('add-mon-form')"><i class="fas fa-plus"></i> Add check</button>
         <div class="add-mon-form" id="add-mon-form">
-          <form method="post" action="{% url 'treatments:add_monitor' course.pk %}" style="margin-top:.65rem">
-            {% csrf_token %}
+          <form method="post" action="{% url 'treatments:add_monitor' course.pk %}" style="margin-top:.6rem">{% csrf_token %}
             <div class="amf2-row">
               <input class="amf2-input" type="text" name="biomarker_name" placeholder="e.g. ALT (Liver)" required>
-              <input class="amf2-input" type="number" name="frequency_days" placeholder="Days" min="1" required title="Frequency in days">
+              <input class="amf2-input" type="number" name="frequency_days" placeholder="Days" min="1" required>
             </div>
-            <input class="amf2-input" type="text" name="note" placeholder="Why (optional)" style="margin-bottom:.55rem">
-            <div style="display:flex;gap:.45rem">
-              <button type="submit" class="amf-submit" style="font-size:.75rem;padding:.32rem .8rem">Add</button>
-              <button type="button" class="amf-cancel" style="font-size:.75rem;padding:.32rem .7rem" onclick="toggleMonForm()">Cancel</button>
-            </div>
+            <input class="amf2-input" type="text" name="note" placeholder="Reason (optional)" style="margin-bottom:.5rem">
+            <div style="display:flex;gap:.4rem"><button type="submit" class="amf-submit" style="font-size:.73rem;padding:.3rem .75rem">Add</button><button type="button" class="amf-cancel" style="font-size:.73rem;padding:.3rem .7rem" onclick="toggleForm('add-mon-form')">Cancel</button></div>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Summary widget -->
+    <!-- Summary -->
     <div class="sidebar-card">
       <div class="sc-title"><i class="fas fa-circle-info"></i> Summary</div>
-      <div style="font-size:.8rem;color:var(--text);display:flex;flex-direction:column;gap:.45rem">
-        <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--muted)">Milestones</span>
-          <strong>{{ milestones.count }}</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--muted)">Days elapsed</span>
-          <strong>{{ course.days_elapsed }}</strong>
-        </div>
-        {% if course.expected_end_date %}
-        <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--muted)">Expected end</span>
-          <strong>{{ course.expected_end_date|date:"M d, Y" }}</strong>
-        </div>
-        {% endif %}
-        {% if course.medications %}
-        <div style="border-top:1px solid var(--border);padding-top:.4rem;margin-top:.15rem">
-          <span style="color:var(--muted);font-size:.72rem;display:block;margin-bottom:.2rem">Medications</span>
-          <span>{{ course.medications }}</span>
-        </div>
-        {% endif %}
-      </div>
+      <div class="sum-row"><span style="color:var(--muted)">Milestones</span><strong>{{ milestones.count }}</strong></div>
+      <div class="sum-row"><span style="color:var(--muted)">Photos</span><strong>{{ photos.count }}</strong></div>
+      <div class="sum-row"><span style="color:var(--muted)">Symptom entries</span><strong>{{ symptom_logs.count }}</strong></div>
+      <div class="sum-row"><span style="color:var(--muted)">Days elapsed</span><strong>{{ course.days_elapsed }}</strong></div>
+      {% if course.expected_end_date %}<div class="sum-row"><span style="color:var(--muted)">Expected end</span><strong>{{ course.expected_end_date|date:"M d, Y" }}</strong></div>{% endif %}
+      {% if course.medications %}<div style="border-top:1px solid var(--border);padding-top:.4rem;margin-top:.2rem;font-size:.76rem"><span style="color:var(--muted);font-size:.7rem;display:block;margin-bottom:.18rem">Medications</span>{{ course.medications }}</div>{% endif %}
     </div>
 
   </aside>
 </div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <button class="lb-nav lb-prev" onclick="event.stopPropagation();lbNav(-1)"><i class="fas fa-chevron-left"></i></button>
+  <img id="lb-img" src="" alt="" onclick="event.stopPropagation()">
+  <div class="lightbox-info">
+    <div class="lb-date" id="lb-date"></div>
+    <div class="lb-caption" id="lb-caption"></div>
+  </div>
+  <button class="lb-nav lb-next" onclick="event.stopPropagation();lbNav(1)"><i class="fas fa-chevron-right"></i></button>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-function toggleMilestoneForm() {
-  document.getElementById('add-ms-form').classList.toggle('open');
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'symptoms') buildChart();
+  location.hash = name;
 }
-function toggleMonForm() {
-  document.getElementById('add-mon-form').classList.toggle('open');
+// Restore tab from URL hash
+(function(){
+  const h = location.hash.replace('#','');
+  if (['photos','symptoms'].includes(h)) {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if (b.getAttribute('onclick').includes("'"+h+"'")) switchTab(h, b);
+    });
+  }
+})();
+
+// ── Toggle forms ──────────────────────────────────────────────────────────────
+function toggleForm(id) {
+  document.getElementById(id).classList.toggle('open');
 }
+
+// ── Photo preview ─────────────────────────────────────────────────────────────
+function previewPhoto(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('preview-img').src = e.target.result;
+      document.getElementById('upload-preview').style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+// Drag and drop
+const dz = document.getElementById('drop-zone');
+if (dz) {
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('drag')));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    const fi = document.getElementById('photo-file');
+    fi.files = e.dataTransfer.files;
+    previewPhoto(fi);
+  });
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+const PHOTOS = [
+  {% for photo in photos %}
+  { src: "{{ photo.image.url }}", date: "{{ photo.date|date:'M d, Y' }}", caption: "{{ photo.caption|escapejs }}", area: "{{ photo.body_area|escapejs }}" }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+let lbIdx = 0;
+function openLightbox(i) {
+  if (!PHOTOS.length) return;
+  lbIdx = i;
+  updateLb();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function updateLb() {
+  const p = PHOTOS[lbIdx];
+  document.getElementById('lb-img').src = p.src;
+  document.getElementById('lb-date').textContent = p.date + (p.area ? ' · ' + p.area : '');
+  document.getElementById('lb-caption').textContent = p.caption;
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function lbNav(dir) {
+  lbIdx = (lbIdx + dir + PHOTOS.length) % PHOTOS.length;
+  updateLb();
+}
+document.addEventListener('keydown', e => {
+  if (document.getElementById('lightbox').classList.contains('open')) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft')  lbNav(-1);
+    if (e.key === 'ArrowRight') lbNav(1);
+  }
+});
+
+// ── Symptom chart ─────────────────────────────────────────────────────────────
+const SYMPTOM_DATA = {{ symptom_chart_json|safe }};
+const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
+let chartBuilt = false;
+
+function buildChart() {
+  if (chartBuilt || !Object.keys(SYMPTOM_DATA).length) return;
+  chartBuilt = true;
+  const ctx = document.getElementById('symptom-chart');
+  if (!ctx) return;
+
+  // Collect all unique dates across all symptoms, sorted
+  const allDates = [...new Set(
+    Object.values(SYMPTOM_DATA).flat().map(p => p.date)
+  )].sort();
+
+  const datasets = Object.entries(SYMPTOM_DATA).map(([name, pts], i) => {
+    const byDate = {};
+    pts.forEach(p => { byDate[p.date] = p.severity; });
+    return {
+      label: name,
+      data: allDates.map(d => byDate[d] ?? null),
+      borderColor: COLORS[i % COLORS.length],
+      backgroundColor: COLORS[i % COLORS.length] + '22',
+      tension: 0.35,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      spanGaps: false,
+    };
+  });
+
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: allDates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 10, ticks: { stepSize: 1, callback: v => v + '/10' }, grid: { color: '#f1f5f9' } },
+        x: { ticks: { maxTicksLimit: 10 } }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}/10`,
+            afterLabel: ctx => {
+              const pts = SYMPTOM_DATA[ctx.dataset.label];
+              const p = pts.find(p => p.date === ctx.label);
+              return p && p.note ? `Note: ${p.note}` : '';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Build chart immediately if symptoms tab is active (restored from hash)
+if (document.getElementById('tab-symptoms').classList.contains('active')) buildChart();
 </script>
 {% endblock %}

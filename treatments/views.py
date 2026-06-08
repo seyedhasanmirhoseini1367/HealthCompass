@@ -3,7 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 
-from .models import TreatmentCourse, TreatmentMilestone, CourseMonitor
+import json
+from collections import defaultdict
+from .models import TreatmentCourse, TreatmentMilestone, CourseMonitor, TreatmentPhoto, SymptomLog
 from medical_records.models import MedicalRecord
 
 
@@ -101,14 +103,34 @@ def course_detail(request, pk):
     # Records available to link when adding milestones
     user_records = MedicalRecord.objects.filter(patient=request.user).order_by('-record_date')
 
+    # Photos
+    photos = course.photos.all()
+
+    # Symptom chart data — one dataset per symptom name
+    all_logs = course.symptom_logs.all()
+    symptom_map = defaultdict(list)
+    for log in all_logs:
+        symptom_map[log.symptom_name].append({
+            'date': log.date.isoformat(),
+            'severity': log.severity,
+            'note': log.note,
+            'id': log.pk,
+        })
+    symptom_chart_json = json.dumps(dict(symptom_map))
+    symptom_names = sorted(symptom_map.keys())
+
     return render(request, 'treatments/detail.html', {
-        'course':       course,
-        'milestones':   milestones,
-        'monitors':     monitors,
-        'user_records': user_records,
-        'milestone_types': TreatmentMilestone.MilestoneType.choices,
-        'outcome_types':   TreatmentMilestone.Outcome.choices,
-        'today': timezone.now().date(),
+        'course':            course,
+        'milestones':        milestones,
+        'monitors':          monitors,
+        'user_records':      user_records,
+        'milestone_types':   TreatmentMilestone.MilestoneType.choices,
+        'outcome_types':     TreatmentMilestone.Outcome.choices,
+        'photos':            photos,
+        'symptom_logs':      all_logs,
+        'symptom_chart_json': symptom_chart_json,
+        'symptom_names':     symptom_names,
+        'today':             timezone.now().date(),
     })
 
 
@@ -237,4 +259,73 @@ def delete_course(request, pk):
         course.delete()
         messages.success(request, f'"{name}" deleted.')
         return redirect('treatments:list')
+    return redirect('treatments:detail', pk=pk)
+
+
+# ── Photos ────────────────────────────────────────────────────────────────────
+
+@login_required
+def add_photo(request, pk):
+    course = get_object_or_404(TreatmentCourse, pk=pk, patient=request.user)
+    if request.method == 'POST':
+        image = request.FILES.get('image')
+        if not image:
+            messages.error(request, 'Please select an image file.')
+            return redirect('treatments:detail', pk=pk)
+        date      = request.POST.get('date') or timezone.now().date()
+        caption   = request.POST.get('caption', '').strip()
+        body_area = request.POST.get('body_area', '').strip()
+        TreatmentPhoto.objects.create(
+            course=course, image=image,
+            date=date, caption=caption, body_area=body_area,
+        )
+        messages.success(request, 'Photo added.')
+    return redirect('treatments:detail', pk=pk)
+
+
+@login_required
+def delete_photo(request, pk, photo_id):
+    course = get_object_or_404(TreatmentCourse, pk=pk, patient=request.user)
+    photo  = get_object_or_404(TreatmentPhoto, pk=photo_id, course=course)
+    if request.method == 'POST':
+        photo.image.delete(save=False)
+        photo.delete()
+        messages.success(request, 'Photo removed.')
+    return redirect('treatments:detail', pk=pk)
+
+
+# ── Symptom logs ──────────────────────────────────────────────────────────────
+
+@login_required
+def add_symptom_log(request, pk):
+    course = get_object_or_404(TreatmentCourse, pk=pk, patient=request.user)
+    if request.method == 'POST':
+        symptom_name = request.POST.get('symptom_name', '').strip()
+        severity     = request.POST.get('severity', '').strip()
+        date         = request.POST.get('date') or timezone.now().date()
+        note         = request.POST.get('note', '').strip()
+        if symptom_name and severity:
+            try:
+                sev = int(severity)
+                if 1 <= sev <= 10:
+                    SymptomLog.objects.create(
+                        course=course, symptom_name=symptom_name,
+                        severity=sev, date=date, note=note,
+                    )
+                    messages.success(request, 'Symptom logged.')
+                else:
+                    messages.error(request, 'Severity must be between 1 and 10.')
+            except (ValueError, TypeError):
+                messages.error(request, 'Invalid severity value.')
+        else:
+            messages.error(request, 'Symptom name and severity are required.')
+    return redirect('treatments:detail', pk=pk)
+
+
+@login_required
+def delete_symptom_log(request, pk, log_id):
+    course = get_object_or_404(TreatmentCourse, pk=pk, patient=request.user)
+    log    = get_object_or_404(SymptomLog, pk=log_id, course=course)
+    if request.method == 'POST':
+        log.delete()
     return redirect('treatments:detail', pk=pk)

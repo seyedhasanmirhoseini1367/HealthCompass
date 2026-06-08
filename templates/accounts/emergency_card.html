@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}Emergency Medical Card — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.ec-page { max-width:720px; margin:0 auto; }
+.ec-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; flex-wrap:wrap; gap:.75rem; }
+.ec-header h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0; }
+
+/* Card preview */
+.ec-card { background:white; border:2px solid #e2e8f0; border-radius:16px; padding:1.5rem; margin-bottom:1.2rem; }
+.ec-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1.5rem; margin-bottom:1.2rem; flex-wrap:wrap; }
+.ec-card-title { display:flex; align-items:center; gap:.65rem; }
+.ec-red-cross { font-size:2rem; }
+.ec-name { font-size:1.3rem; font-weight:900; color:#1e293b; }
+.ec-sub { font-size:.78rem; color:#64748b; margin-top:.1rem; }
+
+.ec-qr { text-align:center; }
+.ec-qr img { border-radius:8px; border:2px solid #e2e8f0; width:100px; height:100px; }
+.ec-qr-label { font-size:.62rem; color:#94a3b8; margin-top:.25rem; }
+
+.ec-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media(max-width:500px){ .ec-grid { grid-template-columns:1fr; } }
+.ec-section { background:#f8fafc; border-radius:10px; padding:.75rem .9rem; }
+.ec-section-title { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#64748b; margin-bottom:.5rem; }
+.ec-item { font-size:.82rem; color:#1e293b; margin-bottom:.25rem; display:flex; align-items:flex-start; gap:.4rem; }
+.ec-item-icon { width:14px; text-align:center; flex-shrink:0; margin-top:.1rem; }
+.ec-tag { display:inline-flex; align-items:center; margin:.2rem .2rem 0 0; padding:.15rem .55rem; border-radius:5px; font-size:.73rem; font-weight:700; }
+.ec-tag.allergy  { background:#fee2e2; color:#b91c1c; }
+.ec-tag.med      { background:#ede9fe; color:#6d28d9; }
+.ec-tag.treatment{ background:#dbeafe; color:#1d4ed8; }
+.ec-tag.blood    { background:#fce7f3; color:#be185d; }
+
+/* Actions bar */
+.ec-actions { display:flex; gap:.65rem; flex-wrap:wrap; margin-bottom:1.2rem; }
+.ec-btn { display:inline-flex; align-items:center; gap:.38rem; padding:.45rem 1rem; border-radius:9px; font-size:.8rem; font-weight:700; border:none; cursor:pointer; transition:opacity .15s; text-decoration:none; }
+.ec-btn:hover { opacity:.87; }
+.ec-btn.primary { background:#6366f1; color:white; }
+.ec-btn.danger  { background:#ef4444; color:white; }
+.ec-btn.outline { background:white; color:var(--text); border:1.5px solid var(--border); }
+
+/* Public URL box */
+.url-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:.85rem 1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.url-text { font-family:monospace; font-size:.73rem; flex:1; color:#15803d; word-break:break-all; }
+.url-note { font-size:.75rem; color:#64748b; margin-top:.5rem; line-height:1.5; }
+
+@media print {
+  .ec-actions, .ec-page > :last-child, nav, .nav-desktop, .sidebar { display:none !important; }
+  .ec-card { border:2px solid black; page-break-inside:avoid; }
+  body { padding:0; background:white; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ec-page">
+  <div class="ec-header">
+    <h1>🆘 Emergency Medical Card</h1>
+    <div style="display:flex;gap:.5rem">
+      <button class="ec-btn outline" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+      <a class="ec-btn primary" href="{{ public_url }}" target="_blank"><i class="fas fa-arrow-up-right-from-square"></i> View public card</a>
+    </div>
+  </div>
+
+  <!-- Card preview -->
+  <div class="ec-card">
+    <div class="ec-card-header">
+      <div class="ec-card-title">
+        <span class="ec-red-cross">🆘</span>
+        <div>
+          <div class="ec-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="ec-sub">
+            {% if request.user.date_of_birth %}DOB: {{ request.user.date_of_birth|date:"M d, Y" }} · {% endif %}
+            {% if profile.national_id %}ID: {{ profile.national_id }} · {% endif %}
+            Emergency Medical Card
+          </div>
+        </div>
+      </div>
+      <div class="ec-qr">
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code">
+        <div class="ec-qr-label">Scan for full card</div>
+      </div>
+    </div>
+
+    <div class="ec-grid">
+      <!-- Blood type -->
+      <div class="ec-section">
+        <div class="ec-section-title">Blood Type</div>
+        {% if profile.blood_type %}
+        <span class="ec-tag blood" style="font-size:1.1rem;padding:.2rem .75rem">{{ profile.blood_type }}</span>
+        {% else %}
+        <span style="font-size:.8rem;color:#94a3b8">Not recorded</span>
+        {% endif %}
+      </div>
+
+      <!-- Emergency contact -->
+      <div class="ec-section">
+        <div class="ec-section-title">Emergency Contact</div>
+        {% if profile.emergency_contact_name %}
+        <div class="ec-item"><span class="ec-item-icon">👤</span><span>{{ profile.emergency_contact_name }}</span></div>
+        {% if profile.emergency_contact_phone %}
+        <div class="ec-item"><span class="ec-item-icon">📞</span><strong>{{ profile.emergency_contact_phone }}</strong></div>
+        {% endif %}
+        {% else %}
+        <span style="font-size:.8rem;color:#94a3b8">Not recorded — <a href="{% url 'accounts:profile_edit' %}" style="color:#6366f1">add in profile</a></span>
+        {% endif %}
+      </div>
+
+      <!-- Allergies -->
+      <div class="ec-section">
+        <div class="ec-section-title">Allergies & Intolerances</div>
+        {% if profile.allergies %}
+        {% for allergy in profile.allergies.splitlines %}
+        <span class="ec-tag allergy">⚠ {{ allergy }}</span>
+        {% endfor %}
+        {% else %}
+        <span style="font-size:.8rem;color:#94a3b8">No known allergies</span>
+        {% endif %}
+      </div>
+
+      <!-- Current medications -->
+      <div class="ec-section">
+        <div class="ec-section-title">Current Medications</div>
+        {% if medications %}
+        {% for med in medications %}
+        <span class="ec-tag med">{{ med.name }}{% if med.dosage %} {{ med.dosage }}{% endif %}</span>
+        {% endfor %}
+        {% else %}
+        <span style="font-size:.8rem;color:#94a3b8">None recorded</span>
+        {% endif %}
+      </div>
+
+      <!-- Active treatments -->
+      {% if treatments %}
+      <div class="ec-section" style="grid-column:1/-1">
+        <div class="ec-section-title">Active Treatment Courses</div>
+        {% for t in treatments %}
+        <span class="ec-tag treatment">{{ t.name }}{% if t.doctor_name %} · {{ t.doctor_name }}{% endif %}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Public URL info -->
+  <div class="url-box">
+    <div style="flex:1">
+      <div style="font-size:.75rem;font-weight:700;color:#15803d;margin-bottom:.35rem"><i class="fas fa-link"></i> Public emergency URL (no login needed)</div>
+      <div class="url-text">{{ public_url }}</div>
+      <div class="url-note">
+        Print this card and carry it in your wallet, or stick a QR code on your phone case.
+        Paramedics and doctors can scan the QR to see your blood type, allergies, and medications instantly — <strong>no account needed</strong>.
+      </div>
+    </div>
+    <button onclick="navigator.clipboard.writeText('{{ public_url }}').then(()=>alert('Copied!'))" class="ec-btn outline"><i class="fas fa-copy"></i> Copy</button>
+  </div>
+
+  <p style="font-size:.75rem;color:#94a3b8;margin-top:.85rem">
+    <i class="fas fa-shield-halved"></i>
+    To update blood type, allergies, or emergency contact, go to <a href="{% url 'accounts:profile_edit' %}" style="color:#6366f1">Profile Settings</a>.
+    Medications and treatments are pulled automatically from your active records.
+  </p>
+</div>
+{% endblock %}

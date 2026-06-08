@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Summary</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f4ff;font-family:Segoe UI,Arial,sans-serif">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4ff;padding:24px 0">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;max-width:560px;width:100%">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:{% if has_checkin %}#15803d{% else %}#64748b{% endif %};padding:20px 28px">
+      <div style="color:white">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.85;margin-bottom:4px">HealthCompass — Daily Summary</div>
+        <div style="font-size:20px;font-weight:800">
+          {% if has_checkin %}✅ {{ patient_name }} checked in today{% else %}📋 {{ patient_name }} — no check-in today{% endif %}
+        </div>
+      </div>
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr>
+    <td style="padding:24px 28px">
+      <p style="margin:0 0 18px;font-size:15px;color:#1e293b">Hi <strong>{{ caregiver_name }}</strong>,</p>
+
+      {% if has_checkin and checkin %}
+      <!-- Score table -->
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1e293b">Today's reported scores:</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:20px">
+        {% if checkin.feeling_score %}
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <td style="padding:10px 16px;font-size:13px;color:#64748b;background:#f8fafc;width:40%">Overall Feeling</td>
+          <td style="padding:10px 16px;font-size:15px;font-weight:800;color:{% if checkin.feeling_score >= 7 %}#15803d{% elif checkin.feeling_score >= 4 %}#854d0e{% else %}#b91c1c{% endif %}">{{ checkin.feeling_score }}/10</td>
+        </tr>
+        {% endif %}
+        {% if checkin.pain_score is not None %}
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <td style="padding:10px 16px;font-size:13px;color:#64748b;background:#f8fafc">Pain Level</td>
+          <td style="padding:10px 16px;font-size:15px;font-weight:800;color:{% if checkin.pain_score <= 2 %}#15803d{% elif checkin.pain_score <= 5 %}#854d0e{% else %}#b91c1c{% endif %}">{{ checkin.pain_score }}/10</td>
+        </tr>
+        {% endif %}
+        {% if checkin.sleep_score %}
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <td style="padding:10px 16px;font-size:13px;color:#64748b;background:#f8fafc">Sleep Quality</td>
+          <td style="padding:10px 16px;font-size:15px;font-weight:800;color:{% if checkin.sleep_score >= 7 %}#15803d{% elif checkin.sleep_score >= 4 %}#854d0e{% else %}#b91c1c{% endif %}">{{ checkin.sleep_score }}/10</td>
+        </tr>
+        {% endif %}
+        {% if checkin.mood %}
+        <tr>
+          <td style="padding:10px 16px;font-size:13px;color:#64748b;background:#f8fafc">Mood</td>
+          <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#1e293b">{{ checkin.get_mood_display }}</td>
+        </tr>
+        {% endif %}
+      </table>
+
+      {% if checkin.medications_taken is not None %}
+      <p style="margin:0 0 14px;font-size:14px;color:#1e293b">
+        Medications taken today:
+        <strong style="color:{% if checkin.medications_taken %}#15803d{% else %}#b91c1c{% endif %}">
+          {% if checkin.medications_taken %}✓ Yes{% else %}✗ No{% endif %}
+        </strong>
+      </p>
+      {% endif %}
+
+      {% if checkin.symptoms %}
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#1e293b">Notes from today:</p>
+      <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;font-size:13px;color:#475569;line-height:1.6;margin-bottom:16px">{{ checkin.symptoms }}</div>
+      {% endif %}
+
+      {% if checkin.is_flagged %}
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:9px;padding:12px 16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#92400e">⚠️ This check-in was automatically flagged</div>
+        <div style="font-size:12px;color:#92400e;margin-top:4px">{{ checkin.flag_reason }}</div>
+      </div>
+      {% endif %}
+
+      {% elif checkin and checkin.is_quick %}
+      <div style="background:#dcfce7;border-radius:10px;padding:14px 18px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:#15803d">✅ Quick check-in — {{ patient_name }} confirmed they are okay today.</div>
+      </div>
+
+      {% else %}
+      <div style="background:#fef9c3;border-radius:10px;padding:14px 18px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:#854d0e">⏳ No check-in has been recorded today.</div>
+        <div style="font-size:12px;color:#92400e;margin-top:4px">You may receive a separate escalation alert if this continues.</div>
+      </div>
+      {% endif %}
+
+      <!-- Dashboard button -->
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="background:#6366f1;border-radius:9px">
+            <a href="{{ dashboard_url }}" style="display:inline-block;padding:11px 22px;color:white;text-decoration:none;font-size:14px;font-weight:700">
+              Open Full Dashboard →
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 28px;text-align:center">
+      <p style="margin:0;font-size:11px;color:#94a3b8">
+        This is your daily summary from HealthCompass.
+        You are receiving this because you are listed as a caregiver.
+      </p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+
+</body>
+</html>
