@@ -604,8 +604,8 @@ def seizure_realtime_models(request):
     return JsonResponse({'models': [
         {'variant': 'ensemble',       'title': 'Ensemble (all 3 models)'},
         {'variant': 'cnn_transformer','title': 'CNN-Transformer'},
-        {'variant': 'gru_attention',  'title': 'GRU + Attention'},
-        {'variant': 'fusion',         'title': 'CNN-GRU Fusion'},
+        {'variant': 'gru_attention',  'title': 'LSTM + Attention'},
+        {'variant': 'fusion',         'title': 'CNN-LSTM Fusion'},
     ]})
 
 
