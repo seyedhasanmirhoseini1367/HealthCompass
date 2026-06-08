@@ -52,6 +52,7 @@ Thumbs.db
 *.onnx
 # Exception: EEG seizure models are small enough to ship in repo
 !ai_insights/models/*.pth
+!ai_insights/models/*.onnx
 
 # Analysis docs generated locally
 HEALTHCOMPASS_*.md
