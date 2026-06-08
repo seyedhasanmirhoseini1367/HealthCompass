@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'notifications',
     'integrations',
     'treatments',
+    'care',
+    'appointments',
+    'goals',
 ]
 
 MIDDLEWARE = [
@@ -143,7 +146,7 @@ OPENAI_API_KEY    = config('OPENAI_API_KEY',    default='')
 
 # ── RAG Configuration ──────────────────────────────────────────────────────────
 RAG_CONFIG = {
-    'EMBEDDING_MODEL':   'sentence-transformers/all-MiniLM-L6-v2',
+    'EMBEDDING_MODEL':   'models/text-embedding-004',
     'CHUNK_SIZE':        200,
     'CHUNK_OVERLAP':     40,
     'TOP_K':             6,
@@ -201,6 +204,21 @@ SOCIALACCOUNT_PROVIDERS = {
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
     }
+}
+
+# ── Care / Escalation ─────────────────────────────────────────────────────────
+# Public URL used to build links in escalation emails (no trailing slash).
+# Set SITE_URL in your .env / Railway environment variables.
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
+
+# Twilio — only needed if SMS notifications are enabled on any CareGiver.
+TWILIO_ACCOUNT_SID  = config('TWILIO_ACCOUNT_SID',  default='')
+TWILIO_AUTH_TOKEN   = config('TWILIO_AUTH_TOKEN',    default='')
+TWILIO_FROM_NUMBER  = config('TWILIO_FROM_NUMBER',   default='')
+
+CARE_ESCALATION = {
+    # Hour (0–23, server timezone) at which daily summary emails are sent.
+    'DAILY_SUMMARY_HOUR': 20,   # 8 pm
 }
 
 # ── Production security headers ────────────────────────────────────────────────

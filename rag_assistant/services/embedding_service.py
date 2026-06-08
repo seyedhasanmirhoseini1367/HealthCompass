@@ -1,12 +1,12 @@
 # rag_assistant/services/embedding_service.py
 """
-Embedding service — generates and stores sentence-transformer vectors
-for medical record chunks.  Identical contract to PersonalPortfolio but
-scoped per patient and stored in MedicalChunk.embedding (pickle bytes).
+Embedding service — uses Gemini text-embedding-004 (free tier: 1,500 req/day).
+Replaces sentence-transformers to eliminate the ~1 GB PyTorch memory footprint.
 """
 import os
 import pickle
 import logging
+import time
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
 
@@ -14,48 +14,49 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+_EMBED_DIM = 768  # Gemini text-embedding-004 output dimension
+
 
 class EmbeddingService:
-    _model = None  # class-level cache — loaded once per process
 
     def __init__(self):
         self.cfg        = settings.RAG_CONFIG
-        self.model_name = self.cfg['EMBEDDING_MODEL']
         self.store_path = self.cfg['VECTOR_STORE_PATH']
         os.makedirs(self.store_path, exist_ok=True)
-
-    @property
-    def model(self):
-        if EmbeddingService._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-                EmbeddingService._model = SentenceTransformer(self.model_name)
-                logger.info('Loaded embedding model: %s', self.model_name)
-            except Exception as e:
-                logger.error('Failed to load embedding model %s: %s', self.model_name, e)
-                EmbeddingService._model = None
-        return EmbeddingService._model
 
     # ── Single embedding ───────────────────────────────────────────────────────
 
     def embed(self, text: str) -> np.ndarray:
-        if self.model is None:
-            return np.zeros(384, dtype=np.float32)
-        return self.model.encode(text, convert_to_numpy=True).astype(np.float32)
+        results = self.embed_batch([text])
+        return results[0]
 
     # ── Batch embed ────────────────────────────────────────────────────────────
 
     def embed_batch(self, texts: List[str]) -> np.ndarray:
         if not texts:
-            return np.zeros((0, 384), dtype=np.float32)
-        if self.model is None:
-            return np.zeros((len(texts), 384), dtype=np.float32)
-        return self.model.encode(
-            texts,
-            batch_size=32,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-        ).astype(np.float32)
+            return np.zeros((0, _EMBED_DIM), dtype=np.float32)
+
+        api_key = getattr(settings, 'GEMINI_API_KEY', '')
+        if not api_key:
+            logger.warning('GEMINI_API_KEY not set — returning zero embeddings')
+            return np.zeros((len(texts), _EMBED_DIM), dtype=np.float32)
+
+        try:
+            from google import genai
+            client  = genai.Client(api_key=api_key)
+            vectors = []
+            for i, text in enumerate(texts):
+                if i > 0 and i % 10 == 0:
+                    time.sleep(1)  # free tier: ~1,500 req/day, stay safe
+                resp = client.models.embed_content(
+                    model    = 'models/text-embedding-004',
+                    contents = text,
+                )
+                vectors.append(resp.embeddings[0].values)
+            return np.array(vectors, dtype=np.float32)
+        except Exception as exc:
+            logger.error('Gemini embedding error: %s', exc)
+            return np.zeros((len(texts), _EMBED_DIM), dtype=np.float32)
 
     # ── Embed and persist MedicalChunk objects ─────────────────────────────────
 
@@ -78,10 +79,6 @@ class EmbeddingService:
         patient,
         document_type: Optional[str] = None,
     ) -> Tuple[List[str], np.ndarray, List[Dict[str, Any]]]:
-        """
-        Return (texts, embeddings_matrix, metadata_list) for all embedded
-        chunks belonging to *patient*.  Optionally filter by document_type.
-        """
         from rag_assistant.models import MedicalChunk
         qs = MedicalChunk.objects.filter(
             patient=patient, embedding__isnull=False
@@ -91,7 +88,7 @@ class EmbeddingService:
 
         chunks = list(qs)
         if not chunks:
-            return [], np.zeros((0, 384), dtype=np.float32), []
+            return [], np.zeros((0, _EMBED_DIM), dtype=np.float32), []
 
         texts, vecs, meta = [], [], []
         for c in chunks:
@@ -100,19 +97,19 @@ class EmbeddingService:
                 texts.append(c.content)
                 vecs.append(vec)
                 meta.append({
-                    'chunk_id':      str(c.id),
-                    'document_id':   str(c.document_id),
+                    'chunk_id':       str(c.id),
+                    'document_id':    str(c.document_id),
                     'document_title': c.document.title,
-                    'document_type': c.document.document_type,
-                    'chunk_index':   c.chunk_index,
-                    'record_id':     str(c.document.record_id) if c.document.record_id else None,
-                    'record_date':   c.metadata.get('record_date'),
+                    'document_type':  c.document.document_type,
+                    'chunk_index':    c.chunk_index,
+                    'record_id':      str(c.document.record_id) if c.document.record_id else None,
+                    'record_date':    c.metadata.get('record_date'),
                     **c.metadata,
                 })
             except Exception as e:
                 logger.warning('Bad embedding on chunk %s: %s', c.id, e)
 
         if not vecs:
-            return [], np.zeros((0, 384), dtype=np.float32), []
+            return [], np.zeros((0, _EMBED_DIM), dtype=np.float32), []
 
         return texts, np.vstack(vecs).astype(np.float32), meta
