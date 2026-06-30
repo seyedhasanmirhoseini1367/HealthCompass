@@ -45,6 +45,11 @@ if [ "$CREATE_ADMIN" = "true" ]; then
     python manage.py createsuperuser --noinput || echo "Superuser already exists — skipping."
 fi
 
+# ── Google OAuth SocialApp ────────────────────────────────────────────────────
+echo ""
+echo ">>> [2.7/3] Ensuring Google SocialApp credentials in DB..."
+python manage.py ensure_social_app || echo "ensure_social_app failed (non-fatal)"
+
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
 echo ">>> [3/3] Starting gunicorn on 0.0.0.0:${PORT}..."
