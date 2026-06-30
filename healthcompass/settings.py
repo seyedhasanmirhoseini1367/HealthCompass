@@ -191,8 +191,8 @@ SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
 ACCOUNT_EMAIL_VERIFICATION  = 'none'
-ACCOUNT_EMAIL_REQUIRED      = True
-ACCOUNT_USERNAME_REQUIRED   = False
+ACCOUNT_SIGNUP_FIELDS       = ['email*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS       = {'email'}
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
