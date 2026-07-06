@@ -177,6 +177,7 @@ USE_X_FORWARDED_HOST    = True
 
 # ── Google OAuth (allauth) ─────────────────────────────────────────────────────
 SITE_ID = 1
+SITE_DOMAIN = config('SITE_DOMAIN', default='healthcompass.hasanai.net')
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
