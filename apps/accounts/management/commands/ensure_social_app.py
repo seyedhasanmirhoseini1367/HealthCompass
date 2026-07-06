@@ -44,41 +44,21 @@ class Command(BaseCommand):
             )
             self.stdout.write(f'Site: {site.domain} (id={site.id}, {"created" if site_created else "updated"})')
 
-            # allauth 65.x added provider_id; set it explicitly to avoid lookup failures
-            provider_id = 'google'
-            app, created = SocialApp.objects.get_or_create(
-                provider=provider_id,
-                defaults={
-                    'provider_id': provider_id,
-                    'name':        'Google',
-                    'client_id':   client_id,
-                    'secret':      secret,
-                    'key':         '',
-                },
-            )
+            # Delete ALL existing Google apps then create one clean record.
+            # get_or_create across multiple deploys can leave duplicates, which
+            # causes allauth to raise MultipleObjectsReturned at login.
+            deleted_count, _ = SocialApp.objects.filter(provider='google').delete()
+            if deleted_count:
+                self.stdout.write(f'Deleted {deleted_count} existing Google SocialApp(s).')
 
-            if not created:
-                changed = False
-                if app.client_id != client_id:
-                    app.client_id = client_id
-                    changed = True
-                if app.secret != secret:
-                    app.secret = secret
-                    changed = True
-                # Ensure provider_id is set on existing records (allauth 65 upgrade)
-                if not getattr(app, 'provider_id', None):
-                    try:
-                        app.provider_id = provider_id
-                        changed = True
-                    except AttributeError:
-                        pass
-                if changed:
-                    app.save()
-                    self.stdout.write(self.style.SUCCESS('Updated Google SocialApp credentials.'))
-                else:
-                    self.stdout.write('Google SocialApp already up to date.')
-            else:
-                self.stdout.write(self.style.SUCCESS('Created Google SocialApp.'))
+            app = SocialApp.objects.create(
+                provider='google',
+                name='Google',
+                client_id=client_id,
+                secret=secret,
+                key='',
+            )
+            self.stdout.write(self.style.SUCCESS(f'Created fresh Google SocialApp (id={app.id}).'))
 
             if site not in app.sites.all():
                 app.sites.add(site)
