@@ -34,7 +34,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Google client_id: {client_id[:8]}…  (secret set: {bool(secret)})')
 
         try:
-            from allauth.socialaccount.models import SocialApp
+            from allauth.socialaccount.models import SocialApp, SocialAppProvider
             from django.contrib.sites.models import Site
 
             domain = os.environ.get('SITE_DOMAIN', '') or getattr(settings, 'SITE_DOMAIN', 'healthcompass.hasanai.net')
@@ -44,18 +44,37 @@ class Command(BaseCommand):
             )
             self.stdout.write(f'Site: {site.domain} (id={site.id}, {"created" if site_created else "updated"})')
 
-            # allauth 65.x added provider_id; set it explicitly to avoid lookup failures
+            # allauth 65.x uses SocialAppProvider as a ForeignKey
             provider_id = 'google'
-            app, created = SocialApp.objects.get_or_create(
-                provider=provider_id,
-                defaults={
-                    'provider_id': provider_id,
-                    'name':        'Google',
-                    'client_id':   client_id,
-                    'secret':      secret,
-                    'key':         '',
-                },
-            )
+            try:
+                # Try to get or create the provider
+                provider, _ = SocialAppProvider.objects.get_or_create(id=provider_id)
+            except Exception:
+                # If SocialAppProvider doesn't exist (older allauth), skip this step
+                provider = None
+
+            # Get or create the SocialApp
+            if provider:
+                app, created = SocialApp.objects.get_or_create(
+                    provider=provider,
+                    defaults={
+                        'name':        'Google',
+                        'client_id':   client_id,
+                        'secret':      secret,
+                        'key':         '',
+                    },
+                )
+            else:
+                # Fallback for older allauth versions
+                app, created = SocialApp.objects.get_or_create(
+                    provider=provider_id,
+                    defaults={
+                        'name':        'Google',
+                        'client_id':   client_id,
+                        'secret':      secret,
+                        'key':         '',
+                    },
+                )
 
             if not created:
                 changed = False
@@ -65,13 +84,6 @@ class Command(BaseCommand):
                 if app.secret != secret:
                     app.secret = secret
                     changed = True
-                # Ensure provider_id is set on existing records (allauth 65 upgrade)
-                if not getattr(app, 'provider_id', None):
-                    try:
-                        app.provider_id = provider_id
-                        changed = True
-                    except AttributeError:
-                        pass
                 if changed:
                     app.save()
                     self.stdout.write(self.style.SUCCESS('Updated Google SocialApp credentials.'))
@@ -89,3 +101,4 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f'ensure_social_app failed: {exc}'))
             self.stderr.write(traceback.format_exc())
             sys.exit(1)
+
