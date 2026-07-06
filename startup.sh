@@ -48,7 +48,7 @@ fi
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
 echo ""
 echo ">>> [2.7/3] Ensuring Google SocialApp credentials in DB..."
-python manage.py ensure_social_app
+python manage.py ensure_social_app || echo "WARNING: ensure_social_app failed — check logs above"
 
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
