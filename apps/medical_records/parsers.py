@@ -331,7 +331,7 @@ class KantaXMLParser:
             return val
 
 
-# ─── Wearable CSV ────────────────────────────────────────────────────────────
+# ─── Wearable (CSV / JSON / Apple Health XML) ────────────────────────────────
 
 # Column name mappings for common wearable exports
 METRIC_COLUMN_MAP = {
@@ -379,37 +379,218 @@ METRIC_UNITS = {
 }
 
 
-class WearableCSVParser:
-    """Parse wearable device CSV exports into structured data points."""
+class WearableParser:
+    """Parse wearable device exports: auto-detects CSV, JSON, or Apple Health XML."""
 
-    def parse(self, csv_bytes: bytes, filename: str = '') -> dict:
+    # ── Public entry point ────────────────────────────────────────────────────
+
+    def parse(self, data_bytes: bytes, filename: str = '') -> dict:
+        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        stripped = data_bytes.lstrip()
+        if ext == 'parquet':
+            return self._parse_parquet(data_bytes, filename)
+        if ext == 'json' or stripped[:1] in (b'{', b'['):
+            return self._parse_json(data_bytes, filename)
+        if ext == 'xml' or stripped[:1] == b'<':
+            return self._parse_xml(data_bytes, filename)
+        return self._parse_csv(data_bytes, filename)
+
+    # ── CSV ───────────────────────────────────────────────────────────────────
+
+    def _parse_csv(self, data_bytes: bytes, filename: str = '') -> dict:
         try:
-            text = csv_bytes.decode('utf-8-sig')  # handles BOM
+            text = data_bytes.decode('utf-8-sig')
         except UnicodeDecodeError:
-            text = csv_bytes.decode('latin-1')
+            text = data_bytes.decode('latin-1')
 
         reader = csv.DictReader(io.StringIO(text))
         headers = reader.fieldnames or []
-
-        # Detect device type from filename or headers
         device = self._detect_device(filename, headers)
-
-        data_points = []
-        errors = []
+        data_points, errors = [], []
 
         for i, row in enumerate(reader):
             try:
-                points = self._parse_row(row, headers, device)
-                data_points.extend(points)
+                data_points.extend(self._parse_row(row, headers, device))
             except Exception as e:
                 errors.append(f'Row {i+2}: {e}')
 
-        return {
-            'device': device,
-            'data_points': data_points,
-            'count': len(data_points),
-            'errors': errors[:10],
-        }
+        return {'device': device, 'data_points': data_points, 'count': len(data_points), 'errors': errors[:10]}
+
+    # ── Parquet ───────────────────────────────────────────────────────────────
+
+    def _parse_parquet(self, data_bytes: bytes, filename: str = '') -> dict:
+        try:
+            import pandas as pd
+        except ImportError:
+            return {'device': 'unknown', 'data_points': [], 'count': 0,
+                    'errors': ['pandas is required to read Parquet files.']}
+        try:
+            df = pd.read_parquet(io.BytesIO(data_bytes))
+        except Exception as e:
+            return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+
+        device = self._detect_device(filename, list(df.columns))
+        data_points, errors = [], []
+
+        # Normalise column names for matching
+        df.columns = [str(c) for c in df.columns]
+
+        # Find a datetime column
+        dt_col = None
+        for candidate in ('datetime', 'date', 'timestamp', 'time', 'startDate',
+                          'start_time', 'creationDate'):
+            if candidate in df.columns:
+                dt_col = candidate
+                break
+        if dt_col is None:
+            for col in df.columns:
+                if 'date' in col.lower() or 'time' in col.lower():
+                    dt_col = col
+                    break
+
+        for _, row in df.iterrows():
+            # Parse datetime
+            dt = None
+            if dt_col:
+                try:
+                    import pandas as pd2
+                    raw = row[dt_col]
+                    if pd2.isna(raw):
+                        continue
+                    dt = pd.Timestamp(raw).to_pydatetime()
+                except Exception:
+                    pass
+            if dt is None:
+                continue
+
+            for col, raw_val in row.items():
+                if col == dt_col:
+                    continue
+                metric = self._map_metric(str(col))
+                if metric is None:
+                    continue
+                try:
+                    value = float(raw_val)
+                    if pd.isna(value):
+                        continue
+                except (ValueError, TypeError):
+                    continue
+                value, unit = self._normalize_value(metric, value, col.lower())
+                data_points.append({'metric': metric, 'value': value,
+                                    'unit': unit, 'recorded_at': dt.isoformat()})
+
+        return {'device': device, 'data_points': data_points,
+                'count': len(data_points), 'errors': errors[:10]}
+
+    # ── JSON ──────────────────────────────────────────────────────────────────
+
+    def _parse_json(self, data_bytes: bytes, filename: str = '') -> dict:
+        try:
+            obj = json.loads(data_bytes.decode('utf-8'))
+        except Exception as e:
+            return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+
+        device = self._detect_device(filename, [])
+        data_points = []
+
+        # Fitbit: {"activities-heart": [{dateTime, value}], ...}
+        if isinstance(obj, dict):
+            for key, val in obj.items():
+                if not isinstance(val, list):
+                    continue
+                metric = self._map_metric(key)
+                for item in val:
+                    if not isinstance(item, dict):
+                        continue
+                    dt = self._extract_datetime(item)
+                    value = self._extract_numeric(item)
+                    if dt and value is not None:
+                        m = metric or 'other'
+                        data_points.append({'metric': m, 'value': value,
+                                            'unit': METRIC_UNITS.get(m, ''), 'recorded_at': dt.isoformat()})
+        # Generic array: [{date, steps, heart_rate, ...}]
+        elif isinstance(obj, list):
+            for item in obj:
+                if not isinstance(item, dict):
+                    continue
+                dt = self._extract_datetime(item)
+                if not dt:
+                    continue
+                for k, v in item.items():
+                    metric = self._map_metric(k)
+                    if not metric:
+                        continue
+                    try:
+                        value = float(v)
+                    except (ValueError, TypeError):
+                        continue
+                    data_points.append({'metric': metric, 'value': value,
+                                        'unit': METRIC_UNITS.get(metric, ''), 'recorded_at': dt.isoformat()})
+
+        if device == 'unknown':
+            device = 'fitbit' if isinstance(obj, dict) else 'unknown'
+        return {'device': device, 'data_points': data_points, 'count': len(data_points), 'errors': []}
+
+    def _extract_numeric(self, item: dict):
+        """Pull the first numeric-looking value out of a Fitbit-style {dateTime, value} dict."""
+        v = item.get('value')
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, dict):
+            # e.g. Fitbit heart rate: {"bpm": 72, "confidence": 2}
+            for sub in ('bpm', 'value', 'count'):
+                if sub in v:
+                    try:
+                        return float(v[sub])
+                    except (ValueError, TypeError):
+                        pass
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
+
+    # ── Apple Health XML ──────────────────────────────────────────────────────
+
+    _AH_TYPE_MAP = {
+        'HKQuantityTypeIdentifierHeartRate':              ('heart_rate',  'bpm'),
+        'HKQuantityTypeIdentifierStepCount':              ('steps',       'steps'),
+        'HKQuantityTypeIdentifierActiveEnergyBurned':     ('calories',    'kcal'),
+        'HKQuantityTypeIdentifierDistanceWalkingRunning': ('distance',    'km'),
+        'HKQuantityTypeIdentifierOxygenSaturation':       ('blood_oxygen','%'),
+        'HKQuantityTypeIdentifierBodyMass':               ('weight',      'kg'),
+        'HKQuantityTypeIdentifierBodyTemperature':        ('temperature', '°C'),
+        'HKQuantityTypeIdentifierRespiratoryRate':        ('respiratory_rate', 'bpm'),
+        'HKCategoryTypeIdentifierSleepAnalysis':          ('sleep',       'h'),
+    }
+
+    def _parse_xml(self, data_bytes: bytes, filename: str = '') -> dict:
+        try:
+            root = ET.fromstring(data_bytes)
+        except ET.ParseError as e:
+            return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+
+        device = 'apple_health'
+        data_points, errors = [], []
+
+        for record in root.iter('Record'):
+            rtype = record.get('type', '')
+            if rtype not in self._AH_TYPE_MAP:
+                continue
+            metric, unit = self._AH_TYPE_MAP[rtype]
+            start_raw = record.get('startDate') or record.get('creationDate', '')
+            value_str = record.get('value')
+            if not start_raw or value_str is None:
+                continue
+            try:
+                dt = datetime.strptime(start_raw[:19], '%Y-%m-%d %H:%M:%S')
+                value = float(value_str)
+            except (ValueError, TypeError):
+                continue
+            data_points.append({'metric': metric, 'value': value, 'unit': unit, 'recorded_at': dt.isoformat()})
+
+        return {'device': device, 'data_points': data_points, 'count': len(data_points), 'errors': errors}
 
     def _detect_device(self, filename: str, headers: list) -> str:
         fname = filename.lower()
@@ -513,6 +694,9 @@ class WearableCSVParser:
         if metric == 'sleep' and value > 24:
             value = round(value / 60, 2)
         return value, unit
+
+
+WearableCSVParser = WearableParser  # backward-compat alias
 
 
 # ─── Plain Text Parser ───────────────────────────────────────────────────────

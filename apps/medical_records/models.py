@@ -16,7 +16,7 @@ class MedicalRecord(models.Model):
 
     class Source(models.TextChoices):
         KANTA_XML     = 'kanta_xml',     'Kanta XML Import'
-        WEARABLE_CSV  = 'wearable_csv',  'Wearable CSV Import'
+        WEARABLE_CSV  = 'wearable_csv',  'Wearable Import'
         MANUAL_UPLOAD = 'manual_upload', 'Manual Upload'
 
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

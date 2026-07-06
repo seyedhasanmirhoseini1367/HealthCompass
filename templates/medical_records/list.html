@@ -2,97 +2,172 @@
 {% block title %}My Medical Records — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-/* ── Two-panel page layout ───────────────────────────────────────────────── */
-.records-page {
-  display: flex;
-  gap: 1.5rem;
-  align-items: flex-start;
+/* ── Add Record button (inline in toolbar) ─────────────────────────────── */
+.add-record-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .38rem .95rem; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white; border: none; border-radius: 9px;
+  font-size: .85rem; font-weight: 800; cursor: pointer;
+  transition: opacity .18s; white-space: nowrap; text-decoration: none;
 }
+.add-record-btn:hover { opacity: .88; color: white; }
 
-/* ── Left sidebar ────────────────────────────────────────────────────────── */
-.upload-sidebar {
-  width: 252px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: .8rem;
-  position: sticky;
-  top: 1rem;
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 400;
+  background: rgba(15,23,42,.45); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; padding: 1rem;
 }
-.sidebar-heading {
-  font-size: .7rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-  padding: 0 .25rem;
+.modal-backdrop.open { display: flex; }
+.modal-box {
+  background: white; border-radius: 20px; width: 100%; max-width: 480px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.2);
+  display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;
+  transition: max-width .2s;
 }
-.upload-card {
-  border-radius: 12px;
-  padding: .6rem .75rem;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: .65rem;
-  border: 1.5px solid transparent;
-  transition: transform .18s, box-shadow .18s;
-}
-.upload-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0,0,0,.09);
-}
-.upload-card.kanta { background: linear-gradient(135deg,#e0f2fe,#f0f7ff); border-color: #bae6fd; }
-.upload-card.wear  { background: linear-gradient(135deg,#ede9fe,#f5f3ff); border-color: #c4b5fd; }
-.upload-card.pdf   { background: linear-gradient(135deg,#dcfce7,#f0fdf4); border-color: #86efac; }
-.upload-card.txt   { background: linear-gradient(135deg,#fff7ed,#fef9c3); border-color: #fde68a; }
-
-.uc-icon {
-  width: 34px; height: 34px;
-  border-radius: 9px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1rem; color: white;
-}
-.kanta .uc-icon { background: #0ea5e9; }
-.wear  .uc-icon { background: #7c3aed; }
-.pdf   .uc-icon { background: #10b981; }
-.txt   .uc-icon { background: #f59e0b; }
-
-.uc-info { flex: 1; min-width: 0; }
-.uc-title { font-size: .83rem; font-weight: 800; color: var(--text); }
-.uc-desc  { font-size: .68rem; color: #64748b; line-height: 1.35; margin-top: .1rem; }
-
-.uc-btn {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: .28rem .65rem;
-  border-radius: 7px;
-  font-size: .73rem; font-weight: 700;
-  text-decoration: none; flex-shrink: 0;
-  transition: opacity .15s;
-  color: white;
-}
-.uc-btn:hover { opacity: .85; }
-.kanta .uc-btn { background: #0ea5e9; }
-.wear  .uc-btn { background: #7c3aed; }
-.pdf   .uc-btn { background: #10b981; }
-.txt   .uc-btn { background: #f59e0b; }
-
-.stats-widget {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: .8rem 1rem;
-}
-.sw-row {
+.modal-box.wide { max-width: 540px; }
+.modal-header {
+  padding: 1rem 1.25rem .75rem;
   display: flex; align-items: center; justify-content: space-between;
-  font-size: .81rem; padding: .18rem 0;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.sw-row + .sw-row { border-top: 1px solid var(--border); margin-top: .25rem; padding-top: .25rem; }
-.sw-label { color: var(--muted); display: flex; align-items: center; gap: .4rem; }
-.sw-val   { font-weight: 800; color: var(--text); }
-.sw-val.warn { color: #f59e0b; }
+.modal-header h2 { font-size: 1rem; font-weight: 800; margin: 0; }
+.modal-close {
+  background: var(--bg); border: none; border-radius: 8px;
+  width: 28px; height: 28px; cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center; color: var(--muted);
+}
+.modal-close:hover { background: #e2e8f0; }
+.modal-options { padding: .6rem .75rem .75rem; display: flex; flex-direction: column; gap: .35rem; overflow-y: auto; }
+.mo-row {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .75rem; border-radius: 11px;
+  border: 1.5px solid var(--border); text-decoration: none;
+  transition: border-color .15s, background .15s, transform .15s;
+  color: var(--text);
+}
+.mo-row:hover { border-color: var(--primary); background: #f0f9ff; transform: translateX(3px); color: var(--text); }
+.mo-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem; color: white;
+}
+.mo-label { font-size: .88rem; font-weight: 700; }
+.mo-desc  { font-size: .72rem; color: var(--muted); margin-top: .05rem; }
 
-/* ── Right main panel ────────────────────────────────────────────────────── */
-.records-main { flex: 1; min-width: 0; }
+/* ── Modal back button ───────────────────────────────────────────────────── */
+.modal-back {
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
+  width: 30px; height: 30px; cursor: pointer; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .82rem; transition: background .15s;
+}
+.modal-back:hover { background: #e2e8f0; }
+
+/* ── Upload panels ───────────────────────────────────────────────────────── */
+.upload-panel { padding: .75rem 1.1rem 1.1rem; overflow-y: auto; }
+.upanel-form  { display: flex; flex-direction: column; gap: .65rem; }
+.up-group     { display: flex; flex-direction: column; gap: .22rem; }
+.up-group label { font-size: .74rem; font-weight: 700; color: var(--text); }
+.up-group input,
+.up-group select,
+.up-group textarea {
+  width: 100%; padding: .44rem .8rem; box-sizing: border-box;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .875rem; font-family: inherit; outline: none;
+  background: white; transition: border .15s;
+}
+.up-group input:focus,
+.up-group select:focus,
+.up-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
+.up-group textarea { resize: vertical; min-height: 85px; }
+.up-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+@media(max-width:500px){ .up-row2 { grid-template-columns: 1fr; } }
+
+/* ── File drop zone ──────────────────────────────────────────────────────── */
+.file-drop-zone {
+  border: 2px dashed var(--border); border-radius: 12px; background: #f8fafc;
+  padding: 1.1rem 1rem; display: flex; flex-direction: column;
+  align-items: center; gap: .35rem; cursor: pointer;
+  transition: border-color .2s, background .2s;
+  font-size: .82rem; color: var(--muted); text-align: center;
+}
+.file-drop-zone i { font-size: 1.75rem; color: #94a3b8; transition: color .2s; }
+.file-drop-zone:hover               { border-color: var(--primary); background: #eef2ff; }
+.file-drop-zone:hover i             { color: var(--primary); }
+.file-drop-zone.pink:hover          { border-color: #ec4899; background: #fdf2f8; }
+.file-drop-zone.pink:hover i        { color: #ec4899; }
+.file-drop-zone.green:hover         { border-color: #10b981; background: #f0fdf4; }
+.file-drop-zone.green:hover i       { color: #10b981; }
+.file-drop-zone.blue:hover          { border-color: #0ea5e9; background: #f0f9ff; }
+.file-drop-zone.blue:hover i        { color: #0ea5e9; }
+.file-drop-zone.purple:hover        { border-color: #7c3aed; background: #f5f3ff; }
+.file-drop-zone.purple:hover i      { color: #7c3aed; }
+.file-chosen { font-size: .75rem; color: var(--primary); font-weight: 600; word-break: break-all; margin-top: .1rem; }
+
+/* ── Upload buttons ──────────────────────────────────────────────────────── */
+.up-submit-btn {
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+  width: 100%; padding: .58rem 1rem; margin-top: .2rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white; border: none; border-radius: 10px;
+  font-size: .875rem; font-weight: 800; cursor: pointer; transition: opacity .18s;
+}
+.up-submit-btn:hover:not(:disabled) { opacity: .88; }
+.up-submit-btn:disabled { opacity: .55; cursor: not-allowed; }
+.up-action-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .4rem .9rem; border-radius: 8px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; border: none; transition: opacity .15s;
+}
+.up-action-btn:disabled { opacity: .5; cursor: not-allowed; }
+.pink-abtn  { background: #ec4899; color: white; }
+.pink-abtn:hover:not(:disabled) { background: #db2777; }
+.gray-abtn  { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+.gray-abtn:hover:not(:disabled) { background: #e2e8f0; }
+
+/* ── Inline spinner ──────────────────────────────────────────────────────── */
+.up-spin {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: white;
+  border-radius: 50%; animation: usp .7s linear infinite; vertical-align: middle;
+}
+@keyframes usp { to { transform: rotate(360deg); } }
+
+/* ── Form error banner ───────────────────────────────────────────────────── */
+.form-error-banner {
+  display: none; background: #fee2e2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: .42rem .75rem;
+  font-size: .8rem; color: #dc2626;
+}
+
+/* ── Scan capture (in modal) ─────────────────────────────────────────────── */
+.scan-preview-img {
+  width: 100%; max-height: 170px; object-fit: contain;
+  border-radius: 10px; border: 1.5px solid var(--border);
+}
+.scan-status {
+  font-size: .79rem; color: var(--muted); min-height: 1.1rem;
+  display: flex; align-items: center; gap: .35rem; margin-top: .3rem;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.upload-toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 600;
+  padding: .65rem 1.1rem; border-radius: 11px;
+  font-size: .85rem; font-weight: 600; color: white;
+  box-shadow: 0 8px 28px rgba(0,0,0,.18);
+  display: flex; align-items: center; gap: .5rem;
+  transform: translateY(14px); opacity: 0;
+  transition: transform .28s, opacity .28s; pointer-events: none;
+}
+.upload-toast.toast-ok   { background: #10b981; }
+.upload-toast.toast-warn { background: #f59e0b; }
+.upload-toast.visible    { transform: translateY(0); opacity: 1; }
+
+/* ── Main panel ──────────────────────────────────────────────────────────── */
+.records-main { width: 100%; }
 
 .panel-title {
   font-size: 1.25rem; font-weight: 800; color: var(--text);
@@ -178,18 +253,17 @@
   background: #6366f1; color: white; font-size: .82rem; font-weight: 700;
 }
 
-/* ── Results bar ─────────────────────────────────────────────────────────── */
-.results-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: .85rem; font-size: .82rem; color: var(--muted);
+/* ── Record count + clear (inside toolbar) ───────────────────────────────── */
+.toolbar-count {
+  margin-left: auto; font-size: .8rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;
 }
-.results-bar .count { font-weight: 700; color: var(--text); }
+.toolbar-count .count { font-weight: 700; color: var(--text); }
 .clear-link {
   display: inline-flex; align-items: center; gap: .3rem;
-  color: #f43f5e; text-decoration: none; font-size: .8rem; font-weight: 700;
-  padding: .22rem .65rem; border-radius: 6px;
+  color: #f43f5e; text-decoration: none; font-size: .78rem; font-weight: 700;
+  padding: .2rem .55rem; border-radius: 6px;
   background: #fff1f2; border: 1px solid #fecdd3;
-  transition: background .15s;
+  transition: background .15s; white-space: nowrap; flex-shrink: 0;
 }
 .clear-link:hover { background: #ffe4e6; }
 
@@ -274,16 +348,10 @@
 .pg-btn.current { background: #6366f1; color: white; border-color: #6366f1; }
 .pg-btn.disabled { opacity: .4; pointer-events: none; }
 
-/* ── Responsive stack ────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .records-page    { flex-direction: column; }
-  .upload-sidebar  { width: 100%; position: static; flex-direction: row; flex-wrap: wrap; }
-  .upload-card     { flex: 1; min-width: 190px; }
-}
-@media (max-width: 500px) {
-  .upload-sidebar  { gap: .5rem; }
-  .upload-card     { min-width: 100%; flex: unset; }
-  .sidebar-heading { font-size: .8rem; }
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .filter-toolbar { gap: .4rem; }
+  .add-record-btn { font-size: .8rem; padding: .34rem .7rem; }
 }
 </style>
 {% endblock %}
@@ -297,78 +365,7 @@
     </div>
   </div>
 </div>
-<div class="records-page">
-
-  <!-- ════════ LEFT SIDEBAR ════════ -->
-  <aside class="upload-sidebar">
-    <p class="sidebar-heading">Add Records</p>
-
-    <div class="upload-card kanta">
-      <div class="uc-icon"><i class="fas fa-file-code"></i></div>
-      <div class="uc-info">
-        <div class="uc-title">Kanta XML</div>
-        <div class="uc-desc">Import Finnish health records — labs, prescriptions &amp; diagnoses.</div>
-      </div>
-      <a href="{% url 'medical_records:upload_kanta' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload
-      </a>
-    </div>
-
-    <div class="upload-card txt">
-      <div class="uc-icon"><i class="fas fa-paste"></i></div>
-      <div class="uc-info">
-        <div class="uc-title">Paste Text</div>
-        <div class="uc-desc">Paste any lab result or note — AI parses it automatically.</div>
-      </div>
-      <a href="{% url 'medical_records:upload_text' %}" class="uc-btn">
-        <i class="fas fa-magic"></i> Paste
-      </a>
-    </div>
-
-    <div class="upload-card pdf">
-      <div class="uc-icon"><i class="fas fa-file-pdf"></i></div>
-      <div class="uc-info">
-        <div class="uc-title">PDF / Document</div>
-        <div class="uc-desc">Upload lab reports, prescriptions or discharge summaries.</div>
-      </div>
-      <a href="{% url 'medical_records:upload_pdf' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload
-      </a>
-    </div>
-
-    <div class="upload-card wear">
-      <div class="uc-icon"><i class="fas fa-watch"></i></div>
-      <div class="uc-info">
-        <div class="uc-title">Wearable CSV</div>
-        <div class="uc-desc">Sync Apple Watch, Fitbit or Garmin — steps, HR, sleep &amp; more.</div>
-      </div>
-      <a href="{% url 'medical_records:upload_wearable' %}" class="uc-btn">
-        <i class="fas fa-upload"></i> Upload
-      </a>
-    </div>
-
-    <div class="stats-widget">
-      <div class="sw-row">
-        <span class="sw-label"><i class="fas fa-folder-open"></i> Total records</span>
-        <span class="sw-val">{{ total_count }}</span>
-      </div>
-      {% if flagged_count %}
-      <div class="sw-row">
-        <span class="sw-label"><i class="fas fa-triangle-exclamation"></i> Flagged</span>
-        <span class="sw-val warn">{{ flagged_count }}</span>
-      </div>
-      {% endif %}
-      {% if active_type or active_period or active_q %}
-      <div class="sw-row">
-        <span class="sw-label"><i class="fas fa-filter"></i> Filtered</span>
-        <span class="sw-val">{{ filtered_count }}</span>
-      </div>
-      {% endif %}
-    </div>
-  </aside>
-
-  <!-- ════════ RIGHT PANEL ════════ -->
-  <div class="records-main">
+<div class="records-main">
 
     {% if flagged_count %}
     <div class="alert-strip">
@@ -383,6 +380,11 @@
       <input type="hidden" name="period" id="hid-period" value="{{ active_period }}">
 
       <div class="filter-toolbar">
+        <button class="add-record-btn" type="button" onclick="openAddModal()">
+          <i class="fas fa-plus"></i> Add Record
+        </button>
+        <div class="vdivider"></div>
+
         <div class="search-wrap">
           <i class="fas fa-magnifying-glass s-icon"></i>
           <input type="text" name="q" id="search-input"
@@ -416,6 +418,19 @@
             <i class="fas fa-calendar-days" style="font-size:.68rem"></i> Custom
           </button>
         </div>
+
+        <span class="toolbar-count">
+          {% if active_type or active_period or active_q %}
+            <span class="count">{{ filtered_count }}</span> of {{ total_count }}
+          {% else %}
+            <span class="count">{{ total_count }}</span> record{{ total_count|pluralize }}
+          {% endif %}
+        </span>
+        {% if active_type or active_period or active_q %}
+        <a href="{% url 'medical_records:list' %}" class="clear-link">
+          <i class="fas fa-xmark"></i> Clear
+        </a>
+        {% endif %}
       </div>
 
       <div class="custom-dates {% if active_period == 'custom' %}visible{% endif %}" id="custom-dates-row">
@@ -427,22 +442,6 @@
         <button type="submit" class="apply-btn">Apply</button>
       </div>
     </form>
-
-    <!-- Results bar -->
-    <div class="results-bar">
-      <span>
-        {% if active_type or active_period or active_q %}
-          Showing <span class="count">{{ filtered_count }}</span> of {{ total_count }} records
-        {% else %}
-          <span class="count">{{ total_count }}</span> record{{ total_count|pluralize }}
-        {% endif %}
-      </span>
-      {% if active_type or active_period or active_q %}
-      <a href="{% url 'medical_records:list' %}" class="clear-link">
-        <i class="fas fa-xmark"></i> Clear filters
-      </a>
-      {% endif %}
-    </div>
 
     <!-- Record list -->
     {% if records %}
@@ -529,14 +528,239 @@
         {% if active_type or active_period or active_q %}
           Try adjusting your filters, or <a href="{% url 'medical_records:list' %}">clear them</a>.
         {% else %}
-          Upload your first record using one of the sources on the left.
+          Click <strong>+ Add Record</strong> above to upload your first record.
         {% endif %}
       </p>
     </div>
     {% endif %}
 
   </div><!-- /records-main -->
-</div><!-- /records-page -->
+
+<!-- ══ Add Record Modal ══ -->
+<div class="modal-backdrop" id="addRecordModal" onclick="closeIfBackdrop(event)">
+  <div class="modal-box" id="modalBox">
+
+    <!-- Unified header -->
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:.6rem;min-width:0">
+        <button class="modal-back" id="modalBack" onclick="showOptions()" style="display:none" title="Back">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2 id="modalTitle" style="font-size:1rem;font-weight:800;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          <i class="fas fa-plus-circle" style="color:var(--primary)"></i> Add Record
+        </h2>
+      </div>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+
+    <!-- ── Step 1: Option picker ── -->
+    <div id="panel-options" class="modal-options">
+      <a class="mo-row" href="#" onclick="showPanel('scan');return false">
+        <div class="mo-icon" style="background:#ec4899"><i class="fas fa-camera"></i></div>
+        <div><div class="mo-label">Scan Paper</div><div class="mo-desc">Take a photo — AI reads and extracts the text</div></div>
+      </a>
+      <a class="mo-row" href="#" onclick="showPanel('pdf');return false">
+        <div class="mo-icon" style="background:#10b981"><i class="fas fa-file-pdf"></i></div>
+        <div><div class="mo-label">PDF / Document</div><div class="mo-desc">Lab reports, prescriptions, discharge summaries</div></div>
+      </a>
+      <a class="mo-row" href="#" onclick="showPanel('text');return false">
+        <div class="mo-icon" style="background:#f59e0b"><i class="fas fa-paste"></i></div>
+        <div><div class="mo-label">Paste Text</div><div class="mo-desc">Paste any lab result or note — AI parses it</div></div>
+      </a>
+      <a class="mo-row" href="#" onclick="showPanel('kanta');return false">
+        <div class="mo-icon" style="background:#0ea5e9"><i class="fas fa-file-code"></i></div>
+        <div><div class="mo-label">Kanta XML</div><div class="mo-desc">Import Finnish health records</div></div>
+      </a>
+      <a class="mo-row" href="#" onclick="showPanel('wearable');return false">
+        <div class="mo-icon" style="background:#7c3aed"><i class="fas fa-watch"></i></div>
+        <div><div class="mo-label">Wearable Data</div><div class="mo-desc">Apple Watch, Fitbit, Garmin — CSV, JSON, or XML export</div></div>
+      </a>
+    </div>
+
+    <!-- ── Step 2a: Scan Paper ── -->
+    <div id="panel-scan" class="upload-panel" style="display:none">
+      <div id="scan-capture-wrap" style="margin-bottom:.75rem">
+        <div class="file-drop-zone pink" onclick="document.getElementById('modal-scan-input').click()">
+          <i class="fas fa-camera"></i>
+          <div><strong>Tap to take photo</strong></div>
+          <div style="font-size:.72rem">or choose an image file</div>
+        </div>
+        <input type="file" id="modal-scan-input" accept="image/*" capture="environment" hidden>
+      </div>
+      <div id="scan-preview-wrap" style="display:none;margin-bottom:.75rem">
+        <img id="modal-scan-preview" class="scan-preview-img" alt="preview">
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+          <button class="up-action-btn pink-abtn" id="modal-extract-btn" type="button">
+            <i class="fas fa-magic"></i> Extract Text with AI
+          </button>
+          <button class="up-action-btn gray-abtn" type="button" onclick="resetScanCapture()">
+            <i class="fas fa-redo"></i> Retake
+          </button>
+        </div>
+        <div class="scan-status" id="modal-scan-status"></div>
+      </div>
+      <form id="form-scan" class="upanel-form">
+        {% csrf_token %}
+        <div class="up-group">
+          <label>Extracted Text <span style="color:#ec4899">*</span></label>
+          <textarea name="raw_text" id="modal-scan-text" rows="4" required
+            placeholder="Extract text first, or type/paste directly…"></textarea>
+        </div>
+        <div class="up-row2">
+          <div class="up-group">
+            <label>Title</label>
+            <input name="title" placeholder="Auto-generated if empty">
+          </div>
+          <div class="up-group">
+            <label>Record Date</label>
+            <input name="record_date" type="date">
+          </div>
+        </div>
+        <div class="up-row2">
+          <div class="up-group">
+            <label>Record Type</label>
+            <select name="record_type">
+              <option value="auto">Auto-detect</option>
+              {% for val, label in record_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="up-group">
+            <label>Notes</label>
+            <input name="notes" placeholder="Optional…">
+          </div>
+        </div>
+        <div class="form-error-banner" id="err-scan"></div>
+        <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_scan' %}">
+          <i class="fas fa-save"></i> Save Record
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Step 2b: PDF ── -->
+    <div id="panel-pdf" class="upload-panel" style="display:none">
+      <form id="form-pdf" class="upanel-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="up-group">
+          <label>PDF File <span style="color:#10b981">*</span></label>
+          <div class="file-drop-zone green" onclick="document.getElementById('modal-pdf-input').click()">
+            <i class="fas fa-file-pdf"></i>
+            <div id="pdf-chosen-name">Click to choose PDF</div>
+          </div>
+          <input type="file" id="modal-pdf-input" name="pdf_file" accept=".pdf" hidden
+                 onchange="setChosen('pdf-chosen-name', this)">
+        </div>
+        <div class="up-row2">
+          <div class="up-group">
+            <label>Record Type</label>
+            <select name="record_type">
+              {% for val, label in record_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="up-group">
+            <label>Notes</label>
+            <input name="notes" placeholder="Optional…">
+          </div>
+        </div>
+        <div class="form-error-banner" id="err-pdf"></div>
+        <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_pdf' %}">
+          <i class="fas fa-cloud-upload-alt"></i> Upload &amp; Parse
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Step 2c: Paste Text ── -->
+    <div id="panel-text" class="upload-panel" style="display:none">
+      <form id="form-text" class="upanel-form">
+        {% csrf_token %}
+        <div class="up-group">
+          <label>Medical Text <span style="color:#f59e0b">*</span></label>
+          <textarea name="text" rows="6" required
+            placeholder="Paste lab results, prescriptions, doctor notes…&#10;&#10;Example:&#10;Glucose: 5.4 mmol/L (ref 3.9–5.6)&#10;HbA1c: 38 mmol/mol"></textarea>
+        </div>
+        <div class="up-row2">
+          <div class="up-group">
+            <label>Record Type</label>
+            <select name="record_type">
+              <option value="auto">Auto-detect</option>
+              {% for val, label in record_types %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="up-group">
+            <label>Notes</label>
+            <input name="notes" placeholder="Optional…">
+          </div>
+        </div>
+        <div class="form-error-banner" id="err-text"></div>
+        <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_text' %}">
+          <i class="fas fa-save"></i> Save Record
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Step 2d: Kanta XML ── -->
+    <div id="panel-kanta" class="upload-panel" style="display:none">
+      <form id="form-kanta" class="upanel-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="up-group">
+          <label>Kanta XML File <span style="color:#0ea5e9">*</span></label>
+          <div class="file-drop-zone blue" onclick="document.getElementById('modal-kanta-input').click()">
+            <i class="fas fa-file-code"></i>
+            <div id="kanta-chosen-name">Click to choose XML file</div>
+          </div>
+          <input type="file" id="modal-kanta-input" name="xml_file" accept=".xml" hidden
+                 onchange="setChosen('kanta-chosen-name', this)">
+        </div>
+        <div class="up-group">
+          <label>Notes</label>
+          <input name="notes" placeholder="Optional…">
+        </div>
+        <div class="form-error-banner" id="err-kanta"></div>
+        <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_kanta' %}">
+          <i class="fas fa-file-import"></i> Import Records
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Step 2e: Wearable Data ── -->
+    <div id="panel-wearable" class="upload-panel" style="display:none">
+      <form id="form-wearable" class="upanel-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="up-group">
+          <label>CSV File <span style="color:#7c3aed">*</span></label>
+          <div class="file-drop-zone purple" onclick="document.getElementById('modal-wearable-input').click()">
+            <i class="fas fa-watch"></i>
+            <div id="wearable-chosen-name">Click to choose file</div>
+            <div style="font-size:.71rem">CSV, JSON, XML, or Parquet</div>
+          </div>
+          <input type="file" id="modal-wearable-input" name="data_file" accept=".csv,.json,.xml,.parquet" hidden
+                 onchange="setChosen('wearable-chosen-name', this)">
+        </div>
+        <div class="up-row2">
+          <div class="up-group">
+            <label>Device</label>
+            <select name="device">
+              <option value="auto">Auto-detect</option>
+              <option value="fitbit">Fitbit</option>
+              <option value="garmin">Garmin</option>
+              <option value="oura">Oura Ring</option>
+              <option value="apple_health">Apple Health</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="up-group">
+            <label>Notes</label>
+            <input name="notes" placeholder="Optional…">
+          </div>
+        </div>
+        <div class="form-error-banner" id="err-wearable"></div>
+        <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_wearable' %}">
+          <i class="fas fa-chart-line"></i> Import Data
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -585,5 +809,275 @@
     searchTimer = setTimeout(function () { form.submit(); }, 600);
   });
 }());
+</script>
+<script>
+/* ── URLs & CSRF ─────────────────────────────────────────────────────────── */
+var SCAN_OCR_URL = '{% url "medical_records:scan_ocr" %}';
+
+function getCsrf() {
+  var el = document.querySelector('#addRecordModal [name=csrfmiddlewaretoken]');
+  return el ? el.value : '';
+}
+
+/* ── Panel titles ────────────────────────────────────────────────────────── */
+var PANEL_TITLES = {
+  scan:     '<i class="fas fa-camera" style="color:#ec4899"></i> Scan Paper',
+  pdf:      '<i class="fas fa-file-pdf" style="color:#10b981"></i> PDF / Document',
+  text:     '<i class="fas fa-paste" style="color:#f59e0b"></i> Paste Text',
+  kanta:    '<i class="fas fa-file-code" style="color:#0ea5e9"></i> Kanta XML',
+  wearable: '<i class="fas fa-watch" style="color:#7c3aed"></i> Wearable Data',
+};
+
+/* ── Modal open/close ────────────────────────────────────────────────────── */
+function openAddModal() {
+  showOptions();
+  document.getElementById('addRecordModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeAddModal() {
+  document.getElementById('addRecordModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function closeIfBackdrop(e) {
+  if (e.target === document.getElementById('addRecordModal')) closeAddModal();
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeAddModal();
+});
+
+/* ── Panel navigation ────────────────────────────────────────────────────── */
+function showOptions() {
+  document.querySelectorAll('.upload-panel').forEach(function(p){ p.style.display='none'; });
+  document.getElementById('panel-options').style.display = 'flex';
+  document.getElementById('modalBack').style.display     = 'none';
+  document.getElementById('modalTitle').innerHTML =
+    '<i class="fas fa-plus-circle" style="color:var(--primary)"></i> Add Record';
+  document.getElementById('modalBox').classList.remove('wide');
+}
+function showPanel(name) {
+  document.getElementById('panel-options').style.display = 'none';
+  document.querySelectorAll('.upload-panel').forEach(function(p){ p.style.display='none'; });
+  document.getElementById('panel-' + name).style.display = 'block';
+  document.getElementById('modalBack').style.display     = 'inline-flex';
+  document.getElementById('modalTitle').innerHTML        = PANEL_TITLES[name] || name;
+  document.getElementById('modalBox').classList.add('wide');
+}
+
+/* ── File chosen label ───────────────────────────────────────────────────── */
+function setChosen(labelId, input) {
+  var el = document.getElementById(labelId);
+  if (el && input.files[0]) {
+    el.innerHTML = '<span class="file-chosen">' + esc(input.files[0].name) + '</span>';
+  }
+}
+
+/* ── Form submission ─────────────────────────────────────────────────────── */
+document.querySelectorAll('.upload-panel form').forEach(function(form) {
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = form.querySelector('[type=submit]');
+    var url = btn.dataset.url;
+    submitUploadForm(form, url, btn);
+  });
+});
+
+async function submitUploadForm(form, url, btn) {
+  var origHtml = btn.innerHTML;
+  var errBanner = form.querySelector('.form-error-banner');
+  if (errBanner) { errBanner.style.display = 'none'; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="up-spin"></span> Saving…';
+
+  try {
+    var fd = new FormData(form);
+    var res = await fetch(url, {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      closeAddModal();
+      form.reset();
+      resetAllFileLabels();
+      if (data.reload) {
+        showToast(data.message || 'Records imported!', data.flagged ? 'warn' : 'ok');
+        setTimeout(function(){ location.reload(); }, 1200);
+      } else if (data.record) {
+        prependRecord(data.record);
+        showToast(data.message || 'Record saved!', data.flagged ? 'warn' : 'ok');
+        updateRecordCount(1);
+      }
+    } else {
+      showFormError(errBanner, data.error || 'Upload failed.');
+    }
+  } catch(e) {
+    showFormError(errBanner, 'Network error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+  }
+}
+
+function showFormError(banner, msg) {
+  if (!banner) { alert(msg); return; }
+  banner.textContent = msg;
+  banner.style.display = 'block';
+  banner.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function resetAllFileLabels() {
+  var defaults = {
+    'pdf-chosen-name':      'Click to choose PDF',
+    'kanta-chosen-name':    'Click to choose XML file',
+    'wearable-chosen-name': 'Click to choose CSV file',
+  };
+  Object.keys(defaults).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = defaults[id];
+  });
+}
+
+/* ── Scan capture ────────────────────────────────────────────────────────── */
+var modalScanBlob = null;
+
+document.getElementById('modal-scan-input').addEventListener('change', function() {
+  var file = this.files[0];
+  if (!file) return;
+  modalScanBlob = file;
+  document.getElementById('modal-scan-preview').src = URL.createObjectURL(file);
+  document.getElementById('scan-capture-wrap').style.display = 'none';
+  document.getElementById('scan-preview-wrap').style.display = 'block';
+  setScanStatus('');
+});
+
+function resetScanCapture() {
+  modalScanBlob = null;
+  document.getElementById('modal-scan-input').value = '';
+  document.getElementById('scan-capture-wrap').style.display = 'block';
+  document.getElementById('scan-preview-wrap').style.display = 'none';
+  document.getElementById('modal-scan-text').value = '';
+  setScanStatus('');
+}
+
+function setScanStatus(msg, loading) {
+  var el = document.getElementById('modal-scan-status');
+  el.innerHTML = loading ? '<span class="up-spin" style="border-top-color:#ec4899;border-color:#fbcfe8"></span> ' + msg : msg;
+}
+
+document.getElementById('modal-extract-btn').addEventListener('click', async function() {
+  if (!modalScanBlob) { setScanStatus('No image captured yet.'); return; }
+  this.disabled = true;
+  setScanStatus('Sending to Gemini Vision…', true);
+  try {
+    var fd = new FormData();
+    fd.append('image', modalScanBlob, 'scan.jpg');
+    fd.append('csrfmiddlewaretoken', getCsrf());
+    var res  = await fetch(SCAN_OCR_URL, { method:'POST', body:fd });
+    var data = await res.json();
+    if (data.error) {
+      setScanStatus('<i class="fas fa-triangle-exclamation" style="color:#ef4444"></i> ' + esc(data.error));
+    } else {
+      document.getElementById('modal-scan-text').value = data.text;
+      setScanStatus('<i class="fas fa-check-circle" style="color:#22c55e"></i> Text extracted — review and save.');
+    }
+  } catch(e) {
+    setScanStatus('Error: ' + e.message);
+  } finally {
+    this.disabled = false;
+  }
+});
+
+/* ── DOM: prepend new record row ─────────────────────────────────────────── */
+var TYPE_COLORS = {
+  lab_result:'#dbeafe', prescription:'#dcfce7', diagnosis:'#fce7f3',
+  vaccination:'#fef9c3', imaging:'#ede9fe', wearable:'#ecfdf5', discharge:'#fff7ed',
+};
+var TYPE_EMOJI = {
+  lab_result:'🧪', prescription:'💊', diagnosis:'🏥',
+  vaccination:'💉', imaging:'🩻', wearable:'⌚', discharge:'📄',
+};
+
+function prependRecord(rec) {
+  var bg    = TYPE_COLORS[rec.record_type] || '#f1f5f9';
+  var emoji = TYPE_EMOJI[rec.record_type]  || '📁';
+  var csrf  = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  var dateSpan  = rec.record_date ? '<span>' + esc(rec.record_date) + '</span>' : '';
+  var flagBadge = rec.is_flagged  ? '<span class="rec-badge warn">⚠️ Abnormal</span>' : '';
+  var rowCls    = rec.is_flagged  ? 'rec-row flagged' : 'rec-row';
+
+  var html = '<div class="' + rowCls + '" onclick="location.href=\'' + esc(rec.detail_url) + '\'">'
+    + '<div class="rec-icon-sm" style="background:' + bg + '">' + emoji + '</div>'
+    + '<div class="rec-info">'
+      + '<div class="rec-title">' + esc(rec.title) + '</div>'
+      + '<div class="rec-meta-row">'
+        + '<span class="rec-badge">' + esc(rec.record_type_display) + '</span>'
+        + '<span class="rec-badge">' + esc(rec.source_display) + '</span>'
+        + dateSpan
+        + '<span>Uploaded ' + esc(rec.uploaded_at) + '</span>'
+        + flagBadge
+      + '</div>'
+    + '</div>'
+    + '<div class="rec-row-actions" onclick="event.stopPropagation()">'
+      + '<a href="' + esc(rec.detail_url) + '" class="row-btn view">View</a>'
+      + '<form id="del-rec-' + rec.pk + '" method="post" action="' + esc(rec.delete_url) + '" style="display:inline">'
+        + '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrf) + '">'
+        + '<button type="button" class="row-btn delete"'
+          + ' onclick="openDeleteModal(\'Delete this record permanently?\','
+          + ' function(){ document.getElementById(\'del-rec-' + rec.pk + '\').submit(); },'
+          + ' \'Delete Record\')">'
+          + 'Delete'
+        + '</button>'
+      + '</form>'
+    + '</div>'
+  + '</div>';
+
+  var list = document.querySelector('.record-list');
+  if (list) {
+    list.insertAdjacentHTML('afterbegin', html);
+    var empty = document.querySelector('.empty-state');
+    if (empty) empty.remove();
+  } else {
+    var listDiv = document.createElement('div');
+    listDiv.className = 'record-list';
+    listDiv.innerHTML = html;
+    var main  = document.querySelector('.records-main');
+    var empty = main ? main.querySelector('.empty-state') : null;
+    if (empty) main.replaceChild(listDiv, empty);
+    else if (main) main.appendChild(listDiv);
+  }
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ── Count update ────────────────────────────────────────────────────────── */
+function updateRecordCount(delta) {
+  var el = document.querySelector('.toolbar-count .count');
+  if (!el) return;
+  var n   = (parseInt(el.textContent) || 0) + delta;
+  var wrap = el.closest('.toolbar-count');
+  wrap.innerHTML = '<span class="count">' + n + '</span> record' + (n !== 1 ? 's' : '');
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+function showToast(msg, type) {
+  var toast = document.createElement('div');
+  toast.className = 'upload-toast ' + (type === 'warn' ? 'toast-warn' : 'toast-ok');
+  toast.innerHTML = '<i class="fas fa-' + (type === 'warn' ? 'triangle-exclamation' : 'check-circle') + '"></i> ' + msg;
+  document.body.appendChild(toast);
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ toast.classList.add('visible'); });
+  });
+  setTimeout(function(){
+    toast.classList.remove('visible');
+    setTimeout(function(){ toast.remove(); }, 350);
+  }, 4500);
+}
 </script>
 {% endblock %}
