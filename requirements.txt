@@ -14,8 +14,8 @@ pyarrow
 joblib
 scipy
 langgraph==0.2.28
-# Google OAuth — pinned to avoid breaking changes across major versions
-django-allauth==65.8.0
+# Google OAuth — allow any 65.x but not 66+ which may have breaking changes
+django-allauth>=65.0.0,<66.0.0
 PyJWT
 requests
 # Production server & database
