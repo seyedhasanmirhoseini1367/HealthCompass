@@ -11,4 +11,6 @@ urlpatterns = [
     path('upload/wearable/', views.upload_wearable, name='upload_wearable'),
     path('upload/pdf/', views.upload_pdf, name='upload_pdf'),
     path('upload/text/', views.upload_text, name='upload_text'),
+    path('upload/scan/', views.upload_scan, name='upload_scan'),
+    path('upload/scan/ocr/', views.scan_ocr, name='scan_ocr'),
 ]

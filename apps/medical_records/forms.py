@@ -23,10 +23,10 @@ class WearableUploadForm(forms.Form):
         ('apple_health', 'Apple Health'),
         ('other', 'Other'),
     ]
-    csv_file = forms.FileField(
-        label='CSV file',
-        help_text='Export data as CSV from your device app and upload here.',
-        widget=forms.ClearableFileInput(attrs={'accept': '.csv'}),
+    data_file = forms.FileField(
+        label='Data file',
+        help_text='CSV, JSON, Apple Health XML, or Parquet export from your device app.',
+        widget=forms.ClearableFileInput(attrs={'accept': '.csv,.json,.xml,.parquet'}),
     )
     device = forms.ChoiceField(choices=DEVICE_CHOICES, initial='auto')
     notes = forms.CharField(

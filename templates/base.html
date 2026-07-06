@@ -12,6 +12,9 @@
     body{font-family:Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
     a{color:inherit;text-decoration:none}
     .navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
+    .proto-notice{position:absolute;left:50%;transform:translateX(-50%);font-size:.8rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#ea580c,#dc2626);padding:.3rem 1.1rem;border-radius:20px;letter-spacing:.03em;white-space:nowrap;pointer-events:none;box-shadow:0 2px 10px rgba(220,38,38,.3)}
+    @media(max-width:900px){.proto-notice{font-size:.7rem;padding:.22rem .7rem}}
+    @media(max-width:600px){.proto-notice{display:none}}
     .nav-brand{display:flex;align-items:center}
     .nav-links{display:flex;align-items:center;gap:.25rem;list-style:none}
     .nav-links a{padding:.45rem .85rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--muted);transition:all .2s}
@@ -159,6 +162,7 @@
 <body {% if user.is_authenticated %}class="auth-layout"{% endif %}>
 <nav class="navbar">
     <a href="/" class="nav-brand"><img src="/static/healthcompass-horizontal.svg" alt="HealthCompass" style="height:38px;width:auto"></a>
+    <div class="proto-notice">🚧 Research Prototype — Not a real healthcare service</div>
 
     <!-- Desktop nav links -->
     <ul class="nav-links">
@@ -174,7 +178,7 @@
                 More <i class="fas fa-chevron-down chevron"></i>
             </button>
             <div class="nav-more-menu" id="moreMenu">
-                <a href="/insights/icu/" class="nav-more-item"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i> Neuro-ICU Demo</a>
+                <a href="/insights/icu/" class="nav-more-item"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i> ICU Monitor</a>
                 <a href="/accounts/emergency-card/" class="nav-more-item"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
             </div>
         </li>
@@ -224,8 +228,8 @@
       <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> My Records</a>
       <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
       <div class="mm-divider"></div>
-      <span class="mm-section-label">Tools</span>
-      <a href="/insights/icu/" class="mm-link"><i class="fas fa-hospital-user" style="color:var(--primary)"></i> Neuro-ICU Demo</a>
+      <span class="mm-section-label">Clinical</span>
+      <a href="/insights/icu/" class="mm-link"><i class="fas fa-hospital-user" style="color:var(--primary)"></i> ICU Monitor</a>
       <div class="mm-divider"></div>
       <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
       <a href="/accounts/emergency-card/" class="mm-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
@@ -255,8 +259,8 @@
     <a href="/notifications/" class="sb-link"><i class="fas fa-bell"></i><span class="sb-txt">Notifications</span>{% if unread_notifications_count %}<span class="sb-badge">{{ unread_notifications_count }}</span>{% endif %}</a>
     <a href="/dashboard/" class="sb-link"><i class="fas fa-tachometer-alt"></i><span class="sb-txt">Dashboard</span></a>
     <div class="sb-divider"></div>
-    <span class="sb-label">Tools</span>
-    <a href="/insights/icu/" class="sb-link"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i><span class="sb-txt">Neuro-ICU Demo</span></a>
+    <span class="sb-label">Clinical</span>
+    <a href="/insights/icu/" class="sb-link"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i><span class="sb-txt">ICU Monitor</span></a>
     <a href="/accounts/emergency-card/" class="sb-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i><span class="sb-txt">Emergency Card</span></a>
   </nav>
 </aside>

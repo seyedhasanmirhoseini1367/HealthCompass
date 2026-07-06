@@ -3,12 +3,14 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 
 from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm, TextPasteForm
 from .models import MedicalRecord, ParsedLabValue, WearableDataPoint
-from .parsers import KantaXMLParser, WearableCSVParser, PDFParser, TextParser
+from .parsers import KantaXMLParser, WearableParser, PDFParser, TextParser
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,7 @@ def record_delete(request, pk):
 
 @login_required
 def upload_kanta(request):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = KantaUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         xml_file = request.FILES['xml_file']
@@ -126,6 +129,8 @@ def upload_kanta(request):
         parsed = parser.parse(xml_bytes)
 
         if 'error' in parsed:
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': f'XML parse error: {parsed["error"]}'}, status=400)
             messages.error(request, f'XML parse error: {parsed["error"]}')
             return render(request, 'medical_records/upload_kanta.html', {'form': form})
 
@@ -201,29 +206,48 @@ def upload_kanta(request):
         msg = f'Imported {records_created} record(s) with {lab_values_created} lab value(s).'
         if flagged:
             msg += f' ⚠️ {flagged} abnormal value(s) detected.'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'reload': True, 'message': msg, 'flagged': bool(flagged)})
+
+        if flagged:
             messages.warning(request, msg)
         else:
             messages.success(request, msg)
-
         return redirect('medical_records:list')
 
+    if is_ajax and request.method == 'POST':
+        return JsonResponse({'success': False, 'error': 'Upload failed. Please check your XML file.'}, status=400)
     return render(request, 'medical_records/upload_kanta.html', {'form': form})
 
 
-# ─── Wearable CSV Upload ──────────────────────────────────────────────────────
+# ─── Wearable Data Upload ─────────────────────────────────────────────────────
 
 @login_required
 def upload_wearable(request):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = WearableUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
-        csv_file = request.FILES['csv_file']
-        csv_bytes = csv_file.read()
+        data_file = request.FILES['data_file']
+        data_bytes = data_file.read()
 
-        parser = WearableCSVParser()
-        parsed = parser.parse(csv_bytes, filename=csv_file.name)
+        try:
+            parser = WearableParser()
+            parsed = parser.parse(data_bytes, filename=data_file.name)
+        except Exception as exc:
+            logger.warning('Wearable parse error: %s', exc)
+            err = f'Could not read file: {exc}'
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': err}, status=400)
+            messages.error(request, err)
+            return render(request, 'medical_records/upload_wearable.html', {'form': form})
 
         if not parsed.get('data_points'):
-            messages.error(request, 'No data points found. Check CSV format.')
+            parse_errors = parsed.get('errors', [])
+            err = ('No data points found. ' + parse_errors[0]) if parse_errors else 'No data points found. Check file format.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': err}, status=400)
+            messages.error(request, err)
             return render(request, 'medical_records/upload_wearable.html', {'form': form})
 
         device = parsed.get('device', 'unknown')
@@ -233,7 +257,7 @@ def upload_wearable(request):
             patient=request.user,
             record_type=MedicalRecord.RecordType.WEARABLE,
             source=MedicalRecord.Source.WEARABLE_CSV,
-            title=f'{device.replace("_", " ").title()} — {csv_file.name}',
+            title=f'{device.replace("_", " ").title()} — {data_file.name}',
             parsed_data={'device': device, 'count': dp_count},
             notes=form.cleaned_data.get('notes', ''),
         )
@@ -257,9 +281,15 @@ def upload_wearable(request):
         msg = f'Imported {len(wearable_objects)} data point(s) from {device}.'
         if parsed.get('errors'):
             msg += f' ({len(parsed["errors"])} rows skipped)'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'record': _record_json(record), 'message': msg, 'flagged': False})
+
         messages.success(request, msg)
         return redirect('medical_records:list')
 
+    if is_ajax and request.method == 'POST':
+        return JsonResponse({'success': False, 'error': 'Upload failed. Please check your CSV file.'}, status=400)
     return render(request, 'medical_records/upload_wearable.html', {'form': form})
 
 
@@ -267,6 +297,7 @@ def upload_wearable(request):
 
 @login_required
 def upload_pdf(request):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = PDFUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         pdf_file = request.FILES['pdf_file']
@@ -276,6 +307,8 @@ def upload_pdf(request):
         parsed = parser.parse(pdf_bytes, use_ai=True)
 
         if parsed.get('error'):
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': f'PDF parse error: {parsed["error"]}'}, status=400)
             messages.error(request, f'PDF parse error: {parsed["error"]}')
             return render(request, 'medical_records/upload_pdf.html', {'form': form})
 
@@ -327,9 +360,15 @@ def upload_pdf(request):
         msg = f'Document uploaded and parsed ({parsed["page_count"]} page(s)).'
         if structured:
             msg += ' AI extracted structured data.'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'record': _record_json(record), 'message': msg, 'flagged': bool(flagged)})
+
         messages.success(request, msg)
         return redirect('medical_records:detail', pk=record.pk)
 
+    if is_ajax and request.method == 'POST':
+        return JsonResponse({'success': False, 'error': 'Upload failed. Please check your file.'}, status=400)
     return render(request, 'medical_records/upload_pdf.html', {'form': form})
 
 
@@ -337,6 +376,7 @@ def upload_pdf(request):
 
 @login_required
 def upload_text(request):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = TextPasteForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         raw_text = form.cleaned_data['text']
@@ -404,16 +444,178 @@ def upload_text(request):
             msg += ' AI extracted structured data.'
         if flagged:
             msg += f' ⚠️ {flagged} abnormal value(s) detected.'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'record': _record_json(record), 'message': msg, 'flagged': bool(flagged)})
+
+        if flagged:
             messages.warning(request, msg)
         else:
             messages.success(request, msg)
-
         return redirect('medical_records:detail', pk=record.pk)
 
+    if is_ajax and request.method == 'POST':
+        return JsonResponse({'success': False, 'error': 'Please fill in all required fields.'}, status=400)
     return render(request, 'medical_records/upload_text.html', {'form': form})
 
 
+# ─── Camera / OCR Scan ───────────────────────────────────────────────────────
+
+@login_required
+def scan_ocr(request):
+    """AJAX: receive an image, return OCR text via Gemini Vision."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    image = request.FILES.get('image')
+    if not image:
+        return JsonResponse({'error': 'No image received'}, status=400)
+
+    try:
+        from django.conf import settings as s
+        from google import genai
+        from google.genai import types
+
+        api_key = getattr(s, 'GEMINI_API_KEY', '')
+        if not api_key:
+            return JsonResponse({'error': 'Gemini API key not configured'}, status=503)
+
+        img_bytes = image.read()
+        mime_type = image.content_type or 'image/jpeg'
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
+                (
+                    'Extract all text from this medical document image. '
+                    'Return only the raw text content exactly as it appears, '
+                    'preserving structure (line breaks, sections, tables). '
+                    'Do not add commentary or explanations.'
+                ),
+            ],
+        )
+        return JsonResponse({'text': (response.text or '').strip()})
+
+    except Exception as exc:
+        logger.warning('Scan OCR error: %s', exc)
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
+@login_required
+def upload_scan(request):
+    """Camera scan page: capture image → OCR → review text → save record."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    record_types = MedicalRecord.RecordType.choices
+
+    if request.method == 'POST':
+        raw_text    = request.POST.get('raw_text', '').strip()
+        title       = request.POST.get('title', '').strip()
+        record_type = request.POST.get('record_type', MedicalRecord.RecordType.OTHER)
+        notes       = request.POST.get('notes', '').strip()
+        date_str    = request.POST.get('record_date', '').strip()
+
+        if not raw_text:
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'No text provided. Please extract text from the image first.'}, status=400)
+            messages.error(request, 'No text extracted. Please capture the image and extract text first.')
+            return render(request, 'medical_records/upload_scan.html', {'record_types': record_types})
+
+        parser     = TextParser()
+        parsed     = parser.parse(raw_text)
+        structured = parsed.get('structured') or {}
+
+        if not title:
+            title = structured.get('title') or raw_text[:60].strip().replace('\n', ' ')
+
+        rec_date = None
+        if date_str:
+            try:
+                rec_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        elif structured.get('date'):
+            try:
+                rec_date = datetime.strptime(structured['date'], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        if record_type == 'auto':
+            record_type = structured.get('record_type', MedicalRecord.RecordType.OTHER)
+
+        record = MedicalRecord.objects.create(
+            patient=request.user,
+            record_type=record_type,
+            source=MedicalRecord.Source.MANUAL_UPLOAD,
+            title=title,
+            raw_text=raw_text,
+            parsed_data=structured,
+            notes=notes,
+            record_date=rec_date,
+        )
+
+        flagged = 0
+        for lv in structured.get('lab_values', []):
+            is_ab = lv.get('is_abnormal', False)
+            ParsedLabValue.objects.create(
+                record=record,
+                parameter_name=lv.get('name', 'Unknown'),
+                value=str(lv.get('value', '')),
+                unit=lv.get('unit', ''),
+                reference_range=lv.get('ref_range', ''),
+                is_abnormal=is_ab,
+            )
+            if is_ab:
+                flagged += 1
+
+        if flagged:
+            record.is_flagged = True
+            record.save(update_fields=['is_flagged'])
+            _create_alert(record, flagged)
+
+        try:
+            from apps.rag_assistant.services.rag_service import RAGService
+            RAGService().index_record(record)
+        except Exception as e:
+            logger.warning('RAG indexing failed for scanned record: %s', e)
+
+        msg = 'Record saved from scanned image.'
+        if structured:
+            msg += ' AI extracted structured data.'
+        if flagged:
+            msg += f' ⚠️ {flagged} abnormal value(s) detected.'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'record': _record_json(record), 'message': msg, 'flagged': bool(flagged)})
+
+        if flagged:
+            messages.warning(request, msg)
+        else:
+            messages.success(request, msg)
+        return redirect('medical_records:detail', pk=record.pk)
+
+    if is_ajax and request.method == 'POST':
+        return JsonResponse({'success': False, 'error': 'Please provide extracted text before saving.'}, status=400)
+    return render(request, 'medical_records/upload_scan.html', {'record_types': record_types})
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _record_json(record):
+    return {
+        'pk':                  str(record.pk),
+        'title':               record.title,
+        'record_type':         record.record_type,
+        'record_type_display': record.get_record_type_display(),
+        'source_display':      record.get_source_display(),
+        'record_date':         record.record_date.strftime('%b %d, %Y') if record.record_date else None,
+        'uploaded_at':         record.uploaded_at.strftime('%b %d, %Y'),
+        'is_flagged':          record.is_flagged,
+        'detail_url':          reverse('medical_records:detail', kwargs={'pk': record.pk}),
+        'delete_url':          reverse('medical_records:delete', kwargs={'pk': record.pk}),
+    }
+
 
 def _map_doc_type(doc_type_str: str) -> str:
     s = doc_type_str.lower()

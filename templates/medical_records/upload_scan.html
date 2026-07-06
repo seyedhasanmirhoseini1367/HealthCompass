@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% block title %}Scan Paper Record — HealthCompass{% endblock %}
+
+{% block extra_css %}
+<style>
+.scan-page { max-width: 900px; margin: 0 auto; }
+.scan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+@media(max-width:700px){ .scan-grid { grid-template-columns: 1fr; } }
+
+.scan-panel {
+  background: white; border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 1.25rem;
+}
+.scan-panel-title {
+  font-size: .75rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.scan-panel-title span {
+  background: #ec4899; color: white;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .7rem;
+}
+
+/* Camera area */
+.camera-area {
+  border: 2px dashed #fbcfe8; border-radius: 12px;
+  background: #fdf2f8; min-height: 200px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .75rem; padding: 1.5rem;
+  cursor: pointer; transition: border-color .2s, background .2s;
+}
+.camera-area:hover { border-color: #ec4899; background: #fce7f3; }
+.camera-area i { font-size: 2.5rem; color: #ec4899; }
+.camera-area p { font-size: .85rem; color: var(--muted); margin: 0; text-align: center; }
+
+#preview-wrap { display: none; }
+#preview-img { width: 100%; border-radius: 10px; border: 1.5px solid var(--border); }
+
+.btn-scan { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.2rem;
+  border-radius: 10px; font-weight: 700; font-size: .875rem; cursor: pointer;
+  border: none; transition: all .2s; text-decoration: none; }
+.btn-pink  { background: #ec4899; color: white; }
+.btn-pink:hover { background: #db2777; }
+.btn-gray  { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+.btn-gray:hover { background: #e2e8f0; }
+
+.ocr-status { font-size: .82rem; color: var(--muted); display: flex; align-items: center; gap: .4rem; margin-top: .6rem; min-height: 1.2rem; }
+.spinner { width: 14px; height: 14px; border: 2px solid #fbcfe8; border-top-color: #ec4899; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Webcam modal */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 500; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal-box { background: white; border-radius: 18px; padding: 1.25rem; max-width: 480px; width: 95%; }
+.modal-title { font-weight: 800; margin-bottom: .75rem; display: flex; align-items: center; justify-content: space-between; }
+#webcamVideo { width: 100%; border-radius: 10px; background: #0f172a; }
+
+/* Right panel form */
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media(max-width:500px){ .form-row2 { grid-template-columns: 1fr; } }
+.flabel { font-size: .78rem; font-weight: 700; color: var(--text); display: block; margin-bottom: .25rem; }
+.finput { width: 100%; padding: .5rem .85rem; border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .875rem; font-family: inherit; outline: none; transition: border .15s; background: white; }
+.finput:focus { border-color: #ec4899; box-shadow: 0 0 0 3px rgba(236,72,153,.1); }
+textarea.finput { resize: vertical; min-height: 160px; }
+.fgroup { margin-bottom: .9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-page">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+    <a href="{% url 'medical_records:list' %}" style="color:var(--muted);font-size:.85rem">
+      <i class="fas fa-arrow-left"></i> Records
+    </a>
+    <h1 style="font-size:1.3rem;font-weight:800;margin:0">
+      <i class="fas fa-camera" style="color:#ec4899"></i> Scan Paper Record
+    </h1>
+  </div>
+
+  <div class="scan-grid">
+
+    <!-- ══ LEFT: Capture ══ -->
+    <div class="scan-panel">
+      <div class="scan-panel-title"><span>1</span> Capture Image</div>
+
+      <!-- Tap/click to open file picker (mobile: camera, desktop: file) -->
+      <div class="camera-area" id="cameraArea" onclick="document.getElementById('fileInput').click()">
+        <i class="fas fa-camera"></i>
+        <p><strong>Tap to take a photo</strong><br>or click to choose an image file</p>
+        <p style="font-size:.75rem">JPG, PNG, HEIC supported</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" hidden>
+
+      <!-- Preview -->
+      <div id="preview-wrap" style="margin-top:.75rem">
+        <img id="preview-img" src="" alt="Preview">
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+          <button class="btn-scan btn-pink" id="extractBtn" type="button">
+            <i class="fas fa-magic"></i> Extract Text with AI
+          </button>
+          <button class="btn-scan btn-gray" type="button" onclick="resetCapture()">
+            <i class="fas fa-redo"></i> Retake
+          </button>
+        </div>
+        <div class="ocr-status" id="ocrStatus"></div>
+      </div>
+
+      <div style="margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--border)">
+        <button class="btn-scan btn-gray" type="button" onclick="openWebcam()" style="width:100%">
+          <i class="fas fa-video"></i> Use Webcam (desktop)
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ RIGHT: Review & Save ══ -->
+    <div class="scan-panel">
+      <div class="scan-panel-title"><span>2</span> Review &amp; Save</div>
+
+      <form method="post" id="saveForm">
+        {% csrf_token %}
+
+        <div class="fgroup">
+          <label class="flabel">Extracted Text <span style="color:#ec4899">*</span></label>
+          <textarea class="finput" name="raw_text" id="rawText"
+            placeholder="Extracted text will appear here after you scan. You can also type or paste directly."></textarea>
+        </div>
+
+        <div class="fgroup">
+          <label class="flabel">Title</label>
+          <input class="finput" name="title" id="recTitle" placeholder="Auto-generated if empty">
+        </div>
+
+        <div class="form-row2">
+          <div class="fgroup">
+            <label class="flabel">Record Type</label>
+            <select class="finput" name="record_type">
+              <option value="auto">Auto-detect</option>
+              {% for val, label in record_types %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fgroup">
+            <label class="flabel">Record Date</label>
+            <input class="finput" name="record_date" type="date" id="recDate">
+          </div>
+        </div>
+
+        <div class="fgroup">
+          <label class="flabel">Notes <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <textarea class="finput" name="notes" rows="2" placeholder="Any additional context…"></textarea>
+        </div>
+
+        <button type="submit" class="btn-scan btn-pink" style="width:100%" id="saveBtn">
+          <i class="fas fa-save"></i> Save Record
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Webcam Modal -->
+<div class="modal-bg" id="webcamModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span><i class="fas fa-video" style="color:#ec4899"></i> Webcam</span>
+      <button onclick="closeWebcam()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted)">&times;</button>
+    </div>
+    <video id="webcamVideo" autoplay playsinline></video>
+    <canvas id="webcamCanvas" hidden></canvas>
+    <div style="display:flex;gap:.6rem;margin-top:.75rem">
+      <button class="btn-scan btn-pink" style="flex:1" onclick="captureWebcam()">
+        <i class="fas fa-camera"></i> Capture
+      </button>
+      <button class="btn-scan btn-gray" onclick="closeWebcam()">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const OCR_URL  = "{% url 'medical_records:scan_ocr' %}";
+const CSRF     = "{{ csrf_token }}";
+let capturedBlob = null;
+
+// ── File input (mobile camera / desktop file picker) ──────────────────────
+document.getElementById('fileInput').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  capturedBlob = file;
+  showPreview(URL.createObjectURL(file));
+});
+
+function showPreview(src) {
+  document.getElementById('cameraArea').style.display = 'none';
+  document.getElementById('preview-wrap').style.display = 'block';
+  document.getElementById('preview-img').src = src;
+  setStatus('');
+}
+
+function resetCapture() {
+  capturedBlob = null;
+  document.getElementById('cameraArea').style.display = 'flex';
+  document.getElementById('preview-wrap').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  setStatus('');
+}
+
+function setStatus(msg, loading=false) {
+  const el = document.getElementById('ocrStatus');
+  el.innerHTML = loading
+    ? `<div class="spinner"></div> ${msg}`
+    : msg;
+}
+
+// ── OCR extraction ────────────────────────────────────────────────────────
+document.getElementById('extractBtn').addEventListener('click', async function() {
+  if (!capturedBlob) { setStatus('No image captured yet.'); return; }
+
+  setStatus('Sending to Gemini Vision…', true);
+  this.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('image', capturedBlob, 'scan.jpg');
+    fd.append('csrfmiddlewaretoken', CSRF);
+
+    const res  = await fetch(OCR_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.error) {
+      setStatus('<i class="fas fa-exclamation-triangle" style="color:#ef4444"></i> ' + data.error);
+    } else {
+      document.getElementById('rawText').value = data.text;
+      setStatus('<i class="fas fa-check-circle" style="color:#22c55e"></i> Text extracted — review and save.');
+      document.getElementById('rawText').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  } catch(e) {
+    setStatus('<i class="fas fa-exclamation-triangle" style="color:#ef4444"></i> Network error: ' + e.message);
+  } finally {
+    this.disabled = false;
+  }
+});
+
+// ── Webcam ────────────────────────────────────────────────────────────────
+let webcamStream = null;
+
+async function openWebcam() {
+  document.getElementById('webcamModal').classList.add('open');
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('webcamVideo').srcObject = webcamStream;
+  } catch(e) {
+    alert('Could not access webcam: ' + e.message);
+    closeWebcam();
+  }
+}
+
+function closeWebcam() {
+  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+  document.getElementById('webcamModal').classList.remove('open');
+}
+
+function captureWebcam() {
+  const video  = document.getElementById('webcamVideo');
+  const canvas = document.getElementById('webcamCanvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    capturedBlob = blob;
+    showPreview(canvas.toDataURL('image/jpeg'));
+    closeWebcam();
+  }, 'image/jpeg', 0.92);
+}
+</script>
+{% endblock %}
