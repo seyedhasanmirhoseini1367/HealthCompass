@@ -196,11 +196,9 @@ ACCOUNT_LOGIN_METHODS       = {'email'}
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': config('GOOGLE_CLIENT_ID',     default=''),
-            'secret':    config('GOOGLE_CLIENT_SECRET', default=''),
-            'key': '',
-        },
+        # No APP key here — credentials live only in the DB (created by
+        # ensure_social_app on startup). Having both settings APP and a DB
+        # record causes allauth list_apps() to return 2 → MultipleObjectsReturned.
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
     }
