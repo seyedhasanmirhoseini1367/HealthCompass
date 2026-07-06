@@ -14,7 +14,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv(
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
 AUTHENTICATION_BACKENDS = [
-    'accounts.backends.EmailOrUsernameBackend',
+    'apps.accounts.backends.EmailOrUsernameBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
@@ -36,18 +36,12 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
     # Project apps
-    'accounts',
-    'medical_records',
-    'ai_insights',
-    'rag_assistant',
-    'dashboard',
-    'stories',
-    'notifications',
-    'integrations',
-    'treatments',
-    'care',
-    'appointments',
-    'goals',
+    'apps.accounts',
+    'apps.medical_records',
+    'apps.ai_insights',
+    'apps.rag_assistant',
+    'apps.dashboard',
+    'apps.notifications',
 ]
 
 MIDDLEWARE = [
@@ -76,7 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'notifications.context_processors.unread_notifications',
+                'apps.notifications.context_processors.unread_notifications',
             ],
         },
     },
@@ -183,11 +177,11 @@ USE_X_FORWARDED_HOST    = True
 
 # ── Google OAuth (allauth) ─────────────────────────────────────────────────────
 SITE_ID = 1
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
-SOCIALACCOUNT_ADAPTER       = 'accounts.adapters.HealthCompassSocialAdapter'
+SOCIALACCOUNT_ADAPTER       = 'apps.accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
 ACCOUNT_EMAIL_VERIFICATION  = 'none'
@@ -206,20 +200,8 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# ── Care / Escalation ─────────────────────────────────────────────────────────
-# Public URL used to build links in escalation emails (no trailing slash).
-# Set SITE_URL in your .env / Railway environment variables.
-SITE_URL = config('SITE_URL', default='http://localhost:8000')
-
-# Twilio — only needed if SMS notifications are enabled on any CareGiver.
-TWILIO_ACCOUNT_SID  = config('TWILIO_ACCOUNT_SID',  default='')
-TWILIO_AUTH_TOKEN   = config('TWILIO_AUTH_TOKEN',    default='')
-TWILIO_FROM_NUMBER  = config('TWILIO_FROM_NUMBER',   default='')
-
-CARE_ESCALATION = {
-    # Hour (0–23, server timezone) at which daily summary emails are sent.
-    'DAILY_SUMMARY_HOUR': 20,   # 8 pm
-}
+# ── ICU Demo (MIMIC-IV local data) ────────────────────────────────────────────
+ICU_DEMO_DATA_PATH = config('ICU_DEMO_DATA_PATH', default='')
 
 # ── Production security headers ────────────────────────────────────────────────
 # Railway terminates SSL at the edge, so no SECURE_SSL_REDIRECT needed.

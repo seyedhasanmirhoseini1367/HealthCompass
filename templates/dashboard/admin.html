@@ -2,7 +2,7 @@
 {% block title %}Admin Dashboard — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-.dash-header{background:linear-gradient(135deg,#1e293b,#334155);color:white;border-radius:16px;padding:2rem 1.5rem;margin-bottom:1.5rem}
+/* .dash-header replaced by global .page-hero */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
 .stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
 .stat-num{font-size:1.875rem;font-weight:800;color:var(--primary)}
@@ -17,9 +17,9 @@
 {% endblock %}
 {% block content %}
 
-<div class="dash-header">
-  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.2rem">⚙️ Admin Dashboard</h1>
-  <p style="opacity:.8;font-size:.88rem">HealthCompass platform management</p>
+<div class="page-hero">
+  <h1>⚙️ Admin Dashboard</h1>
+  <p>HealthCompass platform management</p>
 </div>
 
 <div class="stat-grid">
@@ -52,11 +52,6 @@
     <div class="action-icon">🔬</div>
     <div class="action-title">Approve Scientists</div>
     <div class="action-desc">{{ pending_scientists }} pending approval</div>
-  </a>
-  <a href="/admin/stories/story/" class="action-card">
-    <div class="action-icon">📰</div>
-    <div class="action-title">Manage Stories</div>
-    <div class="action-desc">Publish health news articles</div>
   </a>
   <a href="/admin/ai_insights/healthalert/" class="action-card">
     <div class="action-icon">⚠️</div>

@@ -2,6 +2,7 @@
 {% block title %}Notifications — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
+/* .page-hero styles are now global in base.html */
 .notif-row{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.2rem;background:white;border-radius:12px;border:1px solid var(--border);margin-bottom:.6rem;transition:all .18s}
 .notif-row:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .notif-row.unread{border-left:3px solid var(--primary);background:#f0f9ff}
@@ -13,9 +14,16 @@
 {% endblock %}
 {% block content %}
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-  <h1 style="font-size:1.375rem;font-weight:700;margin:0">🔔 Notifications</h1>
-  <span style="font-size:.82rem;color:var(--muted)">Unread ones are marked blue</span>
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1><i class="fas fa-bell" style="margin-right:.45rem;opacity:.9"></i>Notifications</h1>
+      <p>Stay updated on your health events and alerts</p>
+    </div>
+    {% if notifications %}
+    <span style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:.3rem .9rem;font-size:.8rem;font-weight:700">{{ notifications|length }} total</span>
+    {% endif %}
+  </div>
 </div>
 
 {% if notifications %}
@@ -38,10 +46,10 @@
 {% endfor %}
 {% else %}
 <div class="card">
-  <div class="card-body" style="text-align:center;padding:3rem;color:var(--muted)">
-    <div style="font-size:2.5rem;margin-bottom:.75rem">🔔</div>
-    <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.3rem">All caught up!</p>
-    <p style="font-size:.875rem">No notifications yet.</p>
+  <div class="card-body empty-state">
+    <span class="es-icon">🔔</span>
+    <span class="es-title">All caught up!</span>
+    <span class="es-desc">No notifications yet. They'll appear here when something important happens.</span>
   </div>
 </div>
 {% endif %}

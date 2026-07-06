@@ -12,15 +12,20 @@
 {% endblock %}
 {% block content %}
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
-  <h1 style="font-size:1.375rem;font-weight:700;margin:0">👤 My Profile</h1>
-  <div style="display:flex;gap:.5rem">
-    <a href="{% url 'accounts:profile_edit' %}" class="btn" style="background:var(--primary);color:white;font-size:.85rem">
-      <i class="fas fa-edit"></i> Edit Profile
-    </a>
-    <a href="{% url 'accounts:change_password' %}" class="btn" style="background:#f1f5f9;color:var(--text);font-size:.85rem">
-      <i class="fas fa-lock"></i> Change Password
-    </a>
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1><i class="fas fa-user-circle" style="margin-right:.45rem;opacity:.9"></i>My Profile</h1>
+      <p>Manage your account details and preferences</p>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a href="{% url 'accounts:profile_edit' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .9rem;border-radius:9px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:white;font-size:.78rem;font-weight:700;text-decoration:none">
+        <i class="fas fa-edit"></i> Edit Profile
+      </a>
+      <a href="{% url 'accounts:change_password' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .9rem;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;font-size:.78rem;font-weight:600;text-decoration:none">
+        <i class="fas fa-lock"></i> Password
+      </a>
+    </div>
   </div>
 </div>
 

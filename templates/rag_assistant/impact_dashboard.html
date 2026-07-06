@@ -4,12 +4,10 @@
 {% block extra_css %}
 <style>
 html,body{overflow-x:hidden}
-.imp-wrap{max-width:1100px;margin:0 auto;padding:2rem 2rem 4rem}
+.imp-wrap{max-width:1100px;margin:0 auto;padding:0 2rem 4rem}
 /* header */
-.imp-header{background:linear-gradient(135deg,#312e81,#4f46e5);color:white;padding:2rem 2.5rem;border-radius:16px;margin-bottom:2rem}
-.imp-header h1{font-size:1.6rem;font-weight:800;margin-bottom:.4rem}
-.imp-header p{opacity:.8;font-size:.9rem;line-height:1.7}
-.badge-live{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:.25rem .75rem;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+/* .imp-header replaced by global .page-hero */
+.badge-live{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);padding:.25rem .75rem;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:white}
 /* section titles */
 .sec-title{font-size:1.1rem;font-weight:800;color:#1e1b4b;margin:2rem 0 .75rem;display:flex;align-items:center;gap:.6rem}
 .tier-badge{font-size:.68rem;font-weight:700;padding:.2rem .65rem;border-radius:12px;text-transform:uppercase;letter-spacing:.04em}
@@ -48,22 +46,18 @@ html,body{overflow-x:hidden}
 {% endblock %}
 
 {% block content %}
-<div class="imp-wrap">
-
-  <!-- HEADER -->
-  <div class="imp-header">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-      <div>
-        <h1>Impact Measurement Dashboard</h1>
-        <p>Live metrics, A/B evaluation results, and Finland-scale productivity projections.<br>
-           All numbers are traceable to sources or directly measured by <code>evaluation/eval_harness.py</code>.</p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:.4rem;align-items:flex-end">
-        <span class="badge-live">Live Data</span>
-        <span style="font-size:.72rem;opacity:.6">Staff only — not patient-facing</span>
-      </div>
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1>Impact Measurement Dashboard</h1>
+      <p>Live metrics, A/B evaluation results, and Finland-scale productivity projections.</p>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <span class="badge-live">Live Data</span>
     </div>
   </div>
+</div>
+<div class="imp-wrap">
 
   <!-- LIVE QUERYLOG STATS -->
   <div class="sec-title">
