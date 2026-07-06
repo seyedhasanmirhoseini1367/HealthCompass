@@ -216,3 +216,31 @@ if not DEBUG:
     CSRF_COOKIE_SECURE    = True
     SECURE_BROWSER_XSS_FILTER   = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# ── Logging — always print full tracebacks to stderr (visible in Railway logs) ─
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} {process}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+        'allauth': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+        'apps': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+    },
+}
