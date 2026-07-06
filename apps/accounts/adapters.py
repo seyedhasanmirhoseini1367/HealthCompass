@@ -3,6 +3,7 @@ from allauth.exceptions import ImmediateHttpResponse
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
+from django.urls import reverse, NoReverseMatch
 
 
 class HealthCompassSocialAdapter(DefaultSocialAccountAdapter):
@@ -41,7 +42,11 @@ class HealthCompassSocialAdapter(DefaultSocialAccountAdapter):
             raise ImmediateHttpResponse(redirect('accounts:login'))
 
         sociallogin.connect(request, existing_user)
-        raise ImmediateHttpResponse(redirect('dashboard:home'))
+        try:
+            dest = reverse('dashboard:home')
+        except NoReverseMatch:
+            dest = '/dashboard/'
+        raise ImmediateHttpResponse(redirect(dest))
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form)

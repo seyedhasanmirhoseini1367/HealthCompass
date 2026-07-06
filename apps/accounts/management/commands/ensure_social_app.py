@@ -29,9 +29,10 @@ class Command(BaseCommand):
             from allauth.socialaccount.models import SocialApp
             from django.contrib.sites.models import Site
 
-            site, _ = Site.objects.get_or_create(
+            domain = getattr(settings, 'SITE_DOMAIN', 'healthcompass.hasanai.net')
+            site, _ = Site.objects.update_or_create(
                 id=settings.SITE_ID,
-                defaults={'domain': 'healthcompass.hasanai.net', 'name': 'HealthCompass'},
+                defaults={'domain': domain, 'name': 'HealthCompass'},
             )
 
             app, created = SocialApp.objects.get_or_create(
