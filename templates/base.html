@@ -38,7 +38,7 @@
     .alert-error,.alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
     .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
     .alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
-    main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%}
+    main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%;background:var(--surface)}
     footer{background:#0f172a;color:#94a3b8;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
     footer strong{color:white}
     .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.2rem;border-radius:10px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
@@ -48,9 +48,9 @@
     .btn-outline:hover{background:#e0f2fe;color:var(--primary-dk)}
     .btn-danger{background:var(--danger);color:white}
     .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
-    .card-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-weight:600;font-size:.95rem}
-    .card-header i{color:var(--primary)}
-    .card-body{padding:1.25rem}
+    .card-header{padding:.6rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:.875rem;color:white;background:linear-gradient(90deg,#0ea5e9,#6366f1)}
+    .card-header i{color:white}
+    .card-body{padding:.875rem}
     .badge{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:20px;font-size:.72rem;font-weight:600}
     .badge-info{background:#dbeafe;color:#1d4ed8}
     .badge-success{background:#dcfce7;color:#15803d}
@@ -59,9 +59,9 @@
     @media(max-width:600px){
       main{padding:.75rem .6rem}
       /* Typography */
-      .dash-header{border-radius:0 0 18px 18px !important;padding:1.25rem 1rem 1.75rem !important}
-      .dash-header h1{font-size:1.2rem !important}
-      .dash-header p{font-size:.82rem !important}
+      .page-hero{border-radius:0 0 18px 18px !important;padding:1rem .75rem 1.25rem !important}
+      .page-hero h1{font-size:1.2rem !important}
+      .page-hero p{font-size:.82rem !important}
       /* Grids → single column */
       .grid-2,.grid-3{grid-template-columns:1fr !important}
       .form-row{grid-template-columns:1fr !important}
@@ -112,10 +112,51 @@
       .nav-right>a.btn-nav-outline,.nav-right>a.btn-nav-solid{display:none}
       .nav-user>span,.nav-user>i{display:none}
     }
+    /* ── App sidebar ──────────────────────────────────────────────────────────── */
+    .app-sidebar{position:fixed;top:60px;left:0;bottom:0;width:220px;background:white;border-right:1px solid var(--border);overflow-y:auto;z-index:89;transition:width .22s;display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.04)}
+    .app-sidebar.collapsed{width:64px}
+    .sb-toggle-row{padding:.5rem .65rem;display:flex;align-items:center;justify-content:flex-end;border-bottom:1px solid var(--border);flex-shrink:0}
+    .app-sidebar.collapsed .sb-toggle-row{justify-content:center}
+    .sb-toggle{width:30px;height:30px;border:none;background:none;cursor:pointer;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .15s;font-size:.85rem}
+    .sb-toggle:hover{background:var(--bg)}
+    .sb-nav{flex:1;overflow-y:auto;padding:.4rem .4rem .8rem}
+    .sb-label{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);padding:.55rem .65rem .15rem;display:block;white-space:nowrap;overflow:hidden}
+    .sb-link{display:flex;align-items:center;gap:.6rem;padding:.5rem .65rem;border-radius:9px;font-size:.84rem;font-weight:500;color:var(--text);text-decoration:none;transition:all .15s;margin-bottom:.08rem;white-space:nowrap;overflow:hidden}
+    .sb-link:hover{background:var(--bg);color:var(--primary-dk);text-decoration:none}
+    .sb-link.active{background:#e0f2fe;color:var(--primary-dk);font-weight:700}
+    .sb-link i{width:18px;text-align:center;flex-shrink:0;font-size:.9rem}
+    .sb-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sb-badge{margin-left:auto;background:#ef4444;color:white;font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:20px;flex-shrink:0}
+    .sb-divider{height:1px;background:var(--border);margin:.4rem .4rem}
+    .app-sidebar.collapsed .sb-label,.app-sidebar.collapsed .sb-txt,.app-sidebar.collapsed .sb-badge{display:none}
+    .app-sidebar.collapsed .sb-link{padding:.5rem;justify-content:center;gap:0}
+    @media(min-width:769px){
+      body.auth-layout .nav-links{display:none}
+      body.auth-layout main{margin-left:220px;margin-right:0;max-width:none;width:auto;transition:margin-left .22s;background:var(--surface)}
+      body.auth-layout footer{margin-left:220px;width:auto;transition:margin-left .22s;margin-top:0}
+      body.auth-layout.sidebar-collapsed main{margin-left:64px}
+      body.auth-layout.sidebar-collapsed footer{margin-left:64px}
+    }
+    @media(max-width:768px){.app-sidebar{display:none!important}}
+    /* ── Empty states ─────────────────────────────────────────────────────────── */
+    .empty-state{text-align:center;padding:2.5rem 1.5rem;color:var(--muted)}
+    .es-icon{font-size:2.5rem;margin-bottom:.75rem;opacity:.5;display:block}
+    .es-title{font-weight:700;color:var(--text);margin-bottom:.3rem;font-size:.95rem;display:block}
+    .es-desc{font-size:.82rem;line-height:1.6;margin-bottom:1.1rem;display:block}
+    /* ── Form controls ────────────────────────────────────────────────────────── */
+    .form-control{border:1.5px solid var(--border);border-radius:9px;padding:.5rem .85rem;font-size:.875rem;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;background:white;color:var(--text);display:block;width:100%}
+    .form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    .form-label{display:block;font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
+    /* ── Page hero (universal edge-to-edge banner) ─────────────────────────── */
+    .page-hero{background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:0 0 28px 28px;padding:1.4rem 1.75rem 1.75rem;margin:-1.5rem -1.5rem 2rem;color:white;position:relative;overflow:hidden;text-align:center}
+    .page-hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+    .page-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:.5rem}
+    .page-hero h1{font-size:1.5rem;font-weight:800;margin:0 0 .15rem;letter-spacing:-.02em;position:relative;z-index:1}
+    .page-hero p{opacity:.88;font-size:.87rem;margin:0;position:relative;z-index:1}
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body {% if user.is_authenticated %}class="auth-layout"{% endif %}>
 <nav class="navbar">
     <a href="/" class="nav-brand"><img src="/static/healthcompass-horizontal.svg" alt="HealthCompass" style="height:38px;width:auto"></a>
 
@@ -133,19 +174,13 @@
                 More <i class="fas fa-chevron-down chevron"></i>
             </button>
             <div class="nav-more-menu" id="moreMenu">
-                <a href="/treatments/" class="nav-more-item"><i class="fas fa-stethoscope"></i> Treatments</a>
-                <a href="/care/" class="nav-more-item"><i class="fas fa-heart-pulse"></i> Care Hub</a>
-                <a href="/appointments/" class="nav-more-item"><i class="fas fa-calendar-check"></i> Appointments</a>
-                <a href="/goals/" class="nav-more-item"><i class="fas fa-bullseye"></i> Goals</a>
-                <div class="nav-more-divider"></div>
-                <a href="/stories/" class="nav-more-item"><i class="fas fa-newspaper"></i> Health News</a>
+                <a href="/insights/icu/" class="nav-more-item"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i> Neuro-ICU Demo</a>
                 <a href="/accounts/emergency-card/" class="nav-more-item"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
             </div>
         </li>
         {% else %}
         <li><a href="/insights/">AI &amp; Analytics</a></li>
         <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
-        <li><a href="/stories/">Health News</a></li>
         {% endif %}
     </ul>
 
@@ -190,17 +225,12 @@
       <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
       <div class="mm-divider"></div>
       <span class="mm-section-label">Tools</span>
-      <a href="/treatments/" class="mm-link"><i class="fas fa-stethoscope"></i> Treatments</a>
-      <a href="/care/" class="mm-link"><i class="fas fa-heart-pulse"></i> Care Hub</a>
-      <a href="/appointments/" class="mm-link"><i class="fas fa-calendar-check"></i> Appointments</a>
-      <a href="/goals/" class="mm-link"><i class="fas fa-bullseye"></i> Goals</a>
-      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
+      <a href="/insights/icu/" class="mm-link"><i class="fas fa-hospital-user" style="color:var(--primary)"></i> Neuro-ICU Demo</a>
       <div class="mm-divider"></div>
       <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
       <a href="/accounts/emergency-card/" class="mm-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
-      <a href="/stories/" class="mm-link"><i class="fas fa-newspaper"></i> Health News</a>
       <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       <a href="/accounts/login/?next=/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <div class="mm-divider"></div>
@@ -211,8 +241,29 @@
       {% endif %}
     </div>
 </nav>
+
+{% if user.is_authenticated %}
+<aside class="app-sidebar" id="appSidebar">
+  <div class="sb-toggle-row">
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Collapse sidebar"><i class="fas fa-bars"></i></button>
+  </div>
+  <nav class="sb-nav">
+    <span class="sb-label">Main</span>
+    <a href="/insights/" class="sb-link"><i class="fas fa-brain"></i><span class="sb-txt">AI &amp; Analytics</span></a>
+    <a href="/assistant/" class="sb-link"><i class="fas fa-robot"></i><span class="sb-txt">AI Assistant</span></a>
+    <a href="/records/" class="sb-link"><i class="fas fa-file-medical"></i><span class="sb-txt">My Records</span></a>
+    <a href="/notifications/" class="sb-link"><i class="fas fa-bell"></i><span class="sb-txt">Notifications</span>{% if unread_notifications_count %}<span class="sb-badge">{{ unread_notifications_count }}</span>{% endif %}</a>
+    <a href="/dashboard/" class="sb-link"><i class="fas fa-tachometer-alt"></i><span class="sb-txt">Dashboard</span></a>
+    <div class="sb-divider"></div>
+    <span class="sb-label">Tools</span>
+    <a href="/insights/icu/" class="sb-link"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i><span class="sb-txt">Neuro-ICU Demo</span></a>
+    <a href="/accounts/emergency-card/" class="sb-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i><span class="sb-txt">Emergency Card</span></a>
+  </nav>
+</aside>
+{% endif %}
+
 {% if messages %}
-<div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>
+{% if messages %}<div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>{% endif %}
 {% endif %}
 <main>{% block content %}{% endblock %}</main>
 <footer>
@@ -281,6 +332,27 @@ document.getElementById('deleteModal').addEventListener('click', function(e) {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeDeleteModal();
 });
+
+function toggleSidebar() {
+  const sb = document.getElementById('appSidebar');
+  if (!sb) return;
+  const c = sb.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed', c);
+  localStorage.setItem('hc_sb', c ? '1' : '0');
+}
+(function(){
+  const sb = document.getElementById('appSidebar');
+  if (!sb) return;
+  if (localStorage.getItem('hc_sb') === '1') {
+    sb.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+  }
+  const path = location.pathname;
+  document.querySelectorAll('.sb-link').forEach(function(a) {
+    const h = a.getAttribute('href');
+    if (h && h !== '/' && path.startsWith(h)) a.classList.add('active');
+  });
+})();
 
 document.addEventListener('click', function(e) {
   if (!document.getElementById('navUserBtn')?.contains(e.target)) {

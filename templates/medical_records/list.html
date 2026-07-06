@@ -289,6 +289,14 @@
 {% endblock %}
 
 {% block content %}
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div>
+      <h1><i class="fas fa-file-medical" style="margin-right:.45rem;opacity:.9"></i>My Medical Records</h1>
+      <p>Your complete health history — labs, prescriptions, and more</p>
+    </div>
+  </div>
+</div>
 <div class="records-page">
 
   <!-- ════════ LEFT SIDEBAR ════════ -->
@@ -361,7 +369,6 @@
 
   <!-- ════════ RIGHT PANEL ════════ -->
   <div class="records-main">
-    <div class="panel-title">📋 My Medical Records</div>
 
     {% if flagged_count %}
     <div class="alert-strip">
