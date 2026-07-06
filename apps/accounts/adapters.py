@@ -1,5 +1,8 @@
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-from allauth.exceptions import ImmediateHttpResponse
+try:
+    from allauth.core.exceptions import ImmediateHttpResponse  # allauth >= 65.x
+except ImportError:
+    from allauth.exceptions import ImmediateHttpResponse        # allauth < 65.x
 from django.contrib import messages
 from django.shortcuts import redirect
 
