@@ -189,6 +189,7 @@ LOGOUT_REDIRECT_URL = '/'
 SOCIALACCOUNT_ADAPTER       = 'apps.accounts.adapters.HealthCompassSocialAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
+SOCIALACCOUNT_LOGIN_ON_GET  = True    # skip confirmation page; GET directly redirects to Google
 ACCOUNT_EMAIL_VERIFICATION  = 'none'
 ACCOUNT_SIGNUP_FIELDS       = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS       = {'email'}
