@@ -102,6 +102,9 @@ def records_list(request):
     record_type = request.query_params.get('type')
     if record_type:
         qs = qs.filter(record_type=record_type)
+    q = request.query_params.get('q', '').strip()
+    if q:
+        qs = qs.filter(title__icontains=q)
     return Response(MedicalRecordSerializer(qs, many=True).data)
 
 
@@ -131,6 +134,8 @@ def record_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_summary(request):
+    from apps.ai_insights.models import ModelPrediction, HealthAlert
+
     user    = request.user
     records = MedicalRecord.objects.filter(patient=user)
 
@@ -140,11 +145,27 @@ def dashboard_summary(request):
         if count:
             by_type[label] = count
 
+    recent_alerts = HealthAlert.objects.filter(
+        patient=user, is_read=False
+    ).order_by('-created_at')[:5]
+
+    recent_predictions = ModelPrediction.objects.filter(
+        patient=user
+    ).order_by('-created_at')[:3]
+
+    latest_pred = ModelPrediction.objects.filter(
+        patient=user, risk_score__isnull=False
+    ).order_by('-created_at').first()
+
     return Response({
-        'total_records': records.count(),
-        'flagged_count': records.filter(is_flagged=True).count(),
-        'records_by_type': by_type,
-        'user': UserSerializer(user).data,
+        'total_records':      records.count(),
+        'flagged_count':      records.filter(is_flagged=True).count(),
+        'unread_alerts':      HealthAlert.objects.filter(patient=user, is_read=False).count(),
+        'records_by_type':    by_type,
+        'user':               UserSerializer(user).data,
+        'recent_alerts':      HealthAlertSerializer(recent_alerts, many=True).data,
+        'recent_predictions': ModelPredictionSerializer(recent_predictions, many=True).data,
+        'latest_risk':        round(float(latest_pred.risk_score) * 100, 1) if latest_pred else None,
     })
 
 
@@ -400,6 +421,74 @@ def run_model_prediction(request, slug):
         return Response(ModelPredictionSerializer(pred).data, status=status.HTTP_201_CREATED)
     except Exception as exc:
         return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ── Seizure Analysis Proxy ────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def seizure_analysis(request):
+    """Proxy EEG parquet/CSV file to hasanai.net seizure comparison API."""
+    import requests as http_requests
+    from apps.ai_insights.models import AIModel, ModelPrediction
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    import logging
+    logger = logging.getLogger(__name__)
+
+    uploaded_file = request.FILES.get('signal_file')
+    if not uploaded_file:
+        return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        resp = http_requests.post(
+            'https://hasanai.net/seizure-comparison/predict/',
+            files={'signal_file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except http_requests.Timeout:
+        return Response({'error': 'Analysis timed out. The file may be too large or the server is busy.'}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+    except Exception as exc:
+        logger.exception('seizure_analysis proxy error: %s', exc)
+        return Response({'error': 'Could not reach the analysis server. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    try:
+        User = get_user_model()
+        admin_user = User.objects.filter(is_staff=True).first() or request.user
+        ai_model, _ = AIModel.objects.get_or_create(
+            slug='eeg-seizure-detection',
+            defaults={
+                'name': 'EEG Seizure Detection',
+                'description': 'Ensemble seizure detection via hasanai.net external API.',
+                'category': AIModel.Category.NEUROLOGY,
+                'input_type': AIModel.InputType.PARQUET,
+                'status': AIModel.Status.ACTIVE,
+                'data_scientist': admin_user,
+            },
+        )
+        label      = data.get('ensemble_label', '')
+        confidence = data.get('ensemble_confidence') or data.get('confidence')
+        if confidence is not None:
+            try: confidence = float(confidence)
+            except (TypeError, ValueError): confidence = None
+        risk_score = None
+        if confidence is not None:
+            risk_score = confidence if 'seizure' in label.lower() else (1 - confidence)
+        pred = ModelPrediction.objects.create(
+            model=ai_model,
+            patient=request.user,
+            input_data={'filename': uploaded_file.name},
+            result=data,
+            risk_score=risk_score,
+        )
+        AIModel.objects.filter(pk=ai_model.pk).update(run_count=ai_model.run_count + 1)
+        data['prediction_id'] = str(pred.pk)
+    except Exception as save_err:
+        logger.warning('Could not save seizure prediction: %s', save_err)
+
+    return Response(data)
 
 
 # ── RAG Assistant ─────────────────────────────────────────────────────────────

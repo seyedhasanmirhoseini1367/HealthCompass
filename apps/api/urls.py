@@ -44,4 +44,7 @@ urlpatterns = [
 
     # AI Assistant
     path('assistant/ask/',         views.assistant_ask,      name='assistant_ask'),
+
+    # Seizure Analysis
+    path('seizure-analysis/',      views.seizure_analysis,   name='seizure_analysis'),
 ]
