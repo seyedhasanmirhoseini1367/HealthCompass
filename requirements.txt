@@ -18,6 +18,10 @@ langgraph==0.2.28
 django-allauth>=65.0.0,<66.0.0
 PyJWT
 requests
+# Mobile API
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
 # Production server & database
 gunicorn
 psycopg2-binary

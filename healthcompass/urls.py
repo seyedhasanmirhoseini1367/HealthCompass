@@ -25,6 +25,7 @@ urlpatterns = [
     path('insights/', include('apps.ai_insights.urls')),
     path('assistant/', include('apps.rag_assistant.urls')),
     path('notifications/', include('apps.notifications.urls')),
+    path('api/v1/', include('apps.api.urls')),
     path('icu/', RedirectView.as_view(url='/insights/icu/', permanent=True)),
     re_path(r'^media/(?P<path>.+)$', serve_media),
 ]
