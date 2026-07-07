@@ -139,6 +139,7 @@ DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default='noreply@healthcompa
 # Use SMTP only when credentials are actually configured; fall back to console
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_TIMEOUT = 10  # fail fast so gunicorn worker doesn't get killed waiting
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 

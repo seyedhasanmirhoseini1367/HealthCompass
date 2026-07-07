@@ -61,7 +61,10 @@ class SafePasswordResetView(PasswordResetView):
             return super().form_valid(form)
         except Exception as e:
             logger.error('Password reset email failed: %s', e)
-            # Still redirect to done — never reveal whether email was sent
+            from django.http import HttpResponseRedirect
+            return HttpResponseRedirect(self.get_success_url())
+        except BaseException as e:
+            logger.error('Password reset fatal error: %s', e)
             from django.http import HttpResponseRedirect
             return HttpResponseRedirect(self.get_success_url())
 
