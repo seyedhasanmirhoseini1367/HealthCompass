@@ -1,47 +1,21 @@
 {% extends 'base.html' %}
-{% block title %}Complete Registration — HealthCompass{% endblock %}
-{% block extra_css %}
-<style>
-.auth-wrap{max-width:440px;margin:3rem auto}
-.auth-card{background:white;border-radius:20px;padding:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,.08);border:1px solid var(--border)}
-.auth-logo{text-align:center;font-size:2.5rem;margin-bottom:1rem}
-.auth-title{font-size:1.4rem;font-weight:700;text-align:center;margin-bottom:.25rem}
-.auth-sub{color:var(--muted);font-size:.875rem;text-align:center;margin-bottom:2rem}
-.form-group{margin-bottom:1.25rem}
-.form-group label{display:block;font-size:.825rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
-.form-group select{width:100%;padding:.65rem .9rem;border:1.5px solid var(--border);border-radius:9px;font-size:.875rem;outline:none;transition:border .2s;background:white;color:var(--text);appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .9rem center}
-.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
-.role-info{background:#e0f2fe;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#0369a1}
-.btn-submit{width:100%;padding:.7rem;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .2s;margin-top:.5rem}
-.btn-submit:hover{background:var(--primary-dk)}
-</style>
-{% endblock %}
+{% block title %}Completing sign-in — HealthCompass{% endblock %}
 {% block content %}
-<div class="auth-wrap">
-  <div class="auth-card">
-    <div class="auth-logo">🧭</div>
-    <h1 class="auth-title">One last step</h1>
-    <p class="auth-sub">You're signing in with Google. Please select your role to complete registration.</p>
-    <div class="role-info"><i class="fas fa-info-circle"></i> Doctors, researchers, and hospital admins require admin approval before access is granted.</div>
-    <form method="post" action="{% url 'socialaccount_signup' %}">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      <div class="form-group">
-        <label for="id_role">I am registering as</label>
-        {% if form.role %}
-          {{ form.role }}
-        {% else %}
-          <select name="role" id="id_role">
-            <option value="patient">Patient</option>
-            <option value="doctor">Doctor / Nurse</option>
-            <option value="data_scientist">Data Scientist / Researcher</option>
-            <option value="hospital_admin">Hospital Admin</option>
-          </select>
-        {% endif %}
-        {{ form.role.errors }}
-      </div>
-      <button type="submit" class="btn-submit">Complete Registration</button>
-    </form>
-  </div>
+<div style="max-width:440px;margin:4rem auto;text-align:center">
+  <div style="font-size:2.5rem;margin-bottom:1rem">🧭</div>
+  <h2 style="font-weight:700;margin-bottom:.5rem">Almost there…</h2>
+  <p style="color:var(--muted);margin-bottom:2rem">Setting up your account, please wait.</p>
+  <div class="spinner-border" style="width:2rem;height:2rem;border:3px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></div>
 </div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+{# Auto-submit the allauth social signup form with no extra fields.           #}
+{# Role defaults to "patient" via save_user() in the social adapter.          #}
+<form id="auto-signup" method="post" action="{% url 'socialaccount_signup' %}" style="display:none">
+  {% csrf_token %}
+  {% for field in form %}
+    {{ field.as_hidden }}
+  {% endfor %}
+</form>
+<script>document.getElementById('auto-signup').submit();</script>
 {% endblock %}
