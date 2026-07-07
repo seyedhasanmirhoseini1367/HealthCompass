@@ -93,6 +93,17 @@ def me(request):
     return Response(UserSerializer(request.user).data)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def register_fcm_token(request):
+    token = request.data.get('token', '').strip()
+    if not token:
+        return Response({'error': 'Token required.'}, status=status.HTTP_400_BAD_REQUEST)
+    from apps.notifications.models import FCMDevice
+    FCMDevice.objects.update_or_create(token=token, defaults={'user': request.user})
+    return Response({'detail': 'Token registered.'})
+
+
 # ── Medical Records ───────────────────────────────────────────────────────────
 
 @api_view(['GET'])

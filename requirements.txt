@@ -22,6 +22,7 @@ requests
 djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
+firebase-admin
 # Production server & database
 gunicorn
 psycopg2-binary

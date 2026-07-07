@@ -14,6 +14,7 @@ urlpatterns = [
     path('auth/change-password/',  views.change_password,  name='change_password'),
     path('auth/forgot-password/',  views.forgot_password,  name='forgot_password'),
     path('auth/emergency-card/',   views.emergency_card,   name='emergency_card'),
+    path('auth/fcm-token/',        views.register_fcm_token, name='fcm_token'),
 
     # Medical records
     path('records/upload/',          views.record_upload,   name='record_upload'),
