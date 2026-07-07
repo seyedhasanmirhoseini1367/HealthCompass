@@ -42,7 +42,23 @@ python manage.py migrate --noinput
 if [ "$CREATE_ADMIN" = "true" ]; then
     echo ""
     echo ">>> [2.5/3] Creating superuser (CREATE_ADMIN=true)..."
-    python manage.py createsuperuser --noinput || echo "Superuser already exists — skipping."
+    python manage.py shell -c "
+import os
+from django.contrib.auth import get_user_model
+User = get_user_model()
+email    = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@healthcompass.dev')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '')
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME', email.split('@')[0])
+if not password:
+    print('DJANGO_SUPERUSER_PASSWORD not set — skipping superuser creation.')
+elif User.objects.filter(is_superuser=True).exists():
+    print('Superuser already exists — skipping.')
+else:
+    u = User.objects.create_superuser(username=username, email=email, password=password)
+    u.is_approved = True
+    u.save()
+    print(f'Superuser created: {email}')
+" || echo "Superuser creation failed — check logs above."
 fi
 
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
