@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import FileResponse, Http404
 from .home_view import home
+from apps.accounts.views import AutoCompleteSocialSignup
 import os
 
 
@@ -17,6 +18,8 @@ def serve_media(request, path):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Override allauth's social signup to auto-complete without a role-selection form
+    path('auth/social/signup/', AutoCompleteSocialSignup.as_view(), name='socialaccount_signup'),
     path('auth/', include('allauth.urls')),
     path('', home, name='home'),
     path('accounts/', include('apps.accounts.urls')),

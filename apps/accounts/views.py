@@ -5,10 +5,24 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.views import PasswordResetView
 from django.urls import reverse_lazy
+from allauth.socialaccount.views import SignupView as BaseSocialSignupView
 from .models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
 from .forms import RegisterForm, LoginForm, ProfileForm, PasswordChangeForm
 
 logger = logging.getLogger(__name__)
+
+
+class AutoCompleteSocialSignup(BaseSocialSignupView):
+    """Skip the signup form — auto-complete as patient. Role can be changed via admin."""
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        # Log why it failed so we can diagnose
+        logger.warning('Social auto-signup form invalid: %s', form.errors)
+        messages.error(request, 'Could not complete Google sign-in. Please try again.')
+        return redirect('/accounts/login/')
 
 
 class SafePasswordResetView(PasswordResetView):
