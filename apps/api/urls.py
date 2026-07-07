@@ -46,5 +46,11 @@ urlpatterns = [
     path('assistant/ask/',         views.assistant_ask,      name='assistant_ask'),
 
     # Seizure Analysis
-    path('seizure-analysis/',      views.seizure_analysis,   name='seizure_analysis'),
+    path('seizure-analysis/',      views.seizure_analysis,      name='seizure_analysis'),
+
+    # Profile picture
+    path('auth/profile/picture/',  views.profile_picture_upload, name='profile_picture'),
+
+    # Population insights
+    path('population/',            views.population_insights,    name='population_insights'),
 ]

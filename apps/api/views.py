@@ -98,13 +98,20 @@ def me(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def records_list(request):
-    qs = MedicalRecord.objects.filter(patient=request.user).order_by('-uploaded_at')
+    from django.db.models import Q
+    qs = MedicalRecord.objects.filter(patient=request.user).order_by('-record_date', '-uploaded_at')
     record_type = request.query_params.get('type')
     if record_type:
         qs = qs.filter(record_type=record_type)
     q = request.query_params.get('q', '').strip()
     if q:
         qs = qs.filter(title__icontains=q)
+    date_from = request.query_params.get('date_from', '').strip()
+    date_to   = request.query_params.get('date_to',   '').strip()
+    if date_from:
+        qs = qs.filter(Q(record_date__gte=date_from) | Q(record_date__isnull=True, uploaded_at__date__gte=date_from))
+    if date_to:
+        qs = qs.filter(Q(record_date__lte=date_to)   | Q(record_date__isnull=True, uploaded_at__date__lte=date_to))
     return Response(MedicalRecordSerializer(qs, many=True).data)
 
 
@@ -179,6 +186,25 @@ def profile_update(request):
         if field in request.data:
             setattr(user, field, request.data[field] or '')
     user.save()
+    return Response(UserSerializer(user).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def profile_picture_upload(request):
+    pic = request.FILES.get('profile_picture')
+    if not pic:
+        return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+    allowed = ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
+    if pic.content_type not in allowed:
+        return Response({'error': 'Only JPEG, PNG, WebP, or GIF images are accepted.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    user = request.user
+    if user.profile_picture:
+        try: user.profile_picture.delete(save=False)
+        except Exception: pass
+    user.profile_picture = pic
+    user.save(update_fields=['profile_picture'])
     return Response(UserSerializer(user).data)
 
 
@@ -421,6 +447,98 @@ def run_model_prediction(request, slug):
         return Response(ModelPredictionSerializer(pred).data, status=status.HTTP_201_CREATED)
     except Exception as exc:
         return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ── Population Insights ───────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def population_insights(request):
+    from collections import defaultdict
+    from apps.medical_records.models import ParsedLabValue
+    from apps.ai_insights.models import HealthAlert, ModelPrediction
+
+    # ── Population biomarker averages (all patients, anonymized) ─────────────
+    qs = ParsedLabValue.objects.select_related('record').values(
+        'parameter_name', 'value', 'unit',
+        'record__record_date', 'record__uploaded_at',
+    )
+    per_unit = defaultdict(lambda: defaultdict(list))
+    for lv in qs:
+        try:
+            numeric = float(lv['value'])
+        except (TypeError, ValueError):
+            continue
+        date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
+        month_key = str(date_val)[:7]
+        key = (lv['parameter_name'], lv.get('unit') or '')
+        per_unit[key][month_key].append(numeric)
+
+    by_name = defaultdict(list)
+    for (name, unit), months in per_unit.items():
+        total = sum(len(v) for v in months.values())
+        by_name[name].append((unit, total, months))
+
+    pop_latest, pop_avg, pop_unit = {}, {}, {}
+    for name, groups in by_name.items():
+        best_unit, _, best_months = max(groups, key=lambda x: x[1])
+        all_vals = [v for vs in best_months.values() for v in vs]
+        sorted_months = sorted(best_months.keys())
+        if sorted_months:
+            last_vals = best_months[sorted_months[-1]]
+            pop_latest[name] = {
+                'value': round(sum(last_vals) / len(last_vals), 2),
+                'unit':  best_unit,
+                'count': len(all_vals),
+            }
+        if len(all_vals) >= 3:
+            pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
+        pop_unit[name] = best_unit
+
+    # ── Risk distribution ─────────────────────────────────────────────────────
+    all_scores = list(
+        ModelPrediction.objects.filter(risk_score__isnull=False)
+        .values_list('risk_score', flat=True)
+    )
+    risk_buckets = {'Low (0–30%)': 0, 'Moderate (30–70%)': 0, 'High (70–100%)': 0}
+    for rs in all_scores:
+        s = float(rs) * 100
+        if s < 30:   risk_buckets['Low (0–30%)']      += 1
+        elif s < 70: risk_buckets['Moderate (30–70%)'] += 1
+        else:        risk_buckets['High (70–100%)']    += 1
+
+    pop_avg_risk = round(sum(float(r) * 100 for r in all_scores) / len(all_scores), 1) \
+        if all_scores else None
+
+    # ── Alerts distribution (all patients) ───────────────────────────────────
+    alerts_summary = {
+        'critical': HealthAlert.objects.filter(severity='critical').count(),
+        'warning':  HealthAlert.objects.filter(severity='warning').count(),
+        'info':     HealthAlert.objects.filter(severity='info').count(),
+    }
+
+    # ── Records by type (all patients) ───────────────────────────────────────
+    records_by_type = {}
+    for rt, label in MedicalRecord.RecordType.choices:
+        count = MedicalRecord.objects.filter(record_type=rt).count()
+        if count:
+            records_by_type[label] = count
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    return Response({
+        'total_patients':    User.objects.filter(is_active=True, role='patient').count(),
+        'total_biomarkers':  len(pop_latest),
+        'total_predictions': len(all_scores),
+        'pop_avg_risk':      pop_avg_risk,
+        'pop_latest':        pop_latest,
+        'pop_avg':           pop_avg,
+        'pop_unit':          pop_unit,
+        'risk_buckets':      risk_buckets,
+        'alerts_summary':    alerts_summary,
+        'records_by_type':   records_by_type,
+    })
 
 
 # ── Seizure Analysis Proxy ────────────────────────────────────────────────────
