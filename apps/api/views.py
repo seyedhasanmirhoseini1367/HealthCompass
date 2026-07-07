@@ -105,6 +105,17 @@ def records_list(request):
     return Response(MedicalRecordSerializer(qs, many=True).data)
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def record_delete(request, pk):
+    try:
+        record = MedicalRecord.objects.get(pk=pk, patient=request.user)
+    except MedicalRecord.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    record.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def record_detail(request, pk):
@@ -134,6 +145,59 @@ def dashboard_summary(request):
         'flagged_count': records.filter(is_flagged=True).count(),
         'records_by_type': by_type,
         'user': UserSerializer(user).data,
+    })
+
+
+# ── Profile Update & Password ─────────────────────────────────────────────────
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def profile_update(request):
+    user = request.user
+    for field in ['first_name', 'last_name', 'phone_number', 'date_of_birth']:
+        if field in request.data:
+            setattr(user, field, request.data[field] or '')
+    user.save()
+    return Response(UserSerializer(user).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    old_pw = request.data.get('old_password', '')
+    new_pw = request.data.get('new_password', '')
+    if not old_pw or not new_pw:
+        return Response({'error': 'Both fields required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not request.user.check_password(old_pw):
+        return Response({'error': 'Current password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(new_pw) < 8:
+        return Response({'error': 'New password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+    request.user.set_password(new_pw)
+    request.user.save()
+    refresh = RefreshToken.for_user(request.user)
+    return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def emergency_card(request):
+    from apps.accounts.models import PatientProfile
+    profile, _ = PatientProfile.objects.get_or_create(user=request.user)
+    if request.method == 'PATCH':
+        for field in ['blood_type', 'allergies', 'emergency_contact_name', 'emergency_contact_phone']:
+            if field in request.data:
+                setattr(profile, field, request.data[field] or '')
+        profile.save()
+    return Response({
+        'full_name':               request.user.get_full_name() or request.user.username,
+        'email':                   request.user.email,
+        'date_of_birth':           str(request.user.date_of_birth) if request.user.date_of_birth else None,
+        'phone_number':            request.user.phone_number,
+        'blood_type':              profile.blood_type,
+        'allergies':               profile.allergies,
+        'emergency_contact_name':  profile.emergency_contact_name,
+        'emergency_contact_phone': profile.emergency_contact_phone,
+        'token':                   str(profile.emergency_token),
     })
 
 
@@ -259,6 +323,27 @@ def notification_mark_read(request, pk):
     return Response({'ok': True})
 
 
+# ── My Predictions ────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_predictions(request):
+    from apps.ai_insights.models import ModelPrediction
+    qs = ModelPrediction.objects.filter(patient=request.user).order_by('-created_at')
+    return Response(ModelPredictionSerializer(qs, many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def prediction_detail_api(request, pk):
+    from apps.ai_insights.models import ModelPrediction
+    try:
+        pred = ModelPrediction.objects.get(pk=pk, patient=request.user)
+    except ModelPrediction.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    return Response(ModelPredictionSerializer(pred).data)
+
+
 # ── AI Models ─────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
@@ -267,6 +352,54 @@ def ai_models_list(request):
     from apps.ai_insights.models import AIModel
     qs = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
     return Response(AIModelListSerializer(qs, many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ai_model_detail(request, slug):
+    from apps.ai_insights.models import AIModel
+    try:
+        model = AIModel.objects.get(slug=slug, status='active')
+    except AIModel.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    data = AIModelListSerializer(model).data
+    data['input_schema'] = model.input_schema
+    data['interpretation_guide'] = model.interpretation_guide
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def run_model_prediction(request, slug):
+    from apps.ai_insights.models import AIModel, ModelPrediction
+    from apps.ai_insights.views import _sanitize
+    from apps.ai_insights.runner import run_model, generate_interpretation
+    try:
+        model = AIModel.objects.get(slug=slug, status='active')
+    except AIModel.DoesNotExist:
+        return Response({'error': 'Model not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if model.input_type not in ('tabular',):
+        return Response(
+            {'error': 'This model requires file upload. Please use the website to run it.'},
+            status=status.HTTP_400_BAD_REQUEST)
+
+    input_data = {k: request.data.get(k, '') for k in model.input_schema.keys()}
+    try:
+        result = _sanitize(run_model(model, input_data, None))
+        if not result.get('success'):
+            raise ValueError(result.get('error', 'Prediction failed'))
+        interpretation = generate_interpretation(model, result, input_data)
+        pred = ModelPrediction.objects.create(
+            model=model, patient=request.user,
+            input_data=input_data, result=result,
+            risk_score=result.get('risk_score'),
+            interpretation=interpretation,
+        )
+        AIModel.objects.filter(pk=model.pk).update(run_count=model.run_count + 1)
+        return Response(ModelPredictionSerializer(pred).data, status=status.HTTP_201_CREATED)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ── RAG Assistant ─────────────────────────────────────────────────────────────

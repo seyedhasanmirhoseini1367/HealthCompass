@@ -15,8 +15,10 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model  = CustomUser
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name',
-                  'role', 'role_display', 'is_approved', 'profile_picture']
-        read_only_fields = fields
+                  'role', 'role_display', 'is_approved', 'profile_picture',
+                  'phone_number', 'date_of_birth']
+        read_only_fields = ['id', 'username', 'email', 'role', 'role_display',
+                            'is_approved', 'profile_picture', 'full_name']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -81,6 +83,7 @@ class HealthAlertSerializer(serializers.ModelSerializer):
 class ModelPredictionSerializer(serializers.ModelSerializer):
     model_name     = serializers.CharField(source='model.name', read_only=True)
     model_category = serializers.CharField(source='model.category', read_only=True)
+    model_slug     = serializers.CharField(source='model.slug', read_only=True)
     risk_pct       = serializers.SerializerMethodField()
     result_label   = serializers.SerializerMethodField()
 
@@ -92,8 +95,8 @@ class ModelPredictionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = ModelPrediction
-        fields = ['id', 'model_name', 'model_category', 'risk_score', 'risk_pct',
-                  'result_label', 'interpretation', 'created_at']
+        fields = ['id', 'model_name', 'model_category', 'model_slug', 'risk_score', 'risk_pct',
+                  'result_label', 'interpretation', 'result', 'input_data', 'created_at']
 
 
 class AIModelListSerializer(serializers.ModelSerializer):
