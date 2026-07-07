@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -7,8 +8,45 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.medical_records.models import MedicalRecord
 from .serializers import UserSerializer, RegisterSerializer, MedicalRecordSerializer
 
+User = get_user_model()
+
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    """Accept email (or username) + password, return JWT tokens."""
+    identifier = request.data.get('email', '').strip()
+    password   = request.data.get('password', '')
+
+    if not identifier or not password:
+        return Response({'error': 'Email and password are required.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Look up by email first, then by username
+    user = (User.objects.filter(email__iexact=identifier).first() or
+            User.objects.filter(username__iexact=identifier).first())
+
+    if not user:
+        return Response({'error': 'Invalid email or password.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
+
+    auth_user = authenticate(username=user.username, password=password)
+    if not auth_user:
+        return Response({'error': 'Invalid email or password.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
+
+    if not auth_user.is_active:
+        return Response({'error': 'Account is inactive.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    refresh = RefreshToken.for_user(auth_user)
+    return Response({
+        'access':  str(refresh.access_token),
+        'refresh': str(refresh),
+        'user':    UserSerializer(auth_user).data,
+    })
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
