@@ -25,6 +25,27 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    email = request.data.get('email', '').strip().lower()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    from django.contrib.auth import get_user_model
+    from django.contrib.auth.forms import PasswordResetForm
+    User = get_user_model()
+    if User.objects.filter(email__iexact=email).exists():
+        try:
+            form = PasswordResetForm({'email': email})
+            if form.is_valid():
+                form.save(request=request, use_https=True,
+                          email_template_name='accounts/email/password_reset_email.txt',
+                          subject_template_name='accounts/email/password_reset_subject.txt')
+        except Exception:
+            pass  # fail silently — never reveal whether email exists
+    return Response({'detail': 'If that email is registered, a reset link has been sent.'})
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
