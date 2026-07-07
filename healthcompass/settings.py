@@ -199,7 +199,6 @@ SOCIALACCOUNT_LOGIN_ON_GET  = True    # skip confirmation page; GET directly red
 ACCOUNT_EMAIL_VERIFICATION  = 'none'
 ACCOUNT_SIGNUP_FIELDS       = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS       = {'email'}
-ACCOUNT_USERNAME_REQUIRED   = False   # don't require username — prevents auto-signup failure
 SOCIALACCOUNT_EMAIL_REQUIRED = False  # don't block signup if Google omits email
 
 SOCIALACCOUNT_PROVIDERS = {
