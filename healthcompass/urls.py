@@ -19,7 +19,7 @@ def serve_media(request, path):
 urlpatterns = [
     path('admin/', admin.site.urls),
     # Override allauth's social signup to auto-complete without a role-selection form
-    path('auth/social/signup/', AutoCompleteSocialSignup.as_view(), name='socialaccount_signup'),
+    path('auth/3rdparty/signup/', AutoCompleteSocialSignup.as_view(), name='socialaccount_signup'),
     path('auth/', include('allauth.urls')),
     path('', home, name='home'),
     path('accounts/', include('apps.accounts.urls')),
