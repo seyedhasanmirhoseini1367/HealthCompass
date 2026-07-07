@@ -10,6 +10,7 @@ urlpatterns = [
     path('auth/login/',         TokenObtainPairView.as_view(), name='login'),
     path('auth/refresh/',       TokenRefreshView.as_view(),    name='token_refresh'),
     path('auth/me/',            views.me,                    name='me'),
+    path('auth/forgot-password/', views.forgot_password,     name='forgot_password'),
 
     # Medical records
     path('records/',            views.records_list,          name='records_list'),
