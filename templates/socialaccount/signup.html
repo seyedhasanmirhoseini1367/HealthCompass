@@ -5,17 +5,7 @@
   <div style="font-size:2.5rem;margin-bottom:1rem">🧭</div>
   <h2 style="font-weight:700;margin-bottom:.5rem">Almost there…</h2>
   <p style="color:var(--muted);margin-bottom:2rem">Setting up your account, please wait.</p>
-  <div class="spinner-border" style="width:2rem;height:2rem;border:3px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></div>
+  <div style="width:2rem;height:2rem;border:3px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-
-{# Auto-submit the allauth social signup form with no extra fields.           #}
-{# Role defaults to "patient" via save_user() in the social adapter.          #}
-<form id="auto-signup" method="post" action="{% url 'socialaccount_signup' %}" style="display:none">
-  {% csrf_token %}
-  {% for field in form %}
-    {{ field.as_hidden }}
-  {% endfor %}
-</form>
-<script>document.getElementById('auto-signup').submit();</script>
 {% endblock %}
