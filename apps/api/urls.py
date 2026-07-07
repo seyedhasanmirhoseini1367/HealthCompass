@@ -6,19 +6,32 @@ app_name = 'api'
 
 urlpatterns = [
     # Auth
-    path('auth/register/',      views.register,              name='register'),
-    path('auth/login/',         views.login,                 name='login'),
-    path('auth/refresh/',       TokenRefreshView.as_view(),    name='token_refresh'),
-    path('auth/me/',            views.me,                    name='me'),
-    path('auth/forgot-password/', views.forgot_password,     name='forgot_password'),
+    path('auth/register/',      views.register,       name='register'),
+    path('auth/login/',         views.login,          name='login'),
+    path('auth/refresh/',       TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/me/',            views.me,             name='me'),
+    path('auth/forgot-password/', views.forgot_password, name='forgot_password'),
 
     # Medical records
-    path('records/',            views.records_list,          name='records_list'),
-    path('records/<int:pk>/',   views.record_detail,         name='record_detail'),
+    path('records/upload/',          views.record_upload,  name='record_upload'),
+    path('records/',                 views.records_list,   name='records_list'),
+    path('records/<str:pk>/',        views.record_detail,  name='record_detail'),
 
     # Dashboard
-    path('dashboard/',          views.dashboard_summary,     name='dashboard'),
+    path('dashboard/',          views.dashboard_summary, name='dashboard'),
+
+    # Analytics & Insights
+    path('analytics/',          views.analytics,         name='analytics'),
+    path('alerts/',             views.alerts_list,       name='alerts_list'),
+    path('alerts/<str:pk>/read/', views.alert_mark_read, name='alert_read'),
+
+    # Notifications
+    path('notifications/',                  views.notifications_list,    name='notifications'),
+    path('notifications/<str:pk>/read/',    views.notification_mark_read, name='notification_read'),
+
+    # AI Models
+    path('ai-models/',          views.ai_models_list,    name='ai_models'),
 
     # AI Assistant
-    path('assistant/ask/',      views.assistant_ask,         name='assistant_ask'),
+    path('assistant/ask/',      views.assistant_ask,     name='assistant_ask'),
 ]
