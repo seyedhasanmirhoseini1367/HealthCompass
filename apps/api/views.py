@@ -6,7 +6,10 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.medical_records.models import MedicalRecord
-from .serializers import UserSerializer, RegisterSerializer, MedicalRecordSerializer
+from .serializers import (UserSerializer, RegisterSerializer, MedicalRecordSerializer,
+                           MedicalRecordUploadSerializer, HealthAlertSerializer,
+                           ModelPredictionSerializer, AIModelListSerializer,
+                           NotificationSerializer)
 
 User = get_user_model()
 
@@ -132,6 +135,138 @@ def dashboard_summary(request):
         'records_by_type': by_type,
         'user': UserSerializer(user).data,
     })
+
+
+# ── Record Upload ─────────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_upload(request):
+    serializer = MedicalRecordUploadSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        record = serializer.save()
+        return Response(MedicalRecordSerializer(record).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def analytics(request):
+    from collections import defaultdict
+    from apps.ai_insights.models import ModelPrediction, HealthAlert
+    from apps.medical_records.models import ParsedLabValue
+
+    patient = request.user
+
+    lab_qs = (ParsedLabValue.objects
+              .filter(record__patient=patient)
+              .select_related('record')
+              .order_by('record__record_date', 'record__uploaded_at'))
+
+    biomarker_map = defaultdict(list)
+    for lv in lab_qs:
+        try:
+            numeric = float(lv.value)
+        except (ValueError, TypeError):
+            continue
+        date_val = lv.record.record_date or lv.record.uploaded_at.date()
+        biomarker_map[lv.parameter_name].append({
+            'date':     str(date_val),
+            'value':    numeric,
+            'unit':     lv.unit or '',
+            'abnormal': lv.is_abnormal,
+            'critical': lv.is_critical,
+            'ref':      lv.reference_range or '',
+        })
+
+    biomarker_latest = {name: pts[-1] for name, pts in biomarker_map.items()}
+    biomarker_trends = {name: pts for name, pts in biomarker_map.items() if len(pts) >= 2}
+
+    records = MedicalRecord.objects.filter(patient=patient)
+    records_by_type = {}
+    for rt, label in MedicalRecord.RecordType.choices:
+        count = records.filter(record_type=rt).count()
+        if count:
+            records_by_type[label] = count
+
+    alerts_qs      = HealthAlert.objects.filter(patient=patient).order_by('-created_at')[:8]
+    predictions_qs = ModelPrediction.objects.filter(patient=patient).order_by('-created_at')[:5]
+
+    latest_pred    = ModelPrediction.objects.filter(patient=patient, risk_score__isnull=False).order_by('-created_at').first()
+    latest_risk    = round(float(latest_pred.risk_score) * 100, 1) if latest_pred else None
+    last_record    = records.filter(record_date__isnull=False).order_by('-record_date').first()
+
+    return Response({
+        'total_records':    records.count(),
+        'flagged_count':    records.filter(is_flagged=True).count(),
+        'total_biomarkers': len(biomarker_map),
+        'unread_alerts':    HealthAlert.objects.filter(patient=patient, is_read=False).count(),
+        'latest_risk':      latest_risk,
+        'last_record_date': str(last_record.record_date) if last_record else None,
+        'biomarker_latest': biomarker_latest,
+        'biomarker_trends': biomarker_trends,
+        'alerts':           HealthAlertSerializer(alerts_qs, many=True).data,
+        'predictions':      ModelPredictionSerializer(predictions_qs, many=True).data,
+        'records_by_type':  records_by_type,
+    })
+
+
+# ── Health Alerts ─────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def alerts_list(request):
+    from apps.ai_insights.models import HealthAlert
+    qs = HealthAlert.objects.filter(patient=request.user).order_by('-created_at')[:30]
+    return Response(HealthAlertSerializer(qs, many=True).data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def alert_mark_read(request, pk):
+    from apps.ai_insights.models import HealthAlert
+    try:
+        alert = HealthAlert.objects.get(pk=pk, patient=request.user)
+    except HealthAlert.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    alert.is_read = True
+    alert.save(update_fields=['is_read'])
+    return Response({'ok': True})
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def notifications_list(request):
+    from apps.notifications.models import Notification
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:30]
+    return Response(NotificationSerializer(qs, many=True).data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def notification_mark_read(request, pk):
+    from apps.notifications.models import Notification
+    try:
+        notif = Notification.objects.get(pk=pk, user=request.user)
+    except Notification.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    notif.is_read = True
+    notif.save(update_fields=['is_read'])
+    return Response({'ok': True})
+
+
+# ── AI Models ─────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ai_models_list(request):
+    from apps.ai_insights.models import AIModel
+    qs = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
+    return Response(AIModelListSerializer(qs, many=True).data)
 
 
 # ── RAG Assistant ─────────────────────────────────────────────────────────────
