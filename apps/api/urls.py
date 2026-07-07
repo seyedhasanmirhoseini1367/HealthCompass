@@ -6,32 +6,42 @@ app_name = 'api'
 
 urlpatterns = [
     # Auth
-    path('auth/register/',      views.register,       name='register'),
-    path('auth/login/',         views.login,          name='login'),
-    path('auth/refresh/',       TokenRefreshView.as_view(), name='token_refresh'),
-    path('auth/me/',            views.me,             name='me'),
-    path('auth/forgot-password/', views.forgot_password, name='forgot_password'),
+    path('auth/register/',         views.register,         name='register'),
+    path('auth/login/',            views.login,            name='login'),
+    path('auth/refresh/',          TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/me/',               views.me,               name='me'),
+    path('auth/profile/',          views.profile_update,   name='profile_update'),
+    path('auth/change-password/',  views.change_password,  name='change_password'),
+    path('auth/forgot-password/',  views.forgot_password,  name='forgot_password'),
+    path('auth/emergency-card/',   views.emergency_card,   name='emergency_card'),
 
     # Medical records
-    path('records/upload/',          views.record_upload,  name='record_upload'),
-    path('records/',                 views.records_list,   name='records_list'),
-    path('records/<str:pk>/',        views.record_detail,  name='record_detail'),
+    path('records/upload/',          views.record_upload,   name='record_upload'),
+    path('records/',                 views.records_list,    name='records_list'),
+    path('records/<str:pk>/',        views.record_detail,   name='record_detail'),
+    path('records/<str:pk>/delete/', views.record_delete,   name='record_delete'),
 
     # Dashboard
-    path('dashboard/',          views.dashboard_summary, name='dashboard'),
+    path('dashboard/',             views.dashboard_summary,  name='dashboard'),
 
     # Analytics & Insights
-    path('analytics/',          views.analytics,         name='analytics'),
-    path('alerts/',             views.alerts_list,       name='alerts_list'),
-    path('alerts/<str:pk>/read/', views.alert_mark_read, name='alert_read'),
+    path('analytics/',             views.analytics,          name='analytics'),
+    path('alerts/',                views.alerts_list,        name='alerts_list'),
+    path('alerts/<str:pk>/read/',  views.alert_mark_read,    name='alert_read'),
+
+    # My predictions
+    path('predictions/',              views.my_predictions,       name='my_predictions'),
+    path('predictions/<str:pk>/',     views.prediction_detail_api, name='prediction_detail'),
 
     # Notifications
-    path('notifications/',                  views.notifications_list,    name='notifications'),
-    path('notifications/<str:pk>/read/',    views.notification_mark_read, name='notification_read'),
+    path('notifications/',                 views.notifications_list,     name='notifications'),
+    path('notifications/<str:pk>/read/',   views.notification_mark_read, name='notification_read'),
 
     # AI Models
-    path('ai-models/',          views.ai_models_list,    name='ai_models'),
+    path('ai-models/',                    views.ai_models_list,      name='ai_models'),
+    path('ai-models/<str:slug>/',         views.ai_model_detail,     name='ai_model_detail'),
+    path('ai-models/<str:slug>/run/',     views.run_model_prediction, name='run_model'),
 
     # AI Assistant
-    path('assistant/ask/',      views.assistant_ask,     name='assistant_ask'),
+    path('assistant/ask/',         views.assistant_ask,      name='assistant_ask'),
 ]
