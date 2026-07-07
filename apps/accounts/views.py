@@ -13,16 +13,40 @@ logger = logging.getLogger(__name__)
 
 
 class AutoCompleteSocialSignup(BaseSocialSignupView):
-    """Skip the signup form — auto-complete as patient. Role can be changed via admin."""
+    """Skip the signup form — auto-complete without asking for a role.
+    If the email already exists, connect the Google account to that user.
+    Role defaults to patient; admin can change it later."""
 
     def get(self, request, *args, **kwargs):
-        form = self.get_form()
-        if form.is_valid():
-            return self.form_valid(form)
-        # Log why it failed so we can diagnose
-        logger.warning('Social auto-signup form invalid: %s', form.errors)
-        messages.error(request, 'Could not complete Google sign-in. Please try again.')
-        return redirect('/accounts/login/')
+        from django.contrib.auth import get_user_model
+        from allauth.socialaccount.internal.flows.signup import (
+            complete_social_signup, clear_pending_signup,
+        )
+
+        sociallogin = self.sociallogin
+        User = get_user_model()
+
+        # Case 1: email already registered — connect Google to that account
+        if sociallogin.email_addresses:
+            email = sociallogin.email_addresses[0].email
+            try:
+                existing_user = User.objects.get(email__iexact=email)
+                clear_pending_signup(request)
+                sociallogin.connect(request, existing_user)
+                return complete_social_signup(request, sociallogin)
+            except User.DoesNotExist:
+                pass
+
+        # Case 2: brand new user — create account as patient
+        try:
+            from allauth.socialaccount.adapter import get_adapter
+            clear_pending_signup(request)
+            get_adapter().save_user(request, sociallogin, form=None)
+            return complete_social_signup(request, sociallogin)
+        except Exception as e:
+            logger.warning('Social auto-signup failed: %s', e)
+            messages.error(request, 'Could not complete Google sign-in. Please try again.')
+            return redirect('/accounts/login/')
 
 
 class SafePasswordResetView(PasswordResetView):
