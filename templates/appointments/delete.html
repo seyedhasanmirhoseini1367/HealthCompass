@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Delete Appointment — HealthCompass{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:0 auto">
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:2rem">
+      <div style="font-size:2.5rem;margin-bottom:1rem">🗑️</div>
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Delete Appointment?</h2>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:.5rem">
+        <strong>{{ appt.title }}</strong>
+      </p>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:1.5rem">
+        {{ appt.appointment_datetime|date:"l, d F Y H:i" }}
+        {% if appt.doctor_name %} · {{ appt.doctor_name }}{% endif %}
+      </p>
+      <div style="display:flex;gap:.75rem;justify-content:center">
+        <a href="{% url 'appointments:list' %}" class="btn" style="background:#f1f5f9;color:var(--text)">Cancel</a>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Delete permanently</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
