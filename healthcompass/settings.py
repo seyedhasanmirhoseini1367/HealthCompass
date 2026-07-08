@@ -275,4 +275,5 @@ SIMPLE_JWT = {
 
 # ── CORS (allow Flutter app to call this API) ──────────────────────────────────
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000', cast=Csv())
+CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://localhost(:\d+)?$']
 CORS_ALLOW_CREDENTIALS = True
