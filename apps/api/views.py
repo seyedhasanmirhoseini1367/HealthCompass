@@ -833,28 +833,34 @@ def seizure_analysis(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def appointments_list_create(request):
-    from apps.appointments.models import Appointment
-    from .serializers import AppointmentSerializer
+    import logging
+    _log = logging.getLogger(__name__)
+    try:
+        from apps.appointments.models import Appointment
+        from .serializers import AppointmentSerializer
 
-    if request.method == 'GET':
-        qs = Appointment.objects.filter(patient=request.user)
-        show = request.query_params.get('show', 'upcoming')
-        from django.utils import timezone
-        now = timezone.now()
-        if show == 'past':
-            qs = qs.filter(appointment_datetime__lt=now).order_by('-appointment_datetime')
-        elif show == 'all':
-            qs = qs.order_by('appointment_datetime')
-        else:
-            qs = qs.filter(appointment_datetime__gte=now, is_cancelled=False)
-        return Response(AppointmentSerializer(qs, many=True).data)
+        if request.method == 'GET':
+            qs = Appointment.objects.filter(patient=request.user)
+            show = request.query_params.get('show', 'upcoming')
+            from django.utils import timezone
+            now = timezone.now()
+            if show == 'past':
+                qs = qs.filter(appointment_datetime__lt=now).order_by('-appointment_datetime')
+            elif show == 'all':
+                qs = qs.order_by('appointment_datetime')
+            else:
+                qs = qs.filter(appointment_datetime__gte=now, is_cancelled=False)
+            return Response(AppointmentSerializer(qs, many=True).data)
 
-    # POST — create
-    ser = AppointmentSerializer(data=request.data)
-    if ser.is_valid():
-        appt = ser.save(patient=request.user)
-        return Response(AppointmentSerializer(appt).data, status=status.HTTP_201_CREATED)
-    return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+        # POST — create
+        ser = AppointmentSerializer(data=request.data)
+        if ser.is_valid():
+            appt = ser.save(patient=request.user)
+            return Response(AppointmentSerializer(appt).data, status=status.HTTP_201_CREATED)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        _log.exception('appointments_list_create error: %s', exc)
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET', 'PATCH', 'DELETE'])
@@ -896,7 +902,11 @@ def assistant_ask(request):
         return Response({'error': 'query is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
         from apps.rag_assistant.services.rag_service import RAGService
+        # ask() returns (response_text, sources, provider, chunks, safety_routed, rules)
         result = RAGService().ask(request.user, query, request.data.get('history', []))
-        return Response({'answer': result.get('answer', ''), 'sources': result.get('sources', [])})
+        response, sources = result[0], result[1]
+        return Response({'answer': response, 'sources': sources})
     except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('assistant_ask error')
         return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
