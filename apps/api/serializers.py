@@ -7,11 +7,24 @@ from apps.appointments.models import Appointment
 
 
 class UserSerializer(serializers.ModelSerializer):
-    full_name    = serializers.SerializerMethodField()
-    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    full_name       = serializers.SerializerMethodField()
+    role_display    = serializers.CharField(source='get_role_display', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username
+
+    def get_profile_picture(self, obj):
+        if not obj.profile_picture:
+            return None
+        url = obj.profile_picture.url
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        # Fallback: build absolute URL using the known domain
+        if not url.startswith('http'):
+            return f'https://healthcompass.hasanai.net{url}'
+        return url
 
     class Meta:
         model  = CustomUser
