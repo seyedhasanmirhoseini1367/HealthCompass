@@ -897,16 +897,109 @@ def appointment_detail(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def assistant_ask(request):
-    query = request.data.get('query', '').strip()
+    from apps.rag_assistant.models import ChatSession, QueryLog
+    from apps.rag_assistant.services.rag_service import RAGService
+
+    query      = request.data.get('query', '').strip()
+    session_id = request.data.get('session_id')
     if not query:
         return Response({'error': 'query is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get or create a persistent session
+    if session_id:
+        try:
+            session = ChatSession.objects.get(pk=session_id, patient=request.user)
+        except ChatSession.DoesNotExist:
+            session = ChatSession.objects.create(patient=request.user, title=query[:60])
+    else:
+        session = ChatSession.objects.create(patient=request.user, title=query[:60])
+
+    # Build history from DB (last 5 exchanges)
+    history = list(
+        session.messages.values('query', 'response').order_by('-created_at')[:5]
+    )
+    history.reverse()
+
     try:
-        from apps.rag_assistant.services.rag_service import RAGService
-        # ask() returns (response_text, sources, provider, chunks, safety_routed, rules)
-        result = RAGService().ask(request.user, query, request.data.get('history', []))
-        response, sources = result[0], result[1]
-        return Response({'answer': response, 'sources': sources})
+        result          = RAGService().ask(request.user, query, history)
+        response_text   = result[0]
+        sources         = result[1]
+        provider        = result[2] if len(result) > 2 else ''
+        chunks_count    = result[3] if len(result) > 3 else None
+        safety_routed   = result[4] if len(result) > 4 else False
+        triggered_rules = result[5] if len(result) > 5 else []
     except Exception as exc:
         import logging
         logging.getLogger(__name__).exception('assistant_ask error')
         return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # Auto-title on first message
+    if not session.messages.exists():
+        session.title = query[:60]
+    session.save(update_fields=['title', 'updated_at'])
+
+    log = QueryLog.objects.create(
+        session                = session,
+        query                  = query,
+        response               = response_text,
+        sources                = sources,
+        llm_provider           = provider,
+        retrieved_chunks_count = chunks_count,
+        safety_routed          = safety_routed,
+        triggered_rules        = triggered_rules,
+    )
+
+    return Response({
+        'answer':     response_text,
+        'sources':    sources,
+        'session_id': str(session.pk),
+        'message_id': str(log.pk),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def assistant_sessions(request):
+    """List the user's 20 most recent chat sessions."""
+    from apps.rag_assistant.models import ChatSession
+    sessions = ChatSession.objects.filter(patient=request.user)[:20]
+    return Response({'sessions': [
+        {
+            'id':            str(s.pk),
+            'title':         s.title,
+            'created_at':    s.created_at.isoformat(),
+            'updated_at':    s.updated_at.isoformat(),
+            'message_count': s.messages.count(),
+        }
+        for s in sessions
+    ]})
+
+
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def assistant_session_detail(request, session_id):
+    """GET → messages in session. DELETE → remove session."""
+    from apps.rag_assistant.models import ChatSession
+    try:
+        session = ChatSession.objects.get(pk=session_id, patient=request.user)
+    except ChatSession.DoesNotExist:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'DELETE':
+        session.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    messages = list(session.messages.values('id', 'query', 'response', 'created_at').order_by('created_at'))
+    return Response({
+        'id':       str(session.pk),
+        'title':    session.title,
+        'messages': [
+            {
+                'id':         str(m['id']),
+                'query':      m['query'],
+                'response':   m['response'],
+                'created_at': m['created_at'].isoformat() if m['created_at'] else None,
+            }
+            for m in messages
+        ],
+    })
