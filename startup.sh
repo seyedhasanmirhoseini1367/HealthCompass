@@ -37,6 +37,9 @@ echo "OK: ./staticfiles/ exists with ${STATIC_COUNT} file(s)."
 echo ""
 echo ">>> [2/3] Running migrations..."
 python manage.py migrate --noinput
+echo ""
+echo ">>> Migration status (appointments):"
+python manage.py showmigrations appointments || echo "(appointments app not found)"
 
 # ── superuser (one-time bootstrap) ───────────────────────────────────────────
 if [ "$CREATE_ADMIN" = "true" ]; then
