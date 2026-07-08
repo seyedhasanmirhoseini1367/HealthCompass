@@ -64,6 +64,11 @@ else:
 " || echo "Superuser creation failed — check logs above."
 fi
 
+# ── Seed demo AI models ───────────────────────────────────────────────────────
+echo ""
+echo ">>> [2.5/3] Seeding demo AI models..."
+python manage.py seed_demo_models || echo "WARNING: seed_demo_models failed — check logs above"
+
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
 echo ""
 echo ">>> [2.7/3] Ensuring Google SocialApp credentials in DB..."

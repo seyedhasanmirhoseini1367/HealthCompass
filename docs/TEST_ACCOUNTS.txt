@@ -16,8 +16,10 @@ Name     : New Patient
 
 ADMIN / YOUR ACCOUNT
 ─────────────────────────────────────────
-Username : admin
-Password : Admin1234!
+Username : seyedhasan.mirhoseini1367
+Password : mqsemi1234
+Email    : seyedhasan.mirhoseini1367@gmail.com
 Notes    : Superuser. Has your real FIMLAB lab results (Apr 2026) indexed in RAG.
 
 URL : http://127.0.0.1:8000/
+
