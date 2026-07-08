@@ -65,4 +65,10 @@ urlpatterns = [
 
     # Population insights
     path('population/',            views.population_insights,    name='population_insights'),
+
+    # ICU Demo
+    path('icu/',                          views.icu_dashboard_api,        name='icu_dashboard_api'),
+
+    # Seizure Realtime
+    path('seizure-realtime/analyze/',     views.seizure_realtime_analyze, name='seizure_realtime_analyze'),
 ]
