@@ -17,7 +17,12 @@ urlpatterns = [
     path('auth/fcm-token/',        views.register_fcm_token, name='fcm_token'),
 
     # Medical records
-    path('records/upload/',          views.record_upload,   name='record_upload'),
+    path('records/upload/',           views.record_upload,       name='record_upload'),
+    path('records/upload/pdf/',       views.upload_pdf_api,      name='upload_pdf'),
+    path('records/upload/text/',      views.upload_text_api,     name='upload_text'),
+    path('records/upload/kanta/',     views.upload_kanta_api,    name='upload_kanta'),
+    path('records/upload/wearable/',  views.upload_wearable_api, name='upload_wearable'),
+    path('records/upload/scan/',      views.scan_ocr_api,        name='scan_ocr'),
     path('records/',                 views.records_list,    name='records_list'),
     path('records/<str:pk>/',        views.record_detail,   name='record_detail'),
     path('records/<str:pk>/delete/', views.record_delete,   name='record_delete'),
