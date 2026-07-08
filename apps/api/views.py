@@ -837,7 +837,7 @@ def assistant_ask(request):
     if not query:
         return Response({'error': 'query is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        from rag_assistant.services.rag_service import RAGService
+        from apps.rag_assistant.services.rag_service import RAGService
         result = RAGService().ask(request.user, query, request.data.get('history', []))
         return Response({'answer': result.get('answer', ''), 'sources': result.get('sources', [])})
     except Exception as exc:
