@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}My Appointments — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.appt-hero{background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:16px;padding:1.5rem 2rem;color:white;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.appt-hero h1{font-size:1.5rem;font-weight:800;margin:0}
+.appt-hero p{font-size:.9rem;opacity:.85;margin:.25rem 0 0}
+.section-h{font-size:1rem;font-weight:700;margin:1.5rem 0 .75rem;display:flex;align-items:center;gap:.5rem;color:var(--text)}
+.section-h i{color:var(--primary)}
+.appt-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1rem 1.25rem;margin-bottom:.75rem;display:flex;align-items:flex-start;gap:1rem;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
+.appt-card:hover{box-shadow:0 4px 12px rgba(14,165,233,.12)}
+.appt-date{min-width:56px;text-align:center;background:linear-gradient(135deg,#e0f2fe,#ede9fe);border-radius:10px;padding:.5rem .4rem;line-height:1}
+.appt-date .day{font-size:1.5rem;font-weight:800;color:var(--primary-dk)}
+.appt-date .mon{font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--muted)}
+.appt-info{flex:1;min-width:0}
+.appt-title{font-weight:700;font-size:.95rem;margin:0 0 .2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt-meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.5rem .75rem;margin-top:.3rem}
+.appt-meta span{display:flex;align-items:center;gap:.25rem}
+.appt-actions{display:flex;gap:.4rem;align-items:center;flex-shrink:0}
+.past-card{opacity:.65}
+.reminder-chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.45rem}
+.chip{display:inline-flex;align-items:center;gap:.2rem;padding:.1rem .45rem;border-radius:20px;font-size:.68rem;font-weight:600;background:#dbeafe;color:#1d4ed8}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty-state i{font-size:2.5rem;color:#c7d2fe;margin-bottom:.75rem;display:block}
+</style>
+{% endblock %}
+{% block content %}
+<div class="appt-hero">
+  <div>
+    <h1>📅 My Appointments</h1>
+    <p>Schedule visits and get reminders right on time</p>
+  </div>
+  <a href="{% url 'appointments:create' %}" class="btn btn-primary" style="background:white;color:var(--primary-dk);font-weight:700">
+    <i class="fas fa-plus"></i> New Appointment
+  </a>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+
+<h2 class="section-h"><i class="fas fa-calendar-day"></i> Upcoming</h2>
+{% if upcoming %}
+  {% for appt in upcoming %}
+  <div class="appt-card{% if appt.is_cancelled %} past-card{% endif %}">
+    <div class="appt-date">
+      <div class="day">{{ appt.appointment_datetime|date:"d" }}</div>
+      <div class="mon">{{ appt.appointment_datetime|date:"M" }}</div>
+    </div>
+    <div class="appt-info">
+      <div class="appt-title">{{ appt.title }}</div>
+      <div class="appt-meta">
+        <span><i class="fas fa-clock"></i> {{ appt.appointment_datetime|date:"H:i" }}</span>
+        {% if appt.doctor_name %}<span><i class="fas fa-user-md"></i> {{ appt.doctor_name }}</span>{% endif %}
+        {% if appt.location %}<span><i class="fas fa-map-marker-alt"></i> {{ appt.location }}</span>{% endif %}
+      </div>
+      <div class="reminder-chips">
+        {% if appt.remind_24h %}<span class="chip"><i class="fas fa-bell"></i> 24h before</span>{% endif %}
+        {% if appt.remind_3h %}<span class="chip"><i class="fas fa-bell"></i> 3h before</span>{% endif %}
+        {% if appt.remind_2h %}<span class="chip"><i class="fas fa-bell"></i> 2h before</span>{% endif %}
+        {% if appt.remind_1h %}<span class="chip"><i class="fas fa-bell"></i> 1h before</span>{% endif %}
+      </div>
+    </div>
+    <div class="appt-actions">
+      <a href="{% url 'appointments:edit' appt.pk %}" class="btn btn-outline" style="padding:.35rem .75rem;font-size:.8rem">Edit</a>
+      <a href="{% url 'appointments:delete' appt.pk %}" class="btn btn-danger" style="padding:.35rem .75rem;font-size:.8rem">Delete</a>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="empty-state">
+    <i class="fas fa-calendar-plus"></i>
+    <p>No upcoming appointments.<br><a href="{% url 'appointments:create' %}" style="color:var(--primary)">Schedule one now</a></p>
+  </div>
+{% endif %}
+
+{% if past %}
+<h2 class="section-h"><i class="fas fa-history"></i> Past Appointments</h2>
+{% for appt in past %}
+<div class="appt-card past-card">
+  <div class="appt-date">
+    <div class="day">{{ appt.appointment_datetime|date:"d" }}</div>
+    <div class="mon">{{ appt.appointment_datetime|date:"M" }}</div>
+  </div>
+  <div class="appt-info">
+    <div class="appt-title">{{ appt.title }}</div>
+    <div class="appt-meta">
+      <span><i class="fas fa-clock"></i> {{ appt.appointment_datetime|date:"H:i, Y" }}</span>
+      {% if appt.doctor_name %}<span><i class="fas fa-user-md"></i> {{ appt.doctor_name }}</span>{% endif %}
+      {% if appt.location %}<span><i class="fas fa-map-marker-alt"></i> {{ appt.location }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="appt-actions">
+    <a href="{% url 'appointments:delete' appt.pk %}" class="btn" style="padding:.3rem .65rem;font-size:.75rem;background:#f1f5f9;color:var(--muted)">Delete</a>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

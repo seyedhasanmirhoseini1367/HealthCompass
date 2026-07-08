@@ -48,6 +48,10 @@ urlpatterns = [
     path('ai-models/<str:slug>/',         views.ai_model_detail,     name='ai_model_detail'),
     path('ai-models/<str:slug>/run/',     views.run_model_prediction, name='run_model'),
 
+    # Appointments
+    path('appointments/',             views.appointments_list_create, name='appointments'),
+    path('appointments/<uuid:pk>/',   views.appointment_detail,       name='appointment_detail'),
+
     # AI Assistant
     path('assistant/ask/',         views.assistant_ask,      name='assistant_ask'),
 

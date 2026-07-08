@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'apps.rag_assistant',
     'apps.dashboard',
     'apps.notifications',
+    'apps.appointments',
     # Mobile API
     'apps.api',
     'rest_framework',

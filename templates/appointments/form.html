@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}{% if appt %}Edit{% else %}New{% endif %} Appointment — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.form-card{max-width:560px;margin:0 auto}
+.form-group{margin-bottom:1.1rem}
+.form-group label{display:block;font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
+.form-group input,.form-group textarea{width:100%;padding:.6rem .85rem;border:1.5px solid var(--border);border-radius:10px;font-size:.9rem;font-family:inherit;background:#fafafa;transition:border .2s;color:var(--text)}
+.form-group input:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);background:white}
+.form-group textarea{resize:vertical;min-height:90px}
+.reminder-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-top:.35rem}
+.reminder-label{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.75rem .5rem;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;text-align:center;font-size:.8rem;font-weight:600;color:var(--muted)}
+.reminder-label:has(input:checked){border-color:var(--primary);background:#e0f2fe;color:var(--primary-dk)}
+.reminder-label i{font-size:1.1rem}
+.reminder-label input{display:none}
+.form-actions{display:flex;gap:.75rem;margin-top:1.5rem}
+@media(max-width:480px){.reminder-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+{% endblock %}
+{% block content %}
+<div style="margin-bottom:1rem"><a href="{% url 'appointments:list' %}" style="color:var(--muted);font-size:.85rem"><i class="fas fa-arrow-left"></i> Back to Appointments</a></div>
+<div class="form-card">
+  <div class="card">
+    <div class="card-header">
+      <i class="fas fa-calendar-plus"></i>
+      {% if appt %}Edit Appointment{% else %}Schedule Appointment{% endif %}
+    </div>
+    <div class="card-body">
+      {% if messages %}{% for msg in messages %}<div class="alert alert-{{ msg.tags }}">{{ msg }}</div>{% endfor %}{% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" name="title" value="{{ appt.title|default:'' }}" placeholder="e.g. Cardiology check-up" required>
+        </div>
+        <div class="form-group">
+          <label>Date & Time *</label>
+          <input type="datetime-local" name="appointment_datetime"
+            value="{{ appt.appointment_datetime|date:'Y-m-d\\TH:i'|default:'' }}" required>
+        </div>
+        <div class="form-group">
+          <label>Doctor / Provider</label>
+          <input type="text" name="doctor_name" value="{{ appt.doctor_name|default:'' }}" placeholder="Dr. Smith">
+        </div>
+        <div class="form-group">
+          <label>Location / Clinic</label>
+          <input type="text" name="location" value="{{ appt.location|default:'' }}" placeholder="City Hospital, Room 3B">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Bring previous test results, fasting required…">{{ appt.notes|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label><i class="fas fa-bell" style="color:var(--primary)"></i> Remind me</label>
+          <div class="reminder-grid">
+            <label class="reminder-label">
+              <input type="checkbox" name="remind_24h" {% if appt.remind_24h or not appt %}checked{% endif %}>
+              <i class="fas fa-bell"></i> 24 hours<br>before
+            </label>
+            <label class="reminder-label">
+              <input type="checkbox" name="remind_3h" {% if appt.remind_3h %}checked{% endif %}>
+              <i class="fas fa-bell"></i> 3 hours<br>before
+            </label>
+            <label class="reminder-label">
+              <input type="checkbox" name="remind_2h" {% if appt.remind_2h %}checked{% endif %}>
+              <i class="fas fa-bell"></i> 2 hours<br>before
+            </label>
+            <label class="reminder-label">
+              <input type="checkbox" name="remind_1h" {% if appt.remind_1h or not appt %}checked{% endif %}>
+              <i class="fas fa-bell"></i> 1 hour<br>before
+            </label>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-check"></i> {% if appt %}Save Changes{% else %}Schedule{% endif %}
+          </button>
+          <a href="{% url 'appointments:list' %}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

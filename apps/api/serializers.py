@@ -3,6 +3,7 @@ from apps.accounts.models import CustomUser
 from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import AIModel, ModelPrediction, HealthAlert
 from apps.notifications.models import Notification
+from apps.appointments.models import Appointment
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -147,3 +148,14 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Notification
         fields = ['id', 'type', 'type_display', 'title', 'message', 'is_read', 'link', 'created_at']
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Appointment
+        fields = [
+            'id', 'title', 'doctor_name', 'location', 'appointment_datetime',
+            'notes', 'remind_24h', 'remind_3h', 'remind_2h', 'remind_1h',
+            'is_completed', 'is_cancelled', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
