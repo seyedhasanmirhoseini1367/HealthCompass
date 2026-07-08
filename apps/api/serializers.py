@@ -62,6 +62,38 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         read_only_fields = ['uploaded_at', 'is_flagged']
 
 
+class ParsedLabValueSerializer(serializers.ModelSerializer):
+    class Meta:
+        from apps.medical_records.models import ParsedLabValue
+        model  = ParsedLabValue
+        fields = ['parameter_name', 'value', 'unit', 'reference_range',
+                  'is_abnormal', 'is_critical', 'measured_at']
+
+
+class WearableDataPointSerializer(serializers.ModelSerializer):
+    metric_display = serializers.CharField(source='get_metric_display', read_only=True)
+
+    class Meta:
+        from apps.medical_records.models import WearableDataPoint
+        model  = WearableDataPoint
+        fields = ['metric', 'metric_display', 'value', 'unit', 'recorded_at']
+
+
+class MedicalRecordDetailSerializer(serializers.ModelSerializer):
+    record_type_display = serializers.CharField(source='get_record_type_display', read_only=True)
+    lab_values          = ParsedLabValueSerializer(many=True, read_only=True)
+    wearable_points     = WearableDataPointSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = MedicalRecord
+        fields = [
+            'id', 'title', 'record_type', 'record_type_display',
+            'record_date', 'uploaded_at', 'is_flagged', 'notes',
+            'parsed_data', 'raw_text', 'lab_values', 'wearable_points',
+        ]
+        read_only_fields = ['uploaded_at', 'is_flagged']
+
+
 class MedicalRecordUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MedicalRecord

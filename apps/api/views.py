@@ -144,7 +144,8 @@ def record_detail(request, pk):
         record = MedicalRecord.objects.get(pk=pk, patient=request.user)
     except MedicalRecord.DoesNotExist:
         return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-    return Response(MedicalRecordSerializer(record).data)
+    from apps.api.serializers import MedicalRecordDetailSerializer
+    return Response(MedicalRecordDetailSerializer(record).data)
 
 
 # ── Dashboard Summary ─────────────────────────────────────────────────────────
