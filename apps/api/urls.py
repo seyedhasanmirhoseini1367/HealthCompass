@@ -53,7 +53,9 @@ urlpatterns = [
     path('appointments/<uuid:pk>/',   views.appointment_detail,       name='appointment_detail'),
 
     # AI Assistant
-    path('assistant/ask/',         views.assistant_ask,      name='assistant_ask'),
+    path('assistant/ask/',                        views.assistant_ask,            name='assistant_ask'),
+    path('assistant/sessions/',                   views.assistant_sessions,       name='assistant_sessions'),
+    path('assistant/sessions/<str:session_id>/',  views.assistant_session_detail, name='assistant_session_detail'),
 
     # Seizure Analysis
     path('seizure-analysis/',      views.seizure_analysis,      name='seizure_analysis'),
