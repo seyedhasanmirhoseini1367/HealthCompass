@@ -975,10 +975,10 @@ def assistant_sessions(request):
     ]})
 
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'DELETE', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def assistant_session_detail(request, session_id):
-    """GET → messages in session. DELETE → remove session."""
+    """GET → messages in session. DELETE → remove session. PATCH → rename."""
     from apps.rag_assistant.models import ChatSession
     try:
         session = ChatSession.objects.get(pk=session_id, patient=request.user)
@@ -988,6 +988,14 @@ def assistant_session_detail(request, session_id):
     if request.method == 'DELETE':
         session.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if request.method == 'PATCH':
+        title = request.data.get('title', '').strip()
+        if not title:
+            return Response({'error': 'Title is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        session.title = title[:200]
+        session.save(update_fields=['title'])
+        return Response({'id': str(session.pk), 'title': session.title})
 
     messages = list(session.messages.values('id', 'query', 'response', 'created_at').order_by('created_at'))
     return Response({
