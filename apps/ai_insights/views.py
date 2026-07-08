@@ -725,6 +725,48 @@ Write in plain paragraphs, no markdown, no bullet points."""
 
 
 @login_required
+def ajax_lab_records(request):
+    """Return user's records that have parsed lab values — for the 'use from records' feature."""
+    from apps.medical_records.models import MedicalRecord, ParsedLabValue
+    ids_with_labs = (
+        ParsedLabValue.objects
+        .filter(record__patient=request.user)
+        .values_list('record_id', flat=True)
+        .distinct()
+    )
+    qs = (MedicalRecord.objects
+          .filter(patient=request.user, id__in=ids_with_labs)
+          .order_by('-record_date', '-uploaded_at')
+          .values('id', 'title', 'record_type', 'record_date'))
+    records = [
+        {
+            'id': str(r['id']),
+            'title': r['title'],
+            'record_type': r['record_type'],
+            'record_date': str(r['record_date']) if r['record_date'] else None,
+        }
+        for r in qs
+    ]
+    return JsonResponse({'records': records})
+
+
+@login_required
+def ajax_record_labs(request, pk):
+    """Return lab values for a specific record, for pre-filling AI model input fields."""
+    from apps.medical_records.models import MedicalRecord, ParsedLabValue
+    try:
+        record = MedicalRecord.objects.get(pk=pk, patient=request.user)
+    except MedicalRecord.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    lab_values = list(
+        ParsedLabValue.objects
+        .filter(record=record)
+        .values('parameter_name', 'value', 'unit')
+    )
+    return JsonResponse({'record_id': str(pk), 'title': record.title, 'lab_values': lab_values})
+
+
+@login_required
 def patient_analytics(request):
     """
     Personal health analytics for patients — lives under /insights/analytics/

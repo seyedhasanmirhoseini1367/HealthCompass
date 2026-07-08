@@ -130,6 +130,30 @@
       {% csrf_token %}
 
       {% if model.input_type == 'tabular' %}
+        <!-- Toggle: manual entry vs. use from records -->
+        <div style="display:flex;gap:3px;background:#f1f5f9;border-radius:10px;padding:3px;margin-bottom:.875rem">
+          <button type="button" id="tab-manual" onclick="switchInputTab('manual')"
+            style="flex:1;padding:.35rem .6rem;border-radius:8px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;background:white;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)">
+            ✎ Enter manually
+          </button>
+          <button type="button" id="tab-records" onclick="switchInputTab('records')"
+            style="flex:1;padding:.35rem .6rem;border-radius:8px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;background:transparent;color:var(--muted);box-shadow:none">
+            📋 Use from Records
+          </button>
+        </div>
+
+        <!-- From Records panel -->
+        <div id="from-records-panel" style="display:none;margin-bottom:.875rem">
+          <select id="record-select" style="width:100%;padding:.5rem .75rem;border-radius:9px;border:1.5px solid var(--border);font-size:.875rem;color:var(--text);margin-bottom:.5rem;background:white">
+            <option value="">Loading your records…</option>
+          </select>
+          <button type="button" onclick="loadRecordValues()"
+            style="width:100%;padding:.45rem;border-radius:9px;border:none;background:var(--secondary);color:white;font-size:.875rem;font-weight:600;cursor:pointer">
+            Auto-fill Fields from This Record
+          </button>
+          <div id="record-load-msg" style="font-size:.78rem;margin-top:.4rem;min-height:1.1rem"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem">
         {% for field_name, field_type in input_fields.items %}
         <div class="form-group" style="margin-bottom:0">
@@ -266,6 +290,81 @@ function fileSelected(input) {
     }
   });
 });
+
+// ── Use from Records ──────────────────────────────────────────────────────────
+let _recordsLoaded = false;
+
+function switchInputTab(tab) {
+  const btnManual  = document.getElementById('tab-manual');
+  const btnRecords = document.getElementById('tab-records');
+  const panel      = document.getElementById('from-records-panel');
+  if (!btnManual) return;
+  if (tab === 'manual') {
+    btnManual.style.cssText  += ';background:white;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)';
+    btnRecords.style.cssText += ';background:transparent;color:var(--muted);box-shadow:none';
+    panel.style.display = 'none';
+  } else {
+    btnRecords.style.cssText += ';background:white;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)';
+    btnManual.style.cssText  += ';background:transparent;color:var(--muted);box-shadow:none';
+    panel.style.display = 'block';
+    if (!_recordsLoaded) _loadRecordList();
+  }
+}
+
+async function _loadRecordList() {
+  const sel = document.getElementById('record-select');
+  try {
+    const resp = await fetch('{% url "ai_insights:ajax_lab_records" %}');
+    const data = await resp.json();
+    if (data.records && data.records.length) {
+      sel.innerHTML = '<option value="">— select a record —</option>';
+      data.records.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.title + (r.record_date ? ' (' + r.record_date + ')' : '');
+        sel.appendChild(opt);
+      });
+    } else {
+      sel.innerHTML = '<option value="">No lab records found — upload one first</option>';
+    }
+    _recordsLoaded = true;
+  } catch (_) {
+    sel.innerHTML = '<option value="">Error loading records</option>';
+  }
+}
+
+async function loadRecordValues() {
+  const sel = document.getElementById('record-select');
+  const msg = document.getElementById('record-load-msg');
+  if (!sel.value) { msg.style.color = '#ef4444'; msg.textContent = 'Please select a record first.'; return; }
+  msg.style.color = 'var(--muted)'; msg.textContent = 'Loading…';
+  try {
+    const resp = await fetch('/insights/ajax/record-labs/' + sel.value + '/');
+    const data = await resp.json();
+    const labs = data.lab_values || [];
+    let filled = 0;
+    document.querySelectorAll('#runForm input[type=number]').forEach(inp => {
+      const fn = inp.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const match = labs.find(lv => {
+        const ln = (lv.parameter_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return ln === fn || ln.includes(fn) || fn.includes(ln);
+      });
+      if (match) {
+        const n = parseFloat(match.value);
+        if (!isNaN(n)) { inp.value = n; filled++; }
+      }
+    });
+    if (filled > 0) {
+      msg.style.color = '#16a34a';
+      msg.textContent = '✓ Filled ' + filled + ' field' + (filled > 1 ? 's' : '') + ' from "' + data.title + '"';
+    } else {
+      msg.style.color = '#b45309';
+      msg.textContent = '⚠ No matching fields found in this record. Try entering values manually.';
+    }
+  } catch (_) {
+    msg.style.color = '#ef4444'; msg.textContent = 'Error loading record values.';
+  }
+}
 
 document.getElementById('runForm')?.addEventListener('submit', async function(e) {
   e.preventDefault();
