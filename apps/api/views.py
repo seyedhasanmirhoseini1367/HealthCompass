@@ -272,6 +272,213 @@ def record_upload(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_pdf_api(request):
+    from apps.medical_records.parsers import PDFParser
+    from apps.medical_records.models import ParsedLabValue
+    from apps.medical_records.views import _create_alert
+    from datetime import datetime as dt
+    pdf_file = request.FILES.get('pdf_file') or request.FILES.get('file')
+    if not pdf_file:
+        return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+    pdf_bytes = pdf_file.read()
+    parsed    = PDFParser().parse(pdf_bytes, use_ai=True)
+    if parsed.get('error'):
+        return Response({'error': parsed['error']}, status=status.HTTP_400_BAD_REQUEST)
+    structured = parsed.get('structured') or {}
+    rtype = structured.get('record_type') or request.data.get('record_type', MedicalRecord.RecordType.OTHER)
+    title = structured.get('title') or pdf_file.name.replace('.pdf', '').replace('.PDF', '')
+    rec_date = None
+    if structured.get('date'):
+        try: rec_date = dt.strptime(structured['date'], '%Y-%m-%d').date()
+        except ValueError: pass
+    record = MedicalRecord.objects.create(
+        patient=request.user, record_type=rtype,
+        source=MedicalRecord.Source.MANUAL_UPLOAD,
+        title=title, file=pdf_file,
+        raw_text=parsed.get('raw_text', ''), parsed_data=structured,
+        notes=request.data.get('notes', ''), record_date=rec_date,
+    )
+    flagged = 0
+    for lv in structured.get('lab_values', []):
+        is_ab = lv.get('is_abnormal', False)
+        ParsedLabValue.objects.create(
+            record=record, parameter_name=lv.get('name', 'Unknown'),
+            value=str(lv.get('value', '')), unit=lv.get('unit', ''),
+            reference_range=lv.get('ref_range', ''), is_abnormal=is_ab,
+        )
+        if is_ab: flagged += 1
+    if flagged:
+        record.is_flagged = True; record.save(update_fields=['is_flagged'])
+        _create_alert(record, flagged)
+    return Response({**MedicalRecordSerializer(record).data, 'flagged': flagged}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_text_api(request):
+    from apps.medical_records.parsers import TextParser
+    from apps.medical_records.models import ParsedLabValue
+    from apps.medical_records.views import _create_alert
+    from datetime import datetime as dt
+    raw_text = (request.data.get('text') or '').strip()
+    if not raw_text:
+        return Response({'error': 'Text is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    parsed     = TextParser().parse(raw_text)
+    structured = parsed.get('structured') or {}
+    chosen_type = request.data.get('record_type', 'auto')
+    rtype = structured.get('record_type', MedicalRecord.RecordType.OTHER) if chosen_type == 'auto' else chosen_type
+    title = structured.get('title') or raw_text[:60].strip().replace('\n', ' ')
+    rec_date = None
+    if structured.get('date'):
+        try: rec_date = dt.strptime(structured['date'], '%Y-%m-%d').date()
+        except ValueError: pass
+    record = MedicalRecord.objects.create(
+        patient=request.user, record_type=rtype,
+        source=MedicalRecord.Source.MANUAL_UPLOAD,
+        title=title, raw_text=raw_text, parsed_data=structured,
+        notes=request.data.get('notes', ''), record_date=rec_date,
+    )
+    flagged = 0
+    for lv in structured.get('lab_values', []):
+        is_ab = lv.get('is_abnormal', False)
+        ParsedLabValue.objects.create(
+            record=record, parameter_name=lv.get('name', 'Unknown'),
+            value=str(lv.get('value', '')), unit=lv.get('unit', ''),
+            reference_range=lv.get('ref_range', ''), is_abnormal=is_ab,
+        )
+        if is_ab: flagged += 1
+    if flagged:
+        record.is_flagged = True; record.save(update_fields=['is_flagged'])
+        _create_alert(record, flagged)
+    try:
+        from apps.rag_assistant.services.rag_service import RAGService
+        RAGService().index_record(record)
+    except Exception: pass
+    return Response({**MedicalRecordSerializer(record).data, 'flagged': flagged}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_kanta_api(request):
+    from apps.medical_records.parsers import KantaXMLParser
+    from apps.medical_records.models import ParsedLabValue
+    from apps.medical_records.views import _map_doc_type, _check_critical, _create_alert
+    from datetime import datetime as dt
+    xml_file = request.FILES.get('xml_file') or request.FILES.get('file')
+    if not xml_file:
+        return Response({'error': 'No XML file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+    parsed = KantaXMLParser().parse(xml_file.read())
+    if 'error' in parsed:
+        return Response({'error': parsed['error']}, status=status.HTTP_400_BAD_REQUEST)
+    records_created = []; lab_values_created = 0
+    for doc in parsed.get('records', []):
+        rtype = _map_doc_type(doc.get('type', ''))
+        rec_date = None
+        if doc.get('date'):
+            try: rec_date = dt.strptime(doc['date'], '%Y-%m-%d').date()
+            except ValueError: pass
+        record = MedicalRecord.objects.create(
+            patient=request.user, record_type=rtype,
+            source=MedicalRecord.Source.KANTA_XML,
+            title=doc.get('title') or doc.get('type') or 'Kanta Record',
+            parsed_data=doc, notes=request.data.get('notes', ''), record_date=rec_date,
+        )
+        flagged = 0
+        for section in doc.get('sections', []):
+            for entry in section.get('entries', []):
+                if entry.get('kind') == 'lab':
+                    is_critical = _check_critical(entry)
+                    is_ab = entry.get('is_abnormal', False) or is_critical
+                    ref_range = ''
+                    if entry.get('ref_low') and entry.get('ref_high'):
+                        ref_range = f"{entry['ref_low']} – {entry['ref_high']}"
+                    ParsedLabValue.objects.create(
+                        record=record, parameter_name=entry.get('name', 'Unknown'),
+                        value=str(entry.get('value', '')), unit=entry.get('unit', ''),
+                        reference_range=ref_range, is_abnormal=is_ab, is_critical=is_critical,
+                    )
+                    lab_values_created += 1
+                    if is_ab: flagged += 1
+        if flagged:
+            record.is_flagged = True; record.save(update_fields=['is_flagged'])
+            _create_alert(record, flagged)
+        records_created.append(str(record.pk))
+    return Response({
+        'records_created': len(records_created), 'lab_values_created': lab_values_created,
+        'record_ids': records_created,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_wearable_api(request):
+    from apps.medical_records.parsers import WearableParser
+    from apps.medical_records.models import WearableDataPoint
+    from datetime import datetime as dt
+    data_file = request.FILES.get('data_file') or request.FILES.get('file')
+    if not data_file:
+        return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+    data_bytes = data_file.read()
+    try:
+        parsed = WearableParser().parse(data_bytes, filename=data_file.name)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    if not parsed.get('data_points'):
+        errs = parsed.get('errors', [])
+        return Response({'error': errs[0] if errs else 'No data points found.'}, status=status.HTTP_400_BAD_REQUEST)
+    device = parsed.get('device', 'unknown')
+    record = MedicalRecord.objects.create(
+        patient=request.user, record_type=MedicalRecord.RecordType.WEARABLE,
+        source=MedicalRecord.Source.WEARABLE_CSV,
+        title=f'{device.replace("_"," ").title()} — {data_file.name}',
+        parsed_data={'device': device, 'count': parsed['count']},
+        notes=request.data.get('notes', ''),
+    )
+    objs = []
+    for dp in parsed['data_points']:
+        try: recorded_at = dt.fromisoformat(dp['recorded_at'])
+        except (ValueError, KeyError): continue
+        objs.append(WearableDataPoint(
+            record=record, metric=dp.get('metric','other'),
+            value=dp['value'], unit=dp.get('unit',''), recorded_at=recorded_at,
+        ))
+    WearableDataPoint.objects.bulk_create(objs, batch_size=500)
+    return Response({**MedicalRecordSerializer(record).data, 'data_points': len(objs)}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def scan_ocr_api(request):
+    """OCR an image and return extracted text (does NOT create a record)."""
+    from django.conf import settings as s
+    image = request.FILES.get('image')
+    if not image:
+        return Response({'error': 'No image provided.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        from google import genai
+        from google.genai import types
+        api_key = getattr(s, 'GEMINI_API_KEY', '')
+        if not api_key:
+            return Response({'error': 'OCR service not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        img_bytes = image.read()
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                types.Part.from_bytes(data=img_bytes, mime_type=image.content_type or 'image/jpeg'),
+                ('Extract all text from this medical document image. '
+                 'Return only the raw text content exactly as it appears, '
+                 'preserving structure (line breaks, sections, tables). '
+                 'Do not add commentary or explanations.'),
+            ],
+        )
+        return Response({'text': (response.text or '').strip()})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ── Analytics ─────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
