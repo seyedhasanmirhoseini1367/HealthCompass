@@ -241,6 +241,25 @@ SOCIALACCOUNT_PROVIDERS = {
 # ── ICU Demo (MIMIC-IV local data) ────────────────────────────────────────────
 ICU_DEMO_DATA_PATH = config('ICU_DEMO_DATA_PATH', default='')
 
+# ── Cache ──────────────────────────────────────────────────────────────────────
+# Default: process-local memory cache (dev / single-worker).
+# Set CACHE_URL (e.g. redis://localhost:6379/0) to switch to Redis in production.
+# Redis is required for django-ratelimit to work correctly across gunicorn workers.
+_CACHE_URL = config('CACHE_URL', default='')
+if _CACHE_URL:
+    CACHES = {
+        'default': {
+            'BACKEND':  'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _CACHE_URL,
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
 # ── PHI retention policy ────────────────────────────────────────────────────────
 # QueryLog stores full patient question + response text (PHI).
 # Run `python manage.py purge_old_query_logs` periodically (e.g. weekly cron)

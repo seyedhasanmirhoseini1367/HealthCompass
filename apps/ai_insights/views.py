@@ -41,8 +41,19 @@ def _build_pop_biomarker_data(biomarker_names=None):
     pop_latest   : {name: {value, unit, count}}               latest month avg
     pop_avg      : {name: float}                              overall avg (>=3 pts)
     pop_unit     : {name: str}                                canonical unit
+
+    Results are cached for 1 hour (population data changes slowly).
     """
+    from django.core.cache import cache
     from apps.medical_records.models import ParsedLabValue
+
+    _cache_key = (
+        'ai_insights:pop_biomarker:'
+        + (','.join(sorted(biomarker_names)) if biomarker_names else 'all')
+    )
+    cached = cache.get(_cache_key)
+    if cached is not None:
+        return cached
 
     qs = ParsedLabValue.objects.select_related('record').values(
         'parameter_name', 'value', 'unit',
@@ -89,7 +100,9 @@ def _build_pop_biomarker_data(biomarker_names=None):
         if len(all_vals) >= 3:
             pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
 
-    return pop_trending, pop_latest, pop_avg, pop_unit
+    result = pop_trending, pop_latest, pop_avg, pop_unit
+    cache.set(_cache_key, result, 3600)
+    return result
 
 
 @login_required

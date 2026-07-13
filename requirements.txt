@@ -37,6 +37,10 @@ firebase-admin
 # anthropic, etc.) — listed here explicitly to guarantee it is present.
 cryptography
 django-ratelimit
+# Cache backend for django-ratelimit (multi-worker safe) and population insights.
+# Django 4.0+ built-in Redis backend uses this package directly.
+# Set CACHE_URL=redis://... in env to activate; falls back to locmem in dev.
+redis
 # Production server & database
 gunicorn
 psycopg2-binary
