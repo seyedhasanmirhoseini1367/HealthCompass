@@ -90,8 +90,12 @@ class GeneralKnowledgeService:
         texts, vectors, meta = [], [], []
         for c in chunks:
             try:
-                import pickle
-                vec = pickle.loads(bytes(c.embedding))
+                raw = bytes(c.embedding)
+                if raw[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
+                    import pickle
+                    vec = pickle.loads(raw)
+                else:
+                    vec = np.frombuffer(raw, dtype=np.float32)
                 texts.append(c.content)
                 vectors.append(vec)
                 meta.append({
@@ -191,7 +195,6 @@ class GeneralKnowledgeService:
         """
         from apps.rag_assistant.models import GeneralKnowledgeChunk
         from apps.rag_assistant.services.embedding_service import EmbeddingService
-        import pickle
 
         emb     = EmbeddingService()
         created = 0
@@ -214,7 +217,7 @@ class GeneralKnowledgeService:
                         'source_url':  source_url,
                         'topic':       topic,
                         'content':     chunk_text,
-                        'embedding':   pickle.dumps(vec),
+                        'embedding':   vec.astype(np.float32).tobytes(),
                     },
                 )
                 created += 1

@@ -4,7 +4,6 @@ Embedding service — uses Gemini text-embedding-004 (free tier: 1,500 req/day).
 Replaces sentence-transformers to eliminate the ~1 GB PyTorch memory footprint.
 """
 import os
-import pickle
 import logging
 import time
 import numpy as np
@@ -38,8 +37,7 @@ class EmbeddingService:
 
         api_key = getattr(settings, 'GEMINI_API_KEY', '')
         if not api_key:
-            logger.warning('GEMINI_API_KEY not set — returning zero embeddings')
-            return np.zeros((len(texts), _EMBED_DIM), dtype=np.float32)
+            raise RuntimeError('GEMINI_API_KEY is not configured — cannot embed texts')
 
         try:
             from google import genai
@@ -55,8 +53,7 @@ class EmbeddingService:
                 vectors.append(resp.embeddings[0].values)
             return np.array(vectors, dtype=np.float32)
         except Exception as exc:
-            logger.error('Gemini embedding error: %s', exc)
-            return np.zeros((len(texts), _EMBED_DIM), dtype=np.float32)
+            raise RuntimeError(f'Gemini embedding error: {exc}') from exc
 
     # ── Embed and persist MedicalChunk objects ─────────────────────────────────
 
@@ -66,11 +63,19 @@ class EmbeddingService:
         chunk_list = list(chunks)
         if not chunk_list:
             return
-        texts      = [c.content for c in chunk_list]
-        embeddings = self.embed_batch(texts)
+        texts = [c.content for c in chunk_list]
+        try:
+            embeddings = self.embed_batch(texts)
+        except Exception as exc:
+            logger.error('embed_chunks: embedding failed, skipping %d chunks: %s', len(chunk_list), exc)
+            return
+        to_update = []
         for chunk, vec in zip(chunk_list, embeddings):
-            chunk.embedding = pickle.dumps(vec)
-        MedicalChunk.objects.bulk_update(chunk_list, ['embedding'])
+            if np.any(vec):  # skip all-zero vectors — they indicate a failed embedding
+                chunk.embedding = vec.astype(np.float32).tobytes()
+                to_update.append(chunk)
+        if to_update:
+            MedicalChunk.objects.bulk_update(to_update, ['embedding'])
 
     # ── Load all embeddings for a patient ─────────────────────────────────────
 
@@ -93,7 +98,13 @@ class EmbeddingService:
         texts, vecs, meta = [], [], []
         for c in chunks:
             try:
-                vec = pickle.loads(bytes(c.embedding))
+                raw = bytes(c.embedding)
+                # Legacy rows were pickle-encoded; new rows use raw float32 bytes.
+                if raw[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
+                    import pickle
+                    vec = pickle.loads(raw)
+                else:
+                    vec = np.frombuffer(raw, dtype=np.float32)
                 texts.append(c.content)
                 vecs.append(vec)
                 meta.append({

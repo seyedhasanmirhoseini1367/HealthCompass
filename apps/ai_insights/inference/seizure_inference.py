@@ -8,7 +8,7 @@ from pathlib import Path
 from scipy.signal import butter, filtfilt, stft as scipy_stft
 from sklearn.preprocessing import StandardScaler
 
-_MODELS_DIR = Path(__file__).parent / "models"
+_MODELS_DIR = Path(__file__).parent / "model_weights"
 
 ONNX_FILES = {
     "cnn_transformer": "cnn_transformer.onnx",

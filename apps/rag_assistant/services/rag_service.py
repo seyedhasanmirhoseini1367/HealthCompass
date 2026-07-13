@@ -93,6 +93,9 @@ class RAGService:
         return response, sources, provider, len(chunks), False, rules_fired
 
     # ── Streaming ask ──────────────────────────────────────────────────────────
+    # Production path — this is what the web UI and mobile API use.
+    # Implements: safety gate → mode classification (general/hybrid/personal)
+    # → trajectory detection → streaming generation → guardrail → sources/chart.
 
     def stream_ask(
         self,
@@ -246,6 +249,9 @@ class RAGService:
             yield 'data: {"type": "done"}\n\n'
 
     # ── LangGraph ask ──────────────────────────────────────────────────────────
+    # Research/PhD path — demonstrates the full router→retrieval→generate→verify
+    # pipeline with LangGraph StateGraph.  The production UI uses stream_ask()
+    # instead (SSE streaming, dual-mode routing, trajectory mode).
 
     def langgraph_ask(
         self,
@@ -257,22 +263,22 @@ class RAGService:
         """
         Full LangGraph pipeline: router → scoped retrieval → generate → verify/retry.
         Returns (response_text, sources, provider, chunks_count).
+
+        Cold-start and safety gate are handled inside the graph
+        (safety_gate_node → router_node → cold_start_node).  The only
+        pre-graph check kept here is a safety gate short-circuit to avoid
+        invoking the graph entirely for emergency queries.
         """
-        from django.conf import settings
         from apps.rag_assistant.graph.graph import health_graph
         from apps.rag_assistant.services.generation_service import _build_sources
         from apps.rag_assistant.services.guardrail_service  import GuardrailService
 
-        # ── Pre-query safety gate (before anything else) ──────────────────────
+        # Pre-flight safety check — avoids graph invocation for emergencies.
+        # Cold-start is intentionally NOT checked here; the graph's router_node
+        # handles it via cold_start_node to avoid logic duplication.
         is_emergency, emergency_response = GuardrailService.check_pre_query(query)
         if is_emergency:
             return emergency_response, [], 'safety_gate', 0
-
-        # ── Cold-start check ──────────────────────────────────────────────────
-        if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
-            cold = self._cold_start_response(patient, query)
-            if cold:
-                return cold, [], 'cold_start', 0
 
         initial_state = {
             'question':          query,

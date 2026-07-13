@@ -39,7 +39,10 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True)
     emergency_contact_name = models.CharField(max_length=100, blank=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True)
-    national_id     = models.CharField(max_length=50, blank=True)
+    national_id     = models.CharField(
+                        max_length=50, blank=True,
+                        help_text='Stored as plaintext. In regulated deployments (Kanta/GDPR) '
+                                  'this field must be encrypted at rest before go-live.')
     emergency_token = models.UUIDField(default=uuid.uuid4, unique=True,
                           help_text='Token for public emergency card URL')
 

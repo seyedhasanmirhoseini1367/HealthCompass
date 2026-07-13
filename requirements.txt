@@ -1,8 +1,15 @@
+# NOTE: versions are unpinned for flexibility during active development.
+# Before go-live, run: pip install pip-tools && pip-compile requirements.txt
+# This produces requirements.lock with exact hashes for reproducible builds.
 django>=5.2
 pillow
 python-decouple
 google-genai
+groq
 onnxruntime
+defusedxml
+django-storages[s3]
+boto3
 rank-bm25
 openai
 scikit-learn
