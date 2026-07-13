@@ -80,5 +80,7 @@ echo ">>> [3/3] Starting gunicorn on 0.0.0.0:${PORT}..."
 exec gunicorn healthcompass.wsgi:application \
     --bind 0.0.0.0:$PORT \
     --workers 2 \
+    --worker-class gthread \
+    --threads 8 \
     --timeout 120 \
     --log-file -

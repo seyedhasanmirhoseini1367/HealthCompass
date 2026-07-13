@@ -127,10 +127,12 @@ _TEMPORAL_ROUTE_KEYWORDS = [
     'last 6 months', 'last 3 months', 'last year', 'last month',
     'fluctuating', 'stable over', 'consistently', 'pattern',
     'should i be worried', 'is this serious', 'is this concerning',
-    # Semantic paraphrases the reviewer identified as missed:
-    'journey', 'paint me a picture', 'walk me through', 'tell me about',
-    'give me an overview', 'how has my', 'how have my', 'evolved',
-    'what happened to my', 'explain my', 'describe my',
+    # Paraphrases for temporal intent — kept specific to avoid false positives.
+    # Broad phrases like "tell me about" / "explain my" are intentionally
+    # omitted here; the semantic embedding fallback (_semantic_temporal_check)
+    # catches novel paraphrases without triggering on generic requests.
+    'journey', 'paint me a picture', 'walk me through',
+    'how has my', 'how have my', 'evolved', 'what happened to my',
 ]
 
 # Prototype sentences for embedding-based semantic fallback
@@ -155,15 +157,18 @@ def _get_proto_embeddings():
     global _proto_embeddings
     if _proto_embeddings is None:
         try:
+            import numpy as np
             from apps.rag_assistant.services.embedding_service import EmbeddingService
-            svc = EmbeddingService()
-            _proto_embeddings = svc.model.encode(
-                _TEMPORAL_PROTOTYPES, normalize_embeddings=True
-            )
+            svc  = EmbeddingService()
+            vecs = svc.embed_batch(_TEMPORAL_PROTOTYPES)
+            # L2-normalise so cosine similarity == dot product
+            norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+            norms = np.where(norms == 0, 1.0, norms)
+            _proto_embeddings = (vecs / norms).astype(np.float32)
             logger.debug('Temporal prototype embeddings computed (%d phrases)', len(_TEMPORAL_PROTOTYPES))
         except Exception as exc:
             logger.warning('Could not compute temporal prototype embeddings: %s', exc)
-            _proto_embeddings = []
+            _proto_embeddings = None
     return _proto_embeddings
 
 
@@ -180,14 +185,18 @@ def _semantic_temporal_check(query: str, threshold: float = 0.52) -> bool:
         from apps.rag_assistant.services.embedding_service import EmbeddingService
 
         protos = _get_proto_embeddings()
-        if len(protos) == 0:
+        if protos is None or protos.shape[0] == 0:
             return False
 
         svc   = EmbeddingService()
-        q_emb = svc.model.encode([query], normalize_embeddings=True)[0]  # already L2-norm
+        q_vec = svc.embed(query)
+        norm  = np.linalg.norm(q_vec)
+        if norm == 0:
+            return False
+        q_emb = (q_vec / norm).astype(np.float32)
 
-        # Cosine similarity = dot product when both vectors are normalised
-        sims = protos @ q_emb
+        # Cosine similarity = dot product when both vectors are L2-normalised
+        sims    = protos @ q_emb
         max_sim = float(sims.max())
         logger.debug('Semantic temporal check: max_sim=%.3f (threshold=%.2f)', max_sim, threshold)
         return max_sim >= threshold
@@ -196,10 +205,15 @@ def _semantic_temporal_check(query: str, threshold: float = 0.52) -> bool:
         return False
 
 
+def _kw_match(kw: str, q: str) -> bool:
+    """Word-boundary keyword match — prevents 'mg' matching inside 'imaging'."""
+    return bool(re.search(r'\b' + re.escape(kw) + r'\b', q))
+
+
 def _is_temporal(question: str) -> bool:
     q = question.lower()
     # Fast keyword path
-    if any(kw in q for kw in _TEMPORAL_ROUTE_KEYWORDS):
+    if any(_kw_match(kw, q) for kw in _TEMPORAL_ROUTE_KEYWORDS):
         return True
     # Semantic embedding fallback (catches novel paraphrases)
     return _semantic_temporal_check(question)
@@ -212,7 +226,7 @@ def _detect_route(question: str) -> str:
         return 'trajectory'
 
     q       = question.lower()
-    matched = [r for r, kws in _ROUTE_KEYWORDS.items() if any(kw in q for kw in kws)]
+    matched = [r for r, kws in _ROUTE_KEYWORDS.items() if any(_kw_match(kw, q) for kw in kws)]
 
     if len(matched) == 0:
         return 'general'
@@ -419,11 +433,12 @@ def verify_node(state: HealthState) -> Dict[str, Any]:
     route       = state.get('route', '')
     retry_count = state.get('retry_count', 0)
 
-    # Cold-start and emergency routes: always terminate cleanly
+    # Cold-start and emergency routes: always terminate cleanly — no retry possible.
+    # retry_count is not incremented here because no retrieval attempt was made.
     if route in ('cold_start', 'emergency'):
         return {
             'needs_retry':        False,
-            'retry_count':        retry_count + 1,
+            'retry_count':        retry_count,
             'trajectory_context': state.get('trajectory_context', ''),
         }
 

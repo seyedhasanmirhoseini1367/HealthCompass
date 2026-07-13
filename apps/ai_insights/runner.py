@@ -37,52 +37,65 @@ def run_model(ai_model, input_data: dict, input_file=None) -> dict:
     return result
 
 
-# ─── Tabular (sklearn / keras with numeric features) ──────────────────────────
+# ─── Tabular (ONNX only) ──────────────────────────────────────────────────────
+
+_BLOCKED_FORMATS = {'pkl', 'pickle', 'h5', 'keras', 'joblib'}
+
+def _blocked_format_error(ext: str) -> dict:
+    return {
+        'success': False,
+        'error': (
+            f'.{ext} models are not supported for security reasons '
+            '(pickle/Keras Lambda layers allow arbitrary code execution on the server). '
+            'Please convert your model to ONNX format and re-upload. '
+            'Use: python convert_to_onnx.py  (included in this project).'
+        ),
+    }
+
 
 def _run_tabular(ai_model, input_data: dict) -> dict:
     file_path = ai_model.model_file.path
     ext = file_path.lower().rsplit('.', 1)[-1]
 
-    if ext == 'pkl':
-        import pickle
-        with open(file_path, 'rb') as f:
-            model = pickle.load(f)
-        X = _build_feature_array(ai_model.input_schema, input_data)
-        prediction = model.predict(X)[0]
-        proba = None
-        if hasattr(model, 'predict_proba'):
-            proba = float(model.predict_proba(X)[0].max())
-        return {
-            'success': True,
-            'prediction': _serialize(prediction),
-            'risk_score': proba,
-            'label': _interpret(proba if proba is not None else prediction, ai_model.output_schema),
-        }
+    if ext in _BLOCKED_FORMATS:
+        return _blocked_format_error(ext)
 
-    elif ext in ('h5', 'keras'):
-        import tensorflow as tf
-        model = tf.keras.models.load_model(file_path)
+    if ext == 'onnx':
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            return {'success': False, 'error': 'onnxruntime is not installed on this server.'}
+        sess = ort.InferenceSession(file_path, providers=['CPUExecutionProvider'])
         X = _build_feature_array(ai_model.input_schema, input_data)
-        out = model.predict(X, verbose=0)[0]
-        risk = float(out[0]) if len(out) == 1 else float(out.max())
+        input_name = sess.get_inputs()[0].name
+        outputs = sess.run(None, {input_name: X.astype(np.float32)})
+        # outputs[0]: predicted class array; outputs[1] (if present): probability dict
+        pred = int(outputs[0][0]) if len(outputs) > 0 else 0
+        proba = None
+        if len(outputs) > 1 and isinstance(outputs[1], list) and outputs[1]:
+            prob_map = outputs[1][0]
+            if isinstance(prob_map, dict):
+                proba = float(max(prob_map.values()))
+            elif hasattr(prob_map, 'max'):
+                proba = float(prob_map.max())
         return {
             'success': True,
-            'prediction': _serialize(out.tolist()),
-            'risk_score': risk,
-            'label': _interpret(risk, ai_model.output_schema),
+            'prediction': pred,
+            'risk_score': proba,
+            'label': _interpret(proba if proba is not None else pred, ai_model.output_schema),
         }
 
     elif ext in ('pt', 'pth'):
         return {
             'success': False,
             'error': (
-                'PyTorch (.pth/.pt) models require a handler. '
+                'PyTorch (.pth/.pt) models require a named handler. '
                 'Go to Django Admin → AI Models → this model and set '
                 'Handler slug to "seizure_eeg" (for EEG) or the appropriate handler slug.'
             ),
         }
 
-    return {'success': False, 'error': f'Unsupported model format: .{ext}'}
+    return {'success': False, 'error': f'Unsupported model format: .{ext}. Only ONNX is accepted.'}
 
 
 # ─── Image input ──────────────────────────────────────────────────────────────
@@ -101,19 +114,32 @@ def _run_image(ai_model, input_file) -> dict:
     from PIL import Image
     img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
 
-    if ext in ('h5', 'keras'):
-        import tensorflow as tf
-        model = tf.keras.models.load_model(file_path)
-        # Get expected input shape from model
-        input_shape = model.input_shape[1:3]  # (H, W)
-        img_resized = img.resize(input_shape[::-1])
+    if ext in _BLOCKED_FORMATS:
+        return _blocked_format_error(ext)
+
+    if ext == 'onnx':
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            return {'success': False, 'error': 'onnxruntime is not installed on this server.'}
+        sess = ort.InferenceSession(file_path, providers=['CPUExecutionProvider'])
+        inp  = sess.get_inputs()[0]
+        # Derive expected H×W from model input shape e.g. [1, 3, 224, 224] or [1, 224, 224, 3]
+        shape = inp.shape
+        h = int(shape[2]) if len(shape) == 4 and shape[2] not in (None, 0) else 224
+        w = int(shape[3]) if len(shape) == 4 and shape[3] not in (None, 0) else 224
+        img_resized = img.resize((w, h))
         X = np.array(img_resized, dtype=np.float32) / 255.0
+        # NCHW vs NHWC
+        if len(shape) == 4 and shape[1] in (1, 3):
+            X = np.transpose(X, (2, 0, 1))
         X = np.expand_dims(X, 0)
-        out = model.predict(X, verbose=0)[0]
+        outputs = sess.run(None, {inp.name: X})
+        out = np.array(outputs[0][0])
         risk = float(out.max())
-        idx = int(out.argmax())
+        idx  = int(out.argmax())
         labels = ai_model.output_schema.get('labels', {})
-        label = labels.get(str(idx), f'Class {idx}') if labels else _interpret(risk, ai_model.output_schema)
+        label  = labels.get(str(idx), f'Class {idx}') if labels else _interpret(risk, ai_model.output_schema)
         return {
             'success': True,
             'prediction': _serialize(out.tolist()),
@@ -122,23 +148,7 @@ def _run_image(ai_model, input_file) -> dict:
             'input_summary': f'Image {img.size[0]}×{img.size[1]} px',
         }
 
-    elif ext == 'pkl':
-        import pickle
-        with open(file_path, 'rb') as f:
-            model = pickle.load(f)
-        img_arr = np.array(img.resize((64, 64)), dtype=np.float32).flatten() / 255.0
-        X = img_arr.reshape(1, -1)
-        prediction = model.predict(X)[0]
-        proba = float(model.predict_proba(X)[0].max()) if hasattr(model, 'predict_proba') else None
-        return {
-            'success': True,
-            'prediction': _serialize(prediction),
-            'risk_score': proba,
-            'label': _interpret(proba if proba is not None else prediction, ai_model.output_schema),
-            'input_summary': f'Image {img.size[0]}×{img.size[1]} px',
-        }
-
-    return {'success': False, 'error': f'Unsupported model format for image: .{ext}'}
+    return {'success': False, 'error': f'Unsupported model format for image: .{ext}. Only ONNX is accepted.'}
 
 
 # ─── EEG / CSV / Parquet file input ───────────────────────────────────────────
@@ -175,41 +185,37 @@ def _run_file_input(ai_model, input_file, itype: str) -> dict:
     X_df = df.select_dtypes(include=[np.number])
     X = X_df.values.astype(np.float32)
 
-    if ext == 'pkl':
-        import pickle
-        with open(file_path, 'rb') as f:
-            model = pickle.load(f)
-        # If model expects a flat vector, take first row or mean
-        if X.ndim == 2 and hasattr(model, 'predict'):
-            prediction = model.predict(X[:1])[0]
-            proba = float(model.predict_proba(X[:1])[0].max()) if hasattr(model, 'predict_proba') else None
-        else:
-            prediction = 0
-            proba = None
-        return {
-            'success': True,
-            'prediction': _serialize(prediction),
-            'risk_score': proba,
-            'label': _interpret(proba if proba is not None else prediction, ai_model.output_schema),
-            'input_summary': input_summary,
-        }
+    if ext in _BLOCKED_FORMATS:
+        return _blocked_format_error(ext)
 
-    elif ext in ('h5', 'keras'):
-        import tensorflow as tf
-        model = tf.keras.models.load_model(file_path)
-        expected = model.input_shape[1]
-        if X.shape[1] != expected:
-            if X.shape[1] > expected:
-                X = X[:, :expected]
+    if ext == 'onnx':
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            return {'success': False, 'error': 'onnxruntime is not installed on this server.'}
+        sess = ort.InferenceSession(file_path, providers=['CPUExecutionProvider'])
+        input_name = sess.get_inputs()[0].name
+        expected   = sess.get_inputs()[0].shape[1] if len(sess.get_inputs()[0].shape) > 1 else None
+        row = X[:1]
+        if expected and row.shape[1] != expected:
+            if row.shape[1] > expected:
+                row = row[:, :expected]
             else:
-                X = np.pad(X, ((0, 0), (0, expected - X.shape[1])))
-        out = model.predict(X[:1], verbose=0)[0]
-        risk = float(out.max())
+                row = np.pad(row, ((0, 0), (0, expected - row.shape[1])))
+        outputs = sess.run(None, {input_name: row.astype(np.float32)})
+        pred = int(outputs[0][0]) if len(outputs) > 0 else 0
+        proba = None
+        if len(outputs) > 1 and isinstance(outputs[1], list) and outputs[1]:
+            prob_map = outputs[1][0]
+            if isinstance(prob_map, dict):
+                proba = float(max(prob_map.values()))
+            elif hasattr(prob_map, 'max'):
+                proba = float(prob_map.max())
         return {
             'success': True,
-            'prediction': _serialize(out.tolist()),
-            'risk_score': risk,
-            'label': _interpret(risk, ai_model.output_schema),
+            'prediction': pred,
+            'risk_score': proba,
+            'label': _interpret(proba if proba is not None else pred, ai_model.output_schema),
             'input_summary': input_summary,
         }
 
@@ -217,42 +223,13 @@ def _run_file_input(ai_model, input_file, itype: str) -> dict:
         return {
             'success': False,
             'error': (
-                'PyTorch (.pth/.pt) models require a handler. '
+                'PyTorch (.pth/.pt) models require a named handler. '
                 'Go to Django Admin → AI Models → this model and set '
-                'Handler slug to "seizure_eeg" (for EEG) or the appropriate handler slug. '
-                'The generic runner cannot load state-dict-only PyTorch files.'
+                'Handler slug to "seizure_eeg" (for EEG) or the appropriate handler slug.'
             ),
         }
 
-    elif ext in ('_pt_full', ):   # placeholder — never reached
-        try:
-            import torch
-        except ImportError:
-            return {'success': False, 'error': 'PyTorch is required to run .pt/.pth models. Run: pip install torch'}
-        try:
-            pt_model = torch.load(file_path, map_location='cpu', weights_only=False)
-            pt_model.eval()
-            tensor = torch.tensor(X[:1], dtype=torch.float32)
-            with torch.no_grad():
-                out = pt_model(tensor)
-            if out.shape[-1] > 1:
-                probs = torch.softmax(out, dim=-1)
-                pred_class = int(probs.argmax(dim=-1).item())
-                proba = float(probs[0, pred_class].item())
-            else:
-                proba = float(torch.sigmoid(out)[0].item())
-                pred_class = 1 if proba >= 0.5 else 0
-            return {
-                'success': True,
-                'prediction': pred_class,
-                'risk_score': proba,
-                'label': _interpret(proba, ai_model.output_schema),
-                'input_summary': input_summary,
-            }
-        except Exception as e:
-            return {'success': False, 'error': f'PyTorch model inference failed: {e}'}
-
-    return {'success': False, 'error': f'Unsupported model format: .{ext}'}
+    return {'success': False, 'error': f'Unsupported model format: .{ext}. Only ONNX is accepted.'}
 
 
 # ─── AI Interpretation ────────────────────────────────────────────────────────

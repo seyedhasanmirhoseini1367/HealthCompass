@@ -15,7 +15,7 @@ HealthCompass is built around a single idea: your health data should be understa
 - Wearable data ingestion (CSV from Fitbit, Garmin, Apple Watch, Oura)
 - Lab value extraction with abnormal/critical flagging
 - AI Health Assistant with streaming responses and cited sources
-- LangGraph-based routing — questions are directed to the most relevant record type before retrieval
+- Hybrid RAG pipeline — keyword + semantic routing, BM25 + dense retrieval, streaming multi-LLM generation with safety guardrails
 
 ---
 
@@ -45,40 +45,68 @@ HealthCompass is built around a single idea: your health data should be understa
 
 The AI Health Assistant is built on a Retrieval-Augmented Generation pipeline that retrieves relevant chunks from the patient's own records before generating a response. No records from other patients are ever included.
 
-### Architecture
+### Architecture — two query paths
+
+**Production path** (`stream_ask`) — what the web UI and mobile API use:
 
 ```
 User question
       │
       ▼
- router_node          ← keyword-based routing, no LLM call
+ Safety gate          ← pre-query emergency / self-harm check (no LLM call)
+      │ safe
+      ▼
+ Mode classifier      ← keyword-based: personal | general | hybrid
       │
-      ├── lab_results_node   → retrieves lab result chunks
-      ├── medications_node   → retrieves medication chunks
-      ├── wearable_node      → retrieves wearable data chunks
-      ├── diagnosis_node     → retrieves clinical note chunks
-      ├── records_node       → retrieves all record types
-      └── general_node       → retrieves all record types
+      ├── general  → Finnish clinical knowledge base only (Käypä hoito / THL)
+      ├── hybrid   → knowledge base + patient records merged
+      └── personal ─┬─ Trajectory check  → chronological context (trend queries)
+                    └─ Hybrid retrieval  → BM25 + semantic + time decay + MMR
+                              │
+                              ▼
+                    Streaming generation  ← Groq → Gemini → Anthropic → OpenAI
+                              │
+                              ▼
+                       Guardrail layer    ← post-generation safety rules
+                              │
+                              ▼
+                    SSE tokens + sources + chart data → browser / mobile
+```
+
+**Research path** (`langgraph_ask`) — LangGraph StateGraph used for PhD evaluation:
+
+```
+User question
+      │
+      ▼
+ safety_gate_node
+      │ safe
+      ▼
+ router_node          ← keyword + word-boundary matching; semantic embedding fallback
+      │
+      ├── cold_start_node    → population reference ranges (no records indexed)
+      ├── trajectory_node    → Δ(D,t,s) chronological context
+      ├── lab_results_node   → lab result chunks
+      ├── medications_node   → medication chunks
+      ├── wearable_node      → wearable data chunks
+      ├── diagnosis_node     → clinical note chunks
+      ├── records_node       → all record types
+      └── general_node       → all record types
                 │
                 ▼
-         generate_node       ← Gemini → Anthropic → OpenAI fallback
+         generate_node       ← Groq → Gemini → Anthropic → OpenAI
                 │
                 ▼
-          verify_node        ← checks answer quality
-                │
-        ┌───────┴───────┐
-    needs_retry=True   needs_retry=False
-        │                    │
-   back to search           END
-   (max 2 retries)
+          verify_node        ← retry if no chunks retrieved (max 2×)
 ```
 
 ### Routing
 
-The router classifies each question with keyword matching — free, no LLM call required:
+The router classifies each question with **word-boundary keyword matching** — no LLM call, no latency cost. For temporal queries ("trend", "over time", "is my creatinine improving"), a semantic embedding fallback (`text-embedding-004` cosine similarity against prototype phrases) catches paraphrases the keyword list misses.
 
 | Route | Triggered by keywords |
 |---|---|
+| `trajectory` | trend, over time, improving, getting worse, journey, how has my… |
 | `lab_results` | lab, blood, cholesterol, glucose, HbA1c, TSH, vitamin, abnormal… |
 | `medications` | medication, prescription, dose, side effect, interaction, insulin… |
 | `wearable` | heart rate, steps, sleep, bpm, SpO2, Fitbit, Garmin, HRV… |
@@ -88,47 +116,56 @@ The router classifies each question with keyword matching — free, no LLM call 
 
 ### Retrieval
 
-Hybrid retrieval combining three signals:
+Hybrid retrieval combining four signals (PhD proposal Score formula):
 
-- **BM25 (35%)** — keyword overlap (sparse retrieval)
-- **Cosine similarity (65%)** — semantic embedding match (dense retrieval)
-- **Time decay** — recent records ranked slightly higher
-- **MMR re-ranking** — Maximal Marginal Relevance to reduce redundant chunks
+```
+Score(q, D) = α·BM25(q,D) + β·cos(q,D) + γ·Δ(D,t,s) + δ·Context(D,i)
+```
 
-Embeddings use `sentence-transformers` (`all-MiniLM-L6-v2`) stored as binary blobs in SQLite.
+- **BM25 (α)** — keyword overlap (sparse). Weight adapts by query intent: 0.20 for temporal, 0.50 for medication, 0.35 default.
+- **Cosine similarity (β)** — semantic match via `Gemini text-embedding-004` (768-dim, stored as raw `float32` bytes in Postgres). Weight is `1 − α`.
+- **Time decay (γ·Δ)** — records older than 1 year are down-weighted by up to 15%.
+- **Context-type boost (δ)** — chunks whose document type aligns with the query intent get a small relevance bonus.
+- **MMR re-ranking** — Maximal Marginal Relevance (λ=0.6) diversifies the final top-6 set.
 
 ### Generation
 
-Three LLMs tried in order; the first successful response is returned:
+Four LLMs tried in order; first successful response is returned:
 
-1. **Gemini** (`gemini-2.5-flash`) — primary, via `google-genai` v1.x
-2. **Anthropic Claude** — first fallback
-3. **OpenAI GPT** — second fallback
+1. **Groq** (`llama-3.1-8b-instant`) — primary; generous free tier, fast
+2. **Gemini** (`gemini-2.5-flash`) — first fallback, via `google-genai` v1.x
+3. **Anthropic Claude** (`claude-haiku-4-5`) — second fallback
+4. **OpenAI GPT** (`gpt-4o-mini`) — third fallback
 
-All three support both non-streaming (full response) and streaming (token-by-token SSE) modes.
+Both streaming (SSE, token-by-token) and non-streaming modes are supported across all four providers.
 
-### Self-correction
+### Safety layer
 
-After generation, `verify_node` checks the answer for:
+**Pre-query gate** — checks for emergency symptoms and self-harm language before any retrieval or LLM call fires. Returns a hard-coded crisis response immediately.
 
-- Fewer than 15 words
-- Uncertain phrases ("I don't know", "unable to find", "no information")
-- Empty context (no chunks retrieved)
+**Post-generation guardrails** — three rules applied to every LLM response:
+- Specific dosage recommendation → medication disclaimer appended
+- Definitive diagnosis statement (`you have diabetes`) → language softened + diagnostic disclaimer
+- Emergency / alarming language → urgent care reminder appended
 
-If any condition is true and fewer than 2 retries have been attempted, the graph loops back to retrieval with the same route.
+### Self-correction (LangGraph path only)
+
+After generation, `verify_node` checks for empty context (no chunks retrieved). If true and fewer than 2 retries have been attempted, the graph loops back through `records_node` for a broader retrieval pass.
 
 ### Streaming
 
 The chat UI connects to `/assistant/stream/` which returns a `text/event-stream` response. Events:
 
 ```
-data: {"type": "token",   "content": "..."}   ← one per token
-data: {"type": "sources", "sources": [...]}   ← after stream ends
+data: {"type": "token",   "content": "..."}        ← one per token
+data: {"type": "sources", "sources": [...]}        ← after all tokens
+data: {"type": "meta",    "provider": "groq", "chunks": 6, "mode": "personal"}
+data: {"type": "chart",   "chart": {...}}           ← trajectory queries only
 data: {"type": "done"}
-data: {"type": "error",   "message": "..."}   ← on failure
+data: {"type": "error",   "message": "..."}        ← on failure
 ```
 
-Tokens are rendered incrementally with live Markdown parsing. The full response is saved to the database in a `finally` block so chat history is always consistent.
+Tokens are rendered incrementally with live Markdown parsing. The full response is saved to `QueryLog` in a `finally` block so chat history is always consistent.
 
 ### API endpoints
 
@@ -148,11 +185,11 @@ Tokens are rendered incrementally with live Markdown parsing. The full response 
 | Layer | Technology |
 |---|---|
 | Backend | Django 5.2, Python 3.11+ |
-| LLM orchestration | LangGraph 0.2, google-genai, Anthropic SDK, OpenAI SDK |
-| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`) |
+| LLM orchestration | LangGraph 0.2, Groq SDK, google-genai, Anthropic SDK, OpenAI SDK |
+| Embeddings | Gemini `text-embedding-004` (768-dim, stored as raw float32 bytes in Postgres) |
 | Sparse retrieval | rank-bm25 |
 | Data processing | pandas, numpy, scikit-learn, scipy, pdfplumber |
-| Database | SQLite (development) |
+| Database | Postgres (Railway production) · SQLite (local dev fallback) |
 | Config | python-decouple |
 | Frontend | Django templates, Marked.js (Markdown), SSE via Fetch API |
 
@@ -177,12 +214,14 @@ SECRET_KEY=your-django-secret-key
 DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
 
-GEMINI_API_KEY=your-gemini-api-key
-ANTHROPIC_API_KEY=              # optional
-OPENAI_API_KEY=                 # optional
+# At least one generation key is required. Groq has a generous free tier.
+GROQ_API_KEY=your-groq-api-key
+GEMINI_API_KEY=your-gemini-api-key   # also used for text-embedding-004
+ANTHROPIC_API_KEY=                   # optional fallback
+OPENAI_API_KEY=                      # optional fallback
 ```
 
-At least one LLM API key is required. Gemini has a free tier.
+At minimum you need `GEMINI_API_KEY` (for embeddings) plus one generation key (`GROQ_API_KEY` recommended — free tier). Keys with no value are skipped; the provider chain advances to the next available key.
 
 **3. Run migrations and start**
 
@@ -202,4 +241,4 @@ python manage.py runserver
 - **Streaming** — Server-Sent Events with Django `StreamingHttpResponse`, incremental Markdown rendering in the browser
 - **LLM integration** — google-genai v1.x, Anthropic, OpenAI SDKs; system prompts; chat history management
 - **Data engineering** — PDF text extraction, CSV wearable ingestion, lab value parsing, abnormal flagging
-- **ML** — sentence-transformers embeddings, cosine similarity, scikit-learn, scipy
+- **ML** — Gemini text-embedding-004 dense vectors, BM25 sparse retrieval, cosine similarity, MMR re-ranking, scikit-learn, scipy

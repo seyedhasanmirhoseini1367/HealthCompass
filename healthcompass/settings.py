@@ -123,6 +123,30 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
 
+# ── Object storage (S3-compatible — Cloudflare R2, MinIO, AWS S3) ──────────────
+# Set OBJECT_STORAGE_URL to opt in.  Without it, uploads fall back to MEDIA_ROOT
+# (local disk — fine for dev, but ephemeral on Railway between deploys).
+#
+# Required env vars when OBJECT_STORAGE_URL is set:
+#   OBJECT_STORAGE_URL    — e.g. https://<account>.r2.cloudflarestorage.com
+#   STORAGE_BUCKET_NAME   — e.g. healthcompass-media
+#   STORAGE_ACCESS_KEY    — S3-compatible access key
+#   STORAGE_SECRET_KEY    — S3-compatible secret key
+_OBJECT_STORAGE_URL = config('OBJECT_STORAGE_URL', default='')
+if _OBJECT_STORAGE_URL:
+    INSTALLED_APPS += ['storages']
+    STORAGES = {
+        'default': {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'},
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
+    AWS_S3_ENDPOINT_URL      = _OBJECT_STORAGE_URL
+    AWS_STORAGE_BUCKET_NAME  = config('STORAGE_BUCKET_NAME', default='healthcompass-media')
+    AWS_ACCESS_KEY_ID        = config('STORAGE_ACCESS_KEY',  default='')
+    AWS_SECRET_ACCESS_KEY    = config('STORAGE_SECRET_KEY',  default='')
+    AWS_S3_FILE_OVERWRITE    = False
+    AWS_DEFAULT_ACL          = None
+    MEDIA_URL                = f'{_OBJECT_STORAGE_URL}/{AWS_STORAGE_BUCKET_NAME}/'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = '/accounts/login/'
@@ -216,13 +240,24 @@ SOCIALACCOUNT_PROVIDERS = {
 # ── ICU Demo (MIMIC-IV local data) ────────────────────────────────────────────
 ICU_DEMO_DATA_PATH = config('ICU_DEMO_DATA_PATH', default='')
 
+# ── PHI retention policy ────────────────────────────────────────────────────────
+# QueryLog stores full patient question + response text (PHI).
+# Run `python manage.py purge_old_query_logs` periodically (e.g. weekly cron)
+# to delete records older than this many days.
+# Set to 0 to disable automatic purging (retain forever — not recommended for
+# any deployment targeting regulated health data contexts such as Kanta/THL).
+QUERYLOG_RETENTION_DAYS = config('QUERYLOG_RETENTION_DAYS', default=90, cast=int)
+
 # ── Production security headers ────────────────────────────────────────────────
 # Railway terminates SSL at the edge, so no SECURE_SSL_REDIRECT needed.
 if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE    = True
-    SECURE_BROWSER_XSS_FILTER   = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE        = True
+    CSRF_COOKIE_SECURE           = True
+    SECURE_BROWSER_XSS_FILTER    = True
+    SECURE_CONTENT_TYPE_NOSNIFF  = True
+    SECURE_HSTS_SECONDS          = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD          = True
 
 # ── Logging — always print full tracebacks to stderr (visible in Railway logs) ─
 LOGGING = {

@@ -100,11 +100,14 @@ _DIAGNOSIS_RE = re.compile(
     r'\b(?:' + _DIAGNOSIS_CONDITIONS + r')\b',
     re.IGNORECASE,
 )
-# Pattern used to soften the language in-place
+# Pattern used to soften the language in-place.
+# Lookahead requires the condition name within 80 chars so that benign
+# phrases like "you have three lab results" are not touched.
 _DIAGNOSIS_SOFTEN_RE = re.compile(
     r'\byou\s+(have|are developing|are suffering from|'
-    r'are diagnosed with|definitely have|now have|clearly have)\b',
-    re.IGNORECASE,
+    r'are diagnosed with|definitely have|now have|clearly have)\b'
+    r'(?=.{0,80}\b(?:' + _DIAGNOSIS_CONDITIONS + r')\b)',
+    re.IGNORECASE | re.DOTALL,
 )
 
 # Rule 3: Emergency / alarming language
