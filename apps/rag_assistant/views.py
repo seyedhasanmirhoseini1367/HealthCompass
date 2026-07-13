@@ -5,9 +5,15 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
+from django_ratelimit.decorators import ratelimit
 
 from .models import ChatSession, QueryLog
 from .services.rag_service import RAGService
+
+_RATE_EXCEEDED = JsonResponse(
+    {'error': 'Rate limit exceeded. Please wait a moment before sending another message.'},
+    status=429,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +71,10 @@ def new_session(request):
 
 @login_required
 @require_POST
+@ratelimit(key='user', rate='20/m', block=False)
 def send_message(request):
+    if getattr(request, 'limited', False):
+        return _RATE_EXCEEDED
     try:
         body = json.loads(request.body)
     except json.JSONDecodeError:
@@ -161,7 +170,10 @@ def delete_session(request, pk):
 
 @login_required
 @require_POST
+@ratelimit(key='user', rate='20/m', block=False)
 def stream_message(request):
+    if getattr(request, 'limited', False):
+        return _RATE_EXCEEDED
     """
     SSE endpoint. Streams tokens from RAGService.stream_ask().
 

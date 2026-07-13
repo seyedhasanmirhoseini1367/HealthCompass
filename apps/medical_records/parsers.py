@@ -773,7 +773,13 @@ TEXT:
 class PDFParser:
     """Extract text from PDF and optionally structure it with Gemini."""
 
+    _MAX_PAGES = 100
+    _MAX_BYTES = 20 * 1024 * 1024  # 20 MB — defence against decompression bombs
+
     def parse(self, pdf_bytes: bytes, use_ai: bool = True) -> dict:
+        if len(pdf_bytes) > self._MAX_BYTES:
+            return {'error': f'PDF exceeds the {self._MAX_BYTES // (1024*1024)} MB size limit.'}
+
         try:
             import pdfplumber
         except ImportError:
@@ -781,6 +787,13 @@ class PDFParser:
 
         text_pages = []
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            if len(pdf.pages) > self._MAX_PAGES:
+                return {
+                    'error': (
+                        f'PDF has {len(pdf.pages)} pages; maximum allowed is {self._MAX_PAGES}. '
+                        'Please split the document and upload each part separately.'
+                    )
+                }
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:

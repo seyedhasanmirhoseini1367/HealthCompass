@@ -11,7 +11,7 @@ from django.utils import timezone
 from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import HealthAlert
 from apps.notifications.models import Notification
-from apps.accounts.models import CustomUser, PatientDoctorRelationship
+from apps.accounts.models import CustomUser, PatientDoctorRelationship, DoctorAccessLog
 
 
 @login_required
@@ -88,6 +88,12 @@ def patient_records(request, patient_pk):
         is_active=True
     )
 
+    DoctorAccessLog.objects.create(
+        actor=request.user,
+        patient=patient,
+        resource='patient_records',
+    )
+
     records = MedicalRecord.objects.filter(patient=patient).order_by('-uploaded_at')
     alerts = HealthAlert.objects.filter(patient=patient).order_by('-created_at')[:5]
 
@@ -113,6 +119,12 @@ def doctor_record_detail(request, record_pk):
         doctor=request.user,
         patient=record.patient,
         is_active=True
+    )
+
+    DoctorAccessLog.objects.create(
+        actor=request.user,
+        patient=record.patient,
+        resource=f'record:{record.pk}',
     )
 
     lab_values = record.lab_values.all()

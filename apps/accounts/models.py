@@ -1,6 +1,7 @@
 import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from .fields import EncryptedCharField
 
 
 class CustomUser(AbstractUser):
@@ -39,10 +40,12 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True)
     emergency_contact_name = models.CharField(max_length=100, blank=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True)
-    national_id     = models.CharField(
-                        max_length=50, blank=True,
-                        help_text='Stored as plaintext. In regulated deployments (Kanta/GDPR) '
-                                  'this field must be encrypted at rest before go-live.')
+    national_id     = EncryptedCharField(
+                        blank=True,
+                        help_text='Encrypted at rest with a Fernet key derived from SECRET_KEY. '
+                                  'Stored as opaque ciphertext in a TEXT column; only the '
+                                  'application can read it. Finnish henkilötunnus — '
+                                  'treat as highest-sensitivity PII.')
     emergency_token = models.UUIDField(default=uuid.uuid4, unique=True,
                           help_text='Token for public emergency card URL')
 
@@ -76,6 +79,36 @@ class HospitalAdminProfile(models.Model):
     hospital_code = models.CharField(max_length=50, blank=True)
 
     def __str__(self): return f'HospAdmin: {self.user.username} @ {self.hospital_name}'
+
+
+class DoctorAccessLog(models.Model):
+    """
+    Immutable audit trail: each time a doctor views a patient's records or a
+    specific record, one row is appended here.
+
+    In real Kanta-connected systems patients can request a list of who has
+    accessed their data. This table is the backing store for that.
+    Never delete rows — archive instead.
+    """
+    actor       = models.ForeignKey(
+                    'accounts.CustomUser', on_delete=models.SET_NULL,
+                    null=True, related_name='access_log_entries',
+                    help_text='The doctor (or admin) who performed the access')
+    patient     = models.ForeignKey(
+                    'accounts.CustomUser', on_delete=models.SET_NULL,
+                    null=True, related_name='access_log_received',
+                    help_text='The patient whose data was accessed')
+    resource    = models.CharField(
+                    max_length=300,
+                    help_text='e.g. "patient_records" or "record:<uuid>"')
+    accessed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['patient', '-accessed_at'])]
+        ordering = ['-accessed_at']
+
+    def __str__(self):
+        return f'{self.actor} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
 
 
 class PatientDoctorRelationship(models.Model):

@@ -30,6 +30,13 @@ djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
 firebase-admin
+# Security: field-level encryption + rate limiting
+# cryptography package provides Fernet (AES-128-CBC + HMAC-SHA256) for
+# EncryptedCharField in apps/accounts/fields.py.
+# It is already a transitive dependency of several packages (google-genai,
+# anthropic, etc.) — listed here explicitly to guarantee it is present.
+cryptography
+django-ratelimit
 # Production server & database
 gunicorn
 psycopg2-binary

@@ -1,4 +1,6 @@
 ﻿import logging
+import os
+import re
 from datetime import datetime
 
 from django.contrib import messages
@@ -14,6 +16,53 @@ from .parsers import KantaXMLParser, WearableParser, PDFParser, TextParser
 from .unit_normalizer import normalize as normalize_lab_unit
 
 logger = logging.getLogger(__name__)
+
+# Magic-byte signatures for binary formats we accept.
+# Each entry maps a lowercase extension to a list of (byte_offset, magic) tuples;
+# any one match is sufficient.
+_MAGIC = {
+    'pdf':     [(0, b'%PDF-')],
+    'xml':     [(0, b'<?xml'), (3, b'<?xml')],   # bare + UTF-8 BOM prefix
+    'jpg':     [(0, b'\xff\xd8\xff')],
+    'jpeg':    [(0, b'\xff\xd8\xff')],
+    'png':     [(0, b'\x89PNG\r\n')],
+    'gif':     [(0, b'GIF8')],
+    'webp':    [(0, b'RIFF')],
+    'parquet': [(0, b'PAR1')],
+}
+
+_UNSAFE_NAME_RE = re.compile(r'[^\w\-.]')
+_MAX_FILENAME_LEN = 200
+
+
+def _validate_upload(file_obj, allowed_exts: list[str]) -> tuple[bool, str]:
+    """
+    Return (ok, message).  On success message is the sanitized filename.
+    On failure message is the human-readable error.
+
+    Checks:
+    1. Extension is in allowed_exts (case-insensitive).
+    2. Magic bytes match the declared extension for known binary types.
+    3. Filename is sanitized (no path traversal, no shell-special chars).
+    """
+    raw_name = os.path.basename(file_obj.name or 'upload')
+    safe_name = _UNSAFE_NAME_RE.sub('_', raw_name)[:_MAX_FILENAME_LEN]
+    if not safe_name:
+        safe_name = 'upload'
+
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+
+    if allowed_exts and ext not in allowed_exts:
+        return False, f'File type ".{ext}" not allowed. Accepted: {", ".join(allowed_exts)}'
+
+    if ext in _MAGIC:
+        header = file_obj.read(16)
+        file_obj.seek(0)
+        matched = any(header[off:off + len(sig)] == sig for off, sig in _MAGIC[ext])
+        if not matched:
+            return False, f'File content does not match its declared type (.{ext}). Upload rejected.'
+
+    return True, safe_name
 
 
 # ─── Record List ─────────────────────────────────────────────────────────────
@@ -124,6 +173,14 @@ def upload_kanta(request):
     form = KantaUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         xml_file = request.FILES['xml_file']
+
+        ok, result = _validate_upload(xml_file, ['xml'])
+        if not ok:
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': result}, status=400)
+            messages.error(request, result)
+            return render(request, 'medical_records/upload_kanta.html', {'form': form})
+
         xml_bytes = xml_file.read()
 
         parser = KantaXMLParser()
@@ -238,6 +295,14 @@ def upload_wearable(request):
     form = WearableUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         data_file = request.FILES['data_file']
+
+        ok, result = _validate_upload(data_file, ['csv', 'json', 'parquet', 'xlsx'])
+        if not ok:
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': result}, status=400)
+            messages.error(request, result)
+            return render(request, 'medical_records/upload_wearable.html', {'form': form})
+
         data_bytes = data_file.read()
 
         try:
@@ -310,6 +375,14 @@ def upload_pdf(request):
     form = PDFUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         pdf_file = request.FILES['pdf_file']
+
+        ok, result = _validate_upload(pdf_file, ['pdf'])
+        if not ok:
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': result}, status=400)
+            messages.error(request, result)
+            return render(request, 'medical_records/upload_pdf.html', {'form': form})
+
         pdf_bytes = pdf_file.read()
 
         parser = PDFParser()
@@ -495,6 +568,10 @@ def scan_ocr(request):
     image = request.FILES.get('image')
     if not image:
         return JsonResponse({'error': 'No image received'}, status=400)
+
+    ok, result = _validate_upload(image, ['jpg', 'jpeg', 'png', 'gif', 'webp'])
+    if not ok:
+        return JsonResponse({'error': result}, status=400)
 
     try:
         from django.conf import settings as s
