@@ -19,6 +19,7 @@ Key improvement over the old system:
 import json
 import logging
 import re
+import re as _re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -214,9 +215,17 @@ _BIOMARKER_ALIASES = {
 
 def _detect_biomarker(q_lower: str) -> Optional[str]:
     for canonical, aliases in _BIOMARKER_ALIASES.items():
-        if any(alias in q_lower for alias in aliases):
+        if any(_biomarker_alias_match(alias, q_lower) for alias in aliases):
             return canonical
     return None
+
+
+def _biomarker_alias_match(alias: str, q: str) -> bool:
+    # Multi-word phrases are specific enough that substring match is safe.
+    # Single words need word-boundary to prevent 'creat' hitting 'recreate'.
+    if ' ' in alias:
+        return alias in q
+    return bool(_re.search(r'\b' + _re.escape(alias) + r'\b', q))
 
 
 def _is_followup(query: str, history: List[dict]) -> bool:

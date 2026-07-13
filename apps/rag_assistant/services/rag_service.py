@@ -203,8 +203,18 @@ class RAGService:
                     )
                     mode = 'history_followup'
 
-            # ── Streaming generation ──────────────────────────────────────────
+            # ── Streaming generation with initial safety buffer ────────────────
+            # Buffer the first _GUARDRAIL_BUF chars before releasing any tokens
+            # so that GuardrailService can soften in-place language such as
+            # "you have kidney disease" BEFORE it reaches the user.
+            # Tokens after the buffer threshold are streamed normally; a final
+            # pass appends any disclaimers triggered by the full response.
+            _GUARDRAIL_BUF = 500
+            _svc            = GuardrailService()
+            _buf            = ''
+            _buf_flushed    = False
             collected_tokens: List[str] = []
+
             for token in generate_streaming(
                 chunks,
                 query,          # always send the original query to the LLM
@@ -214,14 +224,27 @@ class RAGService:
                 general_chunks=general_chunks,
             ):
                 collected_tokens.append(token)
-                yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
+                if not _buf_flushed:
+                    _buf += token
+                    if len(_buf) >= _GUARDRAIL_BUF:
+                        safe_buf, _ = _svc.apply(_buf)
+                        yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
+                        _buf_flushed = True
+                else:
+                    yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
 
-            # ── Guardrail ─────────────────────────────────────────────────────
+            # Flush remaining buffer if stream ended before threshold
+            if not _buf_flushed:
+                safe_buf, _ = _svc.apply(_buf)
+                yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
+
+            # ── Guardrail: append disclaimers for full response ────────────────
+            # get_appended_disclaimers() does NOT re-apply in-place softening
+            # (already done on the buffer), so the slice is always clean text.
             full_response = ''.join(collected_tokens)
-            safe_response, rules_fired = GuardrailService().apply(full_response)
-            if len(safe_response) > len(full_response):
-                extra = safe_response[len(full_response):]
-                yield f'data: {json.dumps({"type": "token", "content": extra})}\n\n'
+            extra_text, rules_fired = _svc.get_appended_disclaimers(full_response)
+            if extra_text:
+                yield f'data: {json.dumps({"type": "token", "content": extra_text})}\n\n'
 
             # ── Sources: merge personal + general ─────────────────────────────
             sources  = _build_sources(chunks)

@@ -22,6 +22,12 @@ from typing import Dict, List, Optional, Tuple
 
 from django.db.models import Q
 
+
+def _biomarker_alias_match(alias: str, q: str) -> bool:
+    if ' ' in alias:
+        return alias in q
+    return bool(re.search(r'\b' + re.escape(alias) + r'\b', q))
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,7 +115,7 @@ class TrajectoryService:
     def detect_biomarker(self, query: str) -> Optional[str]:
         q = query.lower()
         for canonical, aliases in _BIOMARKERS.items():
-            if any(alias in q for alias in aliases):
+            if any(_biomarker_alias_match(alias, q) for alias in aliases):
                 return canonical
         return None
 

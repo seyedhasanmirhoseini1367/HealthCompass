@@ -174,6 +174,44 @@ class GuardrailService:
             return True, _EMERGENCY_GATE_RESPONSE
         return False, ''
 
+    def get_appended_disclaimers(self, response: str) -> Tuple[str, List[str]]:
+        """
+        Return (text_to_append, rules_fired) WITHOUT modifying the response text.
+
+        Used by the streaming path: the in-place language softening is handled
+        separately on the initial buffer; this method only produces the appended
+        disclaimers so the caller can yield them without a garbled length-diff slice.
+        """
+        triggered: List[str] = []
+        appended = ''
+
+        if _DOSAGE_RE.search(response):
+            appended += _DOSAGE_DISCLAIMER
+            triggered.append('dosage_recommendation')
+            logger.info('Guardrail fired: dosage_recommendation')
+
+        if _DIAGNOSIS_RE.search(response):
+            appended += _DIAGNOSIS_DISCLAIMER
+            triggered.append('definitive_diagnosis')
+            logger.info('Guardrail fired: definitive_diagnosis')
+
+        if _EMERGENCY_RE.search(response):
+            appended += _EMERGENCY_DISCLAIMER
+            triggered.append('emergency_indicator')
+            logger.info('Guardrail fired: emergency_indicator')
+
+        if not triggered:
+            tail = response[-400:]
+            already_reminded = bool(re.search(
+                r'(consult|healthcare provider|your doctor|physician|medical advice)',
+                tail,
+                re.IGNORECASE,
+            ))
+            if not already_reminded:
+                appended += _SOFT_CONSULT_REMINDER
+
+        return appended, triggered
+
     def apply(self, response: str) -> Tuple[str, List[str]]:
         """
         Validate *response* against all safety rules.
