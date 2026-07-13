@@ -89,7 +89,9 @@ class RetrievalService:
             'diagnostic': (0.30, 0.70),
             'general':    (0.35, 0.65),
         })
-        self.ctx_boost = self.cfg.get('CONTEXT_TYPE_BOOST', 0.08)
+        self.ctx_boost            = self.cfg.get('CONTEXT_TYPE_BOOST', 0.08)
+        # Stage-1 widens retrieval by this factor before Stage-2 LLM reranking
+        self.rerank_recall_factor = self.cfg.get('RERANK_RECALL_FACTOR', 5)
 
     # ── Main entry point ───────────────────────────────────────────────────────
 
@@ -102,8 +104,11 @@ class RetrievalService:
         query_intent:  Optional[str]  = None,
     ) -> List[Dict[str, Any]]:
         """
-        Return up to *top_k* dicts: {'text', 'score', 'metadata'}.
-        Falls back gracefully if no embeddings exist yet.
+        Two-stage retrieval:
+          Stage 1 — hybrid BM25 + cosine + time decay + context boost + MMR
+                    over a widened recall set (top_k × RERANK_RECALL_FACTOR).
+          Stage 2 — LLM reranker (Groq) narrows to top_k with cross-attention
+                    precision. Falls back to Stage-1 order if Groq is unavailable.
         """
         from apps.rag_assistant.services.embedding_service import EmbeddingService
 
@@ -115,38 +120,104 @@ class RetrievalService:
 
         k = top_k or self.top_k
 
-        # Detect intent from query if not supplied by caller
         intent = query_intent or self.classify_query_intent(query)
         bm25_w, sem_w = self.intent_weights.get(intent, (self.bm25_weight, self.sem_weight))
-
         logger.debug('retrieve: intent=%s  α(BM25)=%.2f  β(sem)=%.2f', intent, bm25_w, sem_w)
 
-        # 1. BM25
+        # ── Stage 1: widened recall ────────────────────────────────────────────
+        recall_k = min(k * self.rerank_recall_factor, len(texts))
+
         bm25   = self._bm25_scores(query, texts)
-        # 2. Cosine similarity
         q_vec  = emb_svc.embed(query)
         cosine = self._cosine_scores(q_vec, matrix)
-        # 3. Adaptive hybrid blend  (α·BM25 + β·cos)
         hybrid = bm25_w * bm25 + sem_w * cosine
-        # 4. Time decay  (γ·Δ)
         hybrid = self._apply_time_decay(hybrid, meta)
-        # 5. Context-type boost  (δ·Context)
         hybrid = self._apply_context_boost(hybrid, meta, intent)
-        # 6. Threshold filter
+
         valid = np.where(hybrid >= self.sim_threshold)[0]
         if len(valid) == 0:
             return []
-        # 7. MMR re-rank
-        indices = self._mmr(q_vec, matrix, hybrid, valid, k)
 
-        results = []
-        for idx in indices:
-            results.append({
-                'text':     texts[idx],
-                'score':    float(hybrid[idx]),
-                'metadata': meta[idx],
-            })
-        return results
+        recall_indices = self._mmr(q_vec, matrix, hybrid, valid, recall_k)
+        candidates = [
+            {'text': texts[i], 'score': float(hybrid[i]), 'metadata': meta[i]}
+            for i in recall_indices
+        ]
+
+        if len(candidates) <= k:
+            return candidates
+
+        # ── Stage 2: LLM reranker ──────────────────────────────────────────────
+        reranked = self._llm_rerank(query, candidates, top_k=k)
+        return reranked
+
+    def _llm_rerank(
+        self,
+        query:      str,
+        candidates: List[Dict[str, Any]],
+        top_k:      int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Ask Groq to order the candidate chunks by relevance to *query*.
+        Returns up to top_k chunks in ranked order.
+        Falls back to the original Stage-1 order on any error.
+        """
+        from django.conf import settings
+        api_key = getattr(settings, 'GROQ_API_KEY', '')
+        if not api_key:
+            return candidates[:top_k]
+
+        try:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+
+            # Build numbered list — truncate each chunk to 300 chars to stay within tokens
+            chunk_lines = "\n".join(
+                f"[{i+1}] {c['text'][:300].strip()}"
+                for i, c in enumerate(candidates)
+            )
+            prompt = (
+                f"Query: {query}\n\n"
+                f"Rank the following {len(candidates)} medical record excerpts from most to least "
+                f"relevant to the query. Return ONLY a JSON array of 1-based indices, e.g. [3,1,5,2,4]. "
+                f"No explanation, no markdown.\n\n"
+                f"{chunk_lines}"
+            )
+
+            resp = client.chat.completions.create(
+                model='llama-3.1-8b-instant',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0,
+                max_tokens=64,
+            )
+            raw = resp.choices[0].message.content.strip()
+
+            import json, re as _re
+            # Strip accidental markdown
+            raw = _re.sub(r'^```[^\n]*\n?|\n?```$', '', raw).strip()
+            order = json.loads(raw)   # e.g. [3, 1, 5, 2, 4]
+
+            reranked = []
+            seen = set()
+            for rank_1based in order:
+                idx = int(rank_1based) - 1
+                if 0 <= idx < len(candidates) and idx not in seen:
+                    seen.add(idx)
+                    reranked.append(candidates[idx])
+                if len(reranked) == top_k:
+                    break
+
+            # Append any candidates the LLM omitted (safety net)
+            for i, c in enumerate(candidates):
+                if i not in seen and len(reranked) < top_k:
+                    reranked.append(c)
+
+            logger.debug('LLM reranker: %d → %d chunks', len(candidates), len(reranked))
+            return reranked
+
+        except Exception as exc:
+            logger.warning('LLM reranker failed (%s), using Stage-1 order', exc)
+            return candidates[:top_k]
 
     # ── Query intent classifier ────────────────────────────────────────────────
 

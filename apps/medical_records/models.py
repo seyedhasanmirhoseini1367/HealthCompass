@@ -47,6 +47,11 @@ class ParsedLabValue(models.Model):
     parameter_name  = models.CharField(max_length=200)
     value           = models.CharField(max_length=100)
     unit            = models.CharField(max_length=50, blank=True)
+    # Canonical value normalized to a consistent unit (e.g. mg/dL) for safe
+    # cross-record comparison. Finnish labs report in SI (µmol/L, mmol/L);
+    # without normalization trajectory thresholds would be wildly wrong.
+    canonical_value = models.FloatField(null=True, blank=True)
+    original_unit   = models.CharField(max_length=50, blank=True)
     reference_range = models.CharField(max_length=100, blank=True)
     is_abnormal     = models.BooleanField(default=False)
     is_critical     = models.BooleanField(default=False)

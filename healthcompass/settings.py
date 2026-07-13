@@ -192,7 +192,8 @@ RAG_CONFIG = {
         'diagnostic': (0.30, 0.70),
         'general':    (0.35, 0.65),
     },
-    'CONTEXT_TYPE_BOOST': 0.08,
+    'CONTEXT_TYPE_BOOST':     0.08,
+    'RERANK_RECALL_FACTOR':   5,    # Stage-1 retrieves top_k×5 before LLM reranker
     'TRAJECTORY_ENABLED': True,
     'COLD_START_ENABLED': True,
     'GROQ_MODEL':        'llama-3.1-8b-instant',

@@ -11,6 +11,7 @@ from django.urls import reverse
 from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm, TextPasteForm
 from .models import MedicalRecord, ParsedLabValue, WearableDataPoint
 from .parsers import KantaXMLParser, WearableParser, PDFParser, TextParser
+from .unit_normalizer import normalize as normalize_lab_unit
 
 logger = logging.getLogger(__name__)
 
@@ -183,11 +184,18 @@ def upload_kanta(request):
                             except ValueError:
                                 pass
 
+                        _unit = entry.get('unit', '')
+                        _val_str = str(entry.get('value', ''))
+                        _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+                            entry.get('name', ''), _val_str, _unit,
+                        )
                         ParsedLabValue.objects.create(
                             record=record,
                             parameter_name=entry.get('name', 'Unknown'),
-                            value=str(entry.get('value', '')),
-                            unit=entry.get('unit', ''),
+                            value=_val_str,
+                            unit=_canon_unit,
+                            canonical_value=_canonical,
+                            original_unit=_orig_unit,
                             reference_range=ref_range,
                             is_abnormal=is_ab,
                             is_critical=is_critical,
@@ -340,11 +348,18 @@ def upload_pdf(request):
         for lv in structured.get('lab_values', []):
             is_critical = False
             is_ab = lv.get('is_abnormal', False)
+            _unit = lv.get('unit', '')
+            _val_str = str(lv.get('value', ''))
+            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+                lv.get('name', ''), _val_str, _unit,
+            )
             ParsedLabValue.objects.create(
                 record=record,
                 parameter_name=lv.get('name', 'Unknown'),
-                value=str(lv.get('value', '')),
-                unit=lv.get('unit', ''),
+                value=_val_str,
+                unit=_canon_unit,
+                canonical_value=_canonical,
+                original_unit=_orig_unit,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
                 is_critical=is_critical,
@@ -416,11 +431,18 @@ def upload_text(request):
         flagged = 0
         for lv in structured.get('lab_values', []):
             is_ab = lv.get('is_abnormal', False)
+            _unit = lv.get('unit', '')
+            _val_str = str(lv.get('value', ''))
+            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+                lv.get('name', ''), _val_str, _unit,
+            )
             ParsedLabValue.objects.create(
                 record=record,
                 parameter_name=lv.get('name', 'Unknown'),
-                value=str(lv.get('value', '')),
-                unit=lv.get('unit', ''),
+                value=_val_str,
+                unit=_canon_unit,
+                canonical_value=_canonical,
+                original_unit=_orig_unit,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
             )
@@ -558,11 +580,18 @@ def upload_scan(request):
         flagged = 0
         for lv in structured.get('lab_values', []):
             is_ab = lv.get('is_abnormal', False)
+            _unit = lv.get('unit', '')
+            _val_str = str(lv.get('value', ''))
+            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+                lv.get('name', ''), _val_str, _unit,
+            )
             ParsedLabValue.objects.create(
                 record=record,
                 parameter_name=lv.get('name', 'Unknown'),
-                value=str(lv.get('value', '')),
-                unit=lv.get('unit', ''),
+                value=_val_str,
+                unit=_canon_unit,
+                canonical_value=_canonical,
+                original_unit=_orig_unit,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
             )

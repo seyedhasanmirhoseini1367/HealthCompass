@@ -123,11 +123,10 @@ class RAGService:
             generate_streaming, _build_sources, _build_general_sources,
             active_stream_provider,
         )
-        from apps.rag_assistant.services.guardrail_service        import GuardrailService
-        from apps.rag_assistant.services.trajectory_service       import TrajectoryService
-        from apps.rag_assistant.services.general_knowledge_service import (
-            GeneralKnowledgeService, classify_query_mode,
-        )
+        from apps.rag_assistant.services.guardrail_service    import GuardrailService
+        from apps.rag_assistant.services.trajectory_service   import TrajectoryService
+        from apps.rag_assistant.services.general_knowledge_service import GeneralKnowledgeService
+        from apps.rag_assistant.services.query_understanding  import understand
 
         try:
             # ── Pre-query safety gate ─────────────────────────────────────────
@@ -139,32 +138,37 @@ class RAGService:
                 yield 'data: {"type": "done"}\n\n'
                 return
 
-            # ── Mode classification (Router Agent) ────────────────────────────
-            query_mode = classify_query_mode(query)
-            logger.info('stream_ask: query_mode=%s query=%r', query_mode, query[:60])
+            # ── Query Understanding (replaces 4 separate classifiers) ─────────
+            qi = understand(query, history)
+            # Use the rewritten query for retrieval so follow-ups like
+            # "what about last year?" become self-contained before embedding.
+            retrieval_query = qi.rewritten_query
+            logger.info(
+                'stream_ask: mode=%s route=%s intent=%s temporal=%s via_llm=%s q=%r',
+                qi.mode, qi.route, qi.intent, qi.is_temporal, qi.via_llm, query[:60],
+            )
 
             general_chunks: List[Dict] = []
             chunks:         List[Dict] = []
             trajectory_context         = ''
-            mode                       = query_mode
+            mode                       = qi.mode
 
             gk_svc = GeneralKnowledgeService()
 
-            if query_mode == 'general':
+            if qi.mode == 'general':
                 # ── General knowledge only — no patient data touched ──────────
-                general_chunks = gk_svc.retrieve(query)
+                general_chunks = gk_svc.retrieve(retrieval_query)
 
-            elif query_mode == 'hybrid':
+            elif qi.mode == 'hybrid':
                 # ── Both sources ──────────────────────────────────────────────
-                general_chunks = gk_svc.retrieve(query)
-                intent = self.ret_svc.classify_query_intent(query)
+                general_chunks = gk_svc.retrieve(retrieval_query)
                 chunks = self.ret_svc.retrieve(
-                    patient=patient, query=query,
-                    document_type=document_type, query_intent=intent,
+                    patient=patient, query=retrieval_query,
+                    document_type=document_type, query_intent=qi.intent,
                 )
 
             else:
-                # ── Personal mode — original pipeline ─────────────────────────
+                # ── Personal mode ─────────────────────────────────────────────
                 if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
                     cold = self._cold_start_response(patient, query)
                     if cold:
@@ -175,23 +179,21 @@ class RAGService:
                         return
 
                 traj_svc = TrajectoryService()
-                if (
-                    settings.RAG_CONFIG.get('TRAJECTORY_ENABLED', True)
-                    and traj_svc.is_temporal_query(query)
-                ):
-                    trajectory_context, chunks = traj_svc.get_trajectory_context(patient, query)
+                if settings.RAG_CONFIG.get('TRAJECTORY_ENABLED', True) and qi.is_temporal:
+                    trajectory_context, chunks = traj_svc.get_trajectory_context(
+                        patient, retrieval_query,
+                    )
                     if trajectory_context:
                         mode = 'trajectory'
                     else:
                         chunks = self.ret_svc.retrieve(
-                            patient=patient, query=query,
+                            patient=patient, query=retrieval_query,
                             document_type=document_type, query_intent='temporal',
                         )
                 else:
-                    intent = self.ret_svc.classify_query_intent(query)
                     chunks = self.ret_svc.retrieve(
-                        patient=patient, query=query,
-                        document_type=document_type, query_intent=intent,
+                        patient=patient, query=retrieval_query,
+                        document_type=document_type, query_intent=qi.intent,
                     )
 
                 if not chunks and not trajectory_context and history:
@@ -205,10 +207,10 @@ class RAGService:
             collected_tokens: List[str] = []
             for token in generate_streaming(
                 chunks,
-                query,
+                query,          # always send the original query to the LLM
                 history or [],
                 context_override=trajectory_context,
-                query_mode=query_mode,
+                query_mode=qi.mode,
                 general_chunks=general_chunks,
             ):
                 collected_tokens.append(token)
