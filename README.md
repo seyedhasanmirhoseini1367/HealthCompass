@@ -73,7 +73,7 @@ User question
                     SSE tokens + sources + chart data → browser / mobile
 ```
 
-**Research path** (`langgraph_ask`) — LangGraph StateGraph used for PhD evaluation:
+**Extended path** (`langgraph_ask`) — LangGraph StateGraph for complex multi-step queries:
 
 ```
 User question
@@ -116,7 +116,7 @@ The router classifies each question with **word-boundary keyword matching** — 
 
 ### Retrieval
 
-Hybrid retrieval combining four signals (PhD proposal Score formula):
+Hybrid retrieval combining four signals:
 
 ```
 Score(q, D) = α·BM25(q,D) + β·cos(q,D) + γ·Δ(D,t,s) + δ·Context(D,i)
