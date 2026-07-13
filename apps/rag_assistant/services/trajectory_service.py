@@ -162,7 +162,7 @@ class TrajectoryService:
 
         lab_rows = (
             ParsedLabValue.objects
-            .filter(record__patient=patient)
+            .filter(record__patient=patient, unit_known=True)
             .filter(q_filter)
             .select_related('record')
             .order_by('record__record_date', 'measured_at')
@@ -183,15 +183,22 @@ class TrajectoryService:
             seen_record_dates.add(key)
 
             # Use canonical_value when available (post-migration rows).
-            # For legacy rows, re-normalize on the fly.
+            # For legacy rows without canonical_value, re-normalize on the fly
+            # and skip if the unit is still unrecognised after normalisation.
             if row.canonical_value is not None:
                 numeric_value = row.canonical_value
                 display_unit  = row.unit           # already canonical unit
                 original_unit = row.original_unit or row.unit
             else:
-                numeric_value, display_unit, original_unit = normalize_unit(
+                numeric_value, display_unit, original_unit, unit_ok = normalize_unit(
                     row.parameter_name, row.value, row.unit,
                 )
+                if not unit_ok:
+                    logger.warning(
+                        'trajectory: skipping %s %s %s — unit not recognised',
+                        row.parameter_name, row.value, row.unit,
+                    )
+                    continue
 
             trajectory_points.append({
                 'date':          record_date,

@@ -284,72 +284,139 @@ class UnitNormalizerTests(SimpleTestCase):
 
     def test_hemoglobin_g_per_L_to_g_per_dL(self):
         # FIMLAB reports Hb in g/L (e.g. 145 g/L = 14.5 g/dL)
-        val, unit, orig = self.normalize('hemoglobin', '145', 'g/L')
+        val, unit, orig, _ = self.normalize('hemoglobin', '145', 'g/L')
         self.assertAlmostEqual(val, 14.5, places=2)
         self.assertEqual(unit, 'g/dL')
         self.assertEqual(orig, 'g/L')
 
     def test_hemoglobin_g_per_L_lowercase(self):
-        val, unit, _ = self.normalize('hgb', '130', 'g/l')
+        val, unit, _, _ = self.normalize('hgb', '130', 'g/l')
         self.assertAlmostEqual(val, 13.0, places=2)
         self.assertEqual(unit, 'g/dL')
 
     def test_hba1c_mmol_mol_to_percent(self):
         # 42 mmol/mol is normal HbA1c in Finland (≈ 6.0%)
         # Without conversion it would read as 42% — a lethal misread
-        val, unit, orig = self.normalize('hba1c', '42', 'mmol/mol')
+        val, unit, orig, _ = self.normalize('hba1c', '42', 'mmol/mol')
         self.assertAlmostEqual(val, 5.99, delta=0.05)
         self.assertEqual(unit, '%')
         self.assertEqual(orig, 'mmol/mol')
 
     def test_hba1c_diabetic_threshold(self):
         # 53 mmol/mol ≈ 7.0% (diabetic threshold)
-        val, unit, _ = self.normalize('hba1c', '53', 'mmol/mol')
+        val, unit, _, _ = self.normalize('hba1c', '53', 'mmol/mol')
         self.assertAlmostEqual(val, 7.0, delta=0.1)
 
     def test_hba1c_alias_hemoglobin_a1c(self):
-        val, unit, _ = self.normalize('hemoglobin a1c', '48', 'mmol/mol')
+        val, unit, _, _ = self.normalize('hemoglobin a1c', '48', 'mmol/mol')
         self.assertAlmostEqual(val, 6.54, delta=0.1)
         self.assertEqual(unit, '%')
 
     # ── Other SI conversions ──────────────────────────────────────────────────
 
     def test_creatinine_umol_L(self):
-        val, unit, _ = self.normalize('creatinine', '112', 'umol/L')
+        val, unit, _, _ = self.normalize('creatinine', '112', 'umol/L')
         self.assertAlmostEqual(val, 1.267, delta=0.01)
         self.assertEqual(unit, 'mg/dL')
 
     def test_glucose_mmol_L(self):
-        val, unit, _ = self.normalize('glucose', '5.5', 'mmol/L')
+        val, unit, _, _ = self.normalize('glucose', '5.5', 'mmol/L')
         self.assertAlmostEqual(val, 99.09, delta=0.5)
         self.assertEqual(unit, 'mg/dL')
 
     def test_cholesterol_mmol_L(self):
-        val, unit, _ = self.normalize('total cholesterol', '5.2', 'mmol/L')
+        val, unit, _, _ = self.normalize('total cholesterol', '5.2', 'mmol/L')
         self.assertAlmostEqual(val, 201.1, delta=1.0)
         self.assertEqual(unit, 'mg/dL')
 
     def test_vitamin_d_nmol_L(self):
-        val, unit, _ = self.normalize('vitamin d', '50', 'nmol/L')
+        val, unit, _, _ = self.normalize('vitamin d', '50', 'nmol/L')
         self.assertAlmostEqual(val, 20.03, delta=0.1)
         self.assertEqual(unit, 'ng/mL')
 
     # ── No-conversion pass-through ────────────────────────────────────────────
 
     def test_no_conversion_needed_mg_dL(self):
-        val, unit, orig = self.normalize('creatinine', '1.1', 'mg/dL')
+        val, unit, orig, _ = self.normalize('creatinine', '1.1', 'mg/dL')
         self.assertAlmostEqual(val, 1.1, places=4)
         self.assertEqual(unit, 'mg/dL')
         self.assertEqual(orig, 'mg/dL')
 
     def test_unparseable_value_returns_none(self):
-        val, unit, _ = self.normalize('creatinine', 'N/A', 'µmol/L')
+        val, unit, _, _ = self.normalize('creatinine', 'N/A', 'µmol/L')
         self.assertIsNone(val)
 
     def test_comma_decimal_separator(self):
         # European CSV files often use comma as decimal separator
-        val, unit, _ = self.normalize('creatinine', '112,5', 'umol/L')
+        val, unit, _, _ = self.normalize('creatinine', '112,5', 'umol/L')
         self.assertAlmostEqual(val, 112.5 / 88.4, delta=0.01)
+
+
+# ── unit_known field ─────────────────────────────────────────────────────────
+
+class UnitKnownTests(SimpleTestCase):
+    """
+    normalize() must return unit_known=False for known analytes with
+    unrecognised units, and True for all safe cases.
+    This is the architectural guard that prevents 'dangerous guessing'.
+    """
+
+    def setUp(self):
+        from apps.medical_records.unit_normalizer import normalize
+        self.normalize = normalize
+
+    def test_known_analyte_known_unit_is_true(self):
+        # creatinine in µmol/L is in the table → unit_known=True
+        _, _, _, known = self.normalize('creatinine', '112', 'µmol/L')
+        self.assertTrue(known)
+
+    def test_known_analyte_already_canonical_is_true(self):
+        # creatinine in mg/dL is already canonical → unit_known=True
+        _, _, _, known = self.normalize('creatinine', '1.1', 'mg/dL')
+        self.assertTrue(known)
+
+    def test_known_analyte_unrecognised_unit_is_false(self):
+        # creatinine in g/L — not in table, not canonical — dangerous guess
+        _, _, _, known = self.normalize('creatinine', '0.001', 'g/L')
+        self.assertFalse(known)
+
+    def test_hemoglobin_unrecognised_unit_is_false(self):
+        # hemoglobin in oz — nonsensical unit, should be flagged
+        _, _, _, known = self.normalize('hemoglobin', '0.5', 'oz')
+        self.assertFalse(known)
+
+    def test_hba1c_known_unit_mmol_mol_is_true(self):
+        # HbA1c in mmol/mol is in the table → unit_known=True
+        _, _, _, known = self.normalize('hba1c', '42', 'mmol/mol')
+        self.assertTrue(known)
+
+    def test_hba1c_already_canonical_percent_is_true(self):
+        # HbA1c in % is already the canonical unit → unit_known=True
+        _, _, _, known = self.normalize('hba1c', '6.0', '%')
+        self.assertTrue(known)
+
+    def test_hba1c_unrecognised_unit_is_false(self):
+        # HbA1c in some unknown unit — should be flagged
+        _, _, _, known = self.normalize('hba1c', '6.0', 'arbitrary')
+        self.assertFalse(known)
+
+    def test_unknown_analyte_pass_through_is_true(self):
+        # TSH (not in _CONVERSIONS) — pass-through is always safe
+        _, _, _, known = self.normalize('tsh', '2.5', 'mIU/L')
+        self.assertTrue(known)
+
+    def test_unparseable_value_unit_known_is_true(self):
+        # Unparseable value is a different problem from unknown unit
+        _, _, _, known = self.normalize('creatinine', 'not-a-number', 'µmol/L')
+        self.assertTrue(known)
+
+    def test_unit_known_false_does_not_corrupt_canonical_value(self):
+        # When unit_known=False, the raw float is returned (not converted)
+        # but callers will exclude it — verify it's still parseable
+        val, _, _, known = self.normalize('creatinine', '0.001', 'g/L')
+        self.assertFalse(known)
+        self.assertIsNotNone(val)   # raw value still returned for display
+        self.assertAlmostEqual(val, 0.001, places=4)
 
 
 # ── QueryUnderstanding ────────────────────────────────────────────────────────

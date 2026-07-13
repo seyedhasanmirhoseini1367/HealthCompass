@@ -15,6 +15,16 @@ Strategy:
 - Store the original value+unit so the UI can display what the lab reported.
 - All trajectory / threshold comparisons use the canonical value.
 
+unit_known semantics (4th return value of normalize()):
+  True  — the unit is in the conversion table, OR the value is already in
+           the canonical unit, OR the analyte is not one we track.
+  False — the analyte IS one we track (in _CONVERSIONS), but the unit is
+           neither in the table nor the canonical unit. This means we cannot
+           safely interpret the number. Callers must exclude such values from
+           threshold checks and trajectory comparisons. Displaying them in the
+           UI as "unit unknown — not interpreted" is the appropriate response.
+           "Better to stay silent than to guess wrong."
+
 Canonical units match the cold-start reference ranges in load_knowledge_base.py
 and the seed data in seed_trajectory_patient.py.
 """
@@ -94,32 +104,51 @@ _CONVERSIONS: dict = {
     ('25(oh)d',            'nmol/l'): ('ng/mL', lambda x: x / 2.496),
 }
 
+# Derived at import time from _CONVERSIONS so they stay in sync automatically.
+# Maps param_key → the canonical unit it converts TO.
+_ANALYTE_CANONICAL_UNIT: dict = {
+    param: canon_unit
+    for (param, _unit), (canon_unit, _fn) in _CONVERSIONS.items()
+}
+
+# Set of param_keys for which we have at least one conversion defined.
+# If a value arrives with a unit NOT in the table for one of these analytes,
+# it means we cannot verify the scale — returning unit_known=False is safer
+# than silently treating the raw number as canonical.
+_KNOWN_ANALYTES: set = set(_ANALYTE_CANONICAL_UNIT.keys())
+
 
 def normalize(
     parameter_name: str,
     value_str: str,
     unit: str,
-) -> Tuple[Optional[float], str, str]:
+) -> Tuple[Optional[float], str, str, bool]:
     """
-    Return (canonical_value, canonical_unit, original_unit).
+    Return (canonical_value, canonical_unit, original_unit, unit_known).
 
-    If no conversion is defined, canonical_value is the raw float parse
-    of value_str (or None if unparseable) and canonical_unit == unit.
-    The original_unit is always preserved unchanged.
+    canonical_value  — converted float, or raw float if no conversion needed,
+                       or None if value_str is unparseable.
+    canonical_unit   — target unit after conversion (or original unit if none).
+    original_unit    — always the unit as received, unchanged.
+    unit_known       — False when the analyte is in our registry but the unit
+                       is not recognised (neither in the conversion table nor
+                       already the canonical unit). Callers must exclude
+                       unit_known=False values from threshold checks and
+                       trajectory comparisons.
     """
     original_unit = unit
 
-    # Try to parse the raw value
+    # Try to parse the raw value (support European comma-decimal)
     try:
         raw = float(value_str.replace(',', '.'))
     except (ValueError, AttributeError):
-        return None, unit, original_unit
+        return None, unit, original_unit, True  # unparseable ≠ wrong unit
 
-    # Look up conversion
     param_key = parameter_name.lower().strip()
     unit_key  = unit.lower().strip()
     key = (param_key, unit_key)
 
+    # ── Case 1: conversion table hit ─────────────────────────────────────────
     if key in _CONVERSIONS:
         canonical_unit, fn = _CONVERSIONS[key]
         try:
@@ -127,8 +156,18 @@ def normalize(
         except Exception:
             canonical_value = raw
             canonical_unit  = unit
-    else:
-        canonical_value = raw
-        canonical_unit  = unit
+        return canonical_value, canonical_unit, original_unit, True
 
-    return canonical_value, canonical_unit, original_unit
+    # ── Case 2: analyte not in our registry — pass-through is safe ───────────
+    if param_key not in _KNOWN_ANALYTES:
+        return raw, unit, original_unit, True
+
+    # ── Case 3: known analyte, unit NOT in table ───────────────────────────
+    canonical_unit = _ANALYTE_CANONICAL_UNIT[param_key]
+    if unit_key == canonical_unit.lower():
+        # Already in canonical form — no conversion needed
+        return raw, canonical_unit, original_unit, True
+
+    # The analyte is one we know about, but we have no formula for this unit.
+    # Returning the raw number would be a silent dangerous guess.
+    return raw, unit, original_unit, False

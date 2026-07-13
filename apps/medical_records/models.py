@@ -52,6 +52,9 @@ class ParsedLabValue(models.Model):
     # without normalization trajectory thresholds would be wildly wrong.
     canonical_value = models.FloatField(null=True, blank=True)
     original_unit   = models.CharField(max_length=50, blank=True)
+    # False when the analyte is known but the incoming unit was not recognised.
+    # Such rows are excluded from trajectory and threshold comparisons.
+    unit_known      = models.BooleanField(default=True)
     reference_range = models.CharField(max_length=100, blank=True)
     is_abnormal     = models.BooleanField(default=False)
     is_critical     = models.BooleanField(default=False)

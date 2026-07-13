@@ -186,7 +186,7 @@ def upload_kanta(request):
 
                         _unit = entry.get('unit', '')
                         _val_str = str(entry.get('value', ''))
-                        _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+                        _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
                             entry.get('name', ''), _val_str, _unit,
                         )
                         ParsedLabValue.objects.create(
@@ -196,6 +196,7 @@ def upload_kanta(request):
                             unit=_canon_unit,
                             canonical_value=_canonical,
                             original_unit=_orig_unit,
+                            unit_known=_unit_known,
                             reference_range=ref_range,
                             is_abnormal=is_ab,
                             is_critical=is_critical,
@@ -350,7 +351,7 @@ def upload_pdf(request):
             is_ab = lv.get('is_abnormal', False)
             _unit = lv.get('unit', '')
             _val_str = str(lv.get('value', ''))
-            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+            _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
                 lv.get('name', ''), _val_str, _unit,
             )
             ParsedLabValue.objects.create(
@@ -360,6 +361,7 @@ def upload_pdf(request):
                 unit=_canon_unit,
                 canonical_value=_canonical,
                 original_unit=_orig_unit,
+                unit_known=_unit_known,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
                 is_critical=is_critical,
@@ -433,7 +435,7 @@ def upload_text(request):
             is_ab = lv.get('is_abnormal', False)
             _unit = lv.get('unit', '')
             _val_str = str(lv.get('value', ''))
-            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+            _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
                 lv.get('name', ''), _val_str, _unit,
             )
             ParsedLabValue.objects.create(
@@ -443,6 +445,7 @@ def upload_text(request):
                 unit=_canon_unit,
                 canonical_value=_canonical,
                 original_unit=_orig_unit,
+                unit_known=_unit_known,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
             )
@@ -582,7 +585,7 @@ def upload_scan(request):
             is_ab = lv.get('is_abnormal', False)
             _unit = lv.get('unit', '')
             _val_str = str(lv.get('value', ''))
-            _canonical, _canon_unit, _orig_unit = normalize_lab_unit(
+            _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
                 lv.get('name', ''), _val_str, _unit,
             )
             ParsedLabValue.objects.create(
@@ -592,6 +595,7 @@ def upload_scan(request):
                 unit=_canon_unit,
                 canonical_value=_canonical,
                 original_unit=_orig_unit,
+                unit_known=_unit_known,
                 reference_range=lv.get('ref_range', ''),
                 is_abnormal=is_ab,
             )
