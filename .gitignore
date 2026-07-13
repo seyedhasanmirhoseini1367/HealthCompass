@@ -58,3 +58,6 @@ Thumbs.db
 HEALTHCOMPASS_*.md
 HEALTHCOMPASS_*.txt
 RAG_SYSTEM_DOCUMENTATION.*
+
+# Docs directory
+docs/
