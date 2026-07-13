@@ -330,9 +330,9 @@ def generate(
     general_chunks:   List[Dict[str, Any]] = None,
 ) -> Tuple[str, List[Dict], str]:
     """
-    Try Gemini → Anthropic → OpenAI.
+    Try Groq → Gemini → Anthropic → OpenAI (first key that is configured wins).
     Returns (response_text, sources, provider_name).
-    provider_name is one of: 'gemini', 'anthropic', 'openai', 'fallback'.
+    provider_name is one of: 'groq', 'gemini', 'anthropic', 'openai', 'fallback'.
 
     When *context_override* is provided (trajectory mode), it is used as the
     context string and TRAJECTORY_SYSTEM_PROMPT is used instead of SYSTEM_PROMPT.
@@ -380,7 +380,6 @@ def _stream_groq(context: str, query: str, history: List[Dict], sys_prompt: str 
                 yield text
     except Exception as exc:
         logger.warning('Groq stream error: %s', exc)
-        yield from _stream_gemini(context, query, history, sys_prompt=sys_prompt)
 
 
 # ── Streaming: Gemini ──────────────────────────────────────────────────────────
@@ -418,13 +417,11 @@ def _stream_gemini(context: str, query: str, history: List[Dict], sys_prompt: st
 
     except Exception as exc:
         logger.warning('Gemini stream error: %s', exc)
-        yield from _stream_anthropic(context, query, history, sys_prompt=sys_prompt)
 
 
 def _stream_anthropic(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
-        yield from _stream_openai(context, query, history, sys_prompt=sys_prompt)
         return
     try:
         import anthropic
@@ -440,7 +437,6 @@ def _stream_anthropic(context: str, query: str, history: List[Dict], sys_prompt:
                     yield text
     except Exception as exc:
         logger.warning('Anthropic stream error: %s', exc)
-        yield from _stream_openai(context, query, history, sys_prompt=sys_prompt)
 
 
 def _stream_openai(context: str, query: str, history: List[Dict], sys_prompt: str = SYSTEM_PROMPT) -> Generator[str, None, None]:
@@ -491,19 +487,17 @@ def generate_streaming(
             yielded = True
             yield token
 
-    api_key_groq      = getattr(settings, 'GROQ_API_KEY',      '')
-    api_key_gemini    = getattr(settings, 'GEMINI_API_KEY',    '')
-    api_key_anthropic = getattr(settings, 'ANTHROPIC_API_KEY', '')
-    api_key_openai    = getattr(settings, 'OPENAI_API_KEY',    '')
-
-    if api_key_groq:
-        yield from _track(_stream_groq(context, query, history, sys_prompt=sys_prompt))
-    elif api_key_gemini:
-        yield from _track(_stream_gemini(context, query, history, sys_prompt=sys_prompt))
-    elif api_key_anthropic:
-        yield from _track(_stream_anthropic(context, query, history, sys_prompt=sys_prompt))
-    elif api_key_openai:
-        yield from _track(_stream_openai(context, query, history, sys_prompt=sys_prompt))
+    for _stream_fn, key_attr in [
+        (_stream_groq,      'GROQ_API_KEY'),
+        (_stream_gemini,    'GEMINI_API_KEY'),
+        (_stream_anthropic, 'ANTHROPIC_API_KEY'),
+        (_stream_openai,    'OPENAI_API_KEY'),
+    ]:
+        if not getattr(settings, key_attr, ''):
+            continue
+        yield from _track(_stream_fn(context, query, history, sys_prompt=sys_prompt))
+        if yielded:
+            break
 
     if not yielded:
         yield _fallback()

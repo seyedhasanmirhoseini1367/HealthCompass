@@ -10,7 +10,10 @@ import csv
 import json
 import logging
 from datetime import datetime, date
-from xml.etree import ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    from xml.etree import ElementTree as ET  # fallback for local dev without defusedxml
 
 logger = logging.getLogger(__name__)
 

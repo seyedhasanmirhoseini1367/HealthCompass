@@ -626,7 +626,7 @@ def seizure_realtime_predict_chunk(request):
         return JsonResponse({'error': 'Missing "data" field.'}, status=400)
 
     try:
-        from apps.ai_insights.seizure_inference import predict
+        from apps.ai_insights.inference.seizure_inference import predict
         result = predict(data_dict, variant=variant)
         return JsonResponse(result)
     except Exception as exc:

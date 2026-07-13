@@ -1105,7 +1105,7 @@ def seizure_realtime_analyze(request):
             df = df.drop(columns=['EKG'])
         df = df.iloc[:, :19]
 
-        from apps.ai_insights.seizure_inference import predict
+        from apps.ai_insights.inference.seizure_inference import predict
         total     = len(df)
         fs        = 200
         win       = fs * 10      # 10-second window
