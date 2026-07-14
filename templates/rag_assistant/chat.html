@@ -71,8 +71,9 @@
 .bubble-user{background:var(--primary);color:white;border-radius:14px 14px 4px 14px}
 .bubble-assistant{background:#f1f5f9;color:var(--text);border-radius:14px 14px 14px 4px;position:relative}
 .bubble-assistant .copy-btn{position:absolute;top:.4rem;right:.4rem;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.2rem .4rem;border-radius:5px;transition:all .15s;opacity:0}
-.bubble-assistant:hover .copy-btn{opacity:1}
-.bubble-assistant .copy-btn:hover{background:#e2e8f0}
+.bubble-assistant:hover .copy-btn,.bubble-assistant .copy-btn:focus-visible{opacity:1}
+.bubble-assistant .copy-btn:hover,.bubble-assistant .copy-btn:focus-visible{background:#e2e8f0}
+.bubble-assistant .copy-btn:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
 .msg-time{font-size:.7rem;color:var(--muted);margin-top:.25rem;text-align:right}
 .msg-user .msg-time{text-align:right}
 .msg-assistant .msg-time{text-align:left}
@@ -93,10 +94,11 @@
 .chart-trend-stable{color:#64748b;font-size:.72rem;font-weight:700}
 .chart-canvas-wrap{position:relative;height:140px}
 .chat-input-area{margin-top:.75rem;display:flex;gap:.6rem;align-items:flex-end}
-.chat-input{flex:1;padding:.65rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;resize:none;outline:none;font-family:inherit;transition:border .15s;max-height:120px}
-.chat-input:focus{border-color:var(--primary)}
+.chat-input{flex:1;padding:.65rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;resize:none;font-family:inherit;transition:border .15s,box-shadow .15s;max-height:120px;outline:none}
+.chat-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
 .send-btn{padding:.65rem 1.1rem;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:.9rem;transition:all .15s;flex-shrink:0}
 .send-btn:hover{background:#0284c7}
+.send-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .send-btn:disabled{opacity:.5;cursor:not-allowed}
 .typing-indicator{display:none;align-self:flex-start}
 .typing-bubble{background:#f1f5f9;border-radius:14px 14px 14px 4px;padding:.65rem 1rem;display:flex;gap:.35rem;align-items:center}
@@ -189,7 +191,8 @@ footer{display:none!important}
     </div>
     {% endif %}
 
-    <div class="messages-area" id="messagesArea">
+    <div class="messages-area" id="messagesArea"
+         role="log" aria-live="polite" aria-label="Conversation" aria-relevant="additions">
       {% if not chat_messages %}
       <div id="emptyState" style="text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <div style="font-size:2.5rem;margin-bottom:.75rem">💬</div>
@@ -212,7 +215,7 @@ footer{display:none!important}
         </div>
         <div class="msg-assistant" data-history-idx="{{ forloop.counter0 }}">
           <div class="bubble bubble-assistant" data-raw="{{ msg.response }}">
-            <button class="copy-btn" onclick="copyMsg(this)" title="Copy"><i class="fas fa-copy"></i></button>
+            <button class="copy-btn" onclick="copyMsg(this)" aria-label="Copy message"><i class="fas fa-copy" aria-hidden="true"></i></button>
             <div class="md-content"></div>
           </div>
           <div class="sources-row"></div>
@@ -221,9 +224,9 @@ footer{display:none!important}
         {% endfor %}
       {% endif %}
 
-      <!-- Typing indicator -->
-      <div class="typing-indicator" id="typingIndicator">
-        <div class="typing-bubble">
+      <!-- Typing indicator — aria-label announced when display switches to flex -->
+      <div class="typing-indicator" id="typingIndicator" role="status" aria-label="AI assistant is typing">
+        <div class="typing-bubble" aria-hidden="true">
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
@@ -234,9 +237,10 @@ footer{display:none!important}
     <div class="chat-input-area">
       <textarea class="chat-input" id="msgInput" rows="1"
                 placeholder="Ask a health question…"
+                aria-label="Ask a health question"
                 onkeydown="handleKey(event)"></textarea>
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-        <i class="fas fa-paper-plane"></i>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+        <i class="fas fa-paper-plane" aria-hidden="true"></i>
       </button>
     </div>
     <p style="font-size:.72rem;color:var(--muted);margin-top:.4rem;text-align:center">
@@ -412,8 +416,8 @@ function makeAssistantBubble(text, sources) {
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'copy-btn';
-  copyBtn.title = 'Copy';
-  copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+  copyBtn.setAttribute('aria-label', 'Copy message');
+  copyBtn.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i>';
   copyBtn.onclick = function() { copyMsg(this); };
 
   const content = document.createElement('div');
@@ -599,8 +603,12 @@ function copyMsg(btn) {
   const bubble = btn.closest('.bubble-assistant');
   const text = bubble.getAttribute('data-raw');
   navigator.clipboard.writeText(text).then(() => {
-    btn.innerHTML = '<i class="fas fa-check"></i>';
-    setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500);
+    btn.setAttribute('aria-label', 'Copied!');
+    btn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
+    setTimeout(() => {
+      btn.setAttribute('aria-label', 'Copy message');
+      btn.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i>';
+    }, 1500);
   });
 }
 

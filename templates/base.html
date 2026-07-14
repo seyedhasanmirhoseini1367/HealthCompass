@@ -39,7 +39,7 @@
     .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
     .alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
     main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%;background:var(--surface)}
-    footer{background:#0f172a;color:#94a3b8;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
+    footer{background:#0f172a;color:#cbd5e1;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
     footer strong{color:white}
     .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.2rem;border-radius:10px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
     .btn-primary{background:var(--primary);color:white}
@@ -146,6 +146,8 @@
     /* ── Form controls ────────────────────────────────────────────────────────── */
     .form-control{border:1.5px solid var(--border);border-radius:9px;padding:.5rem .85rem;font-size:.875rem;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;background:white;color:var(--text);display:block;width:100%}
     .form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    /* Global keyboard-navigation focus ring — shown only on keyboard (not click) */
+    a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-visible,.sb-toggle:focus-visible,.nav-notification:focus-visible,.nav-more-btn:focus-visible,.nav-user:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
     .form-label{display:block;font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
     /* ── Page hero (universal edge-to-edge banner) ─────────────────────────── */
     .page-hero{background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:0 0 28px 28px;padding:1.4rem 1.75rem 1.75rem;margin:-1.5rem -1.5rem 2rem;color:white;position:relative;overflow:hidden;text-align:center}
@@ -170,8 +172,9 @@
         <li><a href="/dashboard/">Dashboard</a></li>
         <!-- More ▾ dropdown -->
         <li class="nav-more-wrap">
-            <button class="nav-more-btn" id="moreBtn" onclick="toggleMoreMenu(event)">
-                More <i class="fas fa-chevron-down chevron"></i>
+            <button class="nav-more-btn" id="moreBtn" onclick="toggleMoreMenu(event)"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu">
+                More <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
             </button>
             <div class="nav-more-menu" id="moreMenu">
                 <a href="/appointments/" class="nav-more-item"><i class="fas fa-calendar-check" style="color:#0ea5e9"></i> Appointments</a>
@@ -187,11 +190,12 @@
     </ul>
 
     <div class="nav-right">
-        <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>
+        <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileMenu">&#9776;</button>
         {% if user.is_authenticated %}
-        <a href="/notifications/" class="nav-notification" title="Notifications">
-            <i class="fas fa-bell"></i>
-            {% if unread_notifications_count %}<span class="notif-badge">{{ unread_notifications_count }}</span>{% endif %}
+        <a href="/notifications/" class="nav-notification"
+           aria-label="Notifications{% if unread_notifications_count %}, {{ unread_notifications_count }} unread{% endif %}">
+            <i class="fas fa-bell" aria-hidden="true"></i>
+            {% if unread_notifications_count %}<span class="notif-badge" aria-hidden="true">{{ unread_notifications_count }}</span>{% endif %}
         </a>
         <div class="nav-user" style="position:relative" id="navUserBtn" onclick="toggleUserMenu()">
             {% if user.profile_picture %}
@@ -248,7 +252,10 @@
 {% if user.is_authenticated %}
 <aside class="app-sidebar" id="appSidebar">
   <div class="sb-toggle-row">
-    <button class="sb-toggle" onclick="toggleSidebar()" title="Collapse sidebar"><i class="fas fa-bars"></i></button>
+    <button class="sb-toggle" id="sbToggleBtn" onclick="toggleSidebar()"
+            aria-label="Collapse sidebar" aria-expanded="true" aria-controls="appSidebar">
+      <i class="fas fa-bars" aria-hidden="true"></i>
+    </button>
   </div>
   <nav class="sb-nav">
     <span class="sb-label">Main</span>
@@ -297,7 +304,10 @@ function toggleUserMenu() {
   closeMoreMenu();
 }
 function toggleMobileMenu() {
-  document.getElementById('mobileMenu').classList.toggle('open');
+  const menu = document.getElementById('mobileMenu');
+  const btn  = document.getElementById('hamburgerBtn');
+  const open = menu.classList.toggle('open');
+  btn && btn.setAttribute('aria-expanded', open);
 }
 function toggleMoreMenu(e) {
   e.stopPropagation();
@@ -308,6 +318,7 @@ function toggleMoreMenu(e) {
   if (!isOpen) {
     menu && menu.classList.add('open');
     btn  && btn.classList.add('open');
+    btn  && btn.setAttribute('aria-expanded', 'true');
   }
   // close user menu if open
   const um = document.getElementById('userMenu');
@@ -318,6 +329,7 @@ function closeMoreMenu() {
   const btn  = document.getElementById('moreBtn');
   menu && menu.classList.remove('open');
   btn  && btn.classList.remove('open');
+  btn  && btn.setAttribute('aria-expanded', 'false');
 }
 let _deleteCallback = null;
 function openDeleteModal(message, onConfirm, title) {
@@ -338,18 +350,25 @@ document.addEventListener('keydown', function(e) {
 });
 
 function toggleSidebar() {
-  const sb = document.getElementById('appSidebar');
+  const sb  = document.getElementById('appSidebar');
+  const btn = document.getElementById('sbToggleBtn');
   if (!sb) return;
-  const c = sb.classList.toggle('collapsed');
-  document.body.classList.toggle('sidebar-collapsed', c);
-  localStorage.setItem('hc_sb', c ? '1' : '0');
+  const collapsed = sb.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+  localStorage.setItem('hc_sb', collapsed ? '1' : '0');
+  if (btn) {
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  }
 }
 (function(){
-  const sb = document.getElementById('appSidebar');
+  const sb  = document.getElementById('appSidebar');
+  const btn = document.getElementById('sbToggleBtn');
   if (!sb) return;
   if (localStorage.getItem('hc_sb') === '1') {
     sb.classList.add('collapsed');
     document.body.classList.add('sidebar-collapsed');
+    if (btn) { btn.setAttribute('aria-expanded','false'); btn.setAttribute('aria-label','Expand sidebar'); }
   }
   const path = location.pathname;
   document.querySelectorAll('.sb-link').forEach(function(a) {
