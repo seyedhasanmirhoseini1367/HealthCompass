@@ -137,17 +137,15 @@ class LoadModelONNXTest(TestCase):
         self.assertIs(result, mock_session)
 
     def test_onnxruntime_not_installed_gives_clear_error(self):
-        import sys
-        saved = sys.modules.pop('onnxruntime', None)
-        try:
-            with patch('os.path.exists', return_value=True):
-                h = _handler('/srv/models/model.onnx')
-                with self.assertRaises(InferenceError) as ctx:
-                    h._load_model()
-            self.assertIn('onnxruntime', str(ctx.exception).lower())
-        finally:
-            if saved is not None:
-                sys.modules['onnxruntime'] = saved
+        # Force ImportError regardless of whether onnxruntime is actually installed.
+        # Setting the key to None in sys.modules makes `import onnxruntime` raise
+        # ImportError — environment-independent behaviour.
+        with patch('os.path.exists', return_value=True), \
+             patch.dict('sys.modules', {'onnxruntime': None}):
+            h = _handler('/srv/models/model.onnx')
+            with self.assertRaises(InferenceError) as ctx:
+                h._load_model()
+        self.assertIn('onnxruntime', str(ctx.exception).lower())
 
 
 # ─── StandardPrediction contract ──────────────────────────────────────────────
