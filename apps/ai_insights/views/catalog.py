@@ -2,6 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 
@@ -58,12 +59,29 @@ def model_detail(request, slug):
     })
 
 
+_RUNNABLE_STATUSES = frozenset({AIModel.Status.ACTIVE, AIModel.Status.APPROVED})
+
+
 @login_required
 def run_prediction(request, slug):
-    model = get_object_or_404(AIModel, slug=slug, status='active')
+    # Fetch by slug only — status is enforced explicitly below.
+    # Using a separate PermissionDenied (403) rather than a 404 means the caller
+    # gets a meaningful error instead of a "page not found" when a model exists
+    # but isn't runnable yet.
+    model = get_object_or_404(AIModel, slug=slug)
 
     if request.method != 'POST':
         return redirect('ai_insights:model_detail', slug=slug)
+
+    # ── Status gate — OUTSIDE try/except so PermissionDenied escapes as HTTP 403 ──
+    if model.status not in _RUNNABLE_STATUSES:
+        raise PermissionDenied
+
+    # APPROVED = passed review but not yet public.
+    # Only the owning data scientist and staff may test-run pre-release models.
+    if (model.status == AIModel.Status.APPROVED and
+            not (request.user == model.data_scientist or request.user.is_staff)):
+        raise PermissionDenied
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 

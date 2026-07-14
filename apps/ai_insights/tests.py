@@ -5,6 +5,8 @@ Key invariants enforced here:
 - Only ONNX model files are accepted by _load_model().
 - All pickle / Keras / PyTorch full-model formats are hard-blocked.
 - A missing or non-existent file raises InferenceError, not an unhandled exception.
+- run_prediction returns HTTP 403 for PENDING/REJECTED models regardless of caller.
+- APPROVED models are only runnable by their owning data scientist and staff.
 """
 from unittest.mock import MagicMock, patch
 
@@ -144,3 +146,90 @@ class LoadModelONNXTest(TestCase):
         finally:
             if saved is not None:
                 sys.modules['onnxruntime'] = saved
+
+
+# ─── Status enforcement in run_prediction view ─────────────────────────────────
+
+from django.contrib.auth import get_user_model
+from django.test import Client
+from django.urls import reverse
+
+from apps.ai_insights.models import AIModel
+
+
+class ModelStatusEnforcementTest(TestCase):
+    """
+    run_prediction must enforce model.status before calling any handler.
+
+    Invariants:
+    - PENDING  → HTTP 403 (not 404; model exists but isn't runnable)
+    - REJECTED → HTTP 403
+    - APPROVED → HTTP 403 for non-owners; non-403 for the owning data scientist and staff
+    - ACTIVE   → non-403 for any authenticated user
+    """
+
+    RUN_URL = staticmethod(
+        lambda slug: reverse('ai_insights:run_prediction', kwargs={'slug': slug})
+    )
+
+    def setUp(self):
+        User = get_user_model()
+        self.patient   = User.objects.create_user('patient_s',  email='patient_s@test.invalid',  password='pw')
+        self.ds_owner  = User.objects.create_user('ds_owner_s', email='ds_owner_s@test.invalid', password='pw')
+        self.ds_other  = User.objects.create_user('ds_other_s', email='ds_other_s@test.invalid', password='pw')
+        self.staff     = User.objects.create_user('staff_s',    email='staff_s@test.invalid',    password='pw', is_staff=True)
+
+        self.model = AIModel.objects.create(
+            name='Status Test Model',
+            slug='status-test-model',
+            description='Test',
+            data_scientist=self.ds_owner,
+            input_schema={},
+            output_schema={'labels': {'0': 'Low', '1': 'High'}},
+            status=AIModel.Status.ACTIVE,
+        )
+
+    def _post(self, user, status=None) -> int:
+        if status is not None:
+            self.model.status = status
+            self.model.save(update_fields=['status'])
+        self.client.login(username=user.username, password='pw')
+        resp = self.client.post(self.RUN_URL(self.model.slug), data={})
+        return resp.status_code
+
+    # ── Blocked statuses ──────────────────────────────────────────────────────
+
+    def test_pending_returns_403_for_patient(self):
+        self.assertEqual(self._post(self.patient,  AIModel.Status.PENDING), 403)
+
+    def test_pending_returns_403_for_owner(self):
+        """Even the model owner cannot run a PENDING model — it needs admin review first."""
+        self.assertEqual(self._post(self.ds_owner, AIModel.Status.PENDING), 403)
+
+    def test_rejected_returns_403_for_patient(self):
+        self.assertEqual(self._post(self.patient,  AIModel.Status.REJECTED), 403)
+
+    def test_rejected_returns_403_for_owner(self):
+        self.assertEqual(self._post(self.ds_owner, AIModel.Status.REJECTED), 403)
+
+    # ── APPROVED: owner and staff only ───────────────────────────────────────
+
+    def test_approved_returns_403_for_patient(self):
+        self.assertEqual(self._post(self.patient,  AIModel.Status.APPROVED), 403)
+
+    def test_approved_returns_403_for_other_data_scientist(self):
+        self.assertEqual(self._post(self.ds_other, AIModel.Status.APPROVED), 403)
+
+    def test_approved_allows_owner(self):
+        """Model owner can test-run their own APPROVED (pre-release) model."""
+        self.assertNotEqual(self._post(self.ds_owner, AIModel.Status.APPROVED), 403)
+
+    def test_approved_allows_staff(self):
+        """Staff (admin) can run any APPROVED model for review purposes."""
+        self.assertNotEqual(self._post(self.staff, AIModel.Status.APPROVED), 403)
+
+    # ── ACTIVE: any authenticated user ──────────────────────────────────────
+
+    def test_active_allows_patient(self):
+        """Any logged-in user can run an ACTIVE model."""
+        self.assertNotEqual(self._post(self.patient, AIModel.Status.ACTIVE), 403)
