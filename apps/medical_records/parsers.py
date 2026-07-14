@@ -17,28 +17,99 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+_MONTH_NAMES = {
+    'january': 1, 'february': 2, 'march': 3, 'april': 4,
+    'may': 5, 'june': 6, 'july': 7, 'august': 8,
+    'september': 9, 'october': 10, 'november': 11, 'december': 12,
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+    'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9,
+    'oct': 10, 'nov': 11, 'dec': 12,
+}
 
-def _extract_date_regex(text: str):
-    """
-    Scan free-form text for a recognizable date and return 'YYYY-MM-DD' string or None.
-    Tries labelled date fields first (most reliable), then long-form month names, then ISO.
-    """
-    MONTHS = {
-        'january': 1, 'february': 2, 'march': 3, 'april': 4,
-        'may': 5, 'june': 6, 'july': 7, 'august': 8,
-        'september': 9, 'october': 10, 'november': 11, 'december': 12,
-        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
-        'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9,
-        'oct': 10, 'nov': 11, 'dec': 12,
-    }
 
-    def _to_iso(y, m, d):
+def _to_iso(y, m, d) -> str | None:
+    try:
+        return date(int(y), int(m), int(d)).strftime('%Y-%m-%d')
+    except (ValueError, OverflowError):
+        return None
+
+
+def _parse_date_string(s: str, locale_hint: str | None = None) -> str | None:
+    """
+    Parse a standalone date string and return 'YYYY-MM-DD' or None.
+
+    Three-layer disambiguation for numeric formats (d/m/Y vs m/d/Y):
+      Layer 1 — Unambiguous formats first: ISO (YYYY-MM-DD) and alphabetic month
+                 names. These carry no ambiguity regardless of locale.
+      Layer 2 — Structural: if one of the two components is > 12, that component
+                 must be the day (months only go to 12). '25/04' is always d/m.
+      Layer 3 — Genuinely ambiguous (both ≤ 12, e.g. '03/04'): use locale_hint.
+                 None → reads DATE_FORMAT_PREFERENCE from Django settings (default 'eu').
+
+    locale_hint: 'eu' (day/month/year) | 'us' (month/day/year) | None (use setting)
+    """
+    if not s:
+        return None
+    s = s.strip().rstrip(',')
+
+    # ── Layer 1a: ISO — YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD (unambiguous) ──
+    iso_m = re.match(r'^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$', s)
+    if iso_m:
+        return _to_iso(iso_m.group(1), iso_m.group(2), iso_m.group(3))
+
+    # ── Layer 1b: Alphabetic month names (unambiguous) ────────────────────────
+    for fmt in ('%B %d, %Y', '%B %d %Y', '%b %d, %Y', '%b %d %Y',
+                '%d %B %Y', '%d %b %Y'):
         try:
-            return date(int(y), int(m), int(d)).strftime('%Y-%m-%d')
-        except (ValueError, OverflowError):
-            return None
+            return datetime.strptime(s, fmt).strftime('%Y-%m-%d')
+        except ValueError:
+            continue
 
-    # 1. Labelled date field: "Collection Date: November 15, 2024" / "Date: 2024-11-15"
+    # ── Layers 2 & 3: Ambiguous numeric d/m/Y vs m/d/Y ───────────────────────
+    num_m = re.match(r'^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$', s)
+    if not num_m:
+        return None
+
+    a, b = int(num_m.group(1)), int(num_m.group(2))
+    y = num_m.group(3)
+    if len(y) == 2:
+        y = '20' + y
+    y = int(y)
+
+    # Layer 2: one component > 12 → it must be the day
+    if a > 12 and b <= 12:
+        return _to_iso(y, b, a)    # day=a, month=b
+    if b > 12 and a <= 12:
+        return _to_iso(y, a, b)    # day=b, month=a
+    if a > 12 and b > 12:
+        return None                 # impossible — both > 12
+
+    # Layer 3: both ≤ 12, truly ambiguous — resolve via locale_hint
+    hint = locale_hint
+    if hint is None:
+        from django.conf import settings as _s
+        hint = getattr(_s, 'DATE_FORMAT_PREFERENCE', 'eu')
+
+    if hint == 'eu':
+        # d/m/Y: first component is day, second is month
+        result = _to_iso(y, b, a)
+        logger.debug('Ambiguous date %r → day=%d month=%d year=%d (locale=eu)', s, a, b, y)
+    else:
+        # m/d/Y: first component is month, second is day
+        result = _to_iso(y, a, b)
+        logger.debug('Ambiguous date %r → month=%d day=%d year=%d (locale=us)', s, a, b, y)
+    return result
+
+
+def _extract_date_regex(text: str, locale_hint: str | None = None) -> str | None:
+    """
+    Scan free-form text for a recognizable date and return 'YYYY-MM-DD' or None.
+
+    locale_hint is forwarded to _parse_date_string for numeric dates that are
+    ambiguous between d/m/Y (EU) and m/d/Y (US).
+    None → reads DATE_FORMAT_PREFERENCE from Django settings.
+    """
+    # 1. Labelled date field: "Collection Date: 03/04/2024" / "Date: 2024-11-15"
     labelled = re.search(
         r'(?:collection\s+date|report\s+date|specimen\s+date|date\s+of\s+(?:service|birth|visit)|'
         r'test\s+date|sample\s+date|exam\s+date|date)\s*[:\-]\s*'
@@ -46,36 +117,31 @@ def _extract_date_regex(text: str):
         text, re.IGNORECASE | re.MULTILINE,
     )
     if labelled:
-        ds = labelled.group(1).strip().rstrip(',')
-        for fmt in ('%B %d, %Y', '%B %d %Y', '%b %d, %Y', '%b %d %Y',
-                    '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
-                    '%d-%m-%Y', '%d.%m.%Y'):
-            try:
-                return datetime.strptime(ds, fmt).strftime('%Y-%m-%d')
-            except ValueError:
-                continue
+        result = _parse_date_string(labelled.group(1).strip(), locale_hint=locale_hint)
+        if result:
+            return result
 
-    # 2. Long-form "November 15, 2024" or "November 15 2024"
+    # 2. Long-form "November 15, 2024" (unambiguous — month name removes ambiguity)
     m = re.search(
         r'\b(January|February|March|April|May|June|July|August|'
         r'September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b',
         text, re.IGNORECASE,
     )
     if m:
-        month = MONTHS.get(m.group(1).lower())
+        month = _MONTH_NAMES.get(m.group(1).lower())
         if month:
             result = _to_iso(m.group(3), month, m.group(2))
             if result:
                 return result
 
-    # 3. Reversed "15 November 2024"
+    # 3. Reversed "15 November 2024" (unambiguous)
     m = re.search(
         r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|'
         r'September|October|November|December)\s+(\d{4})\b',
         text, re.IGNORECASE,
     )
     if m:
-        month = MONTHS.get(m.group(2).lower())
+        month = _MONTH_NAMES.get(m.group(2).lower())
         if month:
             result = _to_iso(m.group(3), month, m.group(1))
             if result:
@@ -659,23 +725,51 @@ class WearableParser:
                     return parsed
         return None
 
-    def _parse_dt(self, val: str):
-        formats = [
+    def _parse_dt(self, val: str, locale_hint: str | None = None):
+        """
+        Parse a datetime string from wearable data.
+        Uses _parse_date_string for the date component so both wearable and
+        text/PDF parsers share the same locale-aware disambiguation logic.
+        """
+        if not val:
+            return None
+        val = val.strip()
+
+        # ISO datetime formats are always unambiguous (Y-M-D order is explicit)
+        for fmt in (
             '%Y-%m-%dT%H:%M:%S',
             '%Y-%m-%d %H:%M:%S',
             '%Y-%m-%d %H:%M',
             '%Y-%m-%d',
-            '%m/%d/%Y %H:%M:%S',
-            '%m/%d/%Y',
-            '%d/%m/%Y',
-            '%d.%m.%Y',
-        ]
-        val = val.strip()
-        for fmt in formats:
+        ):
             try:
                 return datetime.strptime(val, fmt)
             except ValueError:
                 continue
+
+        # Non-ISO: separate the date part from an optional time component, then
+        # run the unified date parser (which handles d/m vs m/d disambiguation).
+        dt_m = re.match(
+            r'^(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})'
+            r'(?:[ T](\d{1,2}:\d{2}(?::\d{2})?))?$',
+            val,
+        )
+        if dt_m:
+            date_part = _parse_date_string(dt_m.group(1), locale_hint=locale_hint)
+            if date_part:
+                time_str = dt_m.group(2)
+                if time_str:
+                    time_fmt = '%H:%M:%S' if time_str.count(':') == 2 else '%H:%M'
+                    try:
+                        return datetime.strptime(f'{date_part} {time_str}',
+                                                 f'%Y-%m-%d {time_fmt}')
+                    except ValueError:
+                        pass
+                try:
+                    return datetime.strptime(date_part, '%Y-%m-%d')
+                except ValueError:
+                    pass
+
         return None
 
     def _map_metric(self, col: str) -> str | None:

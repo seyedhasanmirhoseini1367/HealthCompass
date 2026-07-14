@@ -336,6 +336,13 @@ CORS_ALLOW_CREDENTIALS = True
 if DEBUG:
     CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://localhost(:\d+)?$']
 
+# ── Date format disambiguation ─────────────────────────────────────────────────
+# Controls how parsers resolve ambiguous numeric dates like 03/04/2024 where both
+# d/m/Y and m/d/Y are structurally valid.  'eu' = day/month/year (Finnish Kanta
+# convention).  'us' = month/day/year.  Dates with an unambiguous component
+# (one value > 12, ISO order, or alphabetic month) are never affected by this.
+DATE_FORMAT_PREFERENCE = config('DATE_FORMAT_PREFERENCE', default='eu')
+
 # ── RAG auto-index mode ────────────────────────────────────────────────────────
 # When True, rag_assistant.signals indexes records synchronously (no background
 # thread). Set automatically during `manage.py test` so test cases are
