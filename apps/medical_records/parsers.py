@@ -203,6 +203,73 @@ def _extract_lab_values_regex(text: str) -> list:
     return results
 
 
+def _structure_medical_text_with_ai(text: str,
+                                     table_lab_values: list | None = None) -> dict | None:
+    """
+    Call Gemini to extract structured medical data from free-form text.
+
+    table_lab_values: pre-parsed lab rows from PDF table extraction.  When
+    non-empty they take priority over AI-extracted values (structured cells are
+    more accurate than AI parsing of flattened text).
+
+    Priority for lab_values: table > AI text > regex fallback.
+    """
+    from django.conf import settings
+    api_key      = getattr(settings, 'GEMINI_API_KEY', '')
+    gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
+
+    def _best_lab_values(ai_values=None):
+        if table_lab_values:
+            return table_lab_values
+        return ai_values or _extract_lab_values_regex(text)
+
+    if not api_key:
+        lab_values = _best_lab_values()
+        return ({'record_type': 'lab_result', 'title': 'Lab Results',
+                 'date': _extract_date_regex(text),
+                 'lab_values': lab_values} if lab_values else None)
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(gemini_model)
+
+        prompt = f"""Extract structured medical data from this text. Return JSON with:
+{{
+  "record_type": "lab_result|prescription|diagnosis|vaccination|imaging|discharge|other",
+  "title": "short descriptive title (max 80 chars)",
+  "date": "YYYY-MM-DD or null",
+  "summary": "2-3 sentence summary",
+  "lab_values": [{{"name":"","value":"","unit":"","ref_range":"","is_abnormal":false}}],
+  "medications": [{{"name":"","dose":"","frequency":"","route":""}}],
+  "diagnoses": [{{"code":"","description":""}}],
+  "provider": "",
+  "facility": ""
+}}
+Return only valid JSON, no markdown fences.
+
+TEXT:
+{text[:4000]}"""
+
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+        raw = re.sub(r'^```(?:json)?\s*', '', raw)
+        raw = re.sub(r'\s*```$', '', raw)
+        result = json.loads(raw)
+        result['lab_values'] = _best_lab_values(result.get('lab_values'))
+        if not result.get('date'):
+            result['date'] = _extract_date_regex(text)
+        return result
+    except Exception as e:
+        logger.warning('Gemini structuring failed: %s', e)
+        lab_values = _best_lab_values()
+        if lab_values:
+            return {'record_type': 'lab_result', 'title': 'Lab Results',
+                    'date': _extract_date_regex(text),
+                    'lab_values': lab_values}
+        return None
+
+
 # ─── Kanta XML ──────────────────────────────────────────────────────────────
 
 KANTA_NS = {
@@ -397,7 +464,7 @@ class KantaXMLParser:
             dt = datetime.strptime(val, '%Y%m%d')
             return dt.strftime('%Y-%m-%d')
         except ValueError:
-            return val
+            return None  # malformed HL7 date — explicit None beats a raw string in callers
 
 
 # ─── Wearable (CSV / JSON / Apple Health XML) ────────────────────────────────
@@ -634,30 +701,46 @@ class WearableParser:
         'HKCategoryTypeIdentifierSleepAnalysis':          ('sleep',       'h'),
     }
 
+    _XML_MAX_BYTES = 50 * 1024 * 1024  # 50 MB — Apple Health exports can be hundreds of MB
+
     def _parse_xml(self, data_bytes: bytes, filename: str = '') -> dict:
-        try:
-            root = ET.fromstring(data_bytes)
-        except ET.ParseError as e:
-            return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+        if len(data_bytes) > self._XML_MAX_BYTES:
+            return {
+                'device': 'apple_health', 'data_points': [], 'count': 0,
+                'errors': [
+                    f'Apple Health export exceeds the '
+                    f'{self._XML_MAX_BYTES // (1024 * 1024)} MB limit. '
+                    'Export a shorter date range and re-upload.'
+                ],
+            }
 
         device = 'apple_health'
         data_points, errors = [], []
 
-        for record in root.iter('Record'):
-            rtype = record.get('type', '')
-            if rtype not in self._AH_TYPE_MAP:
-                continue
-            metric, unit = self._AH_TYPE_MAP[rtype]
-            start_raw = record.get('startDate') or record.get('creationDate', '')
-            value_str = record.get('value')
-            if not start_raw or value_str is None:
-                continue
-            try:
-                dt = datetime.strptime(start_raw[:19], '%Y-%m-%d %H:%M:%S')
-                value = float(value_str)
-            except (ValueError, TypeError):
-                continue
-            data_points.append({'metric': metric, 'value': value, 'unit': unit, 'recorded_at': dt.isoformat()})
+        # Use stdlib iterparse for streaming — defusedxml's iterparse is
+        # deprecated; the 50 MB cap above provides the size-bomb protection.
+        from xml.etree.ElementTree import iterparse as _iterparse
+        try:
+            for _event, elem in _iterparse(io.BytesIO(data_bytes), events=('end',)):
+                if elem.tag != 'Record':
+                    elem.clear()
+                    continue
+                rtype = elem.get('type', '')
+                if rtype in self._AH_TYPE_MAP:
+                    metric, unit = self._AH_TYPE_MAP[rtype]
+                    start_raw = elem.get('startDate') or elem.get('creationDate', '')
+                    value_str = elem.get('value')
+                    if start_raw and value_str is not None:
+                        try:
+                            dt    = datetime.strptime(start_raw[:19], '%Y-%m-%d %H:%M:%S')
+                            value = float(value_str)
+                            data_points.append({'metric': metric, 'value': value,
+                                                'unit': unit, 'recorded_at': dt.isoformat()})
+                        except (ValueError, TypeError):
+                            pass
+                elem.clear()
+        except Exception as e:
+            return {'device': 'apple_health', 'data_points': [], 'count': 0, 'errors': [str(e)]}
 
         return {'device': device, 'data_points': data_points, 'count': len(data_points), 'errors': errors}
 
@@ -781,13 +864,18 @@ class WearableParser:
 
     def _normalize_value(self, metric: str, value: float, col_lower: str):
         unit = METRIC_UNITS.get(metric, '')
-        # Convert lbs to kg
-        if metric == 'weight' and 'lb' in col_lower:
-            value = round(value * 0.453592, 2)
-        # Convert Fahrenheit to Celsius
-        if metric == 'temperature' and ('f' in col_lower or 'fahrenheit' in col_lower):
-            value = round((value - 32) * 5/9, 2)
-        # Convert minutes to hours for sleep
+        if metric == 'weight':
+            # Explicit lbs column, OR value > 350 with no kg hint → almost certainly pounds
+            # (350 kg would be an extreme medical outlier; 350 lbs ≈ 159 kg is plausible)
+            is_lbs = 'lb' in col_lower or (value > 350 and 'kg' not in col_lower)
+            if is_lbs:
+                value = round(value * 0.453592, 2)
+        if metric == 'temperature':
+            # Explicit °F column, OR value > 50 → must be Fahrenheit (normal body temp
+            # in Celsius peaks around 42–43°C; 50°C is lethal hyperthermia)
+            is_fahrenheit = 'fahrenheit' in col_lower or 'f' in col_lower or value > 50
+            if is_fahrenheit:
+                value = round((value - 32) * 5 / 9, 2)
         if metric == 'sleep' and value > 24:
             value = round(value / 60, 2)
         return value, unit
@@ -811,55 +899,7 @@ class TextParser:
         return result
 
     def _structure_with_ai(self, text: str) -> dict | None:
-        from django.conf import settings
-        api_key = getattr(settings, 'GEMINI_API_KEY', '')
-        gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
-        if not api_key:
-            return None
-
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(gemini_model)
-
-            prompt = f"""Extract structured medical data from this text. Return JSON with:
-{{
-  "record_type": "lab_result|prescription|diagnosis|vaccination|imaging|discharge|other",
-  "title": "short descriptive title (max 80 chars)",
-  "date": "YYYY-MM-DD or null",
-  "summary": "2-3 sentence summary",
-  "lab_values": [{{"name":"","value":"","unit":"","ref_range":"","is_abnormal":false}}],
-  "medications": [{{"name":"","dose":"","frequency":"","route":""}}],
-  "diagnoses": [{{"code":"","description":""}}],
-  "provider": "",
-  "facility": ""
-}}
-Return only valid JSON, no markdown fences.
-
-TEXT:
-{text[:4000]}"""
-
-            response = model.generate_content(prompt)
-            raw = response.text.strip()
-            raw = re.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re.sub(r'\s*```$', '', raw)
-            result = json.loads(raw)
-            # If AI returned no lab values, try regex as supplement
-            if not result.get('lab_values'):
-                result['lab_values'] = _extract_lab_values_regex(text)
-            # If AI returned no date, try regex extraction from raw text
-            if not result.get('date'):
-                result['date'] = _extract_date_regex(text)
-            return result
-        except Exception as e:
-            logger.warning(f'Gemini text structuring failed: {e}')
-            # Fallback: regex-only extraction
-            lab_values = _extract_lab_values_regex(text)
-            if lab_values:
-                return {'record_type': 'lab_result', 'title': 'Lab Results',
-                        'date': _extract_date_regex(text),
-                        'lab_values': lab_values}
-            return None
+        return _structure_medical_text_with_ai(text)
 
 
 # ─── PDF Parser ──────────────────────────────────────────────────────────────
@@ -1025,60 +1065,4 @@ class PDFParser:
 
     def _structure_with_ai(self, text: str,
                            table_lab_values: list | None = None) -> dict | None:
-        from django.conf import settings
-        api_key      = getattr(settings, 'GEMINI_API_KEY', '')
-        gemini_model = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
-
-        # Lab value priority: table (structured) > AI (text-derived) > regex fallback
-        def _best_lab_values(ai_values=None):
-            if table_lab_values:
-                return table_lab_values          # table wins — most accurate
-            if ai_values:
-                return ai_values
-            return _extract_lab_values_regex(text)
-
-        if not api_key:
-            lab_values = _best_lab_values()
-            return ({'record_type': 'lab_result', 'title': 'Lab Results',
-                     'date': _extract_date_regex(text),
-                     'lab_values': lab_values} if lab_values else None)
-
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(gemini_model)
-
-            prompt = f"""Extract structured medical data from this document. Return JSON with:
-{{
-  "record_type": "lab_result|prescription|diagnosis|vaccination|imaging|discharge|other",
-  "title": "short descriptive title",
-  "date": "YYYY-MM-DD or null",
-  "summary": "2-3 sentence summary",
-  "lab_values": [{{"name":"","value":"","unit":"","ref_range":"","is_abnormal":false}}],
-  "medications": [{{"name":"","dose":"","frequency":"","route":""}}],
-  "diagnoses": [{{"code":"","description":""}}],
-  "provider": "",
-  "facility": ""
-}}
-Return only valid JSON, no markdown.
-
-DOCUMENT:
-{text[:4000]}"""
-
-            response = model.generate_content(prompt)
-            raw = response.text.strip()
-            raw = re.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re.sub(r'\s*```$', '', raw)
-            result = json.loads(raw)
-            result['lab_values'] = _best_lab_values(result.get('lab_values'))
-            if not result.get('date'):
-                result['date'] = _extract_date_regex(text)
-            return result
-        except Exception as e:
-            logger.warning(f'Gemini structuring failed: {e}')
-            lab_values = _best_lab_values()
-            if lab_values:
-                return {'record_type': 'lab_result', 'title': 'Lab Results',
-                        'date': _extract_date_regex(text),
-                        'lab_values': lab_values}
-            return None
+        return _structure_medical_text_with_ai(text, table_lab_values=table_lab_values)
