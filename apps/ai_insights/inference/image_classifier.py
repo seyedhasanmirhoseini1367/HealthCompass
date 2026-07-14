@@ -1,7 +1,8 @@
 # ai_insights/inference/image_classifier.py
 """
 Image classification handler — supports JPG, PNG, BMP, TIFF.
-Loads a Keras .h5 / .keras model (or sklearn with flattened pixels).
+Requires an ONNX model file (.onnx).  Keras (.h5/.keras) and PyTorch (.pt/.pth)
+are blocked by _load_model() for security.
 
 handler_slug: "image_classifier"
 
@@ -65,31 +66,37 @@ class ImageClassifierHandler(InferenceHandler):
         self.validate_file(uploaded_file, filename)
         _, input_summary = self.load_and_preprocess(uploaded_file, filename)
 
-        model = self._load_model()
+        sess = self._load_model()  # InferenceSession (ONNX-only)
 
         img = self._img_array
-        # Add batch dimension if needed
         if img.ndim == 3:
-            img = np.expand_dims(img, axis=0)
+            img = np.expand_dims(img, axis=0)  # → (1, H, W, C)
+
+        inp       = sess.get_inputs()[0]
+        inp_shape = inp.shape
+        # Detect NCHW layout: shape[1] is an integer channel count of 1 or 3
+        if (len(inp_shape) == 4 and
+                isinstance(inp_shape[1], int) and
+                inp_shape[1] in (1, 3)):
+            img = np.transpose(img, (0, 3, 1, 2))  # NHWC → NCHW
 
         try:
-            raw_pred = model.predict(img)
+            outputs = sess.run(None, {inp.name: img.astype(np.float32)})
         except Exception as e:
             raise InferenceError(f'Model prediction failed: {e}')
 
-        if raw_pred.ndim > 1 and raw_pred.shape[-1] > 1:
-            # Multi-class softmax
-            pred_class = int(np.argmax(raw_pred[0]))
-            proba      = float(np.max(raw_pred[0]))
+        raw = outputs[0][0]   # (num_classes,) or scalar
+        if raw.ndim > 0 and raw.shape[-1] > 1:
+            pred_class = int(np.argmax(raw))
+            proba      = float(np.max(raw))
         else:
-            # Binary sigmoid
-            proba      = float(raw_pred[0][0] if raw_pred.ndim > 1 else raw_pred[0])
+            proba      = float(raw[0] if raw.ndim > 0 else raw)
             pred_class = 1 if proba >= 0.5 else 0
 
         label_map = self.cfg.get('label_map', {})
         label     = label_map.get(str(pred_class), str(pred_class))
 
-        result = {
+        return {
             'success':           True,
             'prediction':        pred_class,
             'prediction_label':  label,
@@ -99,4 +106,3 @@ class ImageClassifierHandler(InferenceHandler):
             'input_summary':     input_summary,
             'input_data':        {'image_shape': str(list(self._img_array.shape))},
         }
-        return result

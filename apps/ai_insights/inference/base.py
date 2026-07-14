@@ -14,14 +14,18 @@ Handler must implement:
     postprocess(raw_pred, proba, feat)  → dict
 
 The run() method orchestrates all steps + model loading.
-For non-sklearn/keras models (e.g. PyTorch), override run() entirely (see seizure_eeg.py).
+For PyTorch models (EEG handlers), override run() entirely and load weights
+with torch.load(..., weights_only=True) + model.load_state_dict().
 """
 
 import os
 import io
-import pickle
 import numpy as np
 import pandas as pd
+
+# Formats that allow arbitrary code execution when deserialised.
+# _load_model() hard-blocks every one of these — only ONNX is accepted.
+_BLOCKED_FORMATS = frozenset({'pkl', 'pickle', 'h5', 'keras', 'joblib', 'pt', 'pth'})
 
 
 class InferenceError(ValueError):
@@ -43,7 +47,7 @@ class InferenceHandler:
 
     def run(self, uploaded_file=None, input_data: dict | None = None) -> dict:
         """
-        Full inference pipeline.
+        Full inference pipeline for tabular/CSV ONNX models.
         Returns a dict:
         {
             "success":           True,
@@ -61,19 +65,22 @@ class InferenceHandler:
             feature_df, input_summary = self.load_and_preprocess(uploaded_file, filename)
             self._validate_features(feature_df)
         else:
-            # Tabular input from form
             feature_df    = self._build_tabular_df(input_data or {})
             input_summary = {'source': 'manual form', 'fields': len(input_data or {})}
 
-        model   = self._load_model()
-        raw_pred = model.predict(feature_df)
+        sess       = self._load_model()    # always InferenceSession after security fix
+        input_name = sess.get_inputs()[0].name
+        X          = feature_df.values.astype(np.float32)
+        outputs    = sess.run(None, {input_name: X})
 
-        proba = None
-        if hasattr(model, 'predict_proba'):
-            try:
-                proba = float(model.predict_proba(feature_df)[0].max())
-            except Exception:
-                pass
+        raw_pred = outputs[0]
+        proba    = None
+        if len(outputs) > 1 and isinstance(outputs[1], list) and outputs[1]:
+            prob_map = outputs[1][0]
+            if isinstance(prob_map, dict):
+                proba = float(max(prob_map.values()))
+            elif hasattr(prob_map, 'max'):
+                proba = float(prob_map.max())
 
         result = self.postprocess(raw_pred, proba, feature_df)
         result['input_summary'] = input_summary
@@ -116,10 +123,19 @@ class InferenceHandler:
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _load_model(self):
+        """
+        Load the model file as an onnxruntime InferenceSession.
+
+        Only .onnx files are accepted.  All other formats (pickle, Keras, PyTorch
+        full-model serialisation) are hard-blocked because deserialising them
+        executes arbitrary Python code — equivalent to running any uploaded file
+        as root.  PyTorch EEG handlers are safe because they construct the
+        architecture in Python and only load state_dict (weights_only=True).
+        """
         if not self.ai_model.model_file:
             raise InferenceError(
-                'No model file uploaded for this model. '
-                'The data scientist must upload a .pkl, .h5, or .pt file via the admin panel.'
+                'No model file uploaded. '
+                'Upload a .onnx file via the Django admin panel.'
             )
         path = self.ai_model.model_file.path
         if not os.path.exists(path):
@@ -127,27 +143,30 @@ class InferenceHandler:
                 f'Model file not found on disk: {os.path.basename(path)}. '
                 'Please re-upload the model file via Django admin.'
             )
-        try:
-            if path.endswith(('.pkl', '.pickle')):
-                with open(path, 'rb') as f:
-                    return pickle.load(f)
-            if path.endswith('.joblib'):
-                import joblib
-                return joblib.load(path)
-            if path.endswith(('.h5', '.keras')):
-                from tensorflow import keras
-                return keras.models.load_model(path)
-            if path.endswith(('.pt', '.pth')):
-                import torch
-                return torch.load(path, map_location='cpu', weights_only=False)
+
+        ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
+
+        if ext in _BLOCKED_FORMATS:
             raise InferenceError(
-                f'Unsupported model format: {os.path.basename(path)}. '
-                'Supported: .pkl, .joblib, .h5, .keras, .pt, .pth'
+                f'.{ext} models are blocked for security reasons — '
+                'pickle, Keras, and unsandboxed PyTorch serialisation execute '
+                'arbitrary code when loaded. '
+                'Convert to ONNX and re-upload (use the bundled convert_to_onnx.py).'
             )
-        except InferenceError:
-            raise
-        except Exception as e:
-            raise InferenceError(f'Failed to load model: {e}')
+
+        if ext == 'onnx':
+            try:
+                import onnxruntime as ort
+            except ImportError:
+                raise InferenceError(
+                    'onnxruntime is not installed. Run: pip install onnxruntime'
+                )
+            return ort.InferenceSession(path, providers=['CPUExecutionProvider'])
+
+        raise InferenceError(
+            f'Unsupported model format: .{ext}. '
+            'Only .onnx is accepted.'
+        )
 
     def _validate_features(self, feature_df: pd.DataFrame) -> None:
         expected_n = self.cfg.get('expected_n_features')

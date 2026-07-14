@@ -7,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from ..models import AIModel, ModelPrediction
 from ..forms import SubmitModelForm
-from ..runner import run_model, generate_interpretation
+from ..inference.interpretation import generate_interpretation, _rule_based_demo_result
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +74,22 @@ def run_prediction(request, slug):
         input_file = request.FILES.get('input_file') or None
 
         handler_slug = model.handler_slug or ''
+
+        # Auto-route when handler_slug is not set in admin
         if not handler_slug and model.model_file:
             ext = model.model_file.name.rsplit('.', 1)[-1].lower()
-            if ext in ('pt', 'pth'):
-                input_type_to_handler = {
-                    'eeg_csv': 'seizure_eeg',
+            _ext_map: dict[str, dict[str, str]] = {
+                'onnx': {
+                    'tabular': 'tabular_passthrough',
                     'image':   'image_classifier',
+                    'eeg_csv': 'eeg_csv',
                     'parquet': 'tabular_passthrough',
-                }
-                handler_slug = input_type_to_handler.get(model.input_type, '')
+                    'file':    'tabular_passthrough',
+                },
+                'pt':  {'eeg_csv': 'eeg_csv', 'parquet': 'eeg_csv'},
+                'pth': {'eeg_csv': 'eeg_csv', 'parquet': 'eeg_csv'},
+            }
+            handler_slug = _ext_map.get(ext, {}).get(model.input_type, '')
 
         logger.info('run_prediction: model=%s handler_slug=%r (resolved=%r)',
                     model.slug, model.handler_slug, handler_slug)
@@ -95,8 +102,16 @@ def run_prediction(request, slug):
                 uploaded_file=input_file,
                 input_data=input_data if not input_file else None,
             )
+        elif not model.model_file:
+            # No model file uploaded — return a demo/rule-based result
+            result = _rule_based_demo_result(model, input_data, input_file)
         else:
-            result = run_model(model, input_data, input_file)
+            ext = model.model_file.name.rsplit('.', 1)[-1].upper()
+            raise ValueError(
+                f'No handler configured for model "{model.name}" ({ext} file). '
+                'Set handler_slug in Django Admin → AI Models → this model. '
+                'Available handlers: seizure_eeg, eeg_csv, image_classifier, tabular_passthrough.'
+            )
 
         result = _sanitize(result)
 
