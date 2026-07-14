@@ -3,7 +3,8 @@ from django.test import TestCase, override_settings
 
 from apps.medical_records.models import MedicalRecord, ParsedLabValue
 from apps.medical_records.parsers import (
-    _parse_date_string, _extract_date_regex, _extract_lab_values_regex, WearableParser,
+    _parse_date_string, _extract_date_regex, _extract_lab_values_regex,
+    WearableParser, PDFParser,
 )
 from apps.medical_records.services import _save_lab_value
 
@@ -292,3 +293,154 @@ class ParserNormalizerChainTest(TestCase):
         glu = next((v for k, v in rows.items() if 'glucose' in k), None)
         self.assertIsNotNone(glu)
         self.assertAlmostEqual(glu.canonical_value, round(5.8 * 18.016, 4), places=2)
+
+
+class PDFParserTableTest(TestCase):
+    """
+    Unit + integration tests for PDFParser table extraction.
+
+    _parse_table is tested directly (pure function) to cover all branches.
+    The end-to-end integration (table → DB) is verified via the chain helper
+    already exercised in ParserNormalizerChainTest.
+    """
+
+    def setUp(self):
+        self.parser = PDFParser()
+
+    # ── _parse_table with explicit header row ────────────────────────────────
+
+    def test_header_row_detected_and_skipped(self):
+        table = [
+            ['Test Name', 'Result', 'Unit', 'Reference Range', 'Flag'],
+            ['Hemoglobin', '145', 'g/L', '117-155', ''],
+            ['Creatinine', '112', 'µmol/L', '45-90', 'H'],
+            ['Glucose', '5.8', 'mmol/L', '3.9-6.1', ''],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 3, "Header row must be consumed, not returned as data")
+        names = [r['name'] for r in rows]
+        self.assertEqual(names, ['Hemoglobin', 'Creatinine', 'Glucose'])
+
+    def test_abnormal_flag_h_sets_is_abnormal(self):
+        table = [
+            ['Test Name', 'Result', 'Unit', 'Ref', 'Flag'],
+            ['Creatinine', '180', 'µmol/L', '45-90', 'H'],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]['is_abnormal'])
+
+    def test_abnormal_flag_l_sets_is_abnormal(self):
+        table = [
+            ['Test Name', 'Result', 'Unit', 'Ref', 'Flag'],
+            ['Glucose', '2.1', 'mmol/L', '3.9-6.1', 'L'],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertTrue(rows[0]['is_abnormal'])
+
+    def test_normal_flag_empty_is_not_abnormal(self):
+        table = [
+            ['Test', 'Result', 'Unit', 'Ref', 'Flag'],
+            ['Hemoglobin', '140', 'g/L', '117-155', ''],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertFalse(rows[0]['is_abnormal'])
+
+    def test_micro_sign_unit_passed_through(self):
+        """µmol/L from a table cell must survive into the lab value dict unchanged."""
+        table = [
+            ['Parameter', 'Value', 'Unit', 'Ref'],
+            ['Creatinine', '112', 'µmol/L', '45-90'],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(rows[0]['unit'], 'µmol/L')
+
+    # ── Positional fallback when no header ───────────────────────────────────
+
+    def test_positional_4col_no_header(self):
+        """With 4 columns and no header: name=0, value=1, unit=2, ref=3."""
+        table = [
+            ['Hemoglobin', '145', 'g/L', '117-155'],
+            ['Glucose', '5.8', 'mmol/L', '3.9-6.1'],
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['unit'], 'g/L')
+        self.assertEqual(rows[0]['ref_range'], '117-155')
+
+    def test_positional_2col_name_value_only(self):
+        table = [['Hemoglobin', '145'], ['Glucose', '5.8']]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['name'], 'Hemoglobin')
+        self.assertEqual(rows[0]['value'], '145')
+        self.assertEqual(rows[0]['unit'], '')
+
+    # ── Filtering and edge cases ──────────────────────────────────────────────
+
+    def test_non_numeric_value_rows_skipped(self):
+        """Rows whose value cell is not a number must be ignored."""
+        table = [
+            ['Test', 'Result', 'Unit'],
+            ['Hemoglobin', '145', 'g/L'],
+            ['Physician', 'Dr. Smith', ''],   # non-numeric → skip
+            ['Note', 'Fasting sample', ''],   # non-numeric → skip
+        ]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['name'], 'Hemoglobin')
+
+    def test_comparison_operator_stripped_from_value(self):
+        """Values like '<0.5' or '≥2.0' must be parsed after stripping the operator."""
+        table = [['Parameter', 'Value', 'Unit'], ['CRP', '<0.5', 'mg/L']]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['value'], '0.5')
+
+    def test_empty_table_returns_empty(self):
+        self.assertEqual(self.parser._parse_table([]), [])
+
+    def test_single_column_table_returns_empty(self):
+        self.assertEqual(self.parser._parse_table([['Header'], ['Value']]), [])
+
+    def test_none_cells_treated_as_empty(self):
+        table = [['Test', 'Result', 'Unit'], ['Hemoglobin', '145', None]]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['unit'], '')
+
+    def test_comma_decimal_value_parsed(self):
+        """European comma-decimal format ('5,8') must be normalised to '5.8'."""
+        table = [['Test', 'Result', 'Unit'], ['Glucose', '5,8', 'mmol/L']]
+        rows = self.parser._parse_table(table)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['value'], '5.8')
+
+    # ── Integration: table row → normalizer → DB ─────────────────────────────
+
+    def test_table_row_chain_to_db(self):
+        """Full chain: table cell → _parse_table → _save_lab_value → ParsedLabValue."""
+        user = get_user_model().objects.create_user(username='tablechain', password='pw')
+        record = MedicalRecord.objects.create(
+            patient=user, title='Table Chain', record_type='lab_result',
+        )
+        table = [
+            ['Test Name', 'Result', 'Unit', 'Ref Range', 'Flag'],
+            ['Hemoglobin', '145', 'g/L', '117-155', ''],
+            ['Creatinine', '112', 'µmol/L', '45-90', 'H'],
+        ]
+        for lv in self.parser._parse_table(table):
+            _save_lab_value(record, lv)
+
+        rows = ParsedLabValue.objects.filter(record=record)
+        self.assertEqual(rows.count(), 2)
+        unknown = rows.filter(unit_known=False)
+        self.assertFalse(
+            unknown.exists(),
+            f"unit_known=False for: {list(unknown.values_list('parameter_name', flat=True))}"
+        )
+        hgb = rows.get(parameter_name='Hemoglobin')
+        self.assertAlmostEqual(hgb.canonical_value, 14.5, places=2)
+        cre = rows.get(parameter_name='Creatinine')
+        self.assertTrue(cre.is_abnormal)
+        self.assertAlmostEqual(cre.canonical_value, round(112 / 88.4, 4), places=4)
