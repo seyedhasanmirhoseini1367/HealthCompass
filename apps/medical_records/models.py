@@ -36,6 +36,9 @@ class MedicalRecord(models.Model):
 
     class Meta:
         ordering = ['-record_date', '-uploaded_at']
+        indexes = [
+            models.Index(fields=['patient', '-record_date']),
+        ]
 
     def __str__(self):
         return f'{self.title} ({self.get_record_type_display()}) - {self.patient.username}'

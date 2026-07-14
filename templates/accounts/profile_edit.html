@@ -7,11 +7,22 @@
 .form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
 .form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
 .form-control:focus{outline:none;border-color:var(--primary)}
+select.form-control{appearance:auto}
+.form-errors{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;margin-top:.3rem;font-size:.8rem;color:#b91c1c;list-style:none}
+.form-errors li{margin:0}
 .section-divider{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
 </style>
-{% endblock %}
-{% block content %}
 
+{% macro field_group lbl fld %}
+<div class="form-group">
+  <label class="form-label">{{ lbl }}</label>
+  {{ fld }}
+  {% if fld.errors %}<ul class="form-errors">{% for e in fld.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endmacro %}
+{% endblock %}
+
+{% block content %}
 <div class="edit-wrap">
   <a href="{% url 'accounts:profile' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
     <i class="fas fa-arrow-left"></i> Back to profile
@@ -21,120 +32,133 @@
     <div class="card-body">
       <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:1.5rem">Edit Profile</h2>
 
+      {% if form.non_field_errors or profile_form.non_field_errors %}
+      <ul class="form-errors" style="margin-bottom:1rem">
+        {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+        {% if profile_form %}{% for e in profile_form.non_field_errors %}<li>{{ e }}</li>{% endfor %}{% endif %}
+      </ul>
+      {% endif %}
+
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
+        <!-- ── Basic Information ── -->
         <div class="section-divider">Basic Information</div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
           <div class="form-group">
-            <label class="form-label">First Name</label>
-            <input type="text" name="first_name" class="form-control" value="{{ user.first_name }}">
+            <label class="form-label">{{ form.first_name.label }}</label>
+            {{ form.first_name }}
+            {% if form.first_name.errors %}<ul class="form-errors">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
           <div class="form-group">
-            <label class="form-label">Last Name</label>
-            <input type="text" name="last_name" class="form-control" value="{{ user.last_name }}">
+            <label class="form-label">{{ form.last_name.label }}</label>
+            {{ form.last_name }}
+            {% if form.last_name.errors %}<ul class="form-errors">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Email</label>
-          <input type="email" name="email" class="form-control" value="{{ user.email }}">
+          <label class="form-label">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<ul class="form-errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
+
         <div class="form-group">
-          <label class="form-label">Phone Number</label>
-          <input type="tel" name="phone_number" class="form-control" value="{{ user.phone_number }}">
+          <label class="form-label">{{ form.phone_number.label }}</label>
+          {{ form.phone_number }}
+          {% if form.phone_number.errors %}<ul class="form-errors">{% for e in form.phone_number.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
+
         <div class="form-group">
-          <label class="form-label">Date of Birth</label>
-          <input type="date" name="date_of_birth" class="form-control"
-                 value="{{ user.date_of_birth|date:'Y-m-d'|default:'' }}">
+          <label class="form-label">{{ form.date_of_birth.label }}</label>
+          {{ form.date_of_birth }}
+          {% if form.date_of_birth.errors %}<ul class="form-errors">{% for e in form.date_of_birth.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
+
         <div class="form-group">
-          <label class="form-label">Profile Picture</label>
-          {% if user.profile_picture %}
+          <label class="form-label">{{ form.profile_picture.label }}</label>
+          {% if request.user.profile_picture %}
           <div style="margin-bottom:.5rem">
-            <img src="{{ user.profile_picture.url }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">
+            <img src="{{ request.user.profile_picture.url }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">
           </div>
           {% endif %}
-          <input type="file" name="profile_picture" class="form-control" accept="image/*">
+          {{ form.profile_picture }}
+          {% if form.profile_picture.errors %}<ul class="form-errors">{% for e in form.profile_picture.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
 
-        {% if user.is_patient %}
-        <div class="section-divider">Patient Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-          <div class="form-group">
-            <label class="form-label">Blood Type</label>
-            <select name="blood_type" class="form-control">
-              <option value="">—</option>
-              {% with current=user.patient_profile.blood_type|default:"" %}
-              <option {% if current == "A+" %}selected{% endif %}>A+</option>
-              <option {% if current == "A-" %}selected{% endif %}>A-</option>
-              <option {% if current == "B+" %}selected{% endif %}>B+</option>
-              <option {% if current == "B-" %}selected{% endif %}>B-</option>
-              <option {% if current == "AB+" %}selected{% endif %}>AB+</option>
-              <option {% if current == "AB-" %}selected{% endif %}>AB-</option>
-              <option {% if current == "O+" %}selected{% endif %}>O+</option>
-              <option {% if current == "O-" %}selected{% endif %}>O-</option>
-              {% endwith %}
-            </select>
+        <!-- ── Role-specific fields ── -->
+        {% if profile_form %}
+          {% if request.user.is_patient %}
+          <div class="section-divider">Patient Details</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.blood_type.label }}</label>
+              {{ profile_form.blood_type }}
+              {% if profile_form.blood_type.errors %}<ul class="form-errors">{% for e in profile_form.blood_type.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
           </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Allergies</label>
-          <textarea name="allergies" class="form-control" rows="2"
-                    placeholder="List any allergies…">{% if user.patient_profile %}{{ user.patient_profile.allergies }}{% endif %}</textarea>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+
           <div class="form-group">
-            <label class="form-label">Emergency Contact Name</label>
-            <input type="text" name="emergency_contact_name" class="form-control"
-                   value="{% if user.patient_profile %}{{ user.patient_profile.emergency_contact_name }}{% endif %}">
+            <label class="form-label">{{ profile_form.allergies.label }}</label>
+            {{ profile_form.allergies }}
+            {% if profile_form.allergies.errors %}<ul class="form-errors">{% for e in profile_form.allergies.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
-          <div class="form-group">
-            <label class="form-label">Emergency Contact Phone</label>
-            <input type="tel" name="emergency_contact_phone" class="form-control"
-                   value="{% if user.patient_profile %}{{ user.patient_profile.emergency_contact_phone }}{% endif %}">
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.emergency_contact_name.label }}</label>
+              {{ profile_form.emergency_contact_name }}
+              {% if profile_form.emergency_contact_name.errors %}<ul class="form-errors">{% for e in profile_form.emergency_contact_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.emergency_contact_phone.label }}</label>
+              {{ profile_form.emergency_contact_phone }}
+              {% if profile_form.emergency_contact_phone.errors %}<ul class="form-errors">{% for e in profile_form.emergency_contact_phone.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
           </div>
-        </div>
-        {% elif user.is_doctor %}
-        <div class="section-divider">Doctor Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-          <div class="form-group">
-            <label class="form-label">Specialty</label>
-            <input type="text" name="specialty" class="form-control"
-                   value="{% if user.doctor_profile %}{{ user.doctor_profile.specialty }}{% endif %}">
+
+          {% elif request.user.is_doctor %}
+          <div class="section-divider">Doctor Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.specialty.label }}</label>
+              {{ profile_form.specialty }}
+              {% if profile_form.specialty.errors %}<ul class="form-errors">{% for e in profile_form.specialty.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.license_number.label }}</label>
+              {{ profile_form.license_number }}
+              {% if profile_form.license_number.errors %}<ul class="form-errors">{% for e in profile_form.license_number.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.hospital.label }}</label>
+              {{ profile_form.hospital }}
+              {% if profile_form.hospital.errors %}<ul class="form-errors">{% for e in profile_form.hospital.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.department.label }}</label>
+              {{ profile_form.department }}
+              {% if profile_form.department.errors %}<ul class="form-errors">{% for e in profile_form.department.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">License Number</label>
-            <input type="text" name="license_number" class="form-control"
-                   value="{% if user.doctor_profile %}{{ user.doctor_profile.license_number }}{% endif %}">
+
+          {% elif request.user.is_data_scientist %}
+          <div class="section-divider">Researcher Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.institution.label }}</label>
+              {{ profile_form.institution }}
+              {% if profile_form.institution.errors %}<ul class="form-errors">{% for e in profile_form.institution.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ profile_form.research_area.label }}</label>
+              {{ profile_form.research_area }}
+              {% if profile_form.research_area.errors %}<ul class="form-errors">{% for e in profile_form.research_area.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Hospital</label>
-            <input type="text" name="hospital" class="form-control"
-                   value="{% if user.doctor_profile %}{{ user.doctor_profile.hospital }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Department</label>
-            <input type="text" name="department" class="form-control"
-                   value="{% if user.doctor_profile %}{{ user.doctor_profile.department }}{% endif %}">
-          </div>
-        </div>
-        {% elif user.is_data_scientist %}
-        <div class="section-divider">Researcher Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-          <div class="form-group">
-            <label class="form-label">Institution</label>
-            <input type="text" name="institution" class="form-control"
-                   value="{% if user.scientist_profile %}{{ user.scientist_profile.institution }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Research Area</label>
-            <input type="text" name="research_area" class="form-control"
-                   value="{% if user.scientist_profile %}{{ user.scientist_profile.research_area }}{% endif %}">
-          </div>
-        </div>
+          {% endif %}
         {% endif %}
 
         <div style="display:flex;gap:.75rem;margin-top:1.5rem">
@@ -147,5 +171,4 @@
     </div>
   </div>
 </div>
-
 {% endblock %}

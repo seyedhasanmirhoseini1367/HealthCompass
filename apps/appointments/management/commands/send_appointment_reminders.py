@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 
@@ -11,8 +12,7 @@ class Command(BaseCommand):
         from apps.notifications.models import Notification
         from apps.notifications.firebase import send_push
 
-        now = timezone.now()
-        # Window: ±8 minutes around each target offset (handles cron drift)
+        now    = timezone.now()
         window = timedelta(minutes=8)
 
         offsets = [
@@ -27,16 +27,30 @@ class Command(BaseCommand):
             target_start = now + offset - window
             target_end   = now + offset + window
 
-            filters = {
+            base_filters = {
                 'appointment_datetime__gte': target_start,
                 'appointment_datetime__lte': target_end,
-                remind_field: True,
-                reminded_field: False,
-                'is_cancelled': False,
+                remind_field:    True,
+                reminded_field:  False,
+                'is_cancelled':  False,
             }
-            qs = Appointment.objects.filter(**filters).select_related('patient')
 
-            for appt in qs:
+            # Atomic claim: SELECT FOR UPDATE SKIP LOCKED → mark sent → release.
+            # If two cron workers run concurrently the second one sees 0 rows
+            # because skip_locked skips any row already held by the first worker.
+            with transaction.atomic():
+                claimed = list(
+                    Appointment.objects
+                    .select_for_update(skip_locked=True)
+                    .filter(**base_filters)
+                    .select_related('patient')
+                )
+                if claimed:
+                    Appointment.objects.filter(
+                        pk__in=[a.pk for a in claimed]
+                    ).update(**{reminded_field: True})
+
+            for appt in claimed:
                 title = f'Appointment in {label}'
                 body  = appt.title
                 if appt.doctor_name:
@@ -44,7 +58,6 @@ class Command(BaseCommand):
                 if appt.location:
                     body += f' at {appt.location}'
 
-                # In-app notification
                 Notification.objects.create(
                     user=appt.patient,
                     type='system',
@@ -53,15 +66,12 @@ class Command(BaseCommand):
                     link='/appointments/',
                 )
 
-                # Push notification (no-op if Firebase not configured)
                 try:
-                    send_push(appt.patient, title, body, data={'type': 'appointment', 'id': str(appt.id)})
+                    send_push(appt.patient, title, body,
+                              data={'type': 'appointment', 'id': str(appt.id)})
                 except Exception:
                     pass
 
-                # Mark as sent
-                setattr(appt, reminded_field, True)
-                appt.save(update_fields=[reminded_field])
                 sent += 1
 
         self.stdout.write(self.style.SUCCESS(f'Sent {sent} appointment reminder(s).'))

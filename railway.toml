@@ -1,0 +1,16 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "bash startup.sh"
+healthcheckPath = "/health/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# ── Appointment reminders cron ─────────────────────────────────────────────────
+# Add a SECOND Railway service pointing to the same repo with these settings:
+#   Start Command : python manage.py send_appointment_reminders
+#   Cron Schedule : */5 * * * *
+# In the Railway dashboard: New Service → Deploy from repo → Settings → Cron
+# ──────────────────────────────────────────────────────────────────────────────

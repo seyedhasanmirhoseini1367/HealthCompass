@@ -96,6 +96,9 @@ class ChatSession(models.Model):
 
     class Meta:
         ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['patient', '-updated_at']),
+        ]
 
     def __str__(self): return f'{self.title} ({self.patient})'
 
@@ -131,5 +134,8 @@ class QueryLog(models.Model):
 
     class Meta:
         ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['session', 'created_at']),
+        ]
 
     def __str__(self): return f'Q: {self.query[:50]}'

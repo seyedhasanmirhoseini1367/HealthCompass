@@ -32,6 +32,10 @@ class Appointment(models.Model):
 
     class Meta:
         ordering = ['appointment_datetime']
+        indexes = [
+            models.Index(fields=['patient', 'appointment_datetime']),
+            models.Index(fields=['appointment_datetime', 'is_cancelled']),
+        ]
 
     def __str__(self):
         return f'{self.title} — {self.patient.get_full_name()} @ {self.appointment_datetime:%Y-%m-%d %H:%M}'

@@ -12,8 +12,10 @@ urlpatterns = [
     path("profile/edit/",    views.profile_edit,    name="profile_edit"),
     path("password/change/", views.change_password, name="change_password"),
     path("delete/",          views.delete_account,  name="delete_account"),
-    path("emergency-card/",  views.emergency_card,  name="emergency_card"),
-    path("emergency/<uuid:token>/", views.emergency_card_public, name="emergency_card_public"),
+    path("emergency-card/",          views.emergency_card,         name="emergency_card"),
+    path("emergency-card/revoke/",   views.revoke_emergency_token, name="revoke_emergency_token"),
+    path("emergency-card/toggle/",   views.toggle_emergency_card,  name="toggle_emergency_card"),
+    path("emergency/<uuid:token>/",  views.emergency_card_public,  name="emergency_card_public"),
 
     # ── Password reset (Django built-in flow) ──────────────────────────────
     path("password/reset/",

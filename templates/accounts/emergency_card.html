@@ -40,8 +40,14 @@
 
 /* Public URL box */
 .url-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:.85rem 1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.url-box.disabled { background:#fff1f2; border-color:#fecdd3; }
 .url-text { font-family:monospace; font-size:.73rem; flex:1; color:#15803d; word-break:break-all; }
+.url-text.disabled { color:#9f1239; text-decoration:line-through; }
 .url-note { font-size:.75rem; color:#64748b; margin-top:.5rem; line-height:1.5; }
+/* Access audit */
+.audit-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.75rem 1rem; margin-top:.85rem; display:flex; align-items:center; gap:.75rem; }
+.audit-count { font-size:1.5rem; font-weight:900; color:#6366f1; min-width:2.5rem; text-align:center; }
+.audit-label { font-size:.78rem; color:#475569; }
 
 @media print {
   .ec-actions, .ec-page > :last-child, nav, .nav-desktop, .sidebar { display:none !important; }
@@ -55,9 +61,11 @@
 <div class="ec-page">
   <div class="ec-header">
     <h1>🆘 Emergency Medical Card</h1>
-    <div style="display:flex;gap:.5rem">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
       <button class="ec-btn outline" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+      {% if profile.emergency_card_enabled %}
       <a class="ec-btn primary" href="{{ public_url }}" target="_blank"><i class="fas fa-arrow-up-right-from-square"></i> View public card</a>
+      {% endif %}
     </div>
   </div>
 
@@ -117,47 +125,57 @@
         {% endif %}
       </div>
 
-      <!-- Current medications -->
-      <div class="ec-section">
-        <div class="ec-section-title">Current Medications</div>
-        {% if medications %}
-        {% for med in medications %}
-        <span class="ec-tag med">{{ med.name }}{% if med.dosage %} {{ med.dosage }}{% endif %}</span>
-        {% endfor %}
-        {% else %}
-        <span style="font-size:.8rem;color:#94a3b8">None recorded</span>
-        {% endif %}
-      </div>
-
-      <!-- Active treatments -->
-      {% if treatments %}
-      <div class="ec-section" style="grid-column:1/-1">
-        <div class="ec-section-title">Active Treatment Courses</div>
-        {% for t in treatments %}
-        <span class="ec-tag treatment">{{ t.name }}{% if t.doctor_name %} · {{ t.doctor_name }}{% endif %}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
     </div>
   </div>
 
   <!-- Public URL info -->
-  <div class="url-box">
+  <div class="url-box {% if not profile.emergency_card_enabled %}disabled{% endif %}">
     <div style="flex:1">
-      <div style="font-size:.75rem;font-weight:700;color:#15803d;margin-bottom:.35rem"><i class="fas fa-link"></i> Public emergency URL (no login needed)</div>
-      <div class="url-text">{{ public_url }}</div>
+      <div style="font-size:.75rem;font-weight:700;color:{% if profile.emergency_card_enabled %}#15803d{% else %}#9f1239{% endif %};margin-bottom:.35rem">
+        <i class="fas fa-link"></i>
+        {% if profile.emergency_card_enabled %}Public emergency URL (no login needed){% else %}Emergency card is currently <strong>disabled</strong> — link will show a 404{% endif %}
+      </div>
+      <div class="url-text {% if not profile.emergency_card_enabled %}disabled{% endif %}">{{ public_url }}</div>
       <div class="url-note">
         Print this card and carry it in your wallet, or stick a QR code on your phone case.
-        Paramedics and doctors can scan the QR to see your blood type, allergies, and medications instantly — <strong>no account needed</strong>.
+        Paramedics and doctors can scan the QR to see your blood type, allergies, and emergency contact instantly — <strong>no account needed</strong>.
       </div>
     </div>
+    {% if profile.emergency_card_enabled %}
     <button onclick="navigator.clipboard.writeText('{{ public_url }}').then(()=>alert('Copied!'))" class="ec-btn outline"><i class="fas fa-copy"></i> Copy</button>
+    {% endif %}
+  </div>
+
+  <!-- Link controls -->
+  <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.75rem">
+    <form method="post" action="{% url 'accounts:revoke_emergency_token' %}" onsubmit="return confirm('This will invalidate your current QR code and link. Anyone who has the old link will no longer be able to view your card. Continue?')">
+      {% csrf_token %}
+      <button type="submit" class="ec-btn danger"><i class="fas fa-rotate"></i> Revoke &amp; regenerate link</button>
+    </form>
+    <form method="post" action="{% url 'accounts:toggle_emergency_card' %}">
+      {% csrf_token %}
+      <button type="submit" class="ec-btn outline">
+        {% if profile.emergency_card_enabled %}
+        <i class="fas fa-eye-slash"></i> Disable card
+        {% else %}
+        <i class="fas fa-eye"></i> Enable card
+        {% endif %}
+      </button>
+    </form>
+  </div>
+
+  <!-- Audit: recent access -->
+  <div class="audit-box">
+    <div class="audit-count">{{ recent_views }}</div>
+    <div class="audit-label">
+      <strong>view{{ recent_views|pluralize }}</strong> of your public emergency card in the last 30 days.<br>
+      <span style="font-size:.72rem;color:#94a3b8">Exact visitor IPs are never stored — only a one-way hash for counting.</span>
+    </div>
   </div>
 
   <p style="font-size:.75rem;color:#94a3b8;margin-top:.85rem">
     <i class="fas fa-shield-halved"></i>
     To update blood type, allergies, or emergency contact, go to <a href="{% url 'accounts:profile_edit' %}" style="color:#6366f1">Profile Settings</a>.
-    Medications and treatments are pulled automatically from your active records.
   </p>
 </div>
 {% endblock %}

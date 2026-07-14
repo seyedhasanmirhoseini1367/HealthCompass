@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from django.http import FileResponse, Http404
 from django.core.exceptions import PermissionDenied
 from pathlib import Path
-from .home_view import home
+from apps.dashboard.landing import home
 from apps.accounts.views import AutoCompleteSocialSignup
 
 

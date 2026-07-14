@@ -12,6 +12,11 @@ class CustomUser(AbstractUser):
         HOSPITAL_ADMIN = 'hospital_admin', 'Hospital Admin'
         ADMIN          = 'admin',          'Admin'
 
+    # Override AbstractUser.email: add unique + null=True so that users without
+    # an email can coexist (NULL != NULL in SQL) while non-null emails are
+    # globally unique and safe to use as a login identifier.
+    email = models.EmailField(blank=True, null=True, unique=True,
+                              verbose_name='email address')
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PATIENT)
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True)
@@ -48,8 +53,30 @@ class PatientProfile(models.Model):
                                   'treat as highest-sensitivity PII.')
     emergency_token = models.UUIDField(default=uuid.uuid4, unique=True,
                           help_text='Token for public emergency card URL')
+    emergency_card_enabled = models.BooleanField(default=True,
+                          help_text='Patient can disable to block all public access to their card')
+
+    def regenerate_emergency_token(self):
+        self.emergency_token = uuid.uuid4()
+        self.save(update_fields=['emergency_token'])
 
     def __str__(self): return f'Patient: {self.user.username}'
+
+
+class EmergencyCardView(models.Model):
+    """Audit log: every time the public emergency card is successfully accessed."""
+    profile   = models.ForeignKey(PatientProfile, on_delete=models.CASCADE,
+                    related_name='emergency_views')
+    viewed_at = models.DateTimeField(auto_now_add=True)
+    ip_hash   = models.CharField(max_length=64,
+                    help_text='SHA-256 of visitor IP — never stores raw IP')
+
+    class Meta:
+        indexes  = [models.Index(fields=['profile', '-viewed_at'])]
+        ordering = ['-viewed_at']
+
+    def __str__(self):
+        return f'{self.profile.user.username} card viewed @ {self.viewed_at}'
 
 
 class DoctorProfile(models.Model):

@@ -1,13 +1,20 @@
-﻿import logging
-from django.shortcuts import render, redirect, get_object_or_404
+﻿import hashlib
+import logging
+
+from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.contrib.auth.views import PasswordResetView
+from django.core.cache import cache
+from django.http import Http404, HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from allauth.socialaccount.views import SignupView as BaseSocialSignupView
-from .models import PatientProfile, DoctorProfile, DataScientistProfile, HospitalAdminProfile
-from .forms import RegisterForm, LoginForm, ProfileForm, PasswordChangeForm
+
+from .models import (PatientProfile, DoctorProfile, DataScientistProfile,
+                     HospitalAdminProfile, EmergencyCardView)
+from .forms import (RegisterForm, LoginForm, ProfileForm, PasswordChangeForm,
+                    PatientProfileForm, DoctorProfileForm, DataScientistProfileForm)
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +70,6 @@ class SafePasswordResetView(PasswordResetView):
             logger.error('Password reset email failed: %s', e)
             from django.http import HttpResponseRedirect
             return HttpResponseRedirect(self.get_success_url())
-        except BaseException as e:
-            logger.error('Password reset fatal error: %s', e)
-            from django.http import HttpResponseRedirect
-            return HttpResponseRedirect(self.get_success_url())
 
 
 def register_view(request):
@@ -98,8 +101,11 @@ def login_view(request):
                 return redirect("accounts:login")
             login(request, user)
             messages.success(request, f"Welcome back, {user.username}!")
-            next_url = request.GET.get("next") or "dashboard:home"
-            return redirect(next_url)
+            next_url = request.GET.get("next", "")
+            from django.utils.http import url_has_allowed_host_and_scheme
+            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect("dashboard:home")
         messages.error(request, "Invalid username or password.")
     else:
         form = LoginForm(request)
@@ -128,35 +134,49 @@ def profile_view(request):
     return render(request, "accounts/profile.html", {"profile": profile})
 
 
+def _profile_form_for(user, data=None):
+    """Return (ProfileFormClass, profile_instance) for the user's role, or (None, None)."""
+    if user.is_patient:
+        instance, _ = PatientProfile.objects.get_or_create(user=user)
+        return PatientProfileForm, instance
+    if user.is_doctor:
+        instance, _ = DoctorProfile.objects.get_or_create(user=user)
+        return DoctorProfileForm, instance
+    if user.is_data_scientist:
+        instance, _ = DataScientistProfile.objects.get_or_create(user=user)
+        return DataScientistProfileForm, instance
+    return None, None
+
+
 @login_required
 def profile_edit(request):
     user = request.user
-    form = ProfileForm(request.POST or None, request.FILES or None, instance=user)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        # Save role-specific profile fields
-        if user.is_patient:
-            p, _ = PatientProfile.objects.get_or_create(user=user)
-            p.blood_type = request.POST.get("blood_type", p.blood_type)
-            p.allergies = request.POST.get("allergies", p.allergies)
-            p.emergency_contact_name = request.POST.get("emergency_contact_name", p.emergency_contact_name)
-            p.emergency_contact_phone = request.POST.get("emergency_contact_phone", p.emergency_contact_phone)
-            p.save()
-        elif user.is_doctor:
-            p, _ = DoctorProfile.objects.get_or_create(user=user)
-            p.specialty = request.POST.get("specialty", p.specialty)
-            p.license_number = request.POST.get("license_number", p.license_number)
-            p.hospital = request.POST.get("hospital", p.hospital)
-            p.department = request.POST.get("department", p.department)
-            p.save()
-        elif user.is_data_scientist:
-            p, _ = DataScientistProfile.objects.get_or_create(user=user)
-            p.institution = request.POST.get("institution", p.institution)
-            p.research_area = request.POST.get("research_area", p.research_area)
-            p.save()
-        messages.success(request, "Profile updated.")
-        return redirect("accounts:profile")
-    return render(request, "accounts/profile_edit.html", {"form": form})
+    ProfileFormClass, profile_instance = _profile_form_for(user)
+
+    if request.method == 'POST':
+        user_form    = ProfileForm(request.POST, request.FILES, instance=user)
+        profile_form = (ProfileFormClass(request.POST, instance=profile_instance)
+                        if ProfileFormClass else None)
+
+        user_valid    = user_form.is_valid()
+        profile_valid = profile_form.is_valid() if profile_form else True
+
+        if user_valid and profile_valid:
+            user_form.save()
+            if profile_form:
+                profile_form.save()
+            messages.success(request, 'Profile updated.')
+            return redirect('accounts:profile')
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        user_form    = ProfileForm(instance=user)
+        profile_form = (ProfileFormClass(instance=profile_instance)
+                        if ProfileFormClass else None)
+
+    return render(request, 'accounts/profile_edit.html', {
+        'form':         user_form,
+        'profile_form': profile_form,
+    })
 
 
 @login_required
@@ -177,18 +197,24 @@ def change_password(request):
 
 # ── Emergency card ────────────────────────────────────────────────────────────
 
+def _get_client_ip(request) -> str:
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+
+
 @login_required
 def emergency_card(request):
-    """Patient's own emergency card view with QR code."""
+    """Patient's own emergency card view with QR code and recent access summary."""
     import base64, io
     import qrcode
     from django.conf import settings as s
+    from django.utils import timezone
+    from datetime import timedelta
 
     profile, _ = PatientProfile.objects.get_or_create(user=request.user)
-    site_url = getattr(s, 'SITE_URL', request.build_absolute_uri('/').rstrip('/'))
+    site_url   = getattr(s, 'SITE_URL', request.build_absolute_uri('/').rstrip('/'))
     public_url = f'{site_url}/accounts/emergency/{profile.emergency_token}/'
 
-    # Generate QR code as base64 PNG
     qr = qrcode.QRCode(box_size=5, border=3,
                        error_correction=qrcode.constants.ERROR_CORRECT_H)
     qr.add_data(public_url)
@@ -198,27 +224,66 @@ def emergency_card(request):
     img.save(buf, format='PNG')
     qr_b64 = base64.b64encode(buf.getvalue()).decode()
 
-    medications = []
+    since_30d    = timezone.now() - timedelta(days=30)
+    recent_views = EmergencyCardView.objects.filter(
+        profile=profile, viewed_at__gte=since_30d
+    ).count()
 
     return render(request, 'accounts/emergency_card.html', {
-        'profile':     profile,
-        'medications': medications,
-        'qr_b64':      qr_b64,
-        'public_url':  public_url,
+        'profile':      profile,
+        'qr_b64':       qr_b64,
+        'public_url':   public_url,
+        'recent_views': recent_views,
     })
 
 
 def emergency_card_public(request, token):
-    """No-login public emergency card — scannable by paramedics or doctors."""
+    """No-login public emergency card — scannable by paramedics or doctors.
+
+    Rate-limited (30 req/min per IP) and logged to EmergencyCardView.
+    Returns 404 if the patient has disabled their card.
+    """
+    ip      = _get_client_ip(request)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()
+
+    rate_key = f'ec_rl:{ip_hash[:16]}'
+    hits     = cache.get(rate_key, 0)
+    if hits >= 30:
+        return HttpResponse('Too many requests. Please wait a minute.', status=429)
+    cache.set(rate_key, hits + 1, 60)
+
     profile = get_object_or_404(PatientProfile, emergency_token=token)
-    user = profile.user
-    medications = []
+    if not profile.emergency_card_enabled:
+        raise Http404
+
+    EmergencyCardView.objects.create(profile=profile, ip_hash=ip_hash)
 
     return render(request, 'accounts/emergency_card_public.html', {
-        'profile':     profile,
-        'patient':     user,
-        'medications': medications,
+        'profile': profile,
+        'patient': profile.user,
     })
+
+
+@login_required
+def revoke_emergency_token(request):
+    """POST only: regenerate the emergency card token, invalidating old links."""
+    if request.method == 'POST':
+        profile, _ = PatientProfile.objects.get_or_create(user=request.user)
+        profile.regenerate_emergency_token()
+        messages.success(request, 'Emergency card link revoked. A new link has been generated.')
+    return redirect('accounts:emergency_card')
+
+
+@login_required
+def toggle_emergency_card(request):
+    """POST only: flip emergency_card_enabled on the patient's profile."""
+    if request.method == 'POST':
+        profile, _ = PatientProfile.objects.get_or_create(user=request.user)
+        profile.emergency_card_enabled = not profile.emergency_card_enabled
+        profile.save(update_fields=['emergency_card_enabled'])
+        state = 'enabled' if profile.emergency_card_enabled else 'disabled'
+        messages.success(request, f'Emergency card {state}.')
+    return redirect('accounts:emergency_card')
 
 
 @login_required
@@ -228,8 +293,9 @@ def delete_account(request):
         user = request.user
         if user.check_password(password):
             logout(request)
-            user.delete()
-            messages.success(request, "Your account has been permanently deleted.")
+            from .services import purge_user_data
+            purge_user_data(user)
+            messages.success(request, "Your account and all associated data have been permanently deleted.")
             return redirect("home")
         messages.error(request, "Incorrect password. Account not deleted.")
     return render(request, "accounts/delete_account.html")

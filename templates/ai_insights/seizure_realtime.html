@@ -381,7 +381,7 @@ async function loadSample() {
   if (loadingFile) return;
   setStatus('Loading demo EEG recording…');
   try {
-    const resp = await fetch('/static/demo/eeg_sample.parquet');
+    const resp = await fetch('/static/samples/eeg_sample.parquet');
     if (!resp.ok) throw new Error('Sample file not available (HTTP ' + resp.status + ')');
     const blob = await resp.blob();
     await loadFiles([new File([blob], 'eeg_sample.parquet', {type: 'application/octet-stream'})]);
