@@ -174,7 +174,7 @@ def _extract_lab_values_regex(text: str) -> list:
         r'(?P<name>[A-Za-z][A-Za-z0-9 \-/()\+]+?)'       # test name
         r'(?:[ \t]*:[ \t]*|[ \t]{2,})'                    # separator
         r'(?P<value>\d{1,6}(?:\.\d{1,4})?)'               # numeric value
-        r'(?:[ \t]+(?P<unit>[a-zA-Z%][a-zA-Z0-9%/·×^μΩ\[\]\.]*))?' # unit
+        r'(?:[ \t]+(?P<unit>[a-zA-Zµμ%][a-zA-Z0-9µμ%/·×^Ω\[\]\.]*))?' # unit (µ = U+00B5 MICRO SIGN, μ = U+03BC GREEK MU)
         r'(?:[ \t]+[\(\[]?[ \t]*(?P<ref>[\d][\d\.\- –]+\d)[ \t]*[\)\]]?)?',  # ref range
         re.MULTILINE,
     )
