@@ -20,6 +20,7 @@ with torch.load(..., weights_only=True) + model.load_state_dict().
 
 import os
 import io
+from dataclasses import dataclass, field as _dc_field
 import numpy as np
 import pandas as pd
 
@@ -31,6 +32,92 @@ _BLOCKED_FORMATS = frozenset({'pkl', 'pickle', 'h5', 'keras', 'joblib', 'pt', 'p
 class InferenceError(ValueError):
     """Raised for user-caused errors (wrong format, missing columns, bad file).
     Message is shown directly to the patient in the UI."""
+
+
+@dataclass
+class StandardPrediction:
+    """
+    Validated output contract for every HealthCompass inference handler.
+
+    Required
+    --------
+    prediction   : raw model output — class index, float score, string, etc.
+    label        : human-readable result shown to the patient
+
+    Optional
+    --------
+    risk_score   : float in [0, 1]; required for binary/risk-classification models
+    confidence   : probability of the predicted class (often equals risk_score)
+    input_summary: dict or string describing the parsed input shown in the UI
+    input_data   : key→value pairs used for inference (shown in history)
+    explanation  : optional static per-handler plain-text note (≠ AI interpretation)
+    demo         : True when the result comes from rule-based logic, not a real model
+    """
+
+    prediction:    object
+    label:         str
+    risk_score:    'float | None'    = None
+    confidence:    'float | None'    = None
+    input_summary: object            = None
+    input_data:    dict              = _dc_field(default_factory=dict)
+    explanation:   str               = ''
+    demo:          bool              = False
+
+    def __post_init__(self):
+        self.label = str(self.label)
+        if self.risk_score is not None and not (0.0 <= float(self.risk_score) <= 1.0):
+            raise InferenceError(
+                f'risk_score must be in [0.0, 1.0], got {self.risk_score!r}. '
+                "Check your handler's postprocess() method."
+            )
+
+    def to_result_dict(self) -> dict:
+        """Return the dict that catalog.py, templates, and ModelPrediction consume."""
+        return {
+            'success':          True,
+            'prediction':       self.prediction,
+            'prediction_label': self.label,   # kept for backward-compat with old templates
+            'label':            self.label,
+            'risk_score':       self.risk_score,
+            'confidence':       self.confidence,
+            'input_summary':    self.input_summary if self.input_summary is not None else {},
+            'input_data':       self.input_data,
+            'explanation':      self.explanation,
+            'demo':             self.demo,
+        }
+
+    @classmethod
+    def from_handler_dict(cls, d: dict) -> 'StandardPrediction':
+        """Validate and normalise a raw handler-output dict into StandardPrediction."""
+        prediction = d.get('prediction')
+        if prediction is None:
+            raise InferenceError(
+                'Handler postprocess() must include "prediction" in its return value. '
+                f'Keys returned: {sorted(d)}. '
+                'Add "prediction" (the raw model output) to the dict.'
+            )
+        label = d.get('label') or d.get('prediction_label') or str(prediction)
+
+        # risk_score: explicit field wins; fall back to raw probability
+        risk_score = d.get('risk_score')
+        if risk_score is None:
+            risk_score = d.get('prediction_proba')
+
+        # confidence: the model probability (may equal risk_score for binary classifiers)
+        confidence = d.get('prediction_proba')
+        if confidence is None:
+            confidence = d.get('confidence') or risk_score
+
+        return cls(
+            prediction    = prediction,
+            label         = str(label),
+            risk_score    = float(risk_score)    if risk_score    is not None else None,
+            confidence    = float(confidence)    if confidence    is not None else None,
+            input_summary = d.get('input_summary'),
+            input_data    = d.get('input_data') or {},
+            explanation   = d.get('explanation', ''),
+            demo          = d.get('demo', False),
+        )
 
 
 class InferenceHandler:
@@ -88,10 +175,7 @@ class InferenceHandler:
             k: (round(v, 6) if isinstance(v, float) else v)
             for k, v in dict(zip(feature_df.columns, feature_df.iloc[0].tolist())).items()
         }
-        result['success']    = True
-        result['risk_score'] = result.get('prediction_proba') or result.get('risk_score')
-        result['label']      = result.get('prediction_label', str(result.get('prediction', '')))
-        return result
+        return StandardPrediction.from_handler_dict(result).to_result_dict()
 
     # ── Subclass interface ────────────────────────────────────────────────────
 

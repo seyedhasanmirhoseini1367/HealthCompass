@@ -55,7 +55,7 @@ from . import my_model   # noqa: F401
        "expected_n_features": 10
    }
    ```
-4. Upload your `.pkl` / `.h5` / `.pt` model file.
+4. Upload your `.onnx` model file. (For EEG/PyTorch handlers that override `run()`, upload a `.pt`/`.pth` weights-only file instead.)
 
 ---
 
@@ -71,7 +71,7 @@ def run(self, uploaded_file=None, input_data=None):
     filename = getattr(uploaded_file, 'name', '').lower()
     self.validate_file(uploaded_file, filename)
     _, summary = self.load_and_preprocess(uploaded_file, filename)
-    model = self._load_model()          # loads .pkl / .h5 / .pt automatically
+    model = self._load_model()          # loads .onnx via onnxruntime
 
     # ... custom inference ...
 
@@ -96,7 +96,7 @@ def run(self, uploaded_file=None, input_data=None):
 | `self.read_parquet(file)` | Same for Parquet |
 | `self.read_image(file, target_size=(W,H))` | Returns `np.ndarray` (H,W,3) |
 | `self.read_edf(file)` | Returns `(df, summary_dict)` via MNE |
-| `self._load_model()` | Loads `.pkl/.joblib/.h5/.pt` from `ai_model.model_file` |
+| `self._load_model()` | Loads `.onnx` from `ai_model.model_file` via onnxruntime |
 | `self._validate_features(df)` | Checks column count vs `cfg["expected_n_features"]` |
 | `self.cfg` | Dict from `ai_model.handler_config` (set in admin) |
 | `self.ai_model` | The `AIModel` instance |

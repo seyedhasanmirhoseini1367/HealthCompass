@@ -12,7 +12,9 @@ from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
-from apps.ai_insights.inference.base import InferenceHandler, InferenceError, _BLOCKED_FORMATS
+from apps.ai_insights.inference.base import (
+    InferenceHandler, InferenceError, StandardPrediction, _BLOCKED_FORMATS,
+)
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
@@ -146,6 +148,71 @@ class LoadModelONNXTest(TestCase):
         finally:
             if saved is not None:
                 sys.modules['onnxruntime'] = saved
+
+
+# ─── StandardPrediction contract ──────────────────────────────────────────────
+
+class StandardPredictionTest(TestCase):
+    """StandardPrediction validates and normalises handler output dicts."""
+
+    def test_valid_dict_creates_prediction(self):
+        sp = StandardPrediction.from_handler_dict({
+            'prediction':       1,
+            'prediction_label': 'High Risk',
+            'prediction_proba': 0.82,
+        })
+        self.assertEqual(sp.prediction, 1)
+        self.assertEqual(sp.label, 'High Risk')
+        self.assertAlmostEqual(sp.risk_score, 0.82)
+        self.assertAlmostEqual(sp.confidence, 0.82)
+
+    def test_missing_prediction_raises(self):
+        with self.assertRaises(InferenceError) as ctx:
+            StandardPrediction.from_handler_dict({'label': 'Low', 'risk_score': 0.2})
+        self.assertIn('prediction', str(ctx.exception).lower())
+
+    def test_label_falls_back_to_str_prediction(self):
+        sp = StandardPrediction.from_handler_dict({'prediction': 42})
+        self.assertEqual(sp.label, '42')
+
+    def test_risk_score_out_of_range_raises(self):
+        with self.assertRaises(InferenceError) as ctx:
+            StandardPrediction(prediction=1, label='X', risk_score=1.5)
+        self.assertIn('risk_score', str(ctx.exception))
+
+    def test_risk_score_none_is_allowed(self):
+        sp = StandardPrediction(prediction='pos', label='Positive', risk_score=None)
+        self.assertIsNone(sp.risk_score)
+        self.assertIsNone(sp.to_result_dict()['risk_score'])
+
+    def test_to_result_dict_has_required_keys(self):
+        sp = StandardPrediction(prediction=0, label='Low', risk_score=0.3)
+        d = sp.to_result_dict()
+        for key in ('success', 'prediction', 'label', 'prediction_label',
+                    'risk_score', 'confidence', 'input_summary',
+                    'input_data', 'explanation', 'demo'):
+            self.assertIn(key, d, f'to_result_dict() must include "{key}"')
+        self.assertTrue(d['success'])
+
+    def test_to_result_dict_backward_compat_prediction_label(self):
+        """Old templates that read 'prediction_label' must still work."""
+        sp = StandardPrediction.from_handler_dict(
+            {'prediction': 0, 'prediction_label': 'Negative'}
+        )
+        d = sp.to_result_dict()
+        self.assertEqual(d['prediction_label'], 'Negative')
+        self.assertEqual(d['label'], 'Negative')
+
+    def test_demo_flag_propagates(self):
+        sp = StandardPrediction.from_handler_dict(
+            {'prediction': 0.3, 'label': 'Low risk', 'demo': True}
+        )
+        self.assertTrue(sp.demo)
+        self.assertTrue(sp.to_result_dict()['demo'])
+
+    def test_explanation_defaults_empty(self):
+        sp = StandardPrediction.from_handler_dict({'prediction': 1, 'label': 'Yes'})
+        self.assertEqual(sp.explanation, '')
 
 
 # ─── Status enforcement in run_prediction view ─────────────────────────────────

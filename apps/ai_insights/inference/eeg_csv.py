@@ -33,7 +33,7 @@ from scipy.signal import butter, filtfilt, stft as scipy_stft
 from sklearn.preprocessing import StandardScaler
 
 from .registry import register
-from .base import InferenceHandler, InferenceError
+from .base import InferenceHandler, InferenceError, StandardPrediction
 
 
 # ─── Signal processing (matches training code exactly) ────────────────────────
@@ -365,13 +365,10 @@ class EEGCSVHandler(InferenceHandler):
         label = label_map.get(str(pred_idx), str(pred_idx))
 
         spec_sample = tensor[0, 0, :, :5].flatten()[:20]
-        return {
-            'success':          True,
+        return StandardPrediction.from_handler_dict({
             'prediction':       pred_idx,
             'prediction_label': label,
             'prediction_proba': confidence,
-            'risk_score':       confidence,
-            'label':            label,
             'input_summary':    input_summary,
             'input_data': {
                 **{f'ch0_spec_f{i}': round(float(v), 5)
@@ -382,4 +379,4 @@ class EEGCSVHandler(InferenceHandler):
                 'predicted_idx': pred_idx,
                 'confidence':    round(confidence, 4),
             },
-        }
+        }).to_result_dict()

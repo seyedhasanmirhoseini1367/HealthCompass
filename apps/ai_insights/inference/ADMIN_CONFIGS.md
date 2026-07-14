@@ -94,7 +94,7 @@ Chest X-ray binary classification example:
 | `channels` | No | 1=grayscale, 3=RGB (default: 3) |
 | `label_map` | No | Maps class index → human label |
 
-**Model file format:** `.h5` or `.keras` (Keras/TensorFlow).
+**Model file format:** `.onnx`. Convert from Keras/TensorFlow with `convert_to_onnx.py`.
 Expected input shape: `(batch, height, width, channels)`
 
 ---

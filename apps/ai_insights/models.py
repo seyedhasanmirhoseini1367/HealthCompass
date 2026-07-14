@@ -38,7 +38,7 @@ class AIModel(models.Model):
                              default=InputType.TABULAR,
                              help_text='How the patient provides input data')
     model_file           = models.FileField(upload_to='ai_models/', blank=True, null=True,
-                             help_text='Upload .pkl or .h5 model file')
+                             help_text='Upload a .onnx model file. Use convert_to_onnx.py to convert from PyTorch/Keras/sklearn.')
     input_schema         = models.JSONField(default=dict,
                              help_text='JSON definition of required input fields (for tabular input)')
     output_schema        = models.JSONField(default=dict,

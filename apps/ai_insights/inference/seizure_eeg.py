@@ -37,7 +37,7 @@ from scipy.signal import butter, filtfilt, stft as scipy_stft
 from sklearn.preprocessing import StandardScaler
 
 from .registry import register
-from .base import InferenceHandler, InferenceError
+from .base import InferenceHandler, InferenceError, StandardPrediction
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -475,20 +475,14 @@ class SeizureEEGHandler(InferenceHandler):
 
         # ── Build final result ────────────────────────────────────────────────
         result = self.postprocess(None, confidence, feature_df)
-        result["success"]       = True
-        result["risk_score"]    = confidence
-        result["label"]         = result["prediction_label"]
-        result["input_summary"] = input_summary
-
         spec_sample = tensor[0, 0, :, :5].flatten()[:20]
-        result["input_data"] = {
-            f"ch0_spec_f{i}": round(float(v), 5)
-            for i, v in enumerate(spec_sample)
+        result['input_summary'] = input_summary
+        result['input_data'] = {
+            **{f'ch0_spec_f{i}': round(float(v), 5) for i, v in enumerate(spec_sample)},
+            'n_channels':    tensor.shape[1],
+            'freq_bins':     tensor.shape[2],
+            'time_steps':    tensor.shape[3],
+            'predicted_idx': pred_idx,
+            'confidence':    round(confidence, 4),
         }
-        result["input_data"]["n_channels"]    = tensor.shape[1]
-        result["input_data"]["freq_bins"]     = tensor.shape[2]
-        result["input_data"]["time_steps"]    = tensor.shape[3]
-        result["input_data"]["predicted_idx"] = pred_idx
-        result["input_data"]["confidence"]    = round(confidence, 4)
-
-        return result
+        return StandardPrediction.from_handler_dict(result).to_result_dict()

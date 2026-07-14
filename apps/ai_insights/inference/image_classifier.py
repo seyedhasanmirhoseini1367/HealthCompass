@@ -18,7 +18,7 @@ handler_config:
 
 import numpy as np
 from .registry import register
-from .base import InferenceHandler, InferenceError
+from .base import InferenceHandler, InferenceError, StandardPrediction
 
 
 @register("image_classifier")
@@ -96,13 +96,10 @@ class ImageClassifierHandler(InferenceHandler):
         label_map = self.cfg.get('label_map', {})
         label     = label_map.get(str(pred_class), str(pred_class))
 
-        return {
-            'success':           True,
-            'prediction':        pred_class,
-            'prediction_label':  label,
-            'prediction_proba':  proba,
-            'risk_score':        proba,
-            'label':             label,
-            'input_summary':     input_summary,
-            'input_data':        {'image_shape': str(list(self._img_array.shape))},
-        }
+        return StandardPrediction.from_handler_dict({
+            'prediction':       pred_class,
+            'prediction_label': label,
+            'prediction_proba': proba,
+            'input_summary':    input_summary,
+            'input_data':       {'image_shape': str(list(self._img_array.shape))},
+        }).to_result_dict()

@@ -143,6 +143,7 @@ def _interpret(prediction, output_schema: dict) -> str:
 
 def _rule_based_demo_result(ai_model, input_data: dict, input_file=None) -> dict:
     """Return a plausible demo result for models that have no uploaded model file."""
+    from .base import StandardPrediction
     import pandas as pd
 
     score         = 0.0
@@ -196,13 +197,12 @@ def _rule_based_demo_result(ai_model, input_data: dict, input_file=None) -> dict
                     pass
             score = min(0.5, sum(vals) / (len(vals) * 100)) if vals else 0.3
 
-    result: dict = {
-        'success':    True,
-        'prediction': score,
-        'risk_score': score,
-        'label':      _interpret(score, ai_model.output_schema),
-        'demo':       True,
+    d: dict = {
+        'prediction':       score,
+        'prediction_proba': score,
+        'label':            _interpret(score, ai_model.output_schema),
+        'demo':             True,
     }
     if input_summary:
-        result['input_summary'] = input_summary
-    return result
+        d['input_summary'] = input_summary
+    return StandardPrediction.from_handler_dict(d).to_result_dict()
