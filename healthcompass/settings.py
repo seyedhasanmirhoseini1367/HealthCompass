@@ -335,3 +335,10 @@ CORS_ALLOW_CREDENTIALS = True
 # only CORS_ALLOWED_ORIGINS (set via env var) controls access.
 if DEBUG:
     CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://localhost(:\d+)?$']
+
+# ── RAG auto-index mode ────────────────────────────────────────────────────────
+# When True, rag_assistant.signals indexes records synchronously (no background
+# thread). Set automatically during `manage.py test` so test cases are
+# deterministic and free from SQLite "table is locked" race conditions.
+import sys as _sys
+RAG_AUTO_INDEX_SYNC = 'test' in _sys.argv
