@@ -10,6 +10,7 @@ Covers:
   QueryUnderstanding       — fast-path classification + biomarker detection
   RetrievalService.rerank  — LLM reranker fallback behaviour
 """
+import django.test
 import numpy as np
 from django.test import SimpleTestCase
 
@@ -576,3 +577,326 @@ class GuardrailAppendedDisclaimersTests(SimpleTestCase):
         _, rules_apply    = self.svc.apply(text)
         _, rules_appended = self.svc.get_appended_disclaimers(text)
         self.assertEqual(set(rules_apply), set(rules_appended))
+
+
+# ── SSE contract integration tests ────────────────────────────────────────────
+# Assert that stream_ask() (legacy path) and stream_graph() (graph path) emit
+# identical SSE event sequences and required JSON keys for the same query.
+#
+# All I/O is mocked at SOURCE modules so tests are fast and fully offline.
+# Because both paths use lazy `from module import X` inside function bodies,
+# patching must target the source module, not the importing module:
+#   generate_streaming  → apps.rag_assistant.services.generation_service
+#   GuardrailService    → apps.rag_assistant.services.guardrail_service
+#   understand          → apps.rag_assistant.services.query_understanding
+#   TrajectoryService   → apps.rag_assistant.services.trajectory_service
+#   health_graph_routing → apps.rag_assistant.graph.graph  (module-level var)
+
+import json
+from unittest.mock import MagicMock, patch
+
+_GEN_SVC  = 'apps.rag_assistant.services.generation_service'
+_GRD_SVC  = 'apps.rag_assistant.services.guardrail_service'
+_QU_SVC   = 'apps.rag_assistant.services.query_understanding'
+_TRAJ_SVC = 'apps.rag_assistant.services.trajectory_service'
+_GRAPH    = 'apps.rag_assistant.graph.graph'
+
+
+class SSEContractTests(django.test.SimpleTestCase):
+    """
+    Integration test: both RAG paths must produce the same SSE contract.
+
+    Contract invariants:
+        1. Last event is always {"type": "done"}
+        2. At least one {"type": "token"} event exists
+        3. Event order: token(s)… → sources → meta → done
+        4. {"type": "meta"} contains keys: provider, chunks, mode
+        5. {"type": "sources"} contains key: sources (list)
+        6. No {"type": "error"} event in the normal (non-exception) path
+    """
+
+    MOCK_TOKENS  = ['Hello', ', ', 'world', '.']
+    # Routing state returned by the mocked health_graph_routing
+    MOCK_RSTATE  = {
+        'route':              'lab_results',
+        'answer':             '',
+        'context_chunks':     [],
+        'trajectory_context': '',
+        'mode':               'personal',
+        'rewritten_query':    'What is my creatinine?',
+    }
+
+    # ── helpers ────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse(gen):
+        """Collect SSE lines from a generator and parse JSON payloads."""
+        events = []
+        for line in gen:
+            if isinstance(line, str) and line.startswith('data: '):
+                try:
+                    events.append(json.loads(line[6:].strip()))
+                except json.JSONDecodeError:
+                    pass
+        return events
+
+    def _assert_contract(self, events, label=''):
+        """Assert all SSE contract invariants hold."""
+        types = [e['type'] for e in events]
+        ctx   = f' [{label}]' if label else ''
+
+        self.assertEqual(types[-1], 'done', f'Last event must be done{ctx}: {types}')
+        self.assertIn('token',   types, f'Must have token event{ctx}')
+        self.assertIn('sources', types, f'Must have sources event{ctx}')
+        self.assertIn('meta',    types, f'Must have meta event{ctx}')
+        self.assertNotIn('error', types, f'Must not have error event{ctx}')
+
+        src_i  = types.index('sources')
+        meta_i = types.index('meta')
+        done_i = types.index('done')
+        last_tok_i = max(i for i, t in enumerate(types) if t == 'token')
+
+        self.assertLess(last_tok_i, src_i,  f'All tokens before sources{ctx}')
+        self.assertLess(src_i,      meta_i, f'sources before meta{ctx}')
+        self.assertLess(meta_i,     done_i, f'meta before done{ctx}')
+
+        meta = next(e for e in events if e['type'] == 'meta')
+        for key in ('provider', 'chunks', 'mode'):
+            self.assertIn(key, meta, f'meta missing "{key}"{ctx}')
+
+        sources_ev = next(e for e in events if e['type'] == 'sources')
+        self.assertIn('sources', sources_ev)
+        self.assertIsInstance(sources_ev['sources'], list)
+
+    def _qi(self):
+        """Fake QueryIntent for personal, non-temporal lab query."""
+        qi = MagicMock()
+        qi.mode = 'personal'; qi.route = 'lab_results'; qi.is_temporal = False
+        qi.via_llm = False; qi.rewritten_query = 'What is my creatinine?'
+        qi.intent = 'general'
+        return qi
+
+    def _grd_inst(self):
+        """GuardrailService instance mock: no-op apply, no disclaimers."""
+        inst = MagicMock()
+        inst.apply.side_effect = lambda t: (t, [])
+        inst.get_appended_disclaimers.return_value = ('', [])
+        return inst
+
+    def _traj_inst(self):
+        """TrajectoryService instance mock: not temporal, no chart."""
+        inst = MagicMock()
+        inst.is_chart_request.return_value = False
+        inst.get_trajectory_context.return_value = ('', [])
+        return inst
+
+    def _legacy_svc(self):
+        """RAGService instance with mocked emb/ret sub-services."""
+        from apps.rag_assistant.services.rag_service import RAGService
+        svc = RAGService.__new__(RAGService)
+        svc.emb_svc = MagicMock()
+        svc.ret_svc = MagicMock()
+        svc.ret_svc.retrieve.return_value = []
+        svc._cold_start_response = MagicMock(return_value=None)
+        return svc
+
+    # ── legacy path ────────────────────────────────────────────────────────────
+
+    def test_legacy_normal_sse_contract(self):
+        """stream_ask() (legacy) emits correct SSE contract for a normal query."""
+        grd_inst = self._grd_inst()
+
+        with (
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+            patch(f'{_QU_SVC}.understand', return_value=self._qi()),
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+            patch.dict('os.environ', {'RAG_PIPELINE': 'legacy'}),
+        ):
+            grd_cls.check_pre_query.return_value = (False, '')
+            grd_cls.return_value = grd_inst
+            events = self._parse(
+                self._legacy_svc().stream_ask(MagicMock(pk=1), 'What is my creatinine?')
+            )
+
+        self._assert_contract(events, 'legacy-normal')
+
+    def test_legacy_emergency_sse_contract(self):
+        """stream_ask() emergency path: token → sources(empty) → meta → done."""
+        with (
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+            patch.dict('os.environ', {'RAG_PIPELINE': 'legacy'}),
+        ):
+            grd_cls.check_pre_query.return_value = (True, 'Call 911 immediately.')
+            grd_cls.return_value = self._grd_inst()
+            events = self._parse(
+                self._legacy_svc().stream_ask(MagicMock(pk=1), 'I have chest pain')
+            )
+
+        types = [e['type'] for e in events]
+        self.assertEqual(types[-1], 'done')
+        self.assertIn('token',   types)
+        self.assertIn('sources', types)
+        self.assertIn('meta',    types)
+        meta = next(e for e in events if e['type'] == 'meta')
+        self.assertTrue(meta.get('safety_routed'))
+        self.assertEqual(meta.get('mode'), 'emergency')
+
+    # ── graph path ─────────────────────────────────────────────────────────────
+
+    def test_graph_normal_sse_contract(self):
+        """stream_graph() emits correct SSE contract for a normal query."""
+        grd_inst = self._grd_inst()
+
+        with (
+            patch(f'{_GRAPH}.health_graph_routing') as mock_routing,
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+        ):
+            grd_cls.check_pre_query.return_value = (False, '')
+            grd_cls.return_value = grd_inst
+            mock_routing.invoke.return_value = dict(self.MOCK_RSTATE)
+
+            from apps.rag_assistant.graph.graph import stream_graph
+            events = self._parse(
+                stream_graph(query='What is my creatinine?', patient=MagicMock(pk=1))
+            )
+
+        self._assert_contract(events, 'graph-normal')
+
+    def test_graph_emergency_sse_contract(self):
+        """stream_graph() emergency route: same structure as legacy emergency."""
+        emergency_state = dict(self.MOCK_RSTATE, route='emergency',
+                               answer='Call 911 immediately.')
+
+        with (
+            patch(f'{_GRAPH}.health_graph_routing') as mock_routing,
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+        ):
+            grd_cls.check_pre_query.return_value = (False, '')
+            grd_cls.return_value = self._grd_inst()
+            mock_routing.invoke.return_value = emergency_state
+
+            from apps.rag_assistant.graph.graph import stream_graph
+            events = self._parse(
+                stream_graph(query='I have chest pain', patient=MagicMock(pk=1))
+            )
+
+        types = [e['type'] for e in events]
+        self.assertEqual(types[-1], 'done')
+        self.assertIn('token',   types)
+        self.assertIn('sources', types)
+        self.assertIn('meta',    types)
+        meta = next(e for e in events if e['type'] == 'meta')
+        self.assertTrue(meta.get('safety_routed'))
+        self.assertEqual(meta.get('mode'), 'emergency')
+
+    # ── cross-path equivalence ──────────────────────────────────────────────────
+
+    def test_both_paths_same_event_type_sequence(self):
+        """
+        Core contract: legacy and graph paths must emit the same event type
+        sequence for the same query.  This is the switch safety gate —
+        changing RAG_PIPELINE must not require any view-layer changes.
+        """
+        # Legacy
+        grd_inst = self._grd_inst()
+        with (
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+            patch(f'{_QU_SVC}.understand', return_value=self._qi()),
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+            patch.dict('os.environ', {'RAG_PIPELINE': 'legacy'}),
+        ):
+            grd_cls.check_pre_query.return_value = (False, '')
+            grd_cls.return_value = grd_inst
+            legacy_events = self._parse(
+                self._legacy_svc().stream_ask(MagicMock(pk=1), 'What is my creatinine?')
+            )
+
+        # Graph
+        grd_inst2 = self._grd_inst()
+        with (
+            patch(f'{_GRAPH}.health_graph_routing') as mock_routing,
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls2,
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+        ):
+            grd_cls2.check_pre_query.return_value = (False, '')
+            grd_cls2.return_value = grd_inst2
+            mock_routing.invoke.return_value = dict(self.MOCK_RSTATE)
+            from apps.rag_assistant.graph.graph import stream_graph
+            graph_events = self._parse(
+                stream_graph(query='What is my creatinine?', patient=MagicMock(pk=1))
+            )
+
+        legacy_types = [e['type'] for e in legacy_events]
+        graph_types  = [e['type'] for e in graph_events]
+        self.assertEqual(
+            legacy_types, graph_types,
+            f'SSE event type mismatch:\n  legacy: {legacy_types}\n  graph:  {graph_types}',
+        )
+
+    def test_both_paths_meta_keys_identical(self):
+        """Both paths must produce a meta event with the same set of JSON keys."""
+        # Legacy meta
+        grd_inst = self._grd_inst()
+        with (
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
+            patch(f'{_QU_SVC}.understand', return_value=self._qi()),
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+            patch.dict('os.environ', {'RAG_PIPELINE': 'legacy'}),
+        ):
+            grd_cls.check_pre_query.return_value = (False, '')
+            grd_cls.return_value = grd_inst
+            legacy_meta = next(
+                e for e in self._parse(
+                    self._legacy_svc().stream_ask(MagicMock(pk=1), 'test')
+                )
+                if e['type'] == 'meta'
+            )
+
+        # Graph meta
+        grd_inst2 = self._grd_inst()
+        with (
+            patch(f'{_GRAPH}.health_graph_routing') as mock_routing,
+            patch(f'{_GRD_SVC}.GuardrailService') as grd_cls2,
+            patch(f'{_GEN_SVC}.generate_streaming',
+                  side_effect=lambda *a, **kw: iter(self.MOCK_TOKENS)),
+            patch(f'{_GEN_SVC}.active_stream_provider', return_value='groq'),
+            patch(f'{_GEN_SVC}._build_sources', return_value=[]),
+            patch(f'{_TRAJ_SVC}.TrajectoryService', return_value=self._traj_inst()),
+        ):
+            grd_cls2.check_pre_query.return_value = (False, '')
+            grd_cls2.return_value = grd_inst2
+            mock_routing.invoke.return_value = dict(self.MOCK_RSTATE)
+            from apps.rag_assistant.graph.graph import stream_graph
+            graph_meta = next(
+                e for e in self._parse(
+                    stream_graph(query='test', patient=MagicMock(pk=1))
+                )
+                if e['type'] == 'meta'
+            )
+
+        self.assertEqual(
+            set(legacy_meta.keys()), set(graph_meta.keys()),
+            f'meta key mismatch:\n  legacy: {set(legacy_meta.keys())}\n'
+            f'  graph:  {set(graph_meta.keys())}',
+        )

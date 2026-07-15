@@ -105,7 +105,17 @@ class RAGService:
         document_type: Optional[str] = None,
     ) -> Generator[str, None, None]:
         """
-        Yields SSE-formatted events:
+        Yields SSE-formatted events.
+
+        When the RAG_PIPELINE environment variable is set to 'graph', delegates
+        to stream_graph() (graph-path SSE) which uses the LangGraph routing
+        subgraph for retrieval then calls generate_streaming() for token-by-token
+        output.  The SSE contract (token/sources/meta/done event sequence) is
+        identical for both paths.
+
+        RAG_PIPELINE=legacy  (default) — this function handles everything.
+        RAG_PIPELINE=graph            — delegates to graph/graph.py:stream_graph().
+
             data: {"type": "token",   "content": "..."}
             data: {"type": "sources", "sources": [...]}
             data: {"type": "meta",    "provider": "gemini", "chunks": 6, "mode": "trajectory"|"standard"}
@@ -118,7 +128,19 @@ class RAGService:
         ranking so the LLM can reason about direction and slope.
         """
         import json
+        import os
         from django.conf import settings
+
+        # ── Feature flag: delegate to graph path ──────────────────────────────
+        if os.environ.get('RAG_PIPELINE', 'legacy').strip().lower() == 'graph':
+            from apps.rag_assistant.graph.graph import stream_graph
+            yield from stream_graph(
+                query         = query,
+                patient       = patient,
+                history       = history,
+                document_type = document_type,
+            )
+            return
         from apps.rag_assistant.services.generation_service import (
             generate_streaming, _build_sources, _build_general_sources,
             active_stream_provider,

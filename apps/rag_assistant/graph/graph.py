@@ -148,5 +148,208 @@ def build_graph() -> StateGraph:
     return graph
 
 
-# Compiled graph — imported by rag_service.py
-health_graph = build_graph().compile()
+# ── Routing-only graph (used by stream_graph) ─────────────────────────────────
+# Runs safety_gate → understand → router → retrieval node → END.
+# generate_node is intentionally absent: stream_graph() calls
+# generate_streaming() directly so tokens come only from generation,
+# never from QueryUnderstanding or other internal nodes.
+
+def _build_routing_graph() -> StateGraph:
+    graph = StateGraph(HealthState)
+
+    graph.add_node('safety_gate_node',  safety_gate_node)
+    graph.add_node('understand_node',   understand_node)
+    graph.add_node('router_node',       router_node)
+    graph.add_node('cold_start_node',   cold_start_node)
+    graph.add_node('trajectory_node',   trajectory_node)
+    graph.add_node('lab_results_node',  lab_results_node)
+    graph.add_node('medications_node',  medications_node)
+    graph.add_node('wearable_node',     wearable_node)
+    graph.add_node('diagnosis_node',    diagnosis_node)
+    graph.add_node('records_node',      records_node)
+    graph.add_node('general_node',      general_node)
+
+    graph.set_entry_point('safety_gate_node')
+
+    graph.add_conditional_edges(
+        'safety_gate_node',
+        _route_from_safety_gate,
+        {'understand_node': 'understand_node', END: END},
+    )
+    graph.add_edge('understand_node', 'router_node')
+    graph.add_conditional_edges(
+        'router_node',
+        _route_from_router,
+        {v: v for v in ROUTE_TO_NODE.values()},
+    )
+    for node_name in ROUTE_TO_NODE.values():
+        graph.add_edge(node_name, END)
+
+    return graph
+
+
+# Compiled graphs — imported by rag_service.py
+health_graph         = build_graph().compile()
+health_graph_routing = _build_routing_graph().compile()
+
+
+# ── stream_graph — graph-path SSE generator ────────────────────────────────────
+
+def stream_graph(
+    query:         str,
+    patient,
+    session_id:    str  = None,
+    history:       list = None,
+    document_type: str  = None,
+):
+    """
+    Graph-path streaming generator (Phase 2 — RAG_PIPELINE=graph).
+
+    Yields SSE strings identical to stream_ask() so the view is path-agnostic:
+        data: {"type": "token",   "content": "..."}
+        data: {"type": "sources", "sources": [...]}
+        data: {"type": "meta",    "provider": ..., "chunks": N, "mode": ...}
+        data: {"type": "chart",   "chart": {...}}   — trajectory only
+        data: {"type": "done"}
+        data: {"type": "error",   "message": "..."}
+
+    Pipeline:
+        1. health_graph_routing resolves retrieval state without running the
+           LLM (safety_gate → understand → router → retrieval node → END).
+           This structural split guarantees zero token leakage from internal
+           nodes (e.g. QueryUnderstanding) — only generation tokens are ever
+           yielded, which is the intent of stream_mode="messages" filtered to
+           generate_node.
+        2. GeneralKnowledgeService called here for general/hybrid modes (the
+           retrieval nodes only fetch personal records).
+        3. generate_streaming() called with retrieval state for token-by-token SSE.
+        4. GuardrailService buffer: first 500 chars buffered for in-place
+           softening, then get_appended_disclaimers() on the full text.
+    """
+    import json
+    from apps.rag_assistant.services.generation_service import (
+        generate_streaming, _build_sources, _build_general_sources,
+        active_stream_provider,
+    )
+    from apps.rag_assistant.services.guardrail_service  import GuardrailService
+    from apps.rag_assistant.services.trajectory_service import TrajectoryService
+
+    try:
+        initial_state = {
+            'question':           query,
+            'route':              'general',
+            'answer':             '',
+            'patient_id':         patient.pk,
+            'context_chunks':     [],
+            'session_id':         session_id,
+            'history':            history or [],
+            'needs_retry':        False,
+            'retry_count':        0,
+            'llm_provider':       '',
+            'trajectory_context': '',
+            'rewritten_query':    '',
+            'mode':               '',
+        }
+
+        # ── Phase 1: routing (no generation) ──────────────────────────────────
+        rstate = health_graph_routing.invoke(initial_state)
+
+        route              = rstate.get('route', 'general')
+        chunks             = rstate.get('context_chunks', [])
+        trajectory_context = rstate.get('trajectory_context', '')
+        mode               = rstate.get('mode', 'personal') or 'personal'
+        rewritten_query    = rstate.get('rewritten_query') or query
+
+        # Emergency: safety_gate_node already built the answer, graph ended early
+        if route == 'emergency':
+            answer = rstate.get('answer', '')
+            yield f'data: {json.dumps({"type": "token", "content": answer})}\n\n'
+            yield 'data: {"type": "sources", "sources": []}\n\n'
+            yield f'data: {json.dumps({"type": "meta", "provider": "safety_gate", "chunks": 0, "mode": "emergency", "safety_routed": True, "triggered_rules": []})}\n\n'
+            yield 'data: {"type": "done"}\n\n'
+            return
+
+        # ── General knowledge retrieval (graph nodes only fetch personal records) ─
+        general_chunks = []
+        if mode in ('general', 'hybrid'):
+            from apps.rag_assistant.services.general_knowledge_service import GeneralKnowledgeService
+            general_chunks = GeneralKnowledgeService().retrieve(rewritten_query)
+
+        # History-only follow-up fallback (mirrors stream_ask behaviour)
+        if not chunks and not trajectory_context and (history or []):
+            trajectory_context = (
+                'No additional records were retrieved for this follow-up. '
+                'Please answer based on the conversation history above.'
+            )
+            mode = 'history_followup'
+
+        # Display mode for meta event
+        if route == 'cold_start':
+            display_mode = 'cold_start'
+        elif trajectory_context and route == 'trajectory':
+            display_mode = 'trajectory'
+        elif mode == 'history_followup':
+            display_mode = 'history_followup'
+        else:
+            display_mode = mode
+
+        gen_mode = mode if mode != 'history_followup' else 'personal'
+
+        # ── Phase 2: streaming generation with guardrail buffer ────────────────
+        _GUARDRAIL_BUF   = 500
+        _svc             = GuardrailService()
+        _buf             = ''
+        _buf_flushed     = False
+        collected_tokens = []
+
+        for token in generate_streaming(
+            chunks,
+            query,          # original query to LLM (rewritten_query is for retrieval only)
+            history or [],
+            context_override = trajectory_context,
+            query_mode       = gen_mode,
+            general_chunks   = general_chunks,
+        ):
+            collected_tokens.append(token)
+            if not _buf_flushed:
+                _buf += token
+                if len(_buf) >= _GUARDRAIL_BUF:
+                    safe_buf, _ = _svc.apply(_buf)
+                    yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
+                    _buf_flushed = True
+            else:
+                yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
+
+        if not _buf_flushed:
+            safe_buf, _ = _svc.apply(_buf)
+            yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
+
+        full_response = ''.join(collected_tokens)
+        extra_text, rules_fired = _svc.get_appended_disclaimers(full_response)
+        if extra_text:
+            yield f'data: {json.dumps({"type": "token", "content": extra_text})}\n\n'
+
+        # ── Sources, meta, chart, done ─────────────────────────────────────────
+        sources  = _build_sources(chunks)
+        if general_chunks:
+            sources += _build_general_sources(general_chunks)
+        provider = active_stream_provider()
+
+        yield f'data: {json.dumps({"type": "sources", "sources": sources})}\n\n'
+        yield f'data: {json.dumps({"type": "meta", "provider": provider, "chunks": len(chunks) + len(general_chunks), "mode": display_mode, "safety_routed": False, "triggered_rules": rules_fired})}\n\n'
+
+        traj_svc = TrajectoryService()
+        if display_mode == 'trajectory' or traj_svc.is_chart_request(query):
+            try:
+                chart_data = traj_svc.get_chart_data(patient, query)
+                if chart_data:
+                    yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
+            except Exception as _chart_err:
+                logger.warning('stream_graph chart_data failed: %s', _chart_err)
+
+        yield 'data: {"type": "done"}\n\n'
+
+    except Exception as exc:
+        logger.exception('stream_graph failed: %s', exc)
+        yield f'data: {json.dumps({"type": "error", "message": str(exc)})}\n\n'
+        yield 'data: {"type": "done"}\n\n'
