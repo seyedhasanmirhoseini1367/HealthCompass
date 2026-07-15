@@ -31,3 +31,13 @@ class HealthState(TypedDict):
     # by TrajectoryService.  When non-empty, generate_node uses it in place of
     # the standard similarity-ranked context so the LLM can reason about trends.
     trajectory_context: str   # '' when not a temporal query
+
+    # ── Query Understanding (set by understand_node) ───────────────────────────
+    # rewritten_query: standalone version of the question with conversation
+    #   context baked in so follow-ups like "what about last year?" become
+    #   self-contained before hitting the embedding model.
+    # mode: 'personal' | 'general' | 'hybrid' — drives system-prompt selection
+    #   in generate_node (Phase 2) and general-knowledge retrieval.
+    # Both fields default to '' in initial state; nodes use .get() to read them.
+    rewritten_query: str   # '' → nodes fall back to state['question']
+    mode:            str   # '' | 'personal' | 'general' | 'hybrid'

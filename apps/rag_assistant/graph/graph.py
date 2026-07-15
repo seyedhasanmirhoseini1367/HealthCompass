@@ -9,26 +9,28 @@ Full pipeline (left to right):
         ├── emergency detected ──────────────────────────────────────► END
         │   (answer already set, no retrieval/LLM call)
         │
-        └── safe ──► router_node
+        └── safe ──► understand_node   (QueryUnderstanding: sets route/mode/rewritten_query)
                          │
-                         ├── cold_start ──► cold_start_node ──┐
-                         ├── trajectory ──► trajectory_node   │
-                         ├── lab_results ► lab_results_node   │
-                         ├── medications ► medications_node   ├──► generate_node
-                         ├── wearable  ──► wearable_node      │         │
-                         ├── diagnosis ──► diagnosis_node     │         ▼
-                         ├── records   ──► records_node ──────┘    verify_node
-                         └── general   ──► general_node               │
-                                                          needs_retry=True ──► records_node
-                                                          cold_start/emergency ──────────────► END
-                                                          needs_retry=False ──────────────────► END
-Improvements over previous version:
-  • safety_gate_node is new entry point (pre-query emergency check)
-  • cold_start_node is a proper LangGraph node (was service-layer only)
-  • router_node checks cold-start BEFORE temporal routing
-  • router_node uses embedding-based semantic fallback for temporal queries
-  • verify_node skips retry for cold_start and emergency routes
-  • Δ(D,t,s) fully implemented in TrajectoryService
+                         └──► router_node  (cold-start gate: may override route → cold_start)
+                                  │
+                                  ├── cold_start ──► cold_start_node ──┐
+                                  ├── trajectory ──► trajectory_node   │
+                                  ├── lab_results ► lab_results_node   │
+                                  ├── medications ► medications_node   ├──► generate_node
+                                  ├── wearable  ──► wearable_node      │         │
+                                  ├── diagnosis ──► diagnosis_node     │         ▼
+                                  ├── records   ──► records_node ──────┘    verify_node
+                                  └── general   ──► general_node               │
+                                                               needs_retry=True ──► records_node
+                                                               cold_start/emergency ──────────► END
+                                                               needs_retry=False ─────────────► END
+
+Phase-1 change: understand_node (QueryUnderstanding) sits between safety_gate and router.
+  • Replaces duplicate _detect_route() / _is_temporal() logic in router_node with
+    the shared understand() service (keyword → LLM fallback, history-aware rewriting).
+  • router_node is now a cold-start gate only — route/mode already set by understand_node.
+  • Retrieval nodes use rewritten_query instead of question so follow-ups resolve correctly.
+  • No behaviour change for the legacy stream_ask() path (it calls understand() directly).
 """
 import logging
 
@@ -37,6 +39,7 @@ from langgraph.graph import StateGraph, END
 from .state import HealthState
 from .nodes import (
     safety_gate_node,
+    understand_node,
     router_node,
     cold_start_node,
     trajectory_node,
@@ -63,11 +66,11 @@ ROUTE_TO_NODE = {
 # ── Edge routing functions ─────────────────────────────────────────────────────
 
 def _route_from_safety_gate(state: HealthState) -> str:
-    """Emergency → END immediately.  Safe → proceed to router."""
+    """Emergency → END immediately.  Safe → understand_node (QU) → router."""
     if state.get('route') == 'emergency':
         logger.debug('safety_gate → END (emergency short-circuit)')
         return END
-    return 'router_node'
+    return 'understand_node'
 
 
 def _route_from_router(state: HealthState) -> str:
@@ -95,6 +98,7 @@ def build_graph() -> StateGraph:
 
     # ── Nodes ──────────────────────────────────────────────────────────────────
     graph.add_node('safety_gate_node',  safety_gate_node)
+    graph.add_node('understand_node',   understand_node)
     graph.add_node('router_node',       router_node)
     graph.add_node('cold_start_node',   cold_start_node)
     graph.add_node('trajectory_node',   trajectory_node)
@@ -110,12 +114,15 @@ def build_graph() -> StateGraph:
     # ── Entry point: safety gate ───────────────────────────────────────────────
     graph.set_entry_point('safety_gate_node')
 
-    # ── safety_gate → END (emergency) | router_node (safe) ────────────────────
+    # ── safety_gate → END (emergency) | understand_node (safe) ───────────────
     graph.add_conditional_edges(
         'safety_gate_node',
         _route_from_safety_gate,
-        {'router_node': 'router_node', END: END},
+        {'understand_node': 'understand_node', END: END},
     )
+
+    # ── understand_node → router_node (unconditional) ─────────────────────────
+    graph.add_edge('understand_node', 'router_node')
 
     # ── router → retrieval / context node ─────────────────────────────────────
     graph.add_conditional_edges(

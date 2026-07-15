@@ -73,6 +73,47 @@ def safety_gate_node(state: HealthState) -> Dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# UNDERSTAND — query understanding (QU) node
+# ══════════════════════════════════════════════════════════════════════════════
+
+def understand_node(state: HealthState) -> Dict[str, Any]:
+    """
+    Runs QueryUnderstanding to classify the query and rewrite follow-ups.
+
+    Sets in state:
+        route           — lab_results | medications | trajectory | … | general
+        rewritten_query — standalone query with conversation context baked in
+        mode            — personal | general | hybrid
+
+    Falls back to _detect_route() (local keyword logic) if the QU service
+    is unavailable (e.g. Groq API key missing, import error).
+    """
+    from apps.rag_assistant.services.query_understanding import understand
+
+    question = state['question']
+    history  = state.get('history', [])
+
+    try:
+        qi = understand(question, history)
+        logger.info(
+            'understand_node: mode=%s route=%s intent=%s temporal=%s via_llm=%s q=%r',
+            qi.mode, qi.route, qi.intent, qi.is_temporal, qi.via_llm, question[:60],
+        )
+        return {
+            'route':           qi.route,
+            'rewritten_query': qi.rewritten_query,
+            'mode':            qi.mode,
+        }
+    except Exception as exc:
+        logger.warning('understand_node failed (%s) — falling back to _detect_route', exc)
+        return {
+            'route':           _detect_route(question),
+            'rewritten_query': question,
+            'mode':            'personal',
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ROUTER — cold-start check + keyword/semantic temporal routing
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -238,12 +279,15 @@ def _detect_route(question: str) -> str:
 
 def router_node(state: HealthState) -> Dict[str, Any]:
     """
-    Routing node.  Checks cold-start condition FIRST (before any retrieval
-    routing), then applies keyword + semantic temporal detection.
+    Routing node — cold-start gate only.
+
+    understand_node (which runs immediately before this) has already set
+    state['route'] via QueryUnderstanding.  This node's only job is to
+    check whether the patient has any indexed records; if not, it overrides
+    the route to 'cold_start' so cold_start_node can handle the response.
     """
     from django.conf import settings
 
-    # ── Cold-start check: patient has no indexed chunks ───────────────────
     if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
         try:
             from django.contrib.auth import get_user_model
@@ -256,9 +300,9 @@ def router_node(state: HealthState) -> Dict[str, Any]:
         except Exception as exc:
             logger.warning('router_node cold-start check failed (proceeding normally): %s', exc)
 
-    route = _detect_route(state['question'])
-    logger.debug('RAG router: "%s" → %s', state['question'][:60], route)
-    return {'route': route, 'trajectory_context': ''}
+    # Route already set by understand_node — nothing to do.
+    logger.debug('router_node: route=%s q=%r', state.get('route'), state['question'][:60])
+    return {}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -312,6 +356,9 @@ def trajectory_node(state: HealthState) -> Dict[str, Any]:
     Stores the formatted context in state['trajectory_context'] and the source
     chunks in state['context_chunks'] for the sources panel.
     """
+    # Use the QU-rewritten query so follow-ups like "what about last year?"
+    # are resolved to self-contained phrases before trajectory extraction.
+    query = state.get('rewritten_query') or state['question']
     try:
         from django.contrib.auth import get_user_model
         from apps.rag_assistant.services.trajectory_service import TrajectoryService
@@ -319,7 +366,7 @@ def trajectory_node(state: HealthState) -> Dict[str, Any]:
         User    = get_user_model()
         patient = User.objects.get(pk=state['patient_id'])
         svc     = TrajectoryService()
-        context, source_chunks = svc.get_trajectory_context(patient, state['question'])
+        context, source_chunks = svc.get_trajectory_context(patient, query)
 
         if context:
             logger.info(
@@ -348,6 +395,8 @@ def _retrieve(
     top_k:         Optional[int] = None,
     query_intent:  Optional[str] = None,
 ) -> Dict[str, Any]:
+    # Use the QU-rewritten query (standalone, history-resolved) when available.
+    query = state.get('rewritten_query') or state['question']
     try:
         from django.contrib.auth import get_user_model
         from apps.rag_assistant.services.retrieval_service import RetrievalService
@@ -357,7 +406,7 @@ def _retrieve(
         svc     = RetrievalService()
         chunks  = svc.retrieve(
             patient       = patient,
-            query         = state['question'],
+            query         = query,
             document_type = document_type,
             top_k         = top_k,
             query_intent  = query_intent,

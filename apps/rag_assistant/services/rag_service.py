@@ -307,7 +307,7 @@ class RAGService:
 
         initial_state = {
             'question':          query,
-            'route':             'general',
+            'route':             'general',      # overwritten by understand_node
             'answer':            '',
             'patient_id':        patient.pk,
             'context_chunks':    [],
@@ -317,6 +317,8 @@ class RAGService:
             'retry_count':       0,
             'llm_provider':      '',
             'trajectory_context': '',
+            'rewritten_query':   '',             # populated by understand_node
+            'mode':              '',             # populated by understand_node
         }
 
         try:
