@@ -30,7 +30,7 @@
 <div class="page-hero">
   <div class="page-hero-inner">
     <div>
-      <h1><i class="fas fa-brain" style="margin-right:.5rem;opacity:.9"></i>AI &amp; Analytics</h1>
+      <h1><i class="fas fa-brain icon-mr" style="opacity:.9" aria-hidden="true"></i>AI &amp; Analytics</h1>
       <p>Your personal health intelligence hub — choose where to go</p>
     </div>
   </div>
@@ -48,11 +48,11 @@
     </div>
     <div class="nc-desc">Your personal biomarker trends, latest lab values, health alerts, and AI risk score — all in one place.</div>
     <div class="nc-tags">
-      <span class="nc-tag" style="background:#ede9fe;color:#6d28d9">Trend Analysis</span>
-      <span class="nc-tag" style="background:#dbeafe;color:#1d4ed8">Lab Values</span>
-      <span class="nc-tag" style="background:#fef3c7;color:#92400e">AI Alerts</span>
+      <span class="nc-tag tag-purple">Trend Analysis</span>
+      <span class="nc-tag tag-blue">Lab Values</span>
+      <span class="nc-tag tag-amber">AI Alerts</span>
     </div>
-    <div class="nc-footer"><span class="nc-cta">Open <i class="fas fa-arrow-right"></i></span></div>
+    <div class="nc-footer"><span class="nc-cta">Open <i class="fas fa-arrow-right" aria-hidden="true"></i></span></div>
   </a>
   {% else %}
   <a href="{% url 'account_login' %}?next={% url 'ai_insights:health' %}" class="nav-card" style="--nc-accent:#6366f1">
@@ -63,11 +63,11 @@
     </div>
     <div class="nc-desc">Your personal biomarker trends, latest lab values, health alerts, and AI risk score — all in one place.</div>
     <div class="nc-tags">
-      <span class="nc-tag" style="background:#ede9fe;color:#6d28d9">Trend Analysis</span>
-      <span class="nc-tag" style="background:#dbeafe;color:#1d4ed8">Lab Values</span>
-      <span class="nc-tag" style="background:#fef3c7;color:#92400e">AI Alerts</span>
+      <span class="nc-tag tag-purple">Trend Analysis</span>
+      <span class="nc-tag tag-blue">Lab Values</span>
+      <span class="nc-tag tag-amber">AI Alerts</span>
     </div>
-    <div class="nc-footer"><span class="nc-cta"><i class="fas fa-lock" style="font-size:.75rem"></i> Sign in to access</span></div>
+    <div class="nc-footer"><span class="nc-cta"><i class="fas fa-lock text-xs" aria-hidden="true"></i> Sign in to access</span></div>
   </a>
   {% endif %}
 
@@ -78,20 +78,20 @@
   <a href="{% url 'account_login' %}?next={% url 'ai_insights:population' %}" class="nav-card" style="--nc-accent:#0ea5e9">
   {% endif %}
     <div class="nc-top">
-      <span class="nc-num" style="background:#0ea5e9">2</span>
+      <span class="nc-num">2</span>
       <span class="nc-icon">🌍</span>
       <div class="nc-title">Population Insights</div>
     </div>
     <div class="nc-desc">Anonymised aggregate statistics across all users — query patterns, safety interventions, and knowledge base coverage.</div>
     <div class="nc-tags">
-      <span class="nc-tag" style="background:#e0f2fe;color:#0369a1">Anonymised</span>
-      <span class="nc-tag" style="background:#d1fae5;color:#065f46">Usage Stats</span>
-      <span class="nc-tag" style="background:#f0fdf4;color:#16a34a">Safety</span>
+      <span class="nc-tag tag-sky">Anonymised</span>
+      <span class="nc-tag tag-green">Usage Stats</span>
+      <span class="nc-tag tag-mint">Safety</span>
     </div>
     <div class="nc-footer">
       <span class="nc-cta">
-        {% if user.is_authenticated %}Open{% else %}<i class="fas fa-lock" style="font-size:.75rem"></i> Sign in{% endif %}
-        <i class="fas fa-arrow-right"></i>
+        {% if user.is_authenticated %}Open{% else %}<i class="fas fa-lock text-xs" aria-hidden="true"></i> Sign in{% endif %}
+        <i class="fas fa-arrow-right" aria-hidden="true"></i>
       </span>
     </div>
   </a>
@@ -99,14 +99,14 @@
   <!-- 3 · AI Models -->
   <a href="{% url 'ai_insights:models' %}" class="nav-card" style="--nc-accent:#10b981">
     <div class="nc-top">
-      <span class="nc-num" style="background:#10b981">3</span>
+      <span class="nc-num">3</span>
       <span class="nc-icon">🤖</span>
       <div class="nc-title">AI Models</div>
     </div>
     <div class="nc-desc">Browse and run {{ total_models }} specialist AI models — from EEG seizure analysis to cardiovascular risk prediction.</div>
     <div class="nc-tags">
-      <span class="nc-tag" style="background:#d1fae5;color:#065f46">{{ total_models }} models</span>
-      <span class="nc-tag" style="background:#fce7f3;color:#9d174d">EEG · Cardio · Diabetes</span>
+      <span class="nc-tag tag-green">{{ total_models }} models</span>
+      <span class="nc-tag tag-pink">EEG · Cardio · Diabetes</span>
     </div>
     <div class="nc-footer"><span class="nc-cta">Browse <i class="fas fa-arrow-right"></i></span></div>
   </a>

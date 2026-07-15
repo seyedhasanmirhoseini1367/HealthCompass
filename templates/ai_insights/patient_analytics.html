@@ -49,6 +49,9 @@
 .status-normal  {background:#dcfce7;color:#16a34a}
 .status-abnormal{background:#fef3c7;color:#d97706}
 .status-critical{background:#fee2e2;color:#dc2626}
+.snap-card .biovalue.critical{color:#dc2626}
+.snap-card .biovalue.abnormal{color:#d97706}
+.snap-card .biovalue:not(.critical):not(.abnormal){color:#16a34a}
 
 /* ── Two-column layout ───────────────────────────────────────────────────── */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
@@ -71,6 +74,7 @@
 /* ── Upload activity ─────────────────────────────────────────────────────── */
 .no-data-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem;color:var(--muted);text-align:center;gap:.75rem}
 .no-data-msg i{font-size:2rem;opacity:.4}
+.no-data-msg.compact{padding:1.5rem}
 
 /* ── Risk badge ─────────────────────────────────────────────────────────── */
 .risk-ring{width:80px;height:80px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;border:4px solid}
@@ -107,7 +111,7 @@
 {% block content %}
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <div class="page-hero">
-  <h1><i class="fas fa-chart-line" style="margin-right:.5rem"></i>AI & Analytics</h1>
+  <h1><i class="fas fa-chart-line icon-mr" aria-hidden="true"></i>AI & Analytics</h1>
   <p>Your personal health trends and anonymised population benchmarks</p>
 </div>
 
@@ -130,19 +134,19 @@
   <!-- ── Summary stats ──────────────────────────────────────────────────── -->
   <div class="stat-grid">
     <div class="stat-card">
-      <div class="num" style="color:var(--primary-dk)">{{ total_records }}</div>
+      <div class="num num-primary">{{ total_records }}</div>
       <div class="lbl">Total Records</div>
     </div>
     <div class="stat-card">
-      <div class="num" style="color:#6366f1">{{ total_biomarkers }}</div>
+      <div class="num num-indigo">{{ total_biomarkers }}</div>
       <div class="lbl">Biomarkers Tracked</div>
     </div>
     <div class="stat-card">
-      <div class="num" style="color:{% if unread_alerts > 0 %}var(--danger){% else %}var(--success){% endif %}">{{ unread_alerts }}</div>
+      <div class="num {% if unread_alerts > 0 %}text-danger{% else %}text-success{% endif %}">{{ unread_alerts }}</div>
       <div class="lbl">Unread Alerts</div>
     </div>
     <div class="stat-card">
-      <div class="num" style="color:#64748b;font-size:1.1rem;padding-top:.3rem">
+      <div class="num num-date">
         {% if last_record_date %}{{ last_record_date|date:"M d, Y" }}{% else %}—{% endif %}
       </div>
       <div class="lbl">Last Record</div>
@@ -155,9 +159,9 @@
       <i class="fas fa-flask"></i>
       <div>
         <strong>No health records yet</strong><br>
-        <span style="font-size:.85rem">Upload your lab results to see your biomarker trends and analytics here.</span>
+        <span class="text-sm">Upload your lab results to see your biomarker trends and analytics here.</span>
       </div>
-      <a href="/records/" class="btn btn-primary" style="margin-top:.5rem"><i class="fas fa-upload"></i> Upload Records</a>
+      <a href="/records/" class="btn btn-primary mt-sm"><i class="fas fa-upload"></i> Upload Records</a>
     </div>
   </div>
 
@@ -177,8 +181,7 @@
     <div class="snap-card">
       <div class="bioname">{{ name }}</div>
       <div>
-        <span class="biovalue {% if pt.critical %}critical{% elif pt.abnormal %}abnormal{% endif %}"
-              style="color:{% if pt.critical %}#dc2626{% elif pt.abnormal %}#d97706{% else %}#16a34a{% endif %}">
+        <span class="biovalue {% if pt.critical %}critical{% elif pt.abnormal %}abnormal{% endif %}">
           {{ pt.value }}
         </span>
         {% if pt.unit %}<span class="biounit">{{ pt.unit }}</span>{% endif %}
@@ -193,7 +196,7 @@
           <span class="biostatus status-normal"><i class="fas fa-check-circle"></i> Normal</span>
         {% endif %}
       </div>
-      <div style="font-size:.72rem;color:#94a3b8;margin-top:.3rem">{{ pt.date }}</div>
+      <div class="text-xs text-subtle mt-xs">{{ pt.date }}</div>
     </div>
     {% endfor %}
   </div>
@@ -202,32 +205,32 @@
   <!-- ── Row: Alerts + Record Types ─────────────────────────────────────── -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header"><i class="fas fa-bell" style="color:#f59e0b"></i> Health Alerts</div>
+      <div class="card-header"><i class="fas fa-bell" aria-hidden="true"></i> Health Alerts</div>
       <div class="card-body">
-        <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.25rem">
-          <div style="text-align:center">
-            <div style="font-size:1.6rem;font-weight:800;color:#ef4444" id="cnt-critical">0</div>
-            <div style="font-size:.75rem;color:var(--muted)">Critical</div>
+        <div class="counter-row">
+          <div class="text-center">
+            <div class="counter-num counter-critical" id="cnt-critical">0</div>
+            <div class="counter-lbl">Critical</div>
           </div>
-          <div style="text-align:center">
-            <div style="font-size:1.6rem;font-weight:800;color:#f59e0b" id="cnt-warning">0</div>
-            <div style="font-size:.75rem;color:var(--muted)">Warning</div>
+          <div class="text-center">
+            <div class="counter-num counter-warning" id="cnt-warning">0</div>
+            <div class="counter-lbl">Warning</div>
           </div>
-          <div style="text-align:center">
-            <div style="font-size:1.6rem;font-weight:800;color:#3b82f6" id="cnt-info">0</div>
-            <div style="font-size:.75rem;color:var(--muted)">Info</div>
+          <div class="text-center">
+            <div class="counter-num counter-info" id="cnt-info">0</div>
+            <div class="counter-lbl">Info</div>
           </div>
         </div>
-        <div style="position:relative;height:140px">
+        <div class="chart-wrap chart-h-sm">
           <canvas id="alerts-chart"></canvas>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-folder-medical" style="color:var(--primary)"></i> Records by Type</div>
-      <div class="card-body" style="display:flex;align-items:center;justify-content:center">
-        <div style="position:relative;height:180px;width:260px">
+      <div class="card-header"><i class="fas fa-folder-medical" aria-hidden="true"></i> Records by Type</div>
+      <div class="card-body flex-center">
+        <div class="chart-wrap" style="height:180px;width:260px">
           <canvas id="records-type-chart"></canvas>
         </div>
       </div>
@@ -237,36 +240,36 @@
   <!-- ── Upload Activity + Risk ─────────────────────────────────────────── -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header"><i class="fas fa-calendar-check" style="color:#10b981"></i> Upload Activity</div>
+      <div class="card-header"><i class="fas fa-calendar-check" aria-hidden="true"></i> Upload Activity</div>
       <div class="card-body">
-        <div style="position:relative;height:140px">
+        <div class="chart-wrap chart-h-sm">
           <canvas id="upload-chart"></canvas>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-brain" style="color:#8b5cf6"></i> AI Risk Assessment</div>
+      <div class="card-header"><i class="fas fa-brain" aria-hidden="true"></i> AI Risk Assessment</div>
       <div class="card-body">
         {% if latest_risk is not None %}
-        <div style="display:flex;align-items:center;gap:1.5rem;margin-bottom:1rem">
+        <div class="risk-row">
           <div class="risk-ring {% if latest_risk >= 70 %}risk-high{% elif latest_risk >= 30 %}risk-medium{% else %}risk-low{% endif %}">
             {{ latest_risk|floatformat:0 }}<span style="font-size:.7rem;font-weight:600">%</span>
           </div>
           <div>
-            <div style="font-weight:700;font-size:.95rem">
+            <div class="risk-label">
               {% if latest_risk >= 70 %}High Risk{% elif latest_risk >= 30 %}Moderate Risk{% else %}Low Risk{% endif %}
             </div>
-            <div style="font-size:.8rem;color:var(--muted)">Latest AI prediction</div>
+            <div class="risk-sublabel">Latest AI prediction</div>
           </div>
         </div>
-        <div style="position:relative;height:120px">
+        <div class="chart-wrap chart-h-xs">
           <canvas id="risk-chart"></canvas>
         </div>
         {% else %}
-        <div class="no-data-msg" style="padding:1.5rem">
+        <div class="no-data-msg compact">
           <i class="fas fa-robot"></i>
-          <span style="font-size:.85rem">No AI predictions yet.<br>Run an AI model from the Insights section.</span>
+          <span class="text-sm">No AI predictions yet.<br>Run an AI model from the Insights section.</span>
         </div>
         {% endif %}
       </div>
@@ -276,7 +279,7 @@
   {% endif %}{# end has_data #}
 
   <!-- Action bar -->
-  <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap">
+  <div class="action-bar">
     <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
     <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI</a>
     <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
@@ -299,24 +302,24 @@
   <!-- ── System-wide summary ─────────────────────────────────────────────── -->
   <div class="pop-stat-grid">
     <div class="pop-stat">
-      <div class="pop-num" style="color:#6366f1">{{ pop_total_users }}</div>
+      <div class="pop-num pop-num-indigo">{{ pop_total_users }}</div>
       <div class="pop-lbl">Active Users</div>
     </div>
     <div class="pop-stat">
-      <div class="pop-num" style="color:#0ea5e9">{{ pop_total_queries }}</div>
+      <div class="pop-num pop-num-sky">{{ pop_total_queries }}</div>
       <div class="pop-lbl">Total Queries</div>
     </div>
     <div class="pop-stat">
-      <div class="pop-num" style="color:#10b981">{{ pop_total_sessions }}</div>
+      <div class="pop-num pop-num-teal">{{ pop_total_sessions }}</div>
       <div class="pop-lbl">Chat Sessions</div>
     </div>
     <div class="pop-stat">
-      <div class="pop-num" style="color:#f59e0b">{{ pop_safety_total }}</div>
+      <div class="pop-num pop-num-amber">{{ pop_safety_total }}</div>
       <div class="pop-lbl">Safety Interceptions</div>
       <div class="pop-sub">{{ pop_safety_pct }}% of queries</div>
     </div>
     <div class="pop-stat">
-      <div class="pop-num" style="color:#8b5cf6">{{ pop_kb_chunks }}</div>
+      <div class="pop-num pop-num-violet">{{ pop_kb_chunks }}</div>
       <div class="pop-lbl">Knowledge Base Articles</div>
       <div class="pop-sub">curated health sources</div>
     </div>
@@ -326,9 +329,9 @@
   <div class="two-col">
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-route" style="color:#6366f1"></i> Query Mode Distribution</div>
+      <div class="card-header"><i class="fas fa-route" aria-hidden="true"></i> Query Mode Distribution</div>
       <div class="card-body">
-        <div style="position:relative;height:200px">
+        <div class="chart-wrap chart-h-lg">
           <canvas id="pop-mode-chart"></canvas>
         </div>
         <div class="mode-legend" id="pop-mode-legend"></div>
@@ -336,9 +339,9 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-chart-bar" style="color:#0ea5e9"></i> Monthly Query Volume</div>
+      <div class="card-header"><i class="fas fa-chart-bar" aria-hidden="true"></i> Monthly Query Volume</div>
       <div class="card-body">
-        <div style="position:relative;height:200px">
+        <div class="chart-wrap chart-h-lg">
           <canvas id="pop-volume-chart"></canvas>
         </div>
       </div>
@@ -347,28 +350,28 @@
   </div>
 
   <!-- ── Knowledge base topic coverage ──────────────────────────────────── -->
-  <div class="card" style="margin-bottom:1.5rem">
-    <div class="card-header"><i class="fas fa-book-medical" style="color:#10b981"></i> Knowledge Base Topic Coverage</div>
+  <div class="card mb-md">
+    <div class="card-header"><i class="fas fa-book-medical" aria-hidden="true"></i> Knowledge Base Topic Coverage</div>
     <div class="card-body" id="pop-topics-bars">
-      <div class="no-data-msg" style="padding:1.5rem"><i class="fas fa-spinner fa-spin"></i><span>Loading…</span></div>
+      <div class="no-data-msg compact"><i class="fas fa-spinner fa-spin"></i><span>Loading…</span></div>
     </div>
   </div>
 
   <!-- ── Safety interventions over time ─────────────────────────────────── -->
-  <div class="card" style="margin-bottom:1.5rem">
-    <div class="card-header"><i class="fas fa-shield-alt" style="color:#ef4444"></i> Safety Interventions Over Time</div>
+  <div class="card mb-md">
+    <div class="card-header"><i class="fas fa-shield-alt" aria-hidden="true"></i> Safety Interventions Over Time</div>
     <div class="card-body">
-      <div style="position:relative;height:160px">
+      <div class="chart-wrap chart-h-md">
         <canvas id="pop-safety-chart"></canvas>
       </div>
-      <p style="font-size:.78rem;color:#94a3b8;margin-top:.5rem;margin-bottom:0">
+      <p class="text-xs text-subtle mt-sm">
         Queries automatically routed to safety protocols (emergency symptoms, crisis language, dangerous advice requests).
       </p>
     </div>
   </div>
 
   <!-- Action bar -->
-  <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap">
+  <div class="action-bar">
     <a href="/assistant/" class="btn btn-primary"><i class="fas fa-robot"></i> Ask AI Assistant</a>
     <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
     <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>

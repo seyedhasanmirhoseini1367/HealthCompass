@@ -238,6 +238,7 @@ footer{display:none!important}
       <textarea class="chat-input" id="msgInput" rows="1"
                 placeholder="Ask a health question…"
                 aria-label="Ask a health question"
+                autofocus
                 onkeydown="handleKey(event)"></textarea>
       <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
         <i class="fas fa-paper-plane" aria-hidden="true"></i>
@@ -311,7 +312,8 @@ async function sendMessage() {
   const typing = document.getElementById('typingIndicator');
   area.appendChild(typing);
   typing.style.display = 'flex';
-  scrollToBottom();
+  _autoScroll = true;
+  scrollToBottom(true);
 
   // Create the assistant bubble up-front so tokens stream into it
   const assistantWrap = makeAssistantBubble('', []);
@@ -612,13 +614,20 @@ function copyMsg(btn) {
   });
 }
 
-function scrollToBottom() {
+// Track whether the user has scrolled up away from the bottom.
+// Streaming tokens only auto-scroll when the user is already at the bottom.
+let _autoScroll = true;
+document.getElementById('messagesArea').addEventListener('scroll', function() {
+  _autoScroll = (this.scrollHeight - this.scrollTop - this.clientHeight) < 80;
+}, { passive: true });
+
+function scrollToBottom(force) {
   const area = document.getElementById('messagesArea');
-  area.scrollTop = area.scrollHeight;
+  if (force || _autoScroll) area.scrollTop = area.scrollHeight;
 }
 
 // Scroll to bottom on load
-scrollToBottom();
+scrollToBottom(true);
 
 function openMobileDrawer() {
   document.getElementById('mobileDrawer').style.display = 'block';
