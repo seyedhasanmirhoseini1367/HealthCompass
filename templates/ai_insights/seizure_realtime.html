@@ -187,9 +187,15 @@ main { padding: 0 !important; max-width: 100% !important; margin: 0 !important; 
   border-top: 1px solid #f1f5f9; padding-top: .55rem; margin-top: auto;
 }
 
+/* Footer adds height below rt-outer → page scrolls → sidebar scrolls away.
+   This page is full-viewport; no footer needed. */
+footer { display: none !important; }
+/* Safety: sidebar must never escape the grid cell */
+.rt-sidebar { position: sticky; top: 0; }
+
 @media(max-width:768px) {
   .rt-grid { grid-template-columns: 1fr; }
-  .rt-sidebar { border-left: none; border-top: 1px solid #e2e8f0; max-height: 340px; }
+  .rt-sidebar { position: static; border-left: none; border-top: 1px solid #e2e8f0; max-height: 340px; }
 }
 </style>
 {% endblock %}
