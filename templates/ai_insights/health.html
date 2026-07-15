@@ -319,8 +319,9 @@
 
 {% endblock %}
 
+{% load static %}
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 const TRENDING     = {{ trending_json|safe }};
 const POP_AVG      = {{ pop_avg_json|safe }};

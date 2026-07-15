@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}AI Health Assistant — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
@@ -119,6 +120,32 @@
 body,main{overflow:hidden!important}
 footer{display:none!important}
 @media(max-width:700px){#drawerBtn{display:inline-flex !important;align-items:center;gap:.35rem}}
+/* ── Local utilities ──────────────────────────────────────────────────────── */
+.icon-14  { width:14px }
+.mb-xs    { margin-bottom:.5rem }
+/* Mobile session drawer */
+.mobile-overlay { position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;background:rgba(0,0,0,.45) }
+.drawer-sheet   { position:absolute;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:1rem;max-height:70vh;overflow-y:auto }
+.drawer-header  { display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem }
+.drawer-title   { font-weight:700;font-size:.95rem }
+.drawer-close   { background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted) }
+/* Drawer open button */
+.drawer-btn { background:rgba(255,255,255,.2);border:none;color:white;border-radius:8px;padding:.4rem .65rem;font-size:.78rem;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap }
+/* Chat header sub-elements */
+.chat-bot-icon  { font-size:1.5rem;flex-shrink:0 }
+.chat-header-info { flex:1;min-width:0 }
+/* Records banner link */
+.link-amber { color:#92400e;font-weight:700;margin-left:.3rem }
+/* Empty state */
+.empty-chat      { text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center }
+.empty-chat-icon { font-size:2.5rem;margin-bottom:.75rem }
+.empty-chat-h    { font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.5rem }
+.empty-chat-p    { font-size:.85rem;max-width:360px }
+/* Prompt chip buttons */
+.prompt-chips { display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:1.25rem }
+.chip-btn     { background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s }
+/* Disclaimer */
+.disclaimer { font-size:.72rem;color:var(--muted);margin-top:.4rem;text-align:center }
 </style>
 {% endblock %}
 {% block content %}
@@ -142,10 +169,10 @@ footer{display:none!important}
       </button>
       <div class="session-dropdown" id="menu-{{ s.pk }}">
         <button onclick="renameSession('{{ s.pk }}','srow-{{ s.pk }}')">
-          <i class="fas fa-pen" style="width:14px"></i> Rename
+          <i class="fas fa-pen icon-14"></i> Rename
         </button>
         <button class="danger" onclick="deleteSession('{{ s.pk }}','srow-{{ s.pk }}')">
-          <i class="fas fa-trash" style="width:14px"></i> Delete
+          <i class="fas fa-trash icon-14"></i> Delete
         </button>
       </div>
     </div>
@@ -153,13 +180,13 @@ footer{display:none!important}
   </div>
 
   <!-- Mobile session drawer -->
-  <div id="mobileDrawer" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;background:rgba(0,0,0,.45)" onclick="closeMobileDrawer()">
-    <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:1rem;max-height:70vh;overflow-y:auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <span style="font-weight:700;font-size:.95rem">Chats</span>
-        <button onclick="closeMobileDrawer()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#64748b">&times;</button>
+  <div id="mobileDrawer" class="mobile-overlay d-none" onclick="closeMobileDrawer()">
+    <div onclick="event.stopPropagation()" class="drawer-sheet">
+      <div class="drawer-header">
+        <span class="drawer-title">Chats</span>
+        <button onclick="closeMobileDrawer()" class="drawer-close">&times;</button>
       </div>
-      <a href="{% url 'rag_assistant:new_session' %}" class="new-chat-btn" style="margin-bottom:.5rem">
+      <a href="{% url 'rag_assistant:new_session' %}" class="new-chat-btn mb-xs">
         <i class="fas fa-plus"></i> New chat
       </a>
       {% for s in sessions %}
@@ -172,13 +199,13 @@ footer{display:none!important}
 
   <!-- Main chat -->
   <div class="chat-main">
-    <div class="chat-header" style="display:flex;align-items:center;gap:.75rem">
-      <div style="font-size:1.5rem;flex-shrink:0">🤖</div>
-      <div style="flex:1;min-width:0">
+    <div class="chat-header">
+      <div class="chat-bot-icon">🤖</div>
+      <div class="chat-header-info">
         <h1>AI Health Assistant</h1>
         <p>Ask about your records, lab results, medications, and health topics</p>
       </div>
-      <button id="drawerBtn" onclick="openMobileDrawer()" style="display:none;background:rgba(255,255,255,.2);border:none;color:white;border-radius:8px;padding:.4rem .65rem;font-size:.78rem;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap">
+      <button id="drawerBtn" onclick="openMobileDrawer()" class="drawer-btn d-none">
         <i class="fas fa-history"></i> Chats
       </button>
     </div>
@@ -187,24 +214,24 @@ footer{display:none!important}
     <div class="no-records-banner">
       <i class="fas fa-info-circle"></i>
       <strong>No records yet.</strong> Upload your medical records for personalized answers.
-      <a href="{% url 'medical_records:list' %}" style="color:#92400e;font-weight:700;margin-left:.3rem">Upload records →</a>
+      <a href="{% url 'medical_records:list' %}" class="link-amber">Upload records →</a>
     </div>
     {% endif %}
 
     <div class="messages-area" id="messagesArea"
          role="log" aria-live="polite" aria-label="Conversation" aria-relevant="additions">
       {% if not chat_messages %}
-      <div id="emptyState" style="text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
-        <div style="font-size:2.5rem;margin-bottom:.75rem">💬</div>
-        <p style="font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.5rem">Start a conversation</p>
-        <p style="font-size:.85rem;max-width:360px">
+      <div id="emptyState" class="empty-chat">
+        <div class="empty-chat-icon">💬</div>
+        <p class="empty-chat-h">Start a conversation</p>
+        <p class="empty-chat-p">
           Ask about your latest lab results, what a medication does, or any general health question.
         </p>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:1.25rem">
-          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">What do my latest lab results show?</button>
-          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">Do I have any abnormal values?</button>
-          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">What are my current medications?</button>
-          <button onclick="usePrompt(this.textContent)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s">Explain my recent diagnosis</button>
+        <div class="prompt-chips">
+          <button onclick="usePrompt(this.textContent)" class="chip-btn">What do my latest lab results show?</button>
+          <button onclick="usePrompt(this.textContent)" class="chip-btn">Do I have any abnormal values?</button>
+          <button onclick="usePrompt(this.textContent)" class="chip-btn">What are my current medications?</button>
+          <button onclick="usePrompt(this.textContent)" class="chip-btn">Explain my recent diagnosis</button>
         </div>
       </div>
       {% else %}
@@ -244,21 +271,22 @@ footer{display:none!important}
         <i class="fas fa-paper-plane" aria-hidden="true"></i>
       </button>
     </div>
-    <p style="font-size:.72rem;color:var(--muted);margin-top:.4rem;text-align:center">
+    <p class="disclaimer">
       ⚠️ AI responses are not a substitute for professional medical advice. Always consult your doctor.
     </p>
   </div>
 </div>
 
 {% endblock %}
+{{ history_data|json_script:"history-data" }}
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/marked.min.js' %}"></script>
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 const SESSION_ID = "{{ session.pk }}";
 const STREAM_URL = "{% url 'rag_assistant:stream_message' %}";
 const CSRF = "{{ csrf_token }}";
-const HISTORY_DATA = {{ history_data_json|safe }};
+const HISTORY_DATA = JSON.parse(document.getElementById('history-data').textContent);
 
 // ── Initialise history messages (markdown + mode badge + sources + chart) ────
 document.querySelectorAll('.bubble-assistant[data-raw]').forEach(bubble => {

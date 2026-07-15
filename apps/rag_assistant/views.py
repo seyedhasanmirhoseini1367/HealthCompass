@@ -52,7 +52,7 @@ def chat_view(request):
         'chat_messages':    chat_messages,
         'sessions':         sessions,
         'has_records':      has_records,
-        'history_data_json': json.dumps(history_data),
+        'history_data': history_data,
     })
 
 

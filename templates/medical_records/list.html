@@ -353,6 +353,47 @@
   .filter-toolbar { gap: .4rem; }
   .add-record-btn { font-size: .8rem; padding: .34rem .7rem; }
 }
+
+/* ── Local utilities (augment main.css) ─────────────────────────────────── */
+.d-none     { display:none }
+.d-inline   { display:inline }
+.mb-sm      { margin-bottom:.75rem }
+.icon-sm    { font-size:.65rem }
+.btn-row    { display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap }
+.text-primary { color:var(--primary) }
+/* Modal header left section */
+.modal-header-left { display:flex;align-items:center;gap:.6rem;min-width:0 }
+/* pg-btn ellipsis separator */
+.pg-ellipsis { border:none;padding:.3rem .2rem }
+/* Empty state heading/body */
+.es-h { font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text) }
+/* Modal title */
+.modal-title-h { font-size:1rem;font-weight:800;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+/* Medium icon size */
+.icon-md { font-size:.8rem }
+/* mo-icon accent backgrounds */
+.mo-icon-pink   { background:#ec4899 }
+.mo-icon-teal   { background:#10b981 }
+.mo-icon-amber  { background:#f59e0b }
+.mo-icon-sky    { background:#0ea5e9 }
+.mo-icon-purple { background:#7c3aed }
+/* Record type icon backgrounds */
+.ri-lab_result  { background:#dbeafe }
+.ri-prescription{ background:#dcfce7 }
+.ri-diagnosis   { background:#fce7f3 }
+.ri-vaccination { background:#fef9c3 }
+.ri-imaging     { background:#ede9fe }
+.ri-wearable    { background:#ecfdf5 }
+.ri-discharge   { background:#fff7ed }
+.ri-other       { background:#f1f5f9 }
+/* Scan spinner accent */
+.up-spin-pink { border-top-color:#ec4899;border-color:#fbcfe8 }
+/* Required asterisk colours */
+.req-pink   { color:#ec4899 }
+.req-teal   { color:#10b981 }
+.req-amber  { color:#f59e0b }
+.req-sky    { color:#0ea5e9 }
+.req-purple { color:#7c3aed }
 </style>
 {% endblock %}
 
@@ -360,7 +401,7 @@
 <div class="page-hero">
   <div class="page-hero-inner">
     <div>
-      <h1><i class="fas fa-file-medical" style="margin-right:.45rem;opacity:.9"></i>My Medical Records</h1>
+      <h1><i class="fas fa-file-medical icon-mr" style="opacity:.9"></i>My Medical Records</h1>
       <p>Your complete health history — labs, prescriptions, and more</p>
     </div>
   </div>
@@ -415,7 +456,7 @@
           <button type="button" class="p-pill {% if active_period == '6m'  %}active{% endif %}" data-period="6m">6m</button>
           <button type="button" class="p-pill {% if active_period == '1y'  %}active{% endif %}" data-period="1y">1y</button>
           <button type="button" class="p-pill {% if active_period == 'custom' %}active{% endif %}" data-period="custom">
-            <i class="fas fa-calendar-days" style="font-size:.68rem"></i> Custom
+            <i class="fas fa-calendar-days icon-sm"></i> Custom
           </button>
         </div>
 
@@ -434,7 +475,7 @@
       </div>
 
       <div class="custom-dates {% if active_period == 'custom' %}visible{% endif %}" id="custom-dates-row">
-        <i class="fas fa-calendar-range" style="font-size:.8rem"></i>
+        <i class="fas fa-calendar-range icon-md"></i>
         <span>From</span>
         <input type="date" name="date_from" id="date-from" value="{{ date_from }}">
         <span>to</span>
@@ -450,8 +491,7 @@
       {% with rtype=rec.record_type %}
       <div class="rec-row {% if rec.is_flagged %}flagged{% endif %}"
            onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
-        <div class="rec-icon-sm"
-             style="background:{% if rtype == 'lab_result' %}#dbeafe{% elif rtype == 'prescription' %}#dcfce7{% elif rtype == 'diagnosis' %}#fce7f3{% elif rtype == 'vaccination' %}#fef9c3{% elif rtype == 'imaging' %}#ede9fe{% elif rtype == 'wearable' %}#ecfdf5{% elif rtype == 'discharge' %}#fff7ed{% else %}#f1f5f9{% endif %}">
+        <div class="rec-icon-sm ri-{{ rtype }}">
           {% if rtype == 'lab_result' %}🧪
           {% elif rtype == 'prescription' %}💊
           {% elif rtype == 'diagnosis' %}🏥
@@ -473,7 +513,7 @@
         </div>
         <div class="rec-row-actions" onclick="event.stopPropagation()">
           <a href="{% url 'medical_records:detail' rec.pk %}" class="row-btn view">View</a>
-          <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" style="display:inline">
+          <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" class="d-inline">
             {% csrf_token %}
             <button type="button" class="row-btn delete"
               onclick="openDeleteModal('Delete &ldquo;{{ rec.title|escapejs }}&rdquo; permanently?', () => document.getElementById('del-rec-{{ rec.pk }}').submit(), 'Delete Record')">Delete</button>
@@ -493,10 +533,10 @@
       <div class="pg-controls">
         {% if page_obj.has_previous %}
         <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
-          <i class="fas fa-chevron-left" style="font-size:.65rem"></i> Prev
+          <i class="fas fa-chevron-left icon-sm"></i> Prev
         </a>
         {% else %}
-        <span class="pg-btn disabled"><i class="fas fa-chevron-left" style="font-size:.65rem"></i> Prev</span>
+        <span class="pg-btn disabled"><i class="fas fa-chevron-left icon-sm"></i> Prev</span>
         {% endif %}
 
         {% for num in page_obj.paginator.page_range %}
@@ -505,16 +545,16 @@
           {% elif num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
           <a class="pg-btn" href="?page={{ num }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">{{ num }}</a>
           {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
-          <span class="pg-btn disabled" style="border:none;padding:.3rem .2rem">…</span>
+          <span class="pg-btn disabled pg-ellipsis">…</span>
           {% endif %}
         {% endfor %}
 
         {% if page_obj.has_next %}
         <a class="pg-btn" href="?page={{ page_obj.next_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
-          Next <i class="fas fa-chevron-right" style="font-size:.65rem"></i>
+          Next <i class="fas fa-chevron-right icon-sm"></i>
         </a>
         {% else %}
-        <span class="pg-btn disabled">Next <i class="fas fa-chevron-right" style="font-size:.65rem"></i></span>
+        <span class="pg-btn disabled">Next <i class="fas fa-chevron-right icon-sm"></i></span>
         {% endif %}
       </div>
     </div>
@@ -523,8 +563,8 @@
     {% else %}
     <div class="empty-state">
       <div class="icon">📁</div>
-      <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text)">No records found</p>
-      <p style="font-size:.875rem">
+      <p class="es-h">No records found</p>
+      <p class="text-sm">
         {% if active_type or active_period or active_q %}
           Try adjusting your filters, or <a href="{% url 'medical_records:list' %}">clear them</a>.
         {% else %}
@@ -542,12 +582,12 @@
 
     <!-- Unified header -->
     <div class="modal-header">
-      <div style="display:flex;align-items:center;gap:.6rem;min-width:0">
-        <button class="modal-back" id="modalBack" onclick="showOptions()" style="display:none" title="Back">
+      <div class="modal-header-left">
+        <button class="modal-back d-none" id="modalBack" onclick="showOptions()" title="Back">
           <i class="fas fa-arrow-left"></i>
         </button>
-        <h2 id="modalTitle" style="font-size:1rem;font-weight:800;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          <i class="fas fa-plus-circle" style="color:var(--primary)"></i> Add Record
+        <h2 id="modalTitle" class="modal-title-h">
+          <i class="fas fa-plus-circle text-primary"></i> Add Record
         </h2>
       </div>
       <button class="modal-close" onclick="closeAddModal()">✕</button>
@@ -556,40 +596,40 @@
     <!-- ── Step 1: Option picker ── -->
     <div id="panel-options" class="modal-options">
       <a class="mo-row" href="#" onclick="showPanel('scan');return false">
-        <div class="mo-icon" style="background:#ec4899"><i class="fas fa-camera"></i></div>
+        <div class="mo-icon mo-icon-pink"><i class="fas fa-camera"></i></div>
         <div><div class="mo-label">Scan Paper</div><div class="mo-desc">Take a photo — AI reads and extracts the text</div></div>
       </a>
       <a class="mo-row" href="#" onclick="showPanel('pdf');return false">
-        <div class="mo-icon" style="background:#10b981"><i class="fas fa-file-pdf"></i></div>
+        <div class="mo-icon mo-icon-teal"><i class="fas fa-file-pdf"></i></div>
         <div><div class="mo-label">PDF / Document</div><div class="mo-desc">Lab reports, prescriptions, discharge summaries</div></div>
       </a>
       <a class="mo-row" href="#" onclick="showPanel('text');return false">
-        <div class="mo-icon" style="background:#f59e0b"><i class="fas fa-paste"></i></div>
+        <div class="mo-icon mo-icon-amber"><i class="fas fa-paste"></i></div>
         <div><div class="mo-label">Paste Text</div><div class="mo-desc">Paste any lab result or note — AI parses it</div></div>
       </a>
       <a class="mo-row" href="#" onclick="showPanel('kanta');return false">
-        <div class="mo-icon" style="background:#0ea5e9"><i class="fas fa-file-code"></i></div>
+        <div class="mo-icon mo-icon-sky"><i class="fas fa-file-code"></i></div>
         <div><div class="mo-label">Kanta XML</div><div class="mo-desc">Import Finnish health records</div></div>
       </a>
       <a class="mo-row" href="#" onclick="showPanel('wearable');return false">
-        <div class="mo-icon" style="background:#7c3aed"><i class="fas fa-watch"></i></div>
+        <div class="mo-icon mo-icon-purple"><i class="fas fa-watch"></i></div>
         <div><div class="mo-label">Wearable Data</div><div class="mo-desc">Apple Watch, Fitbit, Garmin — CSV, JSON, or XML export</div></div>
       </a>
     </div>
 
     <!-- ── Step 2a: Scan Paper ── -->
-    <div id="panel-scan" class="upload-panel" style="display:none">
-      <div id="scan-capture-wrap" style="margin-bottom:.75rem">
+    <div id="panel-scan" class="upload-panel d-none">
+      <div id="scan-capture-wrap" class="mb-sm">
         <div class="file-drop-zone pink" onclick="document.getElementById('modal-scan-input').click()">
           <i class="fas fa-camera"></i>
           <div><strong>Tap to take photo</strong></div>
-          <div style="font-size:.72rem">or choose an image file</div>
+          <div class="text-xs">or choose an image file</div>
         </div>
         <input type="file" id="modal-scan-input" accept="image/*" capture="environment" hidden>
       </div>
-      <div id="scan-preview-wrap" style="display:none;margin-bottom:.75rem">
+      <div id="scan-preview-wrap" class="d-none mb-sm">
         <img id="modal-scan-preview" class="scan-preview-img" alt="preview">
-        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+        <div class="btn-row">
           <button class="up-action-btn pink-abtn" id="modal-extract-btn" type="button">
             <i class="fas fa-magic"></i> Extract Text with AI
           </button>
@@ -602,7 +642,7 @@
       <form id="form-scan" class="upanel-form">
         {% csrf_token %}
         <div class="up-group">
-          <label>Extracted Text <span style="color:#ec4899">*</span></label>
+          <label>Extracted Text <span class="req-pink">*</span></label>
           <textarea name="raw_text" id="modal-scan-text" rows="4" required
             placeholder="Extract text first, or type/paste directly…"></textarea>
         </div>
@@ -637,11 +677,11 @@
     </div>
 
     <!-- ── Step 2b: PDF ── -->
-    <div id="panel-pdf" class="upload-panel" style="display:none">
+    <div id="panel-pdf" class="upload-panel d-none">
       <form id="form-pdf" class="upanel-form" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="up-group">
-          <label>PDF File <span style="color:#10b981">*</span></label>
+          <label>PDF File <span class="req-teal">*</span></label>
           <div class="file-drop-zone green" onclick="document.getElementById('modal-pdf-input').click()">
             <i class="fas fa-file-pdf"></i>
             <div id="pdf-chosen-name">Click to choose PDF</div>
@@ -669,11 +709,11 @@
     </div>
 
     <!-- ── Step 2c: Paste Text ── -->
-    <div id="panel-text" class="upload-panel" style="display:none">
+    <div id="panel-text" class="upload-panel d-none">
       <form id="form-text" class="upanel-form">
         {% csrf_token %}
         <div class="up-group">
-          <label>Medical Text <span style="color:#f59e0b">*</span></label>
+          <label>Medical Text <span class="req-amber">*</span></label>
           <textarea name="text" rows="6" required
             placeholder="Paste lab results, prescriptions, doctor notes…&#10;&#10;Example:&#10;Glucose: 5.4 mmol/L (ref 3.9–5.6)&#10;HbA1c: 38 mmol/mol"></textarea>
         </div>
@@ -698,11 +738,11 @@
     </div>
 
     <!-- ── Step 2d: Kanta XML ── -->
-    <div id="panel-kanta" class="upload-panel" style="display:none">
+    <div id="panel-kanta" class="upload-panel d-none">
       <form id="form-kanta" class="upanel-form" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="up-group">
-          <label>Kanta XML File <span style="color:#0ea5e9">*</span></label>
+          <label>Kanta XML File <span class="req-sky">*</span></label>
           <div class="file-drop-zone blue" onclick="document.getElementById('modal-kanta-input').click()">
             <i class="fas fa-file-code"></i>
             <div id="kanta-chosen-name">Click to choose XML file</div>
@@ -722,15 +762,15 @@
     </div>
 
     <!-- ── Step 2e: Wearable Data ── -->
-    <div id="panel-wearable" class="upload-panel" style="display:none">
+    <div id="panel-wearable" class="upload-panel d-none">
       <form id="form-wearable" class="upanel-form" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="up-group">
-          <label>CSV File <span style="color:#7c3aed">*</span></label>
+          <label>CSV File <span class="req-purple">*</span></label>
           <div class="file-drop-zone purple" onclick="document.getElementById('modal-wearable-input').click()">
             <i class="fas fa-watch"></i>
             <div id="wearable-chosen-name">Click to choose file</div>
-            <div style="font-size:.71rem">CSV, JSON, XML, or Parquet</div>
+            <div class="text-xs">CSV, JSON, XML, or Parquet</div>
           </div>
           <input type="file" id="modal-wearable-input" name="data_file" accept=".csv,.json,.xml,.parquet" hidden
                  onchange="setChosen('wearable-chosen-name', this)">
@@ -821,11 +861,11 @@ function getCsrf() {
 
 /* ── Panel titles ────────────────────────────────────────────────────────── */
 var PANEL_TITLES = {
-  scan:     '<i class="fas fa-camera" style="color:#ec4899"></i> Scan Paper',
-  pdf:      '<i class="fas fa-file-pdf" style="color:#10b981"></i> PDF / Document',
-  text:     '<i class="fas fa-paste" style="color:#f59e0b"></i> Paste Text',
-  kanta:    '<i class="fas fa-file-code" style="color:#0ea5e9"></i> Kanta XML',
-  wearable: '<i class="fas fa-watch" style="color:#7c3aed"></i> Wearable Data',
+  scan:     '<i class="fas fa-camera req-pink"></i> Scan Paper',
+  pdf:      '<i class="fas fa-file-pdf req-teal"></i> PDF / Document',
+  text:     '<i class="fas fa-paste req-amber"></i> Paste Text',
+  kanta:    '<i class="fas fa-file-code req-sky"></i> Kanta XML',
+  wearable: '<i class="fas fa-watch req-purple"></i> Wearable Data',
 };
 
 /* ── Modal open/close ────────────────────────────────────────────────────── */
@@ -851,7 +891,7 @@ function showOptions() {
   document.getElementById('panel-options').style.display = 'flex';
   document.getElementById('modalBack').style.display     = 'none';
   document.getElementById('modalTitle').innerHTML =
-    '<i class="fas fa-plus-circle" style="color:var(--primary)"></i> Add Record';
+    '<i class="fas fa-plus-circle text-primary"></i> Add Record';
   document.getElementById('modalBox').classList.remove('wide');
 }
 function showPanel(name) {
@@ -964,7 +1004,7 @@ function resetScanCapture() {
 
 function setScanStatus(msg, loading) {
   var el = document.getElementById('modal-scan-status');
-  el.innerHTML = loading ? '<span class="up-spin" style="border-top-color:#ec4899;border-color:#fbcfe8"></span> ' + msg : msg;
+  el.innerHTML = loading ? '<span class="up-spin up-spin-pink"></span> ' + msg : msg;
 }
 
 document.getElementById('modal-extract-btn').addEventListener('click', async function() {
@@ -978,10 +1018,10 @@ document.getElementById('modal-extract-btn').addEventListener('click', async fun
     var res  = await fetch(SCAN_OCR_URL, { method:'POST', body:fd });
     var data = await res.json();
     if (data.error) {
-      setScanStatus('<i class="fas fa-triangle-exclamation" style="color:#ef4444"></i> ' + esc(data.error));
+      setScanStatus('<i class="fas fa-triangle-exclamation text-danger"></i> ' + esc(data.error));
     } else {
       document.getElementById('modal-scan-text').value = data.text;
-      setScanStatus('<i class="fas fa-check-circle" style="color:#22c55e"></i> Text extracted — review and save.');
+      setScanStatus('<i class="fas fa-check-circle text-success"></i> Text extracted — review and save.');
     }
   } catch(e) {
     setScanStatus('Error: ' + e.message);
@@ -991,17 +1031,12 @@ document.getElementById('modal-extract-btn').addEventListener('click', async fun
 });
 
 /* ── DOM: prepend new record row ─────────────────────────────────────────── */
-var TYPE_COLORS = {
-  lab_result:'#dbeafe', prescription:'#dcfce7', diagnosis:'#fce7f3',
-  vaccination:'#fef9c3', imaging:'#ede9fe', wearable:'#ecfdf5', discharge:'#fff7ed',
-};
 var TYPE_EMOJI = {
   lab_result:'🧪', prescription:'💊', diagnosis:'🏥',
   vaccination:'💉', imaging:'🩻', wearable:'⌚', discharge:'📄',
 };
 
 function prependRecord(rec) {
-  var bg    = TYPE_COLORS[rec.record_type] || '#f1f5f9';
   var emoji = TYPE_EMOJI[rec.record_type]  || '📁';
   var csrf  = document.querySelector('[name=csrfmiddlewaretoken]').value;
   var dateSpan  = rec.record_date ? '<span>' + esc(rec.record_date) + '</span>' : '';
@@ -1009,7 +1044,7 @@ function prependRecord(rec) {
   var rowCls    = rec.is_flagged  ? 'rec-row flagged' : 'rec-row';
 
   var html = '<div class="' + rowCls + '" onclick="location.href=\'' + esc(rec.detail_url) + '\'">'
-    + '<div class="rec-icon-sm" style="background:' + bg + '">' + emoji + '</div>'
+    + '<div class="rec-icon-sm ri-' + esc(rec.record_type) + '">' + emoji + '</div>'
     + '<div class="rec-info">'
       + '<div class="rec-title">' + esc(rec.title) + '</div>'
       + '<div class="rec-meta-row">'
@@ -1022,7 +1057,7 @@ function prependRecord(rec) {
     + '</div>'
     + '<div class="rec-row-actions" onclick="event.stopPropagation()">'
       + '<a href="' + esc(rec.detail_url) + '" class="row-btn view">View</a>'
-      + '<form id="del-rec-' + rec.pk + '" method="post" action="' + esc(rec.delete_url) + '" style="display:inline">'
+      + '<form id="del-rec-' + rec.pk + '" method="post" action="' + esc(rec.delete_url) + '" class="d-inline">'
         + '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrf) + '">'
         + '<button type="button" class="row-btn delete"'
           + ' onclick="openDeleteModal(\'Delete this record permanently?\','

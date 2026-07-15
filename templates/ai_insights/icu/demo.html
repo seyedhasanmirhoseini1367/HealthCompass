@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}ICU Monitor · HealthCompass{% endblock %}
 
 {% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script src="{% static 'vendor/chartjs-plugin-annotation.min.js' %}"></script>
 <style>
 /* ── Dark clinical canvas ─────────────────────────────────────────────────── */
 .icu-wrap{background:#0b1220;min-height:calc(100vh - 58px);padding:0 0 2.5rem;margin:-1.5rem -1.5rem 0;color:#cbd5e1;font-size:.875rem}
