@@ -17,7 +17,7 @@
 .hero::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
 .hero-grid{max-width:var(--container);margin:0 auto;position:relative;z-index:1;
-  display:grid;grid-template-columns:1fr 360px;gap:2.5rem;align-items:center}
+  display:grid;grid-template-columns:1fr 420px;gap:2.5rem;align-items:center}
 @media(max-width:880px){.hero-grid{grid-template-columns:1fr;text-align:center}}
 
 .hero-pill{display:inline-flex;align-items:center;gap:.5rem;
@@ -49,31 +49,32 @@
 
 /* Hero right column — browser mockup */
 .hero-browser{display:flex;align-items:flex-start;justify-content:center}
-@media(max-width:880px){.hero-browser{order:-1;max-width:440px;margin:0 auto}}
-.browser-chrome{background:#1e293b;border-radius:12px;overflow:hidden;
-  box-shadow:0 20px 60px rgba(0,0,0,.45);width:100%}
+/* Mobile: hide mockup entirely — headline + CTA must be first thing visible */
+@media(max-width:700px){.hero-browser{display:none}}
+@media(max-width:880px){.hero-browser{max-width:480px;margin:0 auto}}
+/* White-card mockup — proven pattern (Stripe/Linear): light on gradient reads
+   as inviting, not as a dark hole. */
+.browser-chrome{background:#fff;border-radius:12px;overflow:hidden;
+  box-shadow:0 20px 50px rgba(30,41,59,.25);width:100%}
 .browser-bar{display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;
-  background:#0f172a;border-bottom:1px solid rgba(255,255,255,.06)}
+  background:#f1f5f9;border-bottom:1px solid #e2e8f0}
 .b-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .b-dot-r{background:#ef4444}.b-dot-y{background:#f59e0b}.b-dot-g{background:#22c55e}
-.b-addr{flex:1;background:rgba(255,255,255,.07);border-radius:5px;
-  padding:.22rem .6rem;font-size:.7rem;color:rgba(255,255,255,.4);margin-left:.25rem}
-.browser-body{padding:.875rem;display:flex;flex-direction:column;gap:.65rem}
+.b-addr{flex:1;background:#e2e8f0;border-radius:5px;
+  padding:.22rem .6rem;font-size:.72rem;color:#64748b;margin-left:.25rem}
+.browser-body{padding:1rem;display:flex;flex-direction:column;gap:.75rem;background:#fff}
+/* Question bubble: indigo on white = clear contrast (was invisible on purple bg) */
 .mock-q{align-self:flex-end;background:#4f46e5;color:white;
-  border-radius:12px 12px 3px 12px;padding:.55rem .85rem;
-  font-size:.78rem;font-weight:500;max-width:82%}
-.mock-a{background:#1e2d3d;color:#cbd5e1;border-radius:12px 12px 12px 3px;
-  padding:.65rem .85rem;font-size:.75rem;line-height:1.6;max-width:92%}
-.mock-a strong{color:#7dd3fc}
+  border-radius:12px 12px 3px 12px;padding:.6rem .95rem;
+  font-size:.88rem;font-weight:500;max-width:82%}
+/* Answer bubble: very light surface with dark text for readability */
+.mock-a{background:#f8fafc;color:#334155;border:1px solid #e2e8f0;
+  border-radius:12px 12px 12px 3px;padding:.75rem .95rem;
+  font-size:.82rem;line-height:1.65;max-width:96%}
+.mock-a strong{color:#4f46e5}
 .mock-cite{display:inline-flex;align-items:center;gap:.3rem;
-  background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.3);
-  border-radius:5px;padding:.12rem .45rem;font-size:.66rem;color:#a5b4fc;margin-top:.35rem}
-.mock-typing{display:flex;gap:.3rem;padding:.45rem .85rem;align-items:center}
-.mock-dot{width:6px;height:6px;border-radius:50%;background:#4f46e5;
-  animation:mockbounce .8s infinite}
-.mock-dot:nth-child(2){animation-delay:.15s}
-.mock-dot:nth-child(3){animation-delay:.3s}
-@keyframes mockbounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+  background:#ede9fe;border:1px solid #c4b5fd;
+  border-radius:5px;padding:.14rem .5rem;font-size:.7rem;color:#5b21b6;margin-top:.4rem}
 
 /* ── Shared section helpers ──────────────────────────────────────────────── */
 .sec{padding:3.5rem 2rem}
@@ -202,11 +203,6 @@
               No upward trend is visible at this point.<br><br>
               <span class="mock-cite"><i class="fas fa-file-medical" aria-hidden="true"></i> Lab Result · City Hospital · Nov 2024</span>
               <span class="mock-cite"><i class="fas fa-file-medical" aria-hidden="true"></i> Lab Result · City Hospital · Jun 2024</span>
-            </div>
-            <div class="mock-typing">
-              <div class="mock-dot"></div>
-              <div class="mock-dot"></div>
-              <div class="mock-dot"></div>
             </div>
           </div>
         </div>
