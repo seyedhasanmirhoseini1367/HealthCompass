@@ -659,10 +659,10 @@ function scrollToBottom(force) {
 scrollToBottom(true);
 
 function openMobileDrawer() {
-  document.getElementById('mobileDrawer').style.display = 'block';
+  document.getElementById('mobileDrawer').classList.remove('d-none');
 }
 function closeMobileDrawer() {
-  document.getElementById('mobileDrawer').style.display = 'none';
+  document.getElementById('mobileDrawer').classList.add('d-none');
 }
 
 // ── Session menu ──────────────────────────────────────────────────────────────

@@ -163,6 +163,7 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .page-hero p{opacity:.88;font-size:.87rem;margin:0;position:relative;z-index:1}
 
 /* ── Utility classes ─────────────────────────────────────────────────────── */
+.d-none        { display:none !important }
 .text-center   { text-align:center }
 .flex-center   { display:flex;align-items:center;justify-content:center }
 .flex-between  { display:flex;align-items:center;justify-content:space-between }
