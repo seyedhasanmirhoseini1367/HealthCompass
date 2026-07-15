@@ -1,177 +1,228 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block title %}HealthCompass — Data · Insight · Care{% endblock %}
+{% block main_class %}full-bleed{% endblock %}
+
+{% block meta_description %}HealthCompass is a personal AI health assistant that turns fragmented medical records into cited, plain-language insights — private, secure, and free to start.{% endblock %}
+{% block og_title %}HealthCompass — AI Health Assistant{% endblock %}
+{% block og_description %}Upload your lab results, prescriptions and wearable data. Ask any health question and get AI-powered cited answers grounded in your own records.{% endblock %}
 
 {% block extra_css %}
 <style>
-html,body{background:var(--surface)}
-.pw{margin:-1.5rem -1.5rem -1.5rem}
-@media(max-width:600px){.pw{margin:-.75rem -.6rem -.75rem}}
-
-/* ── Proto banner ───────────────────────────────────────────────────────────── */
-.proto{background:#fefce8;border-bottom:1px solid #fde68a;padding:.45rem 1.5rem;
-  text-align:center;font-size:.75rem;color:#78350f;
-  display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap}
-
-/* ── HERO ───────────────────────────────────────────────────────────────────── */
+/* ── Type scale (inherits --fs-* from main.css :root) ────────────────────── */
+/* ── HERO ────────────────────────────────────────────────────────────────── */
 .hero{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 55%,#a855f7 100%);
-  padding:1.1rem 2rem 1.5rem;position:relative;overflow:hidden;color:white;
+  padding:4rem 2rem 4.5rem;position:relative;overflow:hidden;color:white;
   border-radius:0 0 28px 28px}
-.hero::before{content:'';position:absolute;inset:0;
-  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");pointer-events:none}
-.hero-grid{max-width:1100px;margin:0 auto;position:relative;z-index:1;
-  display:grid;grid-template-columns:1fr 240px;gap:1.75rem;align-items:center}
+.hero::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.hero-grid{max-width:var(--container);margin:0 auto;position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 360px;gap:2.5rem;align-items:center}
 @media(max-width:880px){.hero-grid{grid-template-columns:1fr;text-align:center}}
 
-.hero h1{font-size:2.6rem;font-weight:900;line-height:1.1;letter-spacing:-.03em;margin:0 0 .9rem}
+.hero-pill{display:inline-flex;align-items:center;gap:.5rem;
+  background:rgba(0,0,0,.25);backdrop-filter:blur(6px);
+  border:1.5px solid rgba(251,146,60,.6);color:#fed7aa;
+  font-size:.82rem;font-weight:700;padding:.35rem 1.1rem;
+  border-radius:24px;letter-spacing:.03em;margin-bottom:1.25rem}
+.hero h1{font-size:var(--fs-hero);font-weight:900;line-height:1.08;
+  letter-spacing:-.03em;margin:0 0 1rem;color:white}
 .hero h1 .accent{color:#bfdbfe}
+.hero-sub{font-size:var(--fs-body);line-height:1.65;margin:0 0 1.75rem;
+  color:rgba(255,255,255,.88);max-width:440px}
 @media(max-width:880px){.hero-grid p{margin-left:auto;margin-right:auto}}
 
 .hero-btns{display:flex;gap:.65rem;flex-wrap:wrap}
 @media(max-width:880px){.hero-btns{justify-content:center}}
-.btn-w{padding:.55rem 1.4rem;border-radius:11px;font-weight:700;font-size:.82rem;
+.btn-w{padding:.6rem 1.5rem;border-radius:11px;font-weight:700;font-size:.9rem;
   background:white;color:#4f46e5;display:inline-flex;align-items:center;gap:.45rem;
   transition:all .18s;box-shadow:0 4px 18px rgba(0,0,0,.18);text-decoration:none}
 .btn-w:hover{background:#f0f9ff;color:#3730a3;transform:translateY(-2px);text-decoration:none}
-.btn-o{padding:.55rem 1.2rem;border-radius:11px;font-weight:700;font-size:.82rem;
+.btn-o{padding:.6rem 1.3rem;border-radius:11px;font-weight:700;font-size:.9rem;
   background:rgba(255,255,255,.12);color:white;border:1.5px solid rgba(255,255,255,.3);
   display:inline-flex;align-items:center;gap:.45rem;transition:all .18s;text-decoration:none}
 .btn-o:hover{background:rgba(255,255,255,.22);color:white;text-decoration:none}
-.btn-g{padding:.55rem 1.1rem;border-radius:11px;font-weight:700;font-size:.82rem;
+.btn-g{padding:.6rem 1.2rem;border-radius:11px;font-weight:700;font-size:.9rem;
   background:transparent;color:rgba(255,255,255,.7);border:1.5px solid rgba(255,255,255,.18);
   display:inline-flex;align-items:center;gap:.45rem;transition:all .18s;text-decoration:none}
 .btn-g:hover{color:white;border-color:rgba(255,255,255,.4);text-decoration:none}
 
-.hero-img-wrap{display:flex;align-items:center;justify-content:center}
-@media(max-width:880px){.hero-img-wrap{order:-1;max-width:240px;margin:0 auto}}
-.hero-img{width:100%;max-width:220px;border-radius:20px;
-  filter:drop-shadow(0 12px 40px rgba(0,0,0,.35));
-  animation:floatImg 5s ease-in-out infinite}
-@keyframes floatImg{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-.hero-img-fallback{width:280px;height:280px;border-radius:50%;
-  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:.5rem;color:rgba(255,255,255,.5);font-size:.85rem}
+/* Hero right column — browser mockup */
+.hero-browser{display:flex;align-items:flex-start;justify-content:center}
+@media(max-width:880px){.hero-browser{order:-1;max-width:440px;margin:0 auto}}
+.browser-chrome{background:#1e293b;border-radius:12px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);width:100%}
+.browser-bar{display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;
+  background:#0f172a;border-bottom:1px solid rgba(255,255,255,.06)}
+.b-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.b-dot-r{background:#ef4444}.b-dot-y{background:#f59e0b}.b-dot-g{background:#22c55e}
+.b-addr{flex:1;background:rgba(255,255,255,.07);border-radius:5px;
+  padding:.22rem .6rem;font-size:.7rem;color:rgba(255,255,255,.4);margin-left:.25rem}
+.browser-body{padding:.875rem;display:flex;flex-direction:column;gap:.65rem}
+.mock-q{align-self:flex-end;background:#4f46e5;color:white;
+  border-radius:12px 12px 3px 12px;padding:.55rem .85rem;
+  font-size:.78rem;font-weight:500;max-width:82%}
+.mock-a{background:#1e2d3d;color:#cbd5e1;border-radius:12px 12px 12px 3px;
+  padding:.65rem .85rem;font-size:.75rem;line-height:1.6;max-width:92%}
+.mock-a strong{color:#7dd3fc}
+.mock-cite{display:inline-flex;align-items:center;gap:.3rem;
+  background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.3);
+  border-radius:5px;padding:.12rem .45rem;font-size:.66rem;color:#a5b4fc;margin-top:.35rem}
+.mock-typing{display:flex;gap:.3rem;padding:.45rem .85rem;align-items:center}
+.mock-dot{width:6px;height:6px;border-radius:50%;background:#4f46e5;
+  animation:mockbounce .8s infinite}
+.mock-dot:nth-child(2){animation-delay:.15s}
+.mock-dot:nth-child(3){animation-delay:.3s}
+@keyframes mockbounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
 
-/* ── Shared section helpers ─────────────────────────────────────────────────── */
-.sec{padding:2.75rem 2rem}
-.sec-inner{max-width:1100px;margin:0 auto}
+/* ── Shared section helpers ──────────────────────────────────────────────── */
+.sec{padding:3.5rem 2rem}
+.sec-inner{max-width:var(--container);margin:0 auto}
 .sec-lbl{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-  padding:.22rem .75rem;border-radius:20px;display:inline-block;margin-bottom:.45rem}
-.sec-title{font-size:1.5rem;font-weight:900;color:#1e293b;margin:0 0 .3rem;line-height:1.15}
+  padding:.22rem .75rem;border-radius:20px;display:inline-block;margin-bottom:.55rem}
+.sec-lbl--danger{background:#fee2e2;color:#b91c1c}
+.sec-lbl--info{background:#dbeafe;color:#1d4ed8}
+.sec-lbl--success{background:#d1fae5;color:#065f46}
+.sec-title{font-size:var(--fs-h2);font-weight:900;color:#1e293b;margin:0 0 .4rem;line-height:1.15}
 .sec-title span{color:#6366f1}
-.sec-sub{font-size:.87rem;color:#64748b;line-height:1.65;max-width:560px;margin:0 0 1.75rem}
+.sec-sub{font-size:var(--fs-small);color:#64748b;line-height:1.7;max-width:560px;margin:0 0 2rem}
 
-/* ── SECTION 2 — Problem / Solution ────────────────────────────────────────── */
-.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.75rem;align-items:center}
+/* ── SECTION 2 — Problem / Solution ─────────────────────────────────────── */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
 @media(max-width:820px){.problem-grid{grid-template-columns:1fr}}
-.problem-text h2{font-size:1.45rem;font-weight:900;color:#1e293b;line-height:1.15;margin:0 0 .4rem}
+.problem-text h2{font-size:var(--fs-h2);font-weight:900;color:#1e293b;line-height:1.15;margin:0 0 .5rem}
 .problem-text h2 .fix{color:#6366f1}
-.problem-text p{font-size:.88rem;color:#64748b;line-height:1.7;margin:.5rem 0}
+.problem-text p{font-size:var(--fs-small);color:#64748b;line-height:1.7;margin:.5rem 0}
 .kanta-badge{display:inline-flex;align-items:center;gap:.5rem;background:#ede9fe;
   border:1px solid #c4b5fd;border-radius:10px;padding:.45rem .9rem;
-  font-size:.8rem;font-weight:700;color:#5b21b6;margin-top:.25rem}
-.gaps-list{list-style:none;padding:0;margin:.5rem 0 0;display:flex;flex-direction:column;gap:.35rem}
-.gaps-list li{display:flex;align-items:flex-start;gap:.6rem;font-size:.84rem;color:#64748b}
-.gaps-list li::before{content:'✗';color:#ef4444;font-weight:900;flex-shrink:0;margin-top:.05rem}
+  font-size:.82rem;font-weight:700;color:#5b21b6;margin-top:.35rem}
+.gaps-list{list-style:none;padding:0;margin:.5rem 0 0;display:flex;flex-direction:column;gap:.4rem}
+.gaps-list li{display:flex;align-items:flex-start;gap:.6rem;font-size:var(--fs-small);color:#64748b}
+.gaps-list li::before{content:'✗';color:#ef4444;font-weight:900;flex-shrink:0;margin-top:.1rem}
 .gaps-list li span{color:#1e293b;font-weight:600}
+.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.stat-card{background:#f8faff;border:1.5px solid #e0e7ff;border-radius:16px;padding:1.25rem 1.1rem}
+.stat-card .sv{font-size:1.9rem;font-weight:900;color:#4f46e5;line-height:1;margin-bottom:.35rem}
+.stat-card .sl{font-size:var(--fs-small);color:#64748b;line-height:1.5}
 
-.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
-.stat-card{background:#f8faff;border:1.5px solid #e0e7ff;border-radius:16px;padding:1.1rem 1rem}
-.stat-card .sv{font-size:1.75rem;font-weight:900;color:#4f46e5;line-height:1;margin-bottom:.3rem}
-.stat-card .sl{font-size:.8rem;color:#64748b;line-height:1.45}
-
-/* ── SECTION 3 — Roles ──────────────────────────────────────────────────────── */
+/* ── SECTION 3 — Roles ───────────────────────────────────────────────────── */
 .roles-sec{background:#f8fafc}
 .roles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem}
 .role-card{background:white;border-radius:18px;border:1.5px solid var(--border);
-  padding:1.3rem 1.25rem 1.15rem;display:flex;flex-direction:column;gap:.6rem;
+  padding:1.4rem 1.3rem 1.2rem;display:flex;flex-direction:column;gap:.65rem;
   transition:all .22s;position:relative;overflow:hidden}
 .role-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3.5px;
   border-radius:18px 18px 0 0;background:var(--rc-accent,#6366f1);opacity:0;transition:opacity .2s}
 .role-card:hover::before{opacity:1}
 .role-card:hover{border-color:var(--rc-accent,#6366f1);box-shadow:0 8px 28px rgba(0,0,0,.08);transform:translateY(-2px)}
 .role-icon-wrap{width:3rem;height:3rem;border-radius:14px;display:flex;align-items:center;
-  justify-content:center;font-size:1.55rem;background:var(--rc-bg,#ede9fe);flex-shrink:0}
-.role-card h3{font-size:.97rem;font-weight:800;color:#1e293b;margin:0}
-.role-card p{font-size:.8rem;color:#64748b;line-height:1.65;margin:0;flex:1}
-.role-cta{font-size:.75rem;font-weight:700;color:var(--rc-accent,#6366f1);
+  justify-content:center;font-size:1.25rem;background:var(--rc-bg,#ede9fe);
+  color:var(--rc-accent,#6366f1);flex-shrink:0}
+.role-card h3{font-size:1rem;font-weight:800;color:#1e293b;margin:0}
+.role-card p{font-size:var(--fs-small);color:#64748b;line-height:1.65;margin:0;flex:1}
+.role-cta{font-size:.78rem;font-weight:700;color:var(--rc-accent,#6366f1);
   text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;
   text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;transition:gap .15s}
 .role-cta:hover{gap:.55rem;text-decoration:none;color:var(--rc-accent,#6366f1)}
-.role-note{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.role-note{font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 
-/* ── SECTION 4 — How to use ─────────────────────────────────────────────────── */
-.steps-flow{display:flex;align-items:flex-start;gap:0;position:relative;flex-wrap:wrap}
+/* ── SECTION 4 — How to use ─────────────────────────────────────────────── */
+.steps-flow{display:flex;align-items:flex-start;gap:0;flex-wrap:wrap}
 .step-item{flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;
   text-align:center;padding:0 1rem;position:relative}
-.step-connector{display:flex;align-items:center;padding-top:1.6rem;flex-shrink:0}
+.step-connector{display:flex;align-items:center;padding-top:1.7rem;flex-shrink:0}
 @media(max-width:700px){.step-connector{display:none}.step-item{min-width:45%}}
 .step-arrow{font-size:1.4rem;color:#c4b5fd;font-weight:900}
-.step-num-wrap{position:relative;margin-bottom:.85rem}
+.step-num-wrap{position:relative;margin-bottom:.9rem}
 .step-circle{width:3.5rem;height:3.5rem;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:1.5rem;
+  justify-content:center;font-size:1.25rem;color:white;
   background:linear-gradient(135deg,var(--st-a,#6366f1),var(--st-b,#8b5cf6));
   box-shadow:0 6px 20px rgba(99,102,241,.3);position:relative;z-index:1}
 .step-num{position:absolute;top:-.2rem;right:-.2rem;width:1.25rem;height:1.25rem;
   border-radius:50%;background:white;border:2px solid var(--st-a,#6366f1);
   font-size:.62rem;font-weight:900;color:var(--st-a,#6366f1);
   display:flex;align-items:center;justify-content:center}
-.step-title{font-size:.95rem;font-weight:800;color:#1e293b;margin-bottom:.4rem}
-.step-desc{font-size:.79rem;color:#64748b;line-height:1.6;max-width:160px;margin:0 auto}
+.step-title{font-size:1rem;font-weight:800;color:#1e293b;margin-bottom:.45rem}
+.step-desc{font-size:var(--fs-small);color:#64748b;line-height:1.6;max-width:220px;margin:0 auto}
 
+/* ── CTA banner ──────────────────────────────────────────────────────────── */
+.cta-sec{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%);padding:4rem 2rem}
+.cta-inner{max-width:640px;margin:0 auto;text-align:center;color:white}
+.cta-inner h2{font-size:var(--fs-h2);font-weight:900;line-height:1.15;margin-bottom:.75rem}
+.cta-inner p{font-size:var(--fs-body);opacity:.88;margin-bottom:1.75rem;line-height:1.65}
+.cta-inner .btn-w{font-size:1rem;padding:.7rem 2rem}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="pw">
 
-  <!-- ══ HERO ══════════════════════════════════════════════════════════════════ -->
+  <!-- ══ HERO ════════════════════════════════════════════════════════════════ -->
   <section class="hero">
-    <div style="text-align:center;margin-bottom:.9rem">
-      <span style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(0,0,0,.25);backdrop-filter:blur(6px);border:1.5px solid rgba(251,146,60,.6);color:#fed7aa;font-size:.9rem;font-weight:700;padding:.4rem 1.4rem;border-radius:24px;letter-spacing:.03em">
-        🚧 <span style="color:#ff6b35">Research Prototype</span> — Not a real healthcare service
-      </span>
-    </div>
     <div class="hero-grid">
+      <!-- Left: copy -->
       <div>
-        <h1 style="font-size:2rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .5rem;color:white">HealthCompass</h1>
-        <p style="font-size:.88rem;line-height:1.6;margin:0 0 1.1rem;color:rgba(255,255,255,.88);max-width:420px">
-          Transforming Fragmented Medical Records into<br>
-          <strong style="color:#bfdbfe">Integrated, Insightful, and Interactive Health Trajectories</strong>
+        <div class="hero-pill">
+          <i class="fas fa-flask" aria-hidden="true"></i>
+          Research Prototype — Not a real healthcare service
+        </div>
+        <h1>Your health data,<br><span class="accent">finally connected.</span></h1>
+        <p class="hero-sub">
+          Upload lab results, prescriptions and wearable data.
+          Ask any question in plain language and get
+          <strong style="color:#bfdbfe">AI-powered, cited answers</strong>
+          grounded in your own records.
         </p>
         <div class="hero-btns">
           {% if user.is_authenticated %}
-          <a href="/dashboard/" class="btn-w"><i class="fas fa-th-large"></i> Dashboard</a>
-          <a href="/assistant/" class="btn-o"><i class="fas fa-robot"></i> AI Assistant</a>
+          <a href="/dashboard/" class="btn-w"><i class="fas fa-th-large" aria-hidden="true"></i> Dashboard</a>
+          <a href="/assistant/" class="btn-o"><i class="fas fa-robot" aria-hidden="true"></i> AI Assistant</a>
           {% else %}
-          <a href="/accounts/register/" class="btn-w"><i class="fas fa-user-plus"></i> Get Started — Free</a>
-          <a href="/accounts/login/" class="btn-o"><i class="fas fa-sign-in-alt"></i> Log In</a>
-          <a href="#how-to-use" class="btn-g"><i class="fas fa-map-signs"></i> How to use</a>
+          <a href="/accounts/register/" class="btn-w"><i class="fas fa-user-plus" aria-hidden="true"></i> Get Started — Free</a>
+          <a href="/accounts/login/" class="btn-o"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Log In</a>
+          <a href="#how-to-use" class="btn-g"><i class="fas fa-chevron-down" aria-hidden="true"></i> How it works</a>
           {% endif %}
         </div>
       </div>
-      <div class="hero-img-wrap">
-        <img src="{% static 'images/compass.jpg' %}" alt="HealthCompass" class="hero-img"
-             onerror="this.style.display='none';document.getElementById('compass-fallback').style.display='flex'">
-        <div class="hero-img-fallback" id="compass-fallback" style="display:none">
-          <i class="fas fa-compass" style="font-size:4rem;opacity:.4"></i>
-          <span style="font-weight:700">HealthCompass</span>
-          <span style="font-size:.72rem">Data · Insight · Care</span>
+
+      <!-- Right: browser mockup -->
+      <div class="hero-browser">
+        <div class="browser-chrome">
+          <div class="browser-bar">
+            <span class="b-dot b-dot-r"></span>
+            <span class="b-dot b-dot-y"></span>
+            <span class="b-dot b-dot-g"></span>
+            <span class="b-addr">healthcompass.app/assistant</span>
+          </div>
+          <div class="browser-body">
+            <div class="mock-q">What is my creatinine trend over the past year?</div>
+            <div class="mock-a">
+              Your creatinine has been <strong>stable</strong>, ranging from
+              0.92–1.04&nbsp;mg/dL across 4 measurements (Jan–Nov 2024) — all
+              within the normal range for adult males (0.7–1.3&nbsp;mg/dL).
+              No upward trend is visible at this point.<br><br>
+              <span class="mock-cite"><i class="fas fa-file-medical" aria-hidden="true"></i> Lab Result · City Hospital · Nov 2024</span>
+              <span class="mock-cite"><i class="fas fa-file-medical" aria-hidden="true"></i> Lab Result · City Hospital · Jun 2024</span>
+            </div>
+            <div class="mock-typing">
+              <div class="mock-dot"></div>
+              <div class="mock-dot"></div>
+              <div class="mock-dot"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
 
-  <!-- ══ SECTION 2 — Problem / Solution ═══════════════════════════════════════ -->
+  <!-- ══ SECTION 2 — Problem / Solution ══════════════════════════════════════ -->
   <section class="sec" style="background:white">
     <div class="sec-inner">
       <div class="problem-grid">
 
         <!-- Left: copy -->
         <div class="problem-text">
-          <div class="sec-lbl" style="background:#fee2e2;color:#b91c1c">The Problem</div>
+          <div class="sec-lbl sec-lbl--danger">The Problem</div>
           <h2>Healthcare data is fragmented<br>and not insightful.<br><span class="fix">We fix that.</span></h2>
 
           <p>Your medical records are scattered across hospitals, apps, labs and paper documents. Your doctor sees only part of the picture. AI stays locked away in research papers.</p>
@@ -183,8 +234,8 @@ html,body{background:var(--surface)}
             <li><span>No plain-language answers</span> — results given without context or explanation</li>
           </ul>
 
-          <p style="margin-top:.6rem;color:#1e293b;font-weight:600;font-size:.88rem">HealthCompass connects all of it — including</p>
-          <div class="kanta-badge"><i class="fas fa-database"></i> Kanta — Finnish national health records supported</div>
+          <p style="margin-top:.75rem;color:#1e293b;font-weight:600">HealthCompass connects all of it — including</p>
+          <div class="kanta-badge"><i class="fas fa-database" aria-hidden="true"></i> Kanta — Finnish national health records supported</div>
         </div>
 
         <!-- Right: stat cards -->
@@ -194,16 +245,16 @@ html,body{background:var(--surface)}
             <div class="sl">Specialist AI models for health prediction and analysis</div>
           </div>
           <div class="stat-card">
-            <div class="sv">100%</div>
-            <div class="sl">Private — your data stays yours, processed locally</div>
+            <div class="sv" style="font-size:1.4rem;line-height:1.2">Secure</div>
+            <div class="sl">Data encrypted at rest — never sold or shared with third parties</div>
           </div>
           <div class="stat-card">
             <div class="sv">Kanta</div>
             <div class="sl">Finnish national health records — natively supported</div>
           </div>
           <div class="stat-card">
-            <div class="sv" style="font-size:1.5rem">∞</div>
-            <div class="sl">Records, uploads, AI questions and health insights</div>
+            <div class="sv">6</div>
+            <div class="sl">Input formats — PDF, scan, text, XML, CSV, wearable export</div>
           </div>
         </div>
 
@@ -212,38 +263,38 @@ html,body{background:var(--surface)}
   </section>
 
 
-  <!-- ══ SECTION 3 — Roles ═════════════════════════════════════════════════════ -->
+  <!-- ══ SECTION 3 — Roles ════════════════════════════════════════════════════ -->
   <section class="sec roles-sec">
     <div class="sec-inner">
-      <div class="sec-lbl" style="background:#dbeafe;color:#1d4ed8">Who Is It For</div>
+      <div class="sec-lbl sec-lbl--info">Who Is It For</div>
       <h2 class="sec-title">Built for <span>everyone in healthcare</span></h2>
       <p class="sec-sub">Whether you're managing your own health or caring for others, HealthCompass adapts to your role.</p>
 
       <div class="roles-grid">
 
         <div class="role-card" style="--rc-accent:#6366f1;--rc-bg:#ede9fe">
-          <div class="role-icon-wrap">🏥</div>
+          <div class="role-icon-wrap"><i class="fas fa-hospital-user" aria-hidden="true"></i></div>
           <h3>Patients</h3>
           <p>Upload lab results, prescriptions and wearable data. Ask questions in plain language. Get cited, AI-powered insights on your health trends — all private.</p>
-          <a href="/accounts/register/" class="role-cta">Get started free <i class="fas fa-arrow-right"></i></a>
+          <a href="/accounts/register/" class="role-cta">Get started free <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
         </div>
 
         <div class="role-card" style="--rc-accent:#0ea5e9;--rc-bg:#e0f2fe">
-          <div class="role-icon-wrap">👨‍⚕️</div>
+          <div class="role-icon-wrap"><i class="fas fa-stethoscope" aria-hidden="true"></i></div>
           <h3>Doctors &amp; Nurses</h3>
           <p>Access your patients' records and AI analytics to support faster, better clinical decisions. See longitudinal trends across visits at a glance.</p>
           <span class="role-note">Requires admin approval</span>
         </div>
 
         <div class="role-card" style="--rc-accent:#8b5cf6;--rc-bg:#f3e8ff">
-          <div class="role-icon-wrap">🔬</div>
+          <div class="role-icon-wrap"><i class="fas fa-flask" aria-hidden="true"></i></div>
           <h3>Data Scientists</h3>
-          <p>Publish ML models for health prediction. Your models run on real, anonymised patient data and become available to the whole platform.</p>
+          <p>Publish ML models for health prediction and analysis. Deploy models to the platform and make them available to clinicians and patients.</p>
           <span class="role-note">Requires admin approval</span>
         </div>
 
         <div class="role-card" style="--rc-accent:#f59e0b;--rc-bg:#fef3c7">
-          <div class="role-icon-wrap">🏛️</div>
+          <div class="role-icon-wrap"><i class="fas fa-building" aria-hidden="true"></i></div>
           <h3>Hospital Admins</h3>
           <p>Manage patient–doctor relationships within your hospital securely and efficiently. Monitor platform usage and oversee model deployments.</p>
           <span class="role-note">Requires admin approval</span>
@@ -254,10 +305,10 @@ html,body{background:var(--surface)}
   </section>
 
 
-  <!-- ══ SECTION 4 — How to use ════════════════════════════════════════════════ -->
+  <!-- ══ SECTION 4 — How to use ═══════════════════════════════════════════════ -->
   <section class="sec" id="how-to-use" style="background:white">
     <div class="sec-inner">
-      <div class="sec-lbl" style="background:#d1fae5;color:#065f46">Get Started</div>
+      <div class="sec-lbl sec-lbl--success">Get Started</div>
       <h2 class="sec-title">How to use <span>HealthCompass</span></h2>
       <p class="sec-sub">Four simple steps — from sign-up to your first AI health insight.</p>
 
@@ -265,18 +316,22 @@ html,body{background:var(--surface)}
 
         <div class="step-item">
           <div class="step-num-wrap">
-            <div class="step-circle" style="--st-a:#6366f1;--st-b:#818cf8">🔐</div>
+            <div class="step-circle" style="--st-a:#6366f1;--st-b:#818cf8">
+              <i class="fas fa-user-plus" aria-hidden="true"></i>
+            </div>
             <div class="step-num" style="border-color:#6366f1;color:#6366f1">1</div>
           </div>
           <div class="step-title">Create account</div>
-          <div class="step-desc">Sign up for free and select your role — patient, doctor, or researcher.</div>
+          <div class="step-desc">Sign up for free. No credit card required.</div>
         </div>
 
         <div class="step-connector"><div class="step-arrow">→</div></div>
 
         <div class="step-item">
           <div class="step-num-wrap">
-            <div class="step-circle" style="--st-a:#0ea5e9;--st-b:#38bdf8">📁</div>
+            <div class="step-circle" style="--st-a:#0ea5e9;--st-b:#38bdf8">
+              <i class="fas fa-folder-open" aria-hidden="true"></i>
+            </div>
             <div class="step-num" style="border-color:#0ea5e9;color:#0ea5e9">2</div>
           </div>
           <div class="step-title">Upload your records</div>
@@ -287,7 +342,9 @@ html,body{background:var(--surface)}
 
         <div class="step-item">
           <div class="step-num-wrap">
-            <div class="step-circle" style="--st-a:#10b981;--st-b:#34d399">🤖</div>
+            <div class="step-circle" style="--st-a:#10b981;--st-b:#34d399">
+              <i class="fas fa-robot" aria-hidden="true"></i>
+            </div>
             <div class="step-num" style="border-color:#10b981;color:#10b981">3</div>
           </div>
           <div class="step-title">Ask the AI</div>
@@ -298,7 +355,9 @@ html,body{background:var(--surface)}
 
         <div class="step-item">
           <div class="step-num-wrap">
-            <div class="step-circle" style="--st-a:#a855f7;--st-b:#c084fc">📊</div>
+            <div class="step-circle" style="--st-a:#a855f7;--st-b:#c084fc">
+              <i class="fas fa-chart-line" aria-hidden="true"></i>
+            </div>
             <div class="step-num" style="border-color:#a855f7;color:#a855f7">4</div>
           </div>
           <div class="step-title">Explore insights</div>
@@ -310,5 +369,17 @@ html,body{background:var(--surface)}
   </section>
 
 
-</div>
+  <!-- ══ CTA ══════════════════════════════════════════════════════════════════ -->
+  {% if not user.is_authenticated %}
+  <section class="cta-sec">
+    <div class="cta-inner">
+      <h2>Ready to understand your health?</h2>
+      <p>Join HealthCompass and get AI-powered cited insights from your own medical records — private, secure, and free to start.</p>
+      <a href="/accounts/register/" class="btn-w">
+        <i class="fas fa-user-plus" aria-hidden="true"></i> Get Started Free
+      </a>
+    </div>
+  </section>
+  {% endif %}
+
 {% endblock %}

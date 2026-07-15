@@ -1,9 +1,32 @@
 /* HealthCompass global stylesheet — page-specific styles stay in each
    template's {% block extra_css %}. */
 
+/* ── Inter Variable — self-hosted (static/vendor/inter/) ──────────────────── */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;
+  src:url('../vendor/inter/InterVariable.woff2') format('woff2-variations')}
+@font-face{font-family:'Inter';font-style:italic;font-weight:100 900;font-display:swap;
+  src:url('../vendor/inter/InterVariable-Italic.woff2') format('woff2-variations')}
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--primary:#0ea5e9;--primary-dk:#0284c7;--secondary:#6366f1;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--bg:#f0f7ff;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--shadow-sm:0 1px 3px rgba(0,0,0,.07);--radius:14px;--gradient-brand:linear-gradient(135deg,#0ea5e9,#6366f1)}
-body{font-family:Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
+:root{
+  /* Brand colours */
+  --primary:#0ea5e9;--primary-dk:#0284c7;--secondary:#6366f1;
+  --success:#22c55e;--warning:#f59e0b;--danger:#ef4444;
+  --bg:#f0f7ff;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.07);--radius:14px;
+  --gradient-brand:linear-gradient(135deg,#0ea5e9,#6366f1);
+  /* Typography */
+  --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+  --fs-hero:3.25rem;
+  --fs-h2:2rem;
+  --fs-body:1rem;
+  --fs-small:.875rem;
+  /* Layout */
+  --container:1140px;
+}
+body{font-family:var(--font-sans);font-size:var(--fs-body);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;display:flex;flex-direction:column}
+/* Full-bleed layout: pages like home remove main's padding and max-width */
+main.full-bleed{padding:0 !important;max-width:none !important;width:100% !important}
 a{color:inherit;text-decoration:none}
 .navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
 .nav-brand{display:flex;align-items:center}
@@ -32,7 +55,7 @@ a{color:inherit;text-decoration:none}
 .alert-error,.alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
 .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
-main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%;background:var(--surface)}
+main{flex:1;padding:1.5rem;max-width:var(--container);margin:0 auto;width:100%;background:var(--surface)}
 footer{background:#0f172a;color:#cbd5e1;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
 footer strong{color:white}
 .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.2rem;border-radius:10px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
