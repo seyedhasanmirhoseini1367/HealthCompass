@@ -8,6 +8,7 @@
   src:url('../vendor/inter/InterVariable-Italic.woff2') format('woff2-variations')}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden}
 :root{
   /* Brand colours */
   --primary:#0ea5e9;--primary-dk:#0284c7;--secondary:#6366f1;
