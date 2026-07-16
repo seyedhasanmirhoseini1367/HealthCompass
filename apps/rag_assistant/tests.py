@@ -766,3 +766,32 @@ class SSEContractTests(django.test.SimpleTestCase):
         self.assertIsInstance(chunks_count, int)
         self.assertFalse(safety_routed)
         self.assertIsInstance(triggered_rules, list)
+
+
+# ── EmbeddingService dimension check ─────────────────────────────────────────
+
+class EmbeddingDimCheckTests(SimpleTestCase):
+    """load_patient_embeddings() must skip stored vectors whose dim != _EMBED_DIM."""
+
+    def test_768_dim_chunk_is_skipped(self):
+        import numpy as np
+        from unittest.mock import MagicMock, patch
+        from apps.rag_assistant.services.embedding_service import EmbeddingService, _EMBED_DIM
+
+        # 768-dim embedding — old text-embedding-004 model
+        fake_chunk = MagicMock()
+        fake_chunk.embedding = np.zeros(768, dtype=np.float32).tobytes()
+        fake_chunk.id = 'legacy-chunk'
+
+        with patch('apps.rag_assistant.models.MedicalChunk') as MockChunk:
+            MockChunk.objects.filter.return_value.select_related.return_value = [fake_chunk]
+
+            svc = EmbeddingService.__new__(EmbeddingService)
+            svc.cfg        = {'VECTOR_STORE_PATH': 'rag_vector_store/'}
+            svc.store_path = 'rag_vector_store/'
+
+            texts, matrix, meta = svc.load_patient_embeddings(MagicMock())
+
+        self.assertEqual(texts, [])
+        self.assertEqual(matrix.shape, (0, _EMBED_DIM))
+        self.assertEqual(meta, [])

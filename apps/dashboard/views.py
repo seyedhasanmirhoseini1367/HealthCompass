@@ -20,13 +20,14 @@ def home(request):
     ctx = {}
 
     if user.is_patient:
-        from apps.ai_insights.models import ModelPrediction
-        ctx['records'] = MedicalRecord.objects.filter(patient=user).order_by('-uploaded_at')[:5]
-        ctx['alerts'] = HealthAlert.objects.filter(patient=user, is_read=False)[:5]
-        ctx['total_records'] = MedicalRecord.objects.filter(patient=user).count()
-        ctx['unread_alerts'] = HealthAlert.objects.filter(patient=user, is_read=False).count()
-        ctx['recent_predictions'] = ModelPrediction.objects.filter(patient=user).order_by('-created_at')[:3]
-        ctx['total_predictions'] = ModelPrediction.objects.filter(patient=user).count()
+        from apps.dashboard.services import get_patient_dashboard_data
+        data = get_patient_dashboard_data(user)
+        ctx['records']            = data['recent_records']
+        ctx['alerts']             = data['recent_alerts']
+        ctx['total_records']      = data['total_records']
+        ctx['unread_alerts']      = data['unread_alerts']
+        ctx['recent_predictions'] = data['recent_predictions']
+        ctx['total_predictions']  = data['total_predictions']
         template = 'dashboard/patient.html'
 
     elif user.is_doctor:

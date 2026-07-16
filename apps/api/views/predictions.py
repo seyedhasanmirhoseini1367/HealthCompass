@@ -56,7 +56,7 @@ def ai_model_detail(request, slug):
 @permission_classes([IsAuthenticated])
 def run_model_prediction(request, slug):
     from apps.ai_insights.models import AIModel, ModelPrediction
-    from apps.ai_insights.views import _sanitize
+    from apps.ai_insights.services.utils import _sanitize
     from apps.ai_insights.runner import run_model, generate_interpretation
     try:
         model = AIModel.objects.get(slug=slug, status='active')

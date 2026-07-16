@@ -20,37 +20,17 @@ _POPULATION_INSIGHTS_TTL = 3600
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_summary(request):
-    from apps.ai_insights.models import ModelPrediction, HealthAlert
-
-    user    = request.user
-    records = MedicalRecord.objects.filter(patient=user)
-
-    by_type = {}
-    for rt, label in MedicalRecord.RecordType.choices:
-        count = records.filter(record_type=rt).count()
-        if count:
-            by_type[label] = count
-
-    recent_alerts = HealthAlert.objects.filter(
-        patient=user, is_read=False
-    ).order_by('-created_at')[:5]
-
-    recent_predictions = ModelPrediction.objects.filter(
-        patient=user
-    ).order_by('-created_at')[:3]
-
-    latest_pred = ModelPrediction.objects.filter(
-        patient=user, risk_score__isnull=False
-    ).order_by('-created_at').first()
-
+    from apps.dashboard.services import get_patient_dashboard_data
+    data = get_patient_dashboard_data(request.user)
+    latest_pred = data['latest_pred']
     return Response({
-        'total_records':      records.count(),
-        'flagged_count':      records.filter(is_flagged=True).count(),
-        'unread_alerts':      HealthAlert.objects.filter(patient=user, is_read=False).count(),
-        'records_by_type':    by_type,
-        'user':               UserSerializer(user).data,
-        'recent_alerts':      HealthAlertSerializer(recent_alerts, many=True).data,
-        'recent_predictions': ModelPredictionSerializer(recent_predictions, many=True).data,
+        'total_records':      data['total_records'],
+        'flagged_count':      data['flagged_count'],
+        'unread_alerts':      data['unread_alerts'],
+        'records_by_type':    data['records_by_type'],
+        'user':               UserSerializer(request.user).data,
+        'recent_alerts':      HealthAlertSerializer(data['recent_alerts'], many=True).data,
+        'recent_predictions': ModelPredictionSerializer(data['recent_predictions'], many=True).data,
         'latest_risk':        round(float(latest_pred.risk_score) * 100, 1) if latest_pred else None,
     })
 

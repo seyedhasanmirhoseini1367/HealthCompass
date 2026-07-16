@@ -168,86 +168,9 @@ _TEMPORAL_ROUTE_KEYWORDS = [
     'last 6 months', 'last 3 months', 'last year', 'last month',
     'fluctuating', 'stable over', 'consistently', 'pattern',
     'should i be worried', 'is this serious', 'is this concerning',
-    # Paraphrases for temporal intent — kept specific to avoid false positives.
-    # Broad phrases like "tell me about" / "explain my" are intentionally
-    # omitted here; the semantic embedding fallback (_semantic_temporal_check)
-    # catches novel paraphrases without triggering on generic requests.
     'journey', 'paint me a picture', 'walk me through',
     'how has my', 'how have my', 'evolved', 'what happened to my',
 ]
-
-# Prototype sentences for embedding-based semantic fallback
-_TEMPORAL_PROTOTYPES = [
-    "how has my lab value changed over time",
-    "is my condition improving or worsening over the months",
-    "explain my health journey across visits",
-    "show me the progression of my lab results",
-    "what is the trend in my test results over time",
-    "walk me through my health history chronologically",
-    "give me a picture of my kidney health over the year",
-    "has my biomarker been going up or down recently",
-    "compare my most recent results to my earlier ones",
-    "describe what has happened to my blood values",
-]
-
-# Module-level cache: computed once on first temporal query, reused after
-_proto_embeddings = None
-
-
-def _get_proto_embeddings():
-    global _proto_embeddings
-    if _proto_embeddings is None:
-        try:
-            import numpy as np
-            from apps.rag_assistant.services.embedding_service import EmbeddingService
-            svc  = EmbeddingService()
-            vecs = svc.embed_batch(_TEMPORAL_PROTOTYPES)
-            # L2-normalise so cosine similarity == dot product
-            norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-            norms = np.where(norms == 0, 1.0, norms)
-            _proto_embeddings = (vecs / norms).astype(np.float32)
-            logger.debug('Temporal prototype embeddings computed (%d phrases)', len(_TEMPORAL_PROTOTYPES))
-        except Exception as exc:
-            logger.warning('Could not compute temporal prototype embeddings: %s', exc)
-            _proto_embeddings = None
-    return _proto_embeddings
-
-
-def _semantic_temporal_check(query: str, threshold: float = 0.92) -> bool:
-    """
-    Embedding-based fallback: return True when the query is semantically
-    close to any temporal prototype phrase (cosine sim ≥ threshold).
-
-    NOTE: threshold was 0.52 (calibrated for text-embedding-004, 768-dim).
-    gemini-embedding-001 (3072-dim) produces 0.56–0.71 for ALL medical queries —
-    temporal and non-temporal alike — so that threshold caused universal false
-    positives.  Set to 0.92 to effectively disable the semantic fallback until
-    a better per-model calibration is done; keyword matching alone is sufficient.
-    """
-    try:
-        import numpy as np
-        from apps.rag_assistant.services.embedding_service import EmbeddingService
-
-        protos = _get_proto_embeddings()
-        if protos is None or protos.shape[0] == 0:
-            return False
-
-        svc   = EmbeddingService()
-        q_vec = svc.embed(query)
-        norm  = np.linalg.norm(q_vec)
-        if norm == 0:
-            return False
-        q_emb = (q_vec / norm).astype(np.float32)
-
-        # Cosine similarity = dot product when both vectors are L2-normalised
-        sims    = protos @ q_emb
-        max_sim = float(sims.max())
-        logger.debug('Semantic temporal check: max_sim=%.3f (threshold=%.2f)', max_sim, threshold)
-        return max_sim >= threshold
-    except Exception as exc:
-        logger.debug('Semantic temporal check failed (skipped): %s', exc)
-        return False
-
 
 def _kw_match(kw: str, q: str) -> bool:
     """Word-boundary keyword match — prevents 'mg' matching inside 'imaging'."""
@@ -256,11 +179,7 @@ def _kw_match(kw: str, q: str) -> bool:
 
 def _is_temporal(question: str) -> bool:
     q = question.lower()
-    # Fast keyword path
-    if any(_kw_match(kw, q) for kw in _TEMPORAL_ROUTE_KEYWORDS):
-        return True
-    # Semantic embedding fallback (catches novel paraphrases)
-    return _semantic_temporal_check(question)
+    return any(_kw_match(kw, q) for kw in _TEMPORAL_ROUTE_KEYWORDS)
 
 
 def _detect_route(question: str) -> str:

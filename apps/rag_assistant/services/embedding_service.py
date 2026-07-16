@@ -100,6 +100,12 @@ class EmbeddingService:
                     vec = pickle.loads(raw)
                 else:
                     vec = np.frombuffer(raw, dtype=np.float32)
+                if len(vec) != _EMBED_DIM:
+                    logger.warning(
+                        'Chunk %s has dim %d (expected %d) — skipping; run reindex_all_embeddings',
+                        c.id, len(vec), _EMBED_DIM,
+                    )
+                    continue
                 texts.append(c.content)
                 vecs.append(vec)
                 meta.append({
