@@ -86,7 +86,7 @@ User question
 
 ### Routing
 
-The router classifies each question with **word-boundary keyword matching** — no LLM call, no latency cost. For temporal queries ("trend", "over time", "is my creatinine improving"), a semantic embedding fallback (`text-embedding-004` cosine similarity against prototype phrases) catches paraphrases the keyword list misses.
+The router classifies each question with **word-boundary keyword matching** — no LLM call, no latency cost. For temporal queries ("trend", "over time", "is my creatinine improving"), a semantic embedding fallback (`gemini-embedding-001` cosine similarity against prototype phrases) catches paraphrases the keyword list misses.
 
 | Route | Triggered by keywords |
 |---|---|
@@ -107,7 +107,7 @@ Score(q, D) = α·BM25(q,D) + β·cos(q,D) + γ·Δ(D,t,s) + δ·Context(D,i)
 ```
 
 - **BM25 (α)** — keyword overlap (sparse). Weight adapts by query intent: 0.20 for temporal, 0.50 for medication, 0.35 default.
-- **Cosine similarity (β)** — semantic match via `Gemini text-embedding-004` (768-dim, stored as raw `float32` bytes in Postgres). Weight is `1 − α`.
+- **Cosine similarity (β)** — semantic match via `Gemini gemini-embedding-001` (3072-dim, stored as raw `float32` bytes in Postgres). Weight is `1 − α`.
 - **Time decay (γ·Δ)** — records older than 1 year are down-weighted by up to 15%.
 - **Context-type boost (δ)** — chunks whose document type aligns with the query intent get a small relevance bonus.
 - **MMR re-ranking** — Maximal Marginal Relevance (λ=0.6) diversifies the final top-6 set.
@@ -170,7 +170,7 @@ Tokens are rendered incrementally with live Markdown parsing. The full response 
 |---|---|
 | Backend | Django 5.2, Python 3.11+ |
 | LLM orchestration | LangGraph 0.2, Groq SDK, google-genai, Anthropic SDK, OpenAI SDK |
-| Embeddings | Gemini `text-embedding-004` (768-dim, stored as raw float32 bytes in Postgres) |
+| Embeddings | Gemini `gemini-embedding-001` (3072-dim, stored as raw float32 bytes in Postgres) |
 | Sparse retrieval | rank-bm25 |
 | Data processing | pandas, numpy, scikit-learn, scipy, pdfplumber |
 | Database | Postgres (Railway production) · SQLite (local dev fallback) |
@@ -200,7 +200,7 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 
 # At least one generation key is required. Groq has a generous free tier.
 GROQ_API_KEY=your-groq-api-key
-GEMINI_API_KEY=your-gemini-api-key   # also used for text-embedding-004
+GEMINI_API_KEY=your-gemini-api-key   # also used for gemini-embedding-001
 ANTHROPIC_API_KEY=                   # optional fallback
 OPENAI_API_KEY=                      # optional fallback
 ```
@@ -225,4 +225,4 @@ python manage.py runserver
 - **Streaming** — Server-Sent Events with Django `StreamingHttpResponse`, incremental Markdown rendering in the browser
 - **LLM integration** — google-genai v1.x, Anthropic, OpenAI SDKs; system prompts; chat history management
 - **Data engineering** — PDF text extraction, CSV wearable ingestion, lab value parsing, abnormal flagging
-- **ML** — Gemini text-embedding-004 dense vectors, BM25 sparse retrieval, cosine similarity, MMR re-ranking, scikit-learn, scipy
+- **ML** — Gemini gemini-embedding-001 dense vectors, BM25 sparse retrieval, cosine similarity, MMR re-ranking, scikit-learn, scipy

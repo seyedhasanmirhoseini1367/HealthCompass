@@ -59,7 +59,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 # ── Django bootstrap ──────────────────────────────────────────────────────────
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # scripts/evaluation/ → scripts/ → project root
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'healthcompass.settings')
 

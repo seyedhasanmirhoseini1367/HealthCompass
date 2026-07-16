@@ -68,8 +68,8 @@ def safety_gate_node(state: HealthState) -> Dict[str, Any]:
             'trajectory_context': '',
         }
 
-    # Safe — proceed normally (no state changes)
-    return {}
+    # Safe — proceed normally; echo route so LangGraph sees a non-empty update
+    return {'route': state.get('route', 'general')}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -300,9 +300,9 @@ def router_node(state: HealthState) -> Dict[str, Any]:
         except Exception as exc:
             logger.warning('router_node cold-start check failed (proceeding normally): %s', exc)
 
-    # Route already set by understand_node — nothing to do.
+    # Route already set by understand_node — echo it so LangGraph sees a non-empty update.
     logger.debug('router_node: route=%s q=%r', state.get('route'), state['question'][:60])
-    return {}
+    return {'route': state.get('route', 'general')}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -1,13 +1,15 @@
 # rag_assistant/services/embedding_service.py
 """
-Embedding service — uses Gemini text-embedding-004 (free tier: 1,500 req/day).
-Replaces sentence-transformers to eliminate the ~1 GB PyTorch memory footprint.
+Embedding service — uses Gemini gemini-embedding-001 (3072-dim).
 
-Key improvements vs earlier version:
+text-embedding-004 (768-dim) was deprecated; gemini-embedding-001 replaces it.
+Existing chunks stored with the old 768-dim model need re-indexing before
+cosine similarity will work correctly against the new query vectors.
+
+Key features:
 - task_type="RETRIEVAL_DOCUMENT" at index time, "RETRIEVAL_QUERY" at query time
-  (asymmetric embedding — measurably better retrieval quality per Google docs).
-- Batch API: sends all texts in a single request instead of a per-text loop
-  with sleep(). Indexing a 30-chunk PDF: ~30 s → ~1 s.
+  (asymmetric embedding — better retrieval quality per Google docs).
+- Batch API: sends all texts in a single request.
 - Batches >100 items are split automatically (Gemini limit: 100 per request).
 """
 import os
@@ -19,7 +21,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-_EMBED_DIM   = 768   # text-embedding-004 output dimension
+_EMBED_DIM   = 3072  # gemini-embedding-001 output dimension
 _BATCH_LIMIT = 100   # Gemini batch API max items per request
 
 

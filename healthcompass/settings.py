@@ -176,7 +176,7 @@ OPENAI_API_KEY    = config('OPENAI_API_KEY',    default='')
 
 # ── RAG Configuration ──────────────────────────────────────────────────────────
 RAG_CONFIG = {
-    'EMBEDDING_MODEL':   'models/text-embedding-004',
+    'EMBEDDING_MODEL':   'models/gemini-embedding-001',
     'CHUNK_SIZE':        200,
     'CHUNK_OVERLAP':     40,
     'TOP_K':             6,
