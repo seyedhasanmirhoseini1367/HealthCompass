@@ -279,8 +279,8 @@ footer{display:none!important}
 </div>
 
 {% endblock %}
-{{ history_data|json_script:"history-data" }}
 {% block extra_js %}
+{{ history_data|json_script:"history-data" }}
 <script src="{% static 'vendor/marked.min.js' %}"></script>
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
@@ -418,6 +418,8 @@ async function sendMessage() {
     typing.style.display = 'none';
     if (firstToken) area.appendChild(makeAssistantBubble('Network error. Please check your connection.', []));
   } finally {
+    typing.style.display = 'none';
+    if (firstToken) area.appendChild(makeAssistantBubble('Sorry, I couldn\'t get a response. Please try again.', []));
     btn.disabled = false;
     scrollToBottom();
   }
