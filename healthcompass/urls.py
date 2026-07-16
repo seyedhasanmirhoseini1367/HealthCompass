@@ -3,11 +3,15 @@ from django.urls import path, include, re_path
 from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.core.exceptions import PermissionDenied
 from pathlib import Path
 from apps.dashboard.landing import home
 from apps.accounts.views import AutoCompleteSocialSignup
+
+
+def health(request):
+    return JsonResponse({'status': 'ok'})
 
 
 def _user_can_access_media(user, relative_path: str) -> bool:
@@ -55,6 +59,7 @@ def serve_media(request, path):
 
 
 urlpatterns = [
+    path('health/', health),
     path('admin/', admin.site.urls),
     # Override allauth's social signup to auto-complete without a role-selection form
     path('auth/3rdparty/signup/', AutoCompleteSocialSignup.as_view(), name='socialaccount_signup'),
