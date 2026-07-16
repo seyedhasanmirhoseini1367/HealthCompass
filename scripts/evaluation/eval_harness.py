@@ -1,7 +1,7 @@
 ﻿"""
 HealthCompass Evaluation Harness — AI for Good Hack 2026
 =========================================================
-Measures two mandatory baseline -> target metrics:
+Measures RAG pipeline quality across four metrics:
 
   Metric 1 — Safety Interception Rate
     % of emergency / unsafe queries caught by the Safety Agent
@@ -14,21 +14,45 @@ Measures two mandatory baseline -> target metrics:
     Baseline: plain LLM with no RAG -> 0 % citations
     Target  : multi-agent RAG pipeline -> near-100 % citations
 
+  Metric 3 — Response Time
+    Median seconds from query submission to full answer.
+
+  Metric 4 — RAG Quality (optional, requires --rag-quality flag)
+    Evaluated against the golden dataset in golden_dataset.py using 30
+    question-answer pairs grounded in the Sara M. seed patient records.
+
+    • Context Recall     — fraction of expected sources found in retrieved chunks
+    • Context Precision  — fraction of retrieved chunks that are in expected sources
+    • Answer Completeness — fraction of expected facts found in the model answer
+                            (faithfulness proxy; no LLM judge needed)
+    • Question Coverage  — fraction of question keywords found in the model answer
+                            (answer relevancy proxy)
+
 Usage
 -----
-    python evaluation/eval_harness.py
+    # Metrics 1-3 only (fast, no LLM calls for Metric 2/3):
+    python scripts/evaluation/eval_harness.py
+
+    # All metrics including RAG quality (makes full ask() calls):
+    python scripts/evaluation/eval_harness.py --rag-quality
+
+    # RAG quality with retrieval-only (no LLM — Context P/R only, very fast):
+    python scripts/evaluation/eval_harness.py --rag-quality --retrieval-only
 
 Outputs
 -------
-    evaluation/results.json          — full numbers per question
-    evaluation/confusion_matrix.png  — safety gate confusion matrix (A/B)
-    evaluation/ab_chart.png          — side-by-side metric bars
+    evaluation/results.json             — Metrics 1-3 full numbers
+    evaluation/rag_quality_results.json — Metric 4 per-question + aggregated
+    evaluation/confusion_matrix.png     — safety gate confusion matrix (A/B)
+    evaluation/ab_chart.png             — side-by-side metric bars (Metrics 1-2)
+    evaluation/rag_quality_chart.png    — Metric 4 bar chart per category
 """
 import os
 import sys
 import json
 import pathlib
 import datetime
+import argparse
 
 # Force UTF-8 output on Windows (avoids cp1252 UnicodeEncodeError)
 if hasattr(sys.stdout, 'reconfigure'):
@@ -124,9 +148,9 @@ def multiagent_has_citation(query: str, patient) -> tuple:
         return False, 0.0
 
 
-# ── Run evaluation ────────────────────────────────────────────────────────────
+# ── Run evaluation (Metrics 1-3) ─────────────────────────────────────────────
 
-def run():
+def _run_metrics_1_to_3():
     print("\n" + "=" * 62)
     print("  HealthCompass Evaluation Harness — AI for Good Hack 2026")
     print("=" * 62)
@@ -311,7 +335,7 @@ def _find_seed_patient():
     try:
         from django.contrib.auth import get_user_model
         User = get_user_model()
-        for username in ('trajectory_patient', 'seed_patient', 'demo_patient'):
+        for username in ('sara.m', 'trajectory_patient', 'seed_patient', 'demo_patient'):
             u = User.objects.filter(username=username).first()
             if u:
                 return u
@@ -417,5 +441,341 @@ def _plot_ab_chart(baseline_safety, multiagent_safety,
     print(f"  A/B chart saved -> {path}")
 
 
+# ── Metric 4: RAG Quality ─────────────────────────────────────────────────────
+
+_STOPWORDS = {
+    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
+    'should', 'may', 'might', 'must', 'can', 'could', 'my', 'me', 'i',
+    'in', 'on', 'at', 'to', 'of', 'for', 'with', 'by', 'from', 'what',
+    'how', 'when', 'where', 'why', 'which', 'any', 'it', 'its', 'their',
+    'and', 'or', 'but', 'not', 'no', 'so', 'if', 'up', 'this', 'that',
+}
+
+
+def _question_keywords(question: str):
+    """Return meaningful tokens from the question (no stopwords, min 3 chars)."""
+    import re
+    tokens = re.findall(r'[a-z0-9]+', question.lower())
+    return [t for t in tokens if t not in _STOPWORDS and len(t) >= 3]
+
+
+def _title_matches(chunk, expected_titles) -> bool:
+    """True if the chunk's document_title matches any expected title (substring)."""
+    title = chunk.get('metadata', {}).get('document_title', '').lower()
+    return any(exp.lower() in title or title in exp.lower() for exp in expected_titles)
+
+
+def _retrieve_for_item(patient, question: str):
+    """
+    Invoke the routing-only graph and return (route, chunks).
+    No LLM generation; fast path for Context P/R.
+    """
+    from apps.rag_assistant.graph.graph import health_graph_routing
+    state = health_graph_routing.invoke({
+        'question':           question,
+        'route':              'general',
+        'answer':             '',
+        'patient_id':         patient.pk,
+        'context_chunks':     [],
+        'session_id':         None,
+        'history':            [],
+        'needs_retry':        False,
+        'retry_count':        0,
+        'llm_provider':       '',
+        'trajectory_context': '',
+        'rewritten_query':    '',
+        'mode':               '',
+    })
+    return state.get('route', 'general'), state.get('context_chunks', [])
+
+
+def _context_metrics(chunks, item) -> tuple:
+    """
+    Returns (context_precision, context_recall) as floats in [0, 1].
+
+    Precision = retrieved chunks that belong to an expected source / total retrieved
+    Recall    = expected sources that appear in retrieved chunks / total expected
+    """
+    expected = item['expected_source_titles']
+    if not expected:
+        # General-knowledge question: no personal records expected
+        return (1.0 if not chunks else 0.0), 1.0
+
+    if not chunks:
+        return 0.0, 0.0
+
+    relevant_count = sum(1 for c in chunks if _title_matches(c, expected))
+    precision = relevant_count / len(chunks)
+
+    found_expected = {
+        exp for exp in expected
+        if any(_title_matches(c, [exp]) for c in chunks)
+    }
+    recall = len(found_expected) / len(expected)
+
+    return round(precision, 4), round(recall, 4)
+
+
+def _answer_completeness(answer: str, item) -> float:
+    """
+    Fraction of expected_facts substrings found in the answer (case-insensitive).
+    Proxy for Faithfulness — no LLM judge needed.
+    """
+    facts = item.get('expected_facts', [])
+    if not facts:
+        return 1.0
+    answer_low = answer.lower()
+    found = sum(1 for f in facts if f.lower() in answer_low)
+    return round(found / len(facts), 4)
+
+
+def _question_coverage(answer: str, question: str) -> float:
+    """
+    Fraction of meaningful question keywords found in the answer.
+    Proxy for Answer Relevancy — no LLM judge needed.
+    """
+    keywords = _question_keywords(question)
+    if not keywords:
+        return 1.0
+    answer_low = answer.lower()
+    found = sum(1 for k in keywords if k in answer_low)
+    return round(found / len(keywords), 4)
+
+
+def run_rag_quality(patient, retrieval_only: bool = False):
+    """
+    Run Metric 4 against the golden dataset.
+    Returns a results dict and saves evaluation/rag_quality_results.json.
+    """
+    sys.path.insert(0, str(ROOT / 'scripts' / 'evaluation'))
+    try:
+        from golden_dataset import GOLDEN_DATASET
+    except ImportError:
+        sys.path.insert(0, str(pathlib.Path(__file__).parent))
+        from golden_dataset import GOLDEN_DATASET
+
+    print(f"\n[Metric 4] RAG Quality  ({'retrieval-only — no LLM' if retrieval_only else 'full pipeline'})")
+    print("-" * 60)
+    print(f"  Dataset: {len(GOLDEN_DATASET)} golden questions across"
+          f" {len({i['category'] for i in GOLDEN_DATASET})} categories")
+    if retrieval_only:
+        print("  Skipping answer generation — computing Context P/R only")
+    print()
+
+    per_item_results = []
+    for item in GOLDEN_DATASET:
+        q    = item['question']
+        cat  = item['category']
+        eid  = item['id']
+
+        try:
+            route, chunks = _retrieve_for_item(patient, q)
+        except Exception as exc:
+            print(f"  [{eid}] RETRIEVAL ERROR: {exc}")
+            per_item_results.append({
+                'id': eid, 'category': cat, 'question': q,
+                'error': str(exc),
+            })
+            continue
+
+        cp, cr = _context_metrics(chunks, item)
+        n_chunks_retrieved = len(chunks)
+
+        route_match = (route == item.get('expected_route', ''))
+
+        result = {
+            'id':                eid,
+            'category':          cat,
+            'question':          q,
+            'expected_route':    item.get('expected_route', ''),
+            'actual_route':      route,
+            'route_correct':     route_match,
+            'n_chunks':          n_chunks_retrieved,
+            'min_chunks_ok':     n_chunks_retrieved >= item.get('min_chunks', 0),
+            'context_precision': cp,
+            'context_recall':    cr,
+        }
+
+        if not retrieval_only:
+            try:
+                from apps.rag_assistant.services.rag_service import RAGService
+                answer, _, provider, _, _, _ = RAGService().ask(patient, q, history=[])
+                ac = _answer_completeness(answer, item)
+                qc = _question_coverage(answer, q)
+
+                # Hallucination check: unexpected_facts must not appear
+                unexpected_found = [
+                    u for u in item.get('unexpected_facts', [])
+                    if u.lower() in answer.lower()
+                ]
+                result.update({
+                    'provider':            provider,
+                    'answer_completeness': ac,
+                    'question_coverage':   qc,
+                    'unexpected_found':    unexpected_found,
+                    'hallucination_flag':  bool(unexpected_found),
+                })
+            except Exception as exc:
+                result['generation_error'] = str(exc)
+
+        per_item_results.append(result)
+
+        route_sym = 'R' if route_match else 'r'
+        if retrieval_only:
+            print(f"  [{eid:<9}] {route_sym} CP={cp:.2f} CR={cr:.2f}  chunks={n_chunks_retrieved}  | {q[:52]}")
+        else:
+            ac_ = result.get('answer_completeness', float('nan'))
+            qc_ = result.get('question_coverage',   float('nan'))
+            hall = '!' if result.get('hallucination_flag') else ' '
+            print(f"  [{eid:<9}] {route_sym}{hall} CP={cp:.2f} CR={cr:.2f}"
+                  f" AC={ac_:.2f} QC={qc_:.2f}  | {q[:42]}")
+
+    # ── Aggregate by category ─────────────────────────────────────────────────
+    categories = sorted({r['category'] for r in per_item_results})
+    agg = {}
+    for cat in categories:
+        items_c = [r for r in per_item_results if r['category'] == cat and 'error' not in r]
+        if not items_c:
+            agg[cat] = {}
+            continue
+        def _avg(key):
+            vals = [r[key] for r in items_c if key in r]
+            return round(sum(vals) / len(vals), 4) if vals else None
+
+        agg[cat] = {
+            'n':                   len(items_c),
+            'route_accuracy':      round(sum(r['route_correct'] for r in items_c) / len(items_c), 4),
+            'context_precision':   _avg('context_precision'),
+            'context_recall':      _avg('context_recall'),
+            'answer_completeness': _avg('answer_completeness'),
+            'question_coverage':   _avg('question_coverage'),
+            'hallucinations':      sum(r.get('hallucination_flag', False) for r in items_c),
+        }
+
+    valid_items = [r for r in per_item_results if 'error' not in r]
+    def _global_avg(key):
+        vals = [r[key] for r in valid_items if key in r]
+        return round(sum(vals) / len(vals), 4) if vals else None
+
+    overall = {
+        'n_items':             len(GOLDEN_DATASET),
+        'n_evaluated':         len(valid_items),
+        'route_accuracy':      round(sum(r['route_correct'] for r in valid_items) / max(len(valid_items), 1), 4),
+        'context_precision':   _global_avg('context_precision'),
+        'context_recall':      _global_avg('context_recall'),
+        'answer_completeness': _global_avg('answer_completeness'),
+        'question_coverage':   _global_avg('question_coverage'),
+        'total_hallucinations':sum(r.get('hallucination_flag', False) for r in valid_items),
+    }
+
+    print()
+    print(f"  ── Overall ({len(valid_items)}/{len(GOLDEN_DATASET)} evaluated) ───────────────────────────")
+    print(f"  Route accuracy   : {overall['route_accuracy']:.1%}")
+    print(f"  Context Recall   : {overall['context_recall']:.1%}")
+    print(f"  Context Precision: {overall['context_precision']:.1%}")
+    if not retrieval_only:
+        print(f"  Ans Completeness : {overall['answer_completeness']:.1%}")
+        print(f"  Question Coverage: {overall['question_coverage']:.1%}")
+        print(f"  Hallucination flg: {overall['total_hallucinations']}")
+
+    rag_results = {
+        'run_at':          datetime.datetime.now().isoformat(),
+        'retrieval_only':  retrieval_only,
+        'overall':         overall,
+        'by_category':     agg,
+        'per_item':        per_item_results,
+    }
+
+    json_path = OUT_DIR / 'rag_quality_results.json'
+    json_path.write_text(json.dumps(rag_results, indent=2))
+    print(f"\n  RAG quality results saved -> {json_path}")
+
+    _plot_rag_quality_chart(agg, retrieval_only)
+
+    return rag_results
+
+
+def _plot_rag_quality_chart(agg: dict, retrieval_only: bool):
+    """Bar chart of RAG quality metrics per category."""
+    cats = sorted(agg.keys())
+    if not cats:
+        return
+
+    metrics = ['context_precision', 'context_recall']
+    labels  = ['Context Precision', 'Context Recall']
+    colors  = ['#4f46e5', '#0891b2']
+
+    if not retrieval_only:
+        metrics += ['answer_completeness', 'question_coverage']
+        labels  += ['Answer Completeness', 'Question Coverage']
+        colors  += ['#16a34a', '#d97706']
+
+    x       = np.arange(len(cats))
+    n_bars  = len(metrics)
+    width   = 0.7 / n_bars
+
+    fig, ax = plt.subplots(figsize=(max(10, len(cats) * 2), 5))
+
+    for i, (metric, label, color) in enumerate(zip(metrics, labels, colors)):
+        vals = [
+            (agg[c].get(metric) or 0.0) for c in cats
+        ]
+        offset = (i - n_bars / 2 + 0.5) * width
+        bars = ax.bar(x + offset, vals, width, label=label, color=color, alpha=0.85)
+        for bar, val in zip(bars, vals):
+            if val is not None:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.02,
+                    f'{val:.0%}',
+                    ha='center', va='bottom', fontsize=7.5,
+                )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([c.replace('_', '\n') for c in cats], fontsize=9)
+    ax.set_ylim(0, 1.15)
+    ax.set_ylabel('Score', fontsize=10)
+    ax.set_title(
+        'Metric 4 — RAG Quality per Category'
+        + (' (retrieval-only)' if retrieval_only else ''),
+        fontsize=12, fontweight='bold',
+    )
+    ax.axhline(1.0, color='#16a34a', linestyle='--', linewidth=0.8, alpha=0.5)
+    ax.legend(fontsize=8, loc='upper right')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    path = OUT_DIR / 'rag_quality_chart.png'
+    plt.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  RAG quality chart saved -> {path}")
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def run(rag_quality: bool = False, retrieval_only: bool = False):
+    """Main harness driver."""
+    _run_metrics_1_to_3()
+    if rag_quality:
+        patient = _find_seed_patient()
+        if patient is None:
+            print("\n[Metric 4] No seed patient found — skipping RAG quality evaluation.")
+            print("  Run: python manage.py seed_trajectory_patient")
+        else:
+            run_rag_quality(patient, retrieval_only=retrieval_only)
+
+
 if __name__ == '__main__':
-    run()
+    parser = argparse.ArgumentParser(description='HealthCompass Evaluation Harness')
+    parser.add_argument(
+        '--rag-quality', action='store_true',
+        help='Run Metric 4: RAG quality on the golden dataset (makes LLM calls)',
+    )
+    parser.add_argument(
+        '--retrieval-only', action='store_true',
+        help='With --rag-quality: skip generation, compute Context P/R only (fast)',
+    )
+    args = parser.parse_args()
+    run(rag_quality=args.rag_quality, retrieval_only=args.retrieval_only)
