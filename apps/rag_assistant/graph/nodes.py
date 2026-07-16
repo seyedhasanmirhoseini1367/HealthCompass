@@ -213,13 +213,16 @@ def _get_proto_embeddings():
     return _proto_embeddings
 
 
-def _semantic_temporal_check(query: str, threshold: float = 0.52) -> bool:
+def _semantic_temporal_check(query: str, threshold: float = 0.92) -> bool:
     """
     Embedding-based fallback: return True when the query is semantically
     close to any temporal prototype phrase (cosine sim ≥ threshold).
 
-    Catches paraphrases like "explain my creatinine journey" that contain
-    no explicit trend keywords but clearly ask about change over time.
+    NOTE: threshold was 0.52 (calibrated for text-embedding-004, 768-dim).
+    gemini-embedding-001 (3072-dim) produces 0.56–0.71 for ALL medical queries —
+    temporal and non-temporal alike — so that threshold caused universal false
+    positives.  Set to 0.92 to effectively disable the semantic fallback until
+    a better per-model calibration is done; keyword matching alone is sufficient.
     """
     try:
         import numpy as np
