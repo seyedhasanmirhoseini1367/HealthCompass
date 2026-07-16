@@ -1,14 +1,16 @@
-from collections import defaultdict
-
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db.models import Count
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.medical_records.models import MedicalRecord
+from apps.ai_insights.services import (
+    get_patient_biomarker_data,
+    get_population_biomarker_stats,
+    get_population_risk_buckets,
+)
 from ..serializers import (UserSerializer, MedicalRecordSerializer,
                             HealthAlertSerializer, ModelPredictionSerializer)
 
@@ -57,31 +59,10 @@ def dashboard_summary(request):
 @permission_classes([IsAuthenticated])
 def analytics(request):
     from apps.ai_insights.models import ModelPrediction, HealthAlert
-    from apps.medical_records.models import ParsedLabValue
 
     patient = request.user
 
-    lab_qs = (ParsedLabValue.objects
-              .filter(record__patient=patient)
-              .select_related('record')
-              .order_by('record__record_date', 'record__uploaded_at'))
-
-    biomarker_map = defaultdict(list)
-    for lv in lab_qs:
-        try:
-            numeric = float(lv.value)
-        except (ValueError, TypeError):
-            continue
-        date_val = lv.record.record_date or lv.record.uploaded_at.date()
-        biomarker_map[lv.parameter_name].append({
-            'date':     str(date_val),
-            'value':    numeric,
-            'unit':     lv.unit or '',
-            'abnormal': lv.is_abnormal,
-            'critical': lv.is_critical,
-            'ref':      lv.reference_range or '',
-        })
-
+    biomarker_map, _, _ = get_patient_biomarker_data(patient)
     biomarker_latest = {name: pts[-1] for name, pts in biomarker_map.items()}
     biomarker_trends = {name: pts for name, pts in biomarker_map.items() if len(pts) >= 2}
 
@@ -121,58 +102,10 @@ def population_insights(request):
     if cached is not None:
         return Response(cached)
 
-    from apps.medical_records.models import ParsedLabValue
     from apps.ai_insights.models import HealthAlert, ModelPrediction
 
-    qs = ParsedLabValue.objects.select_related('record').values(
-        'parameter_name', 'value', 'unit',
-        'record__record_date', 'record__uploaded_at',
-    )
-    per_unit = defaultdict(lambda: defaultdict(list))
-    for lv in qs:
-        try:
-            numeric = float(lv['value'])
-        except (TypeError, ValueError):
-            continue
-        date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
-        month_key = str(date_val)[:7]
-        key = (lv['parameter_name'], lv.get('unit') or '')
-        per_unit[key][month_key].append(numeric)
-
-    by_name = defaultdict(list)
-    for (name, unit), months in per_unit.items():
-        total = sum(len(v) for v in months.values())
-        by_name[name].append((unit, total, months))
-
-    pop_latest, pop_avg, pop_unit = {}, {}, {}
-    for name, groups in by_name.items():
-        best_unit, _, best_months = max(groups, key=lambda x: x[1])
-        all_vals = [v for vs in best_months.values() for v in vs]
-        sorted_months = sorted(best_months.keys())
-        if sorted_months:
-            last_vals = best_months[sorted_months[-1]]
-            pop_latest[name] = {
-                'value': round(sum(last_vals) / len(last_vals), 2),
-                'unit':  best_unit,
-                'count': len(all_vals),
-            }
-        if len(all_vals) >= 3:
-            pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
-        pop_unit[name] = best_unit
-
-    all_scores = list(
-        ModelPrediction.objects.filter(risk_score__isnull=False)
-        .values_list('risk_score', flat=True)
-    )
-    risk_buckets = {'Low (0–30%)': 0, 'Moderate (30–70%)': 0, 'High (70–100%)': 0}
-    for rs in all_scores:
-        s = float(rs) * 100
-        if s < 30:   risk_buckets['Low (0–30%)']      += 1
-        elif s < 70: risk_buckets['Moderate (30–70%)'] += 1
-        else:        risk_buckets['High (70–100%)']    += 1
-
-    pop_avg_risk = round(sum(float(r) * 100 for r in all_scores) / len(all_scores), 1) \
-        if all_scores else None
+    _, pop_latest, pop_avg, pop_unit = get_population_biomarker_stats()
+    risk_buckets, pop_avg_risk, _ = get_population_risk_buckets()
 
     alerts_summary = {
         'critical': HealthAlert.objects.filter(severity='critical').count(),
@@ -191,7 +124,7 @@ def population_insights(request):
     payload = {
         'total_patients':    User.objects.filter(is_active=True, role='patient').count(),
         'total_biomarkers':  len(pop_latest),
-        'total_predictions': len(all_scores),
+        'total_predictions': sum(risk_buckets.values()),
         'pop_avg_risk':      pop_avg_risk,
         'pop_latest':        pop_latest,
         'pop_avg':           pop_avg,
