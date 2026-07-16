@@ -74,11 +74,6 @@ echo ""
 echo ">>> [2.7/3] Ensuring Google SocialApp credentials in DB..."
 python manage.py ensure_social_app || echo "WARNING: ensure_social_app failed — check logs above"
 
-# ── One-time embedding re-index (remove after first successful production run) ─
-echo ""
-echo ">>> [2.9/3] Re-indexing all chunk embeddings to gemini-embedding-001 (3072-dim)..."
-python manage.py reindex_all_embeddings || echo "WARNING: reindex_all_embeddings failed — check logs above"
-
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
 echo ">>> [3/3] Starting gunicorn on 0.0.0.0:${PORT}..."
