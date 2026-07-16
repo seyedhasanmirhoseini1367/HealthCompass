@@ -298,3 +298,227 @@ class ModelStatusEnforcementTest(TestCase):
     def test_active_allows_patient(self):
         """Any logged-in user can run an ACTIVE model."""
         self.assertNotEqual(self._post(self.patient, AIModel.Status.ACTIVE), 403)
+
+
+# ─── Service layer: get_patient_biomarker_data ────────────────────────────────
+
+import datetime as _dt
+
+from apps.medical_records.models import MedicalRecord, ParsedLabValue
+
+
+class PatientBiomarkerServiceTest(TestCase):
+    """Unit tests for get_patient_biomarker_data — called directly, no HTTP."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.patient = User.objects.create_user(
+            'svc_patient', email='svc_patient@test.invalid', password='pw'
+        )
+        self.record = MedicalRecord.objects.create(
+            patient=self.patient,
+            title='Lab 1',
+            record_type='lab_result',
+            record_date=_dt.date(2024, 1, 15),
+        )
+
+    def _add_lab(self, name, value, unit='mg/dL', record=None):
+        return ParsedLabValue.objects.create(
+            record=record or self.record,
+            parameter_name=name,
+            value=str(value),
+            unit=unit,
+        )
+
+    def test_empty_patient_returns_empty_dicts(self):
+        from apps.ai_insights.services import get_patient_biomarker_data
+        biomarker_map, trending, latest = get_patient_biomarker_data(self.patient)
+        self.assertEqual(biomarker_map, {})
+        self.assertEqual(trending, {})
+        self.assertEqual(latest, {})
+
+    def test_single_data_point_is_in_latest_not_trending(self):
+        from apps.ai_insights.services import get_patient_biomarker_data
+        self._add_lab('Glucose', 95.0)
+        biomarker_map, trending, latest = get_patient_biomarker_data(self.patient)
+        self.assertIn('Glucose', biomarker_map)
+        self.assertIn('Glucose', latest)
+        self.assertNotIn('Glucose', trending)
+
+    def test_two_data_points_appear_in_trending(self):
+        from apps.ai_insights.services import get_patient_biomarker_data
+        record2 = MedicalRecord.objects.create(
+            patient=self.patient, title='Lab 2',
+            record_type='lab_result', record_date=_dt.date(2024, 2, 15),
+        )
+        self._add_lab('Glucose', 95.0)
+        self._add_lab('Glucose', 102.0, record=record2)
+        biomarker_map, trending, latest = get_patient_biomarker_data(self.patient)
+        self.assertIn('Glucose', trending)
+        self.assertEqual(len(trending['Glucose']), 2)
+
+    def test_non_numeric_value_is_skipped(self):
+        from apps.ai_insights.services import get_patient_biomarker_data
+        ParsedLabValue.objects.create(
+            record=self.record, parameter_name='Status', value='Positive', unit=''
+        )
+        biomarker_map, _, _ = get_patient_biomarker_data(self.patient)
+        self.assertNotIn('Status', biomarker_map)
+
+    def test_data_point_dict_has_required_keys(self):
+        from apps.ai_insights.services import get_patient_biomarker_data
+        self._add_lab('HbA1c', 6.2, unit='%')
+        biomarker_map, _, _ = get_patient_biomarker_data(self.patient)
+        pt = biomarker_map['HbA1c'][0]
+        for key in ('date', 'value', 'unit', 'abnormal', 'critical', 'ref'):
+            self.assertIn(key, pt, f"Point dict missing key '{key}'")
+
+    def test_only_patient_own_records_returned(self):
+        """Service must not leak another patient's lab values."""
+        from apps.ai_insights.services import get_patient_biomarker_data
+        User = get_user_model()
+        other = User.objects.create_user('other_svc', email='other_svc@test.invalid', password='pw')
+        other_record = MedicalRecord.objects.create(
+            patient=other, title='Other Lab', record_type='lab_result',
+            record_date=_dt.date(2024, 3, 1),
+        )
+        ParsedLabValue.objects.create(
+            record=other_record, parameter_name='Sodium', value='140', unit='mEq/L'
+        )
+        self._add_lab('Glucose', 100)
+        biomarker_map, _, _ = get_patient_biomarker_data(self.patient)
+        self.assertIn('Glucose', biomarker_map)
+        self.assertNotIn('Sodium', biomarker_map)
+
+
+# ─── Service layer: get_population_risk_buckets ───────────────────────────────
+
+from apps.ai_insights.models import ModelPrediction as _ModelPrediction
+
+
+class PopulationRiskBucketsServiceTest(TestCase):
+    """Unit tests for get_population_risk_buckets — called directly, no HTTP."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.ds = User.objects.create_user('svc_ds', email='svc_ds@test.invalid', password='pw')
+        self.patient = User.objects.create_user(
+            'svc_pt2', email='svc_pt2@test.invalid', password='pw'
+        )
+        self.ai_model = AIModel.objects.create(
+            name='Risk Test Model', description='test',
+            data_scientist=self.ds,
+            input_schema={}, output_schema={},
+            status=AIModel.Status.ACTIVE,
+        )
+
+    def _add_prediction(self, risk_score):
+        return _ModelPrediction.objects.create(
+            model=self.ai_model,
+            patient=self.patient,
+            input_data={},
+            result={},
+            risk_score=risk_score,
+        )
+
+    def test_empty_returns_zero_counts(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        buckets, avg_risk, scores = get_population_risk_buckets()
+        self.assertEqual(sum(buckets.values()), 0)
+        self.assertIsNone(avg_risk)
+        self.assertEqual(scores, [])
+
+    def test_low_risk_prediction_counted(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        self._add_prediction(0.1)
+        buckets, _, _ = get_population_risk_buckets()
+        self.assertEqual(buckets['Low (0–30%)'], 1)
+        self.assertEqual(buckets['Moderate (30–70%)'], 0)
+        self.assertEqual(buckets['High (70–100%)'], 0)
+
+    def test_moderate_risk_prediction_counted(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        self._add_prediction(0.5)
+        buckets, _, _ = get_population_risk_buckets()
+        self.assertEqual(buckets['Moderate (30–70%)'], 1)
+
+    def test_high_risk_prediction_counted(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        self._add_prediction(0.9)
+        buckets, _, _ = get_population_risk_buckets()
+        self.assertEqual(buckets['High (70–100%)'], 1)
+
+    def test_pop_avg_risk_computed_correctly(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        self._add_prediction(0.2)
+        self._add_prediction(0.8)
+        _, avg_risk, _ = get_population_risk_buckets()
+        self.assertAlmostEqual(avg_risk, 50.0, places=1)
+
+    def test_none_risk_score_excluded(self):
+        from apps.ai_insights.services import get_population_risk_buckets
+        _ModelPrediction.objects.create(
+            model=self.ai_model, patient=self.patient,
+            input_data={}, result={}, risk_score=None,
+        )
+        _, _, scores = get_population_risk_buckets()
+        self.assertEqual(scores, [])
+
+
+# ─── Service + API consistency test ──────────────────────────────────────────
+
+from rest_framework.test import APIClient as _APIClient
+
+
+class BiomarkerServiceAPIConsistencyTest(TestCase):
+    """
+    Calls get_patient_biomarker_data directly AND the /api/v1/analytics/ endpoint,
+    then asserts they agree on the same biomarker names and data-point count.
+
+    The API uses JWT authentication; we bypass token issuance via
+    APIClient.force_authenticate so the test stays focused on data consistency.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.patient = User.objects.create_user(
+            'consist_pt', email='consist_pt@test.invalid', password='pw'
+        )
+        record = MedicalRecord.objects.create(
+            patient=self.patient, title='Consistency Lab',
+            record_type='lab_result', record_date=_dt.date(2024, 5, 1),
+        )
+        for name, val in [('Glucose', 95.0), ('HbA1c', 6.1), ('Cholesterol', 180.0)]:
+            ParsedLabValue.objects.create(
+                record=record, parameter_name=name, value=str(val), unit='mg/dL'
+            )
+        self.api_client = _APIClient()
+        self.api_client.force_authenticate(user=self.patient)
+
+    def test_api_biomarker_latest_matches_service(self):
+        """API response biomarker_latest keys == service biomarker_map keys."""
+        from apps.ai_insights.services import get_patient_biomarker_data
+
+        # 1. Direct service call
+        biomarker_map, _, _ = get_patient_biomarker_data(self.patient)
+
+        # 2. API call (force_authenticate bypasses JWT so this is an integration test)
+        resp = self.api_client.get('/api/v1/analytics/')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        api_biomarker_keys = set(data['biomarker_latest'].keys())
+        svc_biomarker_keys = set(biomarker_map.keys())
+        self.assertEqual(api_biomarker_keys, svc_biomarker_keys)
+
+    def test_api_total_biomarkers_matches_service(self):
+        """API response total_biomarkers count == len(service biomarker_map)."""
+        from apps.ai_insights.services import get_patient_biomarker_data
+
+        biomarker_map, _, _ = get_patient_biomarker_data(self.patient)
+
+        resp = self.api_client.get('/api/v1/analytics/')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data['total_biomarkers'], len(biomarker_map))

@@ -11,107 +11,32 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect
 
 from ..models import AIModel, ModelPrediction, HealthAlert
+from ..services import (
+    get_patient_biomarker_data,
+    get_population_biomarker_stats,
+    get_population_risk_buckets,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _build_pop_biomarker_data(biomarker_names=None):
     """
-    Returns (pop_trending, pop_latest, pop_avg, pop_unit) computed from all
-    patients' ParsedLabValue rows.  Groups by (parameter_name, unit) to avoid
-    mixing incompatible units.  Results cached 1 hour.
+    Thin wrapper kept for backward-compatibility with any code that may still
+    call this helper directly.  Delegates to the service layer.
     """
-    from django.core.cache import cache
-    from apps.medical_records.models import ParsedLabValue
-
-    _cache_key = (
-        'ai_insights:pop_biomarker:'
-        + (','.join(sorted(biomarker_names)) if biomarker_names else 'all')
-    )
-    cached = cache.get(_cache_key)
-    if cached is not None:
-        return cached
-
-    qs = ParsedLabValue.objects.select_related('record').values(
-        'parameter_name', 'value', 'unit',
-        'record__record_date', 'record__uploaded_at',
-    )
-    if biomarker_names:
-        qs = qs.filter(parameter_name__in=biomarker_names)
-
-    per_unit_monthly = defaultdict(lambda: defaultdict(list))
-
-    for lv in qs:
-        try:
-            numeric = float(lv['value'])
-        except (ValueError, TypeError):
-            continue
-        date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
-        month_key = date_val.strftime('%Y-%m')
-        key       = (lv['parameter_name'], lv.get('unit') or '')
-        per_unit_monthly[key][month_key].append(numeric)
-
-    by_name = defaultdict(list)
-    for (name, unit), months in per_unit_monthly.items():
-        total = sum(len(vs) for vs in months.values())
-        by_name[name].append((unit, total, months))
-
-    pop_trending, pop_latest, pop_avg, pop_unit = {}, {}, {}, {}
-    for name, groups in by_name.items():
-        best_unit, _, best_months = max(groups, key=lambda x: x[1])
-        all_vals      = [v for vs in best_months.values() for v in vs]
-        sorted_months = sorted(best_months.keys())
-        series = [
-            {'date': m, 'value': round(sum(best_months[m]) / len(best_months[m]), 2),
-             'count': len(best_months[m]), 'unit': best_unit}
-            for m in sorted_months if best_months[m]
-        ]
-        pop_unit[name] = best_unit
-        if len(series) >= 2:
-            pop_trending[name] = series
-        if series:
-            last = series[-1]
-            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count']}
-        if len(all_vals) >= 3:
-            pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
-
-    result = pop_trending, pop_latest, pop_avg, pop_unit
-    cache.set(_cache_key, result, 3600)
-    return result
+    return get_population_biomarker_stats(biomarker_names=biomarker_names)
 
 
 @login_required
 def health_view(request):
-    from apps.medical_records.models import MedicalRecord, ParsedLabValue
+    from apps.medical_records.models import MedicalRecord
 
     patient = request.user
 
-    lab_qs = (
-        ParsedLabValue.objects
-        .filter(record__patient=patient)
-        .select_related('record')
-        .order_by('record__record_date', 'record__uploaded_at')
-    )
-    biomarker_map = defaultdict(list)
-    for lv in lab_qs:
-        try:
-            numeric = float(lv.value)
-        except (ValueError, TypeError):
-            continue
-        date_val = lv.record.record_date or lv.record.uploaded_at.date()
-        biomarker_map[lv.parameter_name].append({
-            'date':     str(date_val),
-            'value':    numeric,
-            'unit':     lv.unit or '',
-            'abnormal': lv.is_abnormal,
-            'critical': lv.is_critical,
-            'ref':      lv.reference_range or '',
-        })
+    biomarker_map, trending_biomarkers, latest_values = get_patient_biomarker_data(patient)
 
-    trending_biomarkers = {k: v for k, v in biomarker_map.items() if len(v) >= 2}
-    latest_values       = {name: pts[-1] for name, pts in biomarker_map.items()}
-
-    pop_trending_raw, _, pop_avg_raw, pop_unit = _build_pop_biomarker_data(
+    pop_trending_raw, _, pop_avg_raw, pop_unit = get_population_biomarker_stats(
         biomarker_names=list(biomarker_map.keys()) or None
     )
     user_unit = {name: pts[-1]['unit'] for name, pts in biomarker_map.items() if pts}
@@ -124,7 +49,6 @@ def health_view(request):
         if pop_unit.get(name, '') == user_unit.get(name, '')
     }
 
-    from apps.medical_records.models import MedicalRecord
     records_by_type = list(
         MedicalRecord.objects.filter(patient=patient)
         .values('record_type').annotate(count=Count('id')).order_by('-count')
@@ -153,7 +77,6 @@ def health_view(request):
     pred_scores = [round(float(p['risk_score']) * 100, 1) for p in predictions]
     latest_risk = pred_scores[-1] if pred_scores else None
 
-    from apps.medical_records.models import MedicalRecord
     total_records    = MedicalRecord.objects.filter(patient=patient).count()
     total_biomarkers = len(biomarker_map)
     unread_alerts    = HealthAlert.objects.filter(patient=patient, is_read=False).count()
@@ -188,7 +111,7 @@ def population_view(request):
 
     User = get_user_model()
 
-    pop_trending, pop_latest, _, _ = _build_pop_biomarker_data()
+    pop_trending, pop_latest, _, _ = get_population_biomarker_stats()
 
     total_patients   = User.objects.filter(is_active=True).count()
     total_biomarkers = len(pop_latest)
@@ -213,17 +136,7 @@ def population_view(request):
     upload_labels = [r['month'].strftime('%b %Y') for r in monthly_uploads]
     upload_counts = [r['count']                   for r in monthly_uploads]
 
-    all_scores = list(
-        ModelPrediction.objects.filter(risk_score__isnull=False)
-        .values_list('risk_score', flat=True)
-    )
-    risk_buckets = {'Low (0–30%)': 0, 'Moderate (30–70%)': 0, 'High (70–100%)': 0}
-    for rs in all_scores:
-        s = float(rs) * 100
-        if s < 30:   risk_buckets['Low (0–30%)']      += 1
-        elif s < 70: risk_buckets['Moderate (30–70%)'] += 1
-        else:        risk_buckets['High (70–100%)']    += 1
-    pop_avg_risk = round(sum(float(r)*100 for r in all_scores) / len(all_scores), 1) if all_scores else None
+    risk_buckets, pop_avg_risk, _ = get_population_risk_buckets()
 
     return render(request, 'ai_insights/population.html', {
         'trending_json':       json.dumps(pop_trending),
@@ -249,37 +162,13 @@ def patient_analytics(request):
         messages.error(request, 'Access denied.')
         return redirect('dashboard:home')
 
-    from apps.medical_records.models import MedicalRecord, ParsedLabValue
+    from apps.medical_records.models import MedicalRecord
     import datetime
     from django.utils import timezone
 
     patient = request.user
 
-    lab_qs = (
-        ParsedLabValue.objects
-        .filter(record__patient=patient)
-        .select_related('record')
-        .order_by('record__record_date', 'record__uploaded_at')
-    )
-
-    biomarker_map = defaultdict(list)
-    for lv in lab_qs:
-        try:
-            numeric = float(lv.value)
-        except (ValueError, TypeError):
-            continue
-        date_val = lv.record.record_date or lv.record.uploaded_at.date()
-        biomarker_map[lv.parameter_name].append({
-            'date':     str(date_val),
-            'value':    numeric,
-            'unit':     lv.unit or '',
-            'abnormal': lv.is_abnormal,
-            'critical': lv.is_critical,
-            'ref':      lv.reference_range or '',
-        })
-
-    trending_biomarkers = {k: v for k, v in biomarker_map.items() if len(v) >= 2}
-    latest_values = {name: pts[-1] for name, pts in biomarker_map.items()}
+    biomarker_map, trending_biomarkers, latest_values = get_patient_biomarker_data(patient)
 
     records_by_type = list(
         MedicalRecord.objects.filter(patient=patient)
