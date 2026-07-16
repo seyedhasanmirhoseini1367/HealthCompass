@@ -1,12 +1,16 @@
-﻿# rag_assistant/services/rag_service.py
+# rag_assistant/services/rag_service.py
 """
 RAG orchestrator — ties together document processing, embedding, retrieval
 and generation into a single public interface.
 
-Supports three query modes:
-  ask()            — non-streaming (returns full response + sources)
-  stream_ask()     — streaming (yields SSE-ready tokens)
-  langgraph_ask()  — LangGraph pipeline with routing + self-correction
+Supports two query modes:
+  ask()        — non-streaming (returns full response + sources)
+  stream_ask() — streaming (yields SSE-ready tokens)
+
+Both delegate to the single LangGraph pipeline in graph/graph.py.
+stream_ask() uses the routing-only subgraph + generate_streaming() for
+token-by-token SSE; ask() consumes that same SSE stream and assembles
+the full response synchronously.
 
 PhD proposal additions (all opt-in via RAG_CONFIG flags):
   • cold-start fallback  — when patient has no indexed records, return
@@ -56,46 +60,50 @@ class RAGService:
         query:         str,
         history:       List[Dict]    = None,
         document_type: Optional[str] = None,
-        top_k:         Optional[int] = None,
     ) -> Tuple[str, List[Dict], str, int, bool, List]:
         """
         Returns (response_text, sources, llm_provider, retrieved_chunks_count,
                  safety_routed, triggered_rules).
+
+        Consumes stream_graph() SSE events synchronously and assembles the
+        full response tuple — same shape callers expect.
         """
-        from django.conf import settings
-        from apps.rag_assistant.services.generation_service import generate
-        from apps.rag_assistant.services.guardrail_service  import GuardrailService
+        import json
+        from apps.rag_assistant.graph.graph import stream_graph
 
-        # ── Pre-query safety gate (before anything else) ──────────────────────
-        is_emergency, emergency_response = GuardrailService.check_pre_query(query)
-        if is_emergency:
-            return emergency_response, [], 'safety_gate', 0, True, []
+        tokens:          List[str]  = []
+        sources:         List[Dict] = []
+        provider:        str        = ''
+        chunks_count:    int        = 0
+        safety_routed:   bool       = False
+        triggered_rules: List       = []
 
-        # ── Cold-start check ──────────────────────────────────────────────────
-        if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
-            cold = self._cold_start_response(patient, query)
-            if cold:
-                return cold, [], 'cold_start', 0, False, []
-
-        chunks = self.ret_svc.retrieve(
-            patient       = patient,
+        for event_str in stream_graph(
             query         = query,
+            patient       = patient,
+            history       = history,
             document_type = document_type,
-            top_k         = top_k,
-        )
-        response, sources, provider = generate(chunks, query, history or [])
+        ):
+            if not event_str.startswith('data: '):
+                continue
+            try:
+                payload = json.loads(event_str[6:].strip())
+            except json.JSONDecodeError:
+                continue
+            t = payload.get('type')
+            if t == 'token':
+                tokens.append(payload.get('content', ''))
+            elif t == 'sources':
+                sources = payload.get('sources', [])
+            elif t == 'meta':
+                provider        = payload.get('provider', '')
+                chunks_count    = payload.get('chunks', 0)
+                safety_routed   = payload.get('safety_routed', False)
+                triggered_rules = payload.get('triggered_rules', [])
 
-        # ── Guardrail ─────────────────────────────────────────────────────────
-        response, rules_fired = GuardrailService().apply(response)
-        if rules_fired:
-            logger.info('ask() guardrail rules fired: %s', rules_fired)
-
-        return response, sources, provider, len(chunks), False, rules_fired
+        return ''.join(tokens), sources, provider, chunks_count, safety_routed, triggered_rules
 
     # ── Streaming ask ──────────────────────────────────────────────────────────
-    # Production path — this is what the web UI and mobile API use.
-    # Implements: safety gate → mode classification (general/hybrid/personal)
-    # → trajectory detection → streaming generation → guardrail → sources/chart.
 
     def stream_ask(
         self,
@@ -105,269 +113,22 @@ class RAGService:
         document_type: Optional[str] = None,
     ) -> Generator[str, None, None]:
         """
-        Yields SSE-formatted events.
-
-        When the RAG_PIPELINE environment variable is set to 'graph', delegates
-        to stream_graph() (graph-path SSE) which uses the LangGraph routing
-        subgraph for retrieval then calls generate_streaming() for token-by-token
-        output.  The SSE contract (token/sources/meta/done event sequence) is
-        identical for both paths.
-
-        RAG_PIPELINE=legacy  (default) — this function handles everything.
-        RAG_PIPELINE=graph            — delegates to graph/graph.py:stream_graph().
+        Yields SSE-formatted events via the LangGraph pipeline.
 
             data: {"type": "token",   "content": "..."}
             data: {"type": "sources", "sources": [...]}
-            data: {"type": "meta",    "provider": "gemini", "chunks": 6, "mode": "trajectory"|"standard"}
+            data: {"type": "meta",    "provider": "groq", "chunks": 6, "mode": "trajectory"|"personal"|...}
+            data: {"type": "chart",   "chart": {...}}    — trajectory queries only
             data: {"type": "done"}
             data: {"type": "error",   "message": "..."}
-
-        When the query is temporal (trend/trajectory keywords detected),
-        TrajectoryService builds a chronologically ordered context and passes
-        it to the LLM with the trajectory system prompt — bypassing similarity
-        ranking so the LLM can reason about direction and slope.
         """
-        import json
-        import os
-        from django.conf import settings
-
-        # ── Feature flag: delegate to graph path ──────────────────────────────
-        if os.environ.get('RAG_PIPELINE', 'legacy').strip().lower() == 'graph':
-            from apps.rag_assistant.graph.graph import stream_graph
-            yield from stream_graph(
-                query         = query,
-                patient       = patient,
-                history       = history,
-                document_type = document_type,
-            )
-            return
-        from apps.rag_assistant.services.generation_service import (
-            generate_streaming, _build_sources, _build_general_sources,
-            active_stream_provider,
+        from apps.rag_assistant.graph.graph import stream_graph
+        yield from stream_graph(
+            query         = query,
+            patient       = patient,
+            history       = history,
+            document_type = document_type,
         )
-        from apps.rag_assistant.services.guardrail_service    import GuardrailService
-        from apps.rag_assistant.services.trajectory_service   import TrajectoryService
-        from apps.rag_assistant.services.general_knowledge_service import GeneralKnowledgeService
-        from apps.rag_assistant.services.query_understanding  import understand
-
-        try:
-            # ── Pre-query safety gate ─────────────────────────────────────────
-            is_emergency, emergency_response = GuardrailService.check_pre_query(query)
-            if is_emergency:
-                yield f'data: {json.dumps({"type": "token", "content": emergency_response})}\n\n'
-                yield 'data: {"type": "sources", "sources": []}\n\n'
-                yield f'data: {json.dumps({"type": "meta", "provider": "safety_gate", "chunks": 0, "mode": "emergency", "safety_routed": True, "triggered_rules": []})}\n\n'
-                yield 'data: {"type": "done"}\n\n'
-                return
-
-            # ── Query Understanding (replaces 4 separate classifiers) ─────────
-            qi = understand(query, history)
-            # Use the rewritten query for retrieval so follow-ups like
-            # "what about last year?" become self-contained before embedding.
-            retrieval_query = qi.rewritten_query
-            logger.info(
-                'stream_ask: mode=%s route=%s intent=%s temporal=%s via_llm=%s q=%r',
-                qi.mode, qi.route, qi.intent, qi.is_temporal, qi.via_llm, query[:60],
-            )
-
-            general_chunks: List[Dict] = []
-            chunks:         List[Dict] = []
-            trajectory_context         = ''
-            mode                       = qi.mode
-
-            gk_svc = GeneralKnowledgeService()
-
-            if qi.mode == 'general':
-                # ── General knowledge only — no patient data touched ──────────
-                general_chunks = gk_svc.retrieve(retrieval_query)
-
-            elif qi.mode == 'hybrid':
-                # ── Both sources ──────────────────────────────────────────────
-                general_chunks = gk_svc.retrieve(retrieval_query)
-                chunks = self.ret_svc.retrieve(
-                    patient=patient, query=retrieval_query,
-                    document_type=document_type, query_intent=qi.intent,
-                )
-
-            else:
-                # ── Personal mode ─────────────────────────────────────────────
-                if settings.RAG_CONFIG.get('COLD_START_ENABLED', True):
-                    cold = self._cold_start_response(patient, query)
-                    if cold:
-                        yield f'data: {json.dumps({"type": "token", "content": cold})}\n\n'
-                        yield 'data: {"type": "sources", "sources": []}\n\n'
-                        yield f'data: {json.dumps({"type": "meta", "provider": "cold_start", "chunks": 0, "mode": "cold_start"})}\n\n'
-                        yield 'data: {"type": "done"}\n\n'
-                        return
-
-                traj_svc = TrajectoryService()
-                if settings.RAG_CONFIG.get('TRAJECTORY_ENABLED', True) and qi.is_temporal:
-                    trajectory_context, chunks = traj_svc.get_trajectory_context(
-                        patient, retrieval_query,
-                    )
-                    if trajectory_context:
-                        mode = 'trajectory'
-                    else:
-                        chunks = self.ret_svc.retrieve(
-                            patient=patient, query=retrieval_query,
-                            document_type=document_type, query_intent='temporal',
-                        )
-                else:
-                    chunks = self.ret_svc.retrieve(
-                        patient=patient, query=retrieval_query,
-                        document_type=document_type, query_intent=qi.intent,
-                    )
-
-                if not chunks and not trajectory_context and history:
-                    trajectory_context = (
-                        "No additional records were retrieved for this follow-up question. "
-                        "Please answer based on the conversation history above."
-                    )
-                    mode = 'history_followup'
-
-            # ── Streaming generation with initial safety buffer ────────────────
-            # Buffer the first _GUARDRAIL_BUF chars before releasing any tokens
-            # so that GuardrailService can soften in-place language such as
-            # "you have kidney disease" BEFORE it reaches the user.
-            # Tokens after the buffer threshold are streamed normally; a final
-            # pass appends any disclaimers triggered by the full response.
-            _GUARDRAIL_BUF = 500
-            _svc            = GuardrailService()
-            _buf            = ''
-            _buf_flushed    = False
-            collected_tokens: List[str] = []
-
-            for token in generate_streaming(
-                chunks,
-                query,          # always send the original query to the LLM
-                history or [],
-                context_override=trajectory_context,
-                query_mode=qi.mode,
-                general_chunks=general_chunks,
-            ):
-                collected_tokens.append(token)
-                if not _buf_flushed:
-                    _buf += token
-                    if len(_buf) >= _GUARDRAIL_BUF:
-                        safe_buf, _ = _svc.apply(_buf)
-                        yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
-                        _buf_flushed = True
-                else:
-                    yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
-
-            # Flush remaining buffer if stream ended before threshold
-            if not _buf_flushed:
-                safe_buf, _ = _svc.apply(_buf)
-                yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
-
-            # ── Guardrail: append disclaimers for full response ────────────────
-            # get_appended_disclaimers() does NOT re-apply in-place softening
-            # (already done on the buffer), so the slice is always clean text.
-            full_response = ''.join(collected_tokens)
-            extra_text, rules_fired = _svc.get_appended_disclaimers(full_response)
-            if extra_text:
-                yield f'data: {json.dumps({"type": "token", "content": extra_text})}\n\n'
-
-            # ── Sources: merge personal + general ─────────────────────────────
-            sources  = _build_sources(chunks)
-            if general_chunks:
-                sources += _build_general_sources(general_chunks)
-            provider = active_stream_provider()
-            yield f'data: {json.dumps({"type": "sources", "sources": sources})}\n\n'
-            yield f'data: {json.dumps({"type": "meta", "provider": provider, "chunks": len(chunks) + len(general_chunks), "mode": mode, "safety_routed": False, "triggered_rules": rules_fired})}\n\n'
-
-            # ── Inline chart: trajectory answers OR explicit chart requests ─────
-            _traj_svc_ref = locals().get('traj_svc') or TrajectoryService()
-            if mode == 'trajectory' or (
-                patient is not None and _traj_svc_ref.is_chart_request(query)
-            ):
-                try:
-                    chart_data = _traj_svc_ref.get_chart_data(patient, query)
-                    if chart_data:
-                        yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
-                except Exception as _chart_err:
-                    logger.warning('chart_data generation failed: %s', _chart_err)
-
-            yield 'data: {"type": "done"}\n\n'
-
-        except Exception as exc:
-            logger.exception('stream_ask failed: %s', exc)
-            yield f'data: {json.dumps({"type": "error", "message": str(exc)})}\n\n'
-            yield 'data: {"type": "done"}\n\n'
-
-    # ── LangGraph ask ──────────────────────────────────────────────────────────
-    # Research/PhD path — demonstrates the full router→retrieval→generate→verify
-    # pipeline with LangGraph StateGraph.  The production UI uses stream_ask()
-    # instead (SSE streaming, dual-mode routing, trajectory mode).
-
-    def langgraph_ask(
-        self,
-        patient,
-        query:      str,
-        history:    List[Dict] = None,
-        session_id: str        = None,
-    ) -> Tuple[str, List[Dict], str, int]:
-        """
-        Full LangGraph pipeline: router → scoped retrieval → generate → verify/retry.
-        Returns (response_text, sources, provider, chunks_count).
-
-        Cold-start and safety gate are handled inside the graph
-        (safety_gate_node → router_node → cold_start_node).  The only
-        pre-graph check kept here is a safety gate short-circuit to avoid
-        invoking the graph entirely for emergency queries.
-        """
-        from apps.rag_assistant.graph.graph import health_graph
-        from apps.rag_assistant.services.generation_service import _build_sources
-        from apps.rag_assistant.services.guardrail_service  import GuardrailService
-
-        # Pre-flight safety check — avoids graph invocation for emergencies.
-        # Cold-start is intentionally NOT checked here; the graph's router_node
-        # handles it via cold_start_node to avoid logic duplication.
-        is_emergency, emergency_response = GuardrailService.check_pre_query(query)
-        if is_emergency:
-            return emergency_response, [], 'safety_gate', 0
-
-        initial_state = {
-            'question':          query,
-            'route':             'general',      # overwritten by understand_node
-            'answer':            '',
-            'patient_id':        patient.pk,
-            'context_chunks':    [],
-            'session_id':        session_id,
-            'history':           history or [],
-            'needs_retry':       False,
-            'retry_count':       0,
-            'llm_provider':      '',
-            'trajectory_context': '',
-            'rewritten_query':   '',             # populated by understand_node
-            'mode':              '',             # populated by understand_node
-        }
-
-        try:
-            result   = health_graph.invoke(initial_state)
-            answer   = result.get('answer', '')
-            chunks   = result.get('context_chunks', [])
-            sources  = _build_sources(chunks)
-            provider = result.get('llm_provider', '')
-
-            logger.info(
-                'LangGraph: route=%s provider=%s retry=%d chunks=%d trajectory=%s',
-                result.get('route'), provider,
-                result.get('retry_count', 0), len(chunks),
-                bool(result.get('trajectory_context')),
-            )
-
-            final_answer = answer or _no_answer_fallback()
-
-            # Guardrail on LangGraph output
-            final_answer, rules_fired = GuardrailService().apply(final_answer)
-            if rules_fired:
-                logger.info('langgraph_ask() guardrail rules fired: %s', rules_fired)
-
-            return final_answer, sources, provider, len(chunks)
-        except Exception as exc:
-            logger.exception('langgraph_ask failed: %s', exc)
-            return _no_answer_fallback(), [], '', 0
 
     # ── Index status ───────────────────────────────────────────────────────────
 

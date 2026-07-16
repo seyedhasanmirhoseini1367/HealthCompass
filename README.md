@@ -45,60 +45,44 @@ HealthCompass is built around a single idea: your health data should be understa
 
 The AI Health Assistant is built on a Retrieval-Augmented Generation pipeline that retrieves relevant chunks from the patient's own records before generating a response. No records from other patients are ever included.
 
-### Architecture — two query paths
+### Architecture — single LangGraph pipeline
 
-**Production path** (`stream_ask`) — what the web UI and mobile API use:
-
-```
-User question
-      │
-      ▼
- Safety gate          ← pre-query emergency / self-harm check (no LLM call)
-      │ safe
-      ▼
- Mode classifier      ← keyword-based: personal | general | hybrid
-      │
-      ├── general  → Finnish clinical knowledge base only (Käypä hoito / THL)
-      ├── hybrid   → knowledge base + patient records merged
-      └── personal ─┬─ Trajectory check  → chronological context (trend queries)
-                    └─ Hybrid retrieval  → BM25 + semantic + time decay + MMR
-                              │
-                              ▼
-                    Streaming generation  ← Groq → Gemini → Anthropic → OpenAI
-                              │
-                              ▼
-                       Guardrail layer    ← post-generation safety rules
-                              │
-                              ▼
-                    SSE tokens + sources + chart data → browser / mobile
-```
-
-**Extended path** (`langgraph_ask`) — LangGraph StateGraph for complex multi-step queries:
+Both `stream_ask()` (streaming SSE) and `ask()` (sync) delegate to the same LangGraph-orchestrated pipeline:
 
 ```
 User question
       │
       ▼
- safety_gate_node
+ safety_gate_node    ← pre-query emergency / self-harm check (no LLM call)
       │ safe
       ▼
- router_node          ← keyword + word-boundary matching; semantic embedding fallback
+ understand_node     ← QueryUnderstanding: mode / route / rewritten query
+      │
+      ▼
+ router_node         ← cold-start gate (no indexed records → cold_start route)
       │
       ├── cold_start_node    → population reference ranges (no records indexed)
-      ├── trajectory_node    → Δ(D,t,s) chronological context
+      ├── trajectory_node    → Δ(D,t,s) chronological context (trend queries)
       ├── lab_results_node   → lab result chunks
       ├── medications_node   → medication chunks
       ├── wearable_node      → wearable data chunks
       ├── diagnosis_node     → clinical note chunks
       ├── records_node       → all record types
-      └── general_node       → all record types
+      └── general_node       → Finnish clinical knowledge base (Käypä hoito / THL)
                 │
                 ▼
-         generate_node       ← Groq → Gemini → Anthropic → OpenAI
+      generate_streaming()   ← Groq → Gemini → Anthropic → OpenAI
+        (guardrail buffer: first 500 chars softened before streaming)
                 │
                 ▼
-          verify_node        ← retry if no chunks retrieved (max 2×)
+        Guardrail layer      ← post-generation disclaimers appended
+                │
+                ▼
+      SSE tokens + sources + chart data → browser / mobile
+                         (or assembled synchronously for ask())
 ```
+
+`stream_ask()` uses a routing-only subgraph (no `generate_node`) that resolves retrieval state, then calls `generate_streaming()` directly for token-by-token SSE output. `ask()` consumes the same SSE stream and assembles the full response tuple synchronously.
 
 ### Routing
 
