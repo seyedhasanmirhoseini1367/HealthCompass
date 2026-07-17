@@ -18,7 +18,7 @@ from .predictions import (
     seizure_analysis,
 )
 from .appointments import appointments_list_create, appointment_detail
-from .assistant import assistant_ask, assistant_sessions, assistant_session_detail
+from .assistant import assistant_ask, assistant_stream, assistant_sessions, assistant_session_detail
 from .icu import icu_dashboard_api, seizure_realtime_analyze
 
 __all__ = [

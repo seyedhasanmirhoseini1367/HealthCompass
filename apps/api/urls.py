@@ -54,6 +54,7 @@ urlpatterns = [
 
     # AI Assistant
     path('assistant/ask/',                        views.assistant_ask,            name='assistant_ask'),
+    path('assistant/stream/',                     views.assistant_stream,         name='assistant_stream'),
     path('assistant/sessions/',                   views.assistant_sessions,       name='assistant_sessions'),
     path('assistant/sessions/<str:session_id>/',  views.assistant_session_detail, name='assistant_session_detail'),
 

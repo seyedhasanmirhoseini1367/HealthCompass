@@ -1,6 +1,8 @@
+import json
 import logging
 
 from django.db.models import Count
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -66,6 +68,109 @@ def assistant_ask(request):
         'session_id': str(session.pk),
         'message_id': str(log.pk),
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def assistant_stream(request):
+    """
+    JWT-authenticated SSE counterpart to `assistant_ask`, for the mobile app.
+
+    Wraps the same RAGService.stream_ask() generator the web chat UI uses
+    (apps/rag_assistant/views.py::stream_message), so the event shape is
+    identical:
+
+        data: {"type": "token",   "content": "..."}
+        data: {"type": "sources", "sources": [...]}
+        data: {"type": "meta",    "provider": "...", "chunks": N, "mode": "..."}
+        data: {"type": "chart",   "chart": {...}}
+        data: {"type": "done"}
+        data: {"type": "error",   "message": "..."}
+    """
+    from apps.rag_assistant.models import ChatSession, QueryLog
+    from apps.rag_assistant.services.rag_service import RAGService
+
+    query      = request.data.get('query', '').strip()
+    session_id = request.data.get('session_id')
+    if not query:
+        return Response({'error': 'query is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if session_id:
+        try:
+            session = ChatSession.objects.get(pk=session_id, patient=request.user)
+        except ChatSession.DoesNotExist:
+            session = ChatSession.objects.create(patient=request.user, title=query[:60])
+    else:
+        session = ChatSession.objects.create(patient=request.user, title=query[:60])
+
+    history = list(
+        session.messages.values('query', 'response').order_by('-created_at')[:5]
+    )
+    history.reverse()
+
+    def _event_stream():
+        collected_tokens          = []
+        collected_sources         = []
+        collected_provider        = ''
+        collected_chunks          = 0
+        collected_safety_routed   = False
+        collected_triggered_rules = []
+        collected_mode            = 'personal'
+        collected_chart_data      = None
+
+        try:
+            for event_str in RAGService().stream_ask(
+                patient  = request.user,
+                query    = query,
+                history  = history,
+            ):
+                yield event_str
+                try:
+                    raw = event_str.strip()
+                    if raw.startswith('data: '):
+                        payload = json.loads(raw[6:])
+                        t = payload.get('type')
+                        if t == 'token':
+                            collected_tokens.append(payload.get('content', ''))
+                        elif t == 'sources':
+                            collected_sources.extend(payload.get('sources', []))
+                        elif t == 'chart':
+                            collected_chart_data = payload.get('chart')
+                        elif t == 'meta':
+                            collected_provider        = payload.get('provider', '')
+                            collected_chunks          = payload.get('chunks', 0)
+                            collected_safety_routed   = payload.get('safety_routed', False)
+                            collected_triggered_rules = payload.get('triggered_rules', [])
+                            collected_mode            = payload.get('mode', 'personal')
+                except Exception:
+                    pass  # parsing failure doesn't break the stream
+        finally:
+            try:
+                full_response = ''.join(collected_tokens)
+                if session.messages.count() == 0:
+                    session.title = query[:60]
+                    session.save(update_fields=['title'])
+
+                QueryLog.objects.create(
+                    session                = session,
+                    query                  = query,
+                    response               = full_response,
+                    sources                = collected_sources,
+                    llm_provider           = collected_provider,
+                    retrieved_chunks_count = collected_chunks,
+                    safety_routed          = collected_safety_routed,
+                    triggered_rules        = collected_triggered_rules,
+                    query_mode             = collected_mode,
+                    chart_data             = collected_chart_data,
+                )
+            except Exception:
+                logger.exception('Failed to save streamed QueryLog')
+
+    response = StreamingHttpResponse(_event_stream(), content_type='text/event-stream')
+    response['Cache-Control']     = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    response['X-Session-Id']      = str(session.pk)
+    return response
 
 
 @api_view(['GET'])
