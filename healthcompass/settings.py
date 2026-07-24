@@ -174,6 +174,12 @@ GEMINI_API_KEY    = config('GEMINI_API_KEY',    default='')
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 OPENAI_API_KEY    = config('OPENAI_API_KEY',    default='')
 
+# ── Firebase Cloud Messaging (push notifications) ─────────────────────────────
+# Paste the full service-account JSON (Firebase Console → Project Settings →
+# Service Accounts → Generate new private key) as a single-line string.
+# Without this, apps.notifications.firebase.send_push() silently no-ops.
+FIREBASE_CREDENTIALS_JSON = config('FIREBASE_CREDENTIALS_JSON', default='')
+
 # ── RAG Configuration ──────────────────────────────────────────────────────────
 RAG_CONFIG = {
     'EMBEDDING_MODEL':   'models/gemini-embedding-001',

@@ -1,7 +1,11 @@
+import logging
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -70,7 +74,7 @@ class Command(BaseCommand):
                     send_push(appt.patient, title, body,
                               data={'type': 'appointment', 'id': str(appt.id)})
                 except Exception:
-                    pass
+                    logger.exception('send_push failed for appointment %s', appt.id)
 
                 sent += 1
 

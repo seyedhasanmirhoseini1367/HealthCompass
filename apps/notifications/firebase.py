@@ -15,6 +15,7 @@ def _get_app():
         from django.conf import settings
         cred_json = getattr(settings, 'FIREBASE_CREDENTIALS_JSON', None)
         if not cred_json:
+            logger.warning('FIREBASE_CREDENTIALS_JSON is not set — push notifications are disabled.')
             return None
         cred_dict = json.loads(cred_json)
         cred = credentials.Certificate(cred_dict)

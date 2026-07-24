@@ -9,8 +9,8 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
 # ── Appointment reminders cron ─────────────────────────────────────────────────
-# Add a SECOND Railway service pointing to the same repo with these settings:
-#   Start Command : python manage.py send_appointment_reminders
-#   Cron Schedule : */5 * * * *
-# In the Railway dashboard: New Service → Deploy from repo → Settings → Cron
+# Add a SECOND Railway service pointing to the same repo, then in that
+# service's Settings → Config-as-code, set "Config File Path" to
+# railway.cron.toml (defines the start command + cron schedule declaratively).
+# Also copy/reference DATABASE_URL and FIREBASE_CREDENTIALS_JSON onto it.
 # ──────────────────────────────────────────────────────────────────────────────
