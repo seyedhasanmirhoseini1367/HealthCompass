@@ -13,13 +13,12 @@ select.form-control{appearance:auto}
 .section-divider{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
 </style>
 
-{% macro field_group lbl fld %}
-<div class="form-group">
-  <label class="form-label">{{ lbl }}</label>
-  {{ fld }}
-  {% if fld.errors %}<ul class="form-errors">{% for e in fld.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
-</div>
-{% endmacro %}
+{% comment %}
+Removed: a Jinja2-style macro block left over from a refactor. That tag does not
+exist in the Django template engine, so the page raised TemplateSyntaxError and
+the profile-edit form was a 500 in production. It was never called anywhere in
+this file. Covered by apps/accounts/test_smoke_urls.py.
+{% endcomment %}
 {% endblock %}
 
 {% block content %}

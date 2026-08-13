@@ -34,6 +34,13 @@ onnxruntime==1.28.0
 # switched off. See apps/medical_records/test_xml_hardening.py.
 defusedxml==0.7.1
 
+# Emergency-card QR generation — apps/accounts/views.py emergency_card().
+# It was imported there but never declared, so the view raised ImportError and
+# returned 500 on any clean build; it only worked in development because a dev
+# virtualenv had it from an earlier unpinned install. No test covered that view,
+# so CI stayed green either way.
+qrcode==8.2
+
 django-storages[s3]==1.14.6
 boto3==1.43.70
 rank-bm25==0.2.2

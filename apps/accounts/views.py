@@ -22,6 +22,27 @@ from .forms import (RegisterForm, LoginForm, ProfileForm, PasswordChangeForm,
 logger = logging.getLogger(__name__)
 
 
+def _email_is_verified(user, email: str) -> bool:
+    """
+    Has this account proven it owns this address?
+
+    allauth records confirmation in EmailAddress.verified. A local account with
+    no EmailAddress row, or one that is unconfirmed, has proven nothing — see
+    the pre-hijack note in AutoCompleteSocialSignup.get().
+
+    Fails CLOSED: if allauth's model cannot be read for any reason, the answer
+    is "not verified". An error here must not become a free account link.
+    """
+    try:
+        from allauth.account.models import EmailAddress
+        return EmailAddress.objects.filter(
+            user=user, email__iexact=email, verified=True).exists()
+    except Exception:
+        logger.exception('Could not determine email verification state; '
+                         'treating as unverified')
+        return False
+
+
 class AutoCompleteSocialSignup(BaseSocialSignupView):
     """Skip the signup form — auto-complete without asking for a role.
     If the email already exists, connect the Google account to that user.
@@ -36,16 +57,55 @@ class AutoCompleteSocialSignup(BaseSocialSignupView):
         sociallogin = self.sociallogin
         User = get_user_model()
 
-        # Case 1: email already registered — connect Google to that account
+        # Case 1: email already registered — connect Google to that account,
+        # but ONLY if that account has proven it owns the address.
+        #
+        # Account pre-hijack, which this guard closes:
+        #   1. Attacker registers locally as victim@gmail.com with a password
+        #      they choose. ACCOUNT_EMAIL_VERIFICATION is 'none', so no
+        #      confirmation mail is ever sent and the victim never learns.
+        #   2. Victim later signs in with Google. allauth matches the address
+        #      and, unguarded, connects the victim's Google identity to the
+        #      ATTACKER's account.
+        #   3. Victim uploads medical records into an account the attacker can
+        #      still log into with the original password.
+        #
+        # Google's assertion proves the VICTIM owns the mailbox; an unverified
+        # local account has proven nothing. So an unverified match is the
+        # suspicious party and must not receive the identity. Refusing degrades
+        # to a denial of service against the squatted address — recoverable via
+        # password reset, which itself proves ownership — instead of a silent
+        # account takeover.
         if sociallogin.email_addresses:
             email = sociallogin.email_addresses[0].email
             try:
                 existing_user = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                existing_user = None
+            except User.MultipleObjectsReturned:
+                # Case-variant duplicates can exist because email uniqueness is
+                # case-sensitive while lookup is not. Refuse rather than pick.
+                logger.error('Social login matched multiple accounts for one address')
+                messages.error(request, 'Could not complete Google sign-in. '
+                                        'Please contact support.')
+                return redirect('/accounts/login/')
+
+            if existing_user is not None:
+                if not _email_is_verified(existing_user, email):
+                    logger.warning(
+                        'Refused to connect a social identity to an unverified '
+                        'local account (user pk=%s)', existing_user.pk)
+                    messages.error(
+                        request,
+                        'An account with this email already exists but the address '
+                        'has not been confirmed, so it cannot be linked to Google. '
+                        'Sign in with your password, or use “Forgot password” to '
+                        'confirm you own this address.')
+                    return redirect('/accounts/login/')
+
                 clear_pending_signup(request)
                 sociallogin.connect(request, existing_user)
                 return complete_social_signup(request, sociallogin)
-            except User.DoesNotExist:
-                pass
 
         # Case 2: brand new user — create account as patient
         try:

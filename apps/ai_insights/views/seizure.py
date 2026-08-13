@@ -9,6 +9,7 @@ from django_ratelimit.decorators import ratelimit
 
 from ..models import AIModel, ModelPrediction
 from django.db.models import F
+from healthcompass.errors import client_error
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,7 @@ def seizure_realtime_load(request):
         })
     except Exception as exc:
         logger.exception('seizure_realtime_load error: %s', exc)
-        return JsonResponse({'error': str(exc)}, status=500)
+        return JsonResponse(client_error(exc, context='seizure'), status=500)
 
 
 def seizure_realtime_models(request):
@@ -210,7 +211,7 @@ def seizure_realtime_predict_chunk(request):
         return JsonResponse(result)
     except Exception as exc:
         logger.exception('seizure_realtime_predict_chunk error: %s', exc)
-        return JsonResponse({'error': str(exc)}, status=500)
+        return JsonResponse(client_error(exc, context='seizure'), status=500)
 
 
 def _generate_seizure_interpretation(data: dict, user=None) -> str:

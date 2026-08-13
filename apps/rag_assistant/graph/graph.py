@@ -350,6 +350,13 @@ def stream_graph(
         yield 'data: {"type": "done"}\n\n'
 
     except Exception as exc:
-        logger.exception('stream_graph failed: %s', exc)
-        yield f'data: {json.dumps({"type": "error", "message": str(exc)})}\n\n'
+        # Never stream internal exception text to the browser. Provider SDK
+        # errors carry request URLs, model identifiers and occasionally partial
+        # key material; database errors carry connection details. The client
+        # receives a correlation reference and the traceback is logged under the
+        # same reference, so support can join them without exposing internals.
+        # healthcompass/urls.py readiness() already applies this discipline.
+        from healthcompass.errors import client_error
+        payload = client_error(exc, context='stream_graph', log=logger)
+        yield f'data: {json.dumps({"type": "error", **payload})}\n\n'
         yield 'data: {"type": "done"}\n\n'

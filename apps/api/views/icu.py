@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..throttling import PredictionThrottle
+from healthcompass.errors import client_error
 
 
 @api_view(['GET'])
@@ -136,4 +137,4 @@ def seizure_realtime_analyze(request):
                                 'No significant seizure activity detected'),
         })
     except Exception as exc:
-        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(client_error(exc, context='icu'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -500,9 +500,38 @@ function renderSources(wrap, sources) {
   sources.forEach(s => {
     const chip = document.createElement('span');
     if (s.is_general) {
+      // Mirrors the personal branch below: DOM construction, never innerHTML.
+      // This branch previously interpolated s.source_url into an href and
+      // s.source_name into element content unescaped. Knowledge-base rows are
+      // admin-controlled today, so the present risk was low — but `javascript:`
+      // URLs and quote-breakout both worked, and the inconsistency between two
+      // adjacent branches is how that becomes exploitable the day the knowledge
+      // base ingests an external feed.
       chip.className = 'source-chip general';
-      const icon = s.source_url ? `<a href="${s.source_url}" target="_blank" rel="noopener">🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}</a>` : `🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}`;
-      chip.innerHTML = icon;
+      const label = `🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}`;
+
+      // Only http(s) may become a link. Anything else renders as plain text, so
+      // a javascript: or data: URL cannot survive as a clickable target.
+      let safeHref = null;
+      if (s.source_url) {
+        try {
+          const parsed = new URL(s.source_url, location.origin);
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            safeHref = parsed.href;
+          }
+        } catch (e) { /* unparseable URL — fall through to plain text */ }
+      }
+
+      if (safeHref) {
+        const link = document.createElement('a');
+        link.href = safeHref;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = label;
+        chip.appendChild(link);
+      } else {
+        chip.textContent = label;
+      }
     } else {
       chip.className = 'source-chip';
       const link = document.createElement('a');
@@ -543,15 +572,44 @@ function renderChart(wrap, data) {
   const cls   = dir === 'INCREASING' ? 'chart-trend-up' : dir === 'DECREASING' ? 'chart-trend-down' : 'chart-trend-stable';
   const pct   = (data.pct_change >= 0 ? '+' : '') + data.pct_change + '%';
 
+  // Built with DOM APIs rather than innerHTML, deliberately.
+  //
+  // `display_name` and `unit` come from ParsedLabValue rows, which are populated
+  // from uploaded PDFs, Kanta XML and LLM parsing output — attacker-influenced
+  // text with no escaping anywhere in that chain. A unit column carrying an
+  // image tag with an error handler reached innerHTML here and executed on a
+  // page that holds the CSRF token in scope. (The payload is deliberately not
+  // written out: this comment is served to the browser, and apps/accounts/
+  // test_appsec.py scans the rendered page for exactly that string.)
+  //
+  // textContent is used instead of escapeHtml() + innerHTML so the escaping
+  // cannot be forgotten by a later edit: there is no HTML-parsing path to
+  // forget it on. See apps/rag_assistant/test_chart_xss.py.
   const card = document.createElement('div');
   card.className = 'chart-card';
-  card.innerHTML = `
-    <div class="chart-card-header">
-      <span class="chart-card-title">📈 ${data.display_name} · ${data.unit}</span>
-      <span class="${cls}">${arrow} ${pct} over ${data.labels.length} readings</span>
-    </div>
-    <div class="chart-canvas-wrap"><canvas id="chart-${Date.now()}"></canvas></div>
-  `;
+
+  const header = document.createElement('div');
+  header.className = 'chart-card-header';
+
+  const titleEl = document.createElement('span');
+  titleEl.className = 'chart-card-title';
+  titleEl.textContent = `📈 ${data.display_name} · ${data.unit}`;
+
+  const trendEl = document.createElement('span');
+  trendEl.className = cls;
+  trendEl.textContent = `${arrow} ${pct} over ${data.labels.length} readings`;
+
+  header.appendChild(titleEl);
+  header.appendChild(trendEl);
+
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'chart-canvas-wrap';
+  const canvasEl = document.createElement('canvas');
+  canvasEl.id = `chart-${Date.now()}`;
+  canvasWrap.appendChild(canvasEl);
+
+  card.appendChild(header);
+  card.appendChild(canvasWrap);
 
   const bubble = wrap.querySelector('.bubble-assistant');
   if (bubble) bubble.after(card);

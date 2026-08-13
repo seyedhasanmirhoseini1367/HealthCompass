@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..throttling import AI_THROTTLES
+from healthcompass.errors import client_error
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def assistant_ask(request):
         triggered_rules = result[5] if len(result) > 5 else []
     except Exception as exc:
         logger.exception('assistant_ask error')
-        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(client_error(exc, context='assistant'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if not session.messages.exists():
         session.title = query[:60]

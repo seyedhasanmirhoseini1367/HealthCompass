@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..serializers import AppointmentSerializer
+from healthcompass.errors import client_error
 
 _log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def appointments_list_create(request):
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as exc:
         _log.exception('appointments_list_create error: %s', exc)
-        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(client_error(exc, context='appointments'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET', 'PATCH', 'DELETE'])

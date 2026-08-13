@@ -172,8 +172,6 @@ def delete_session(request, pk):
 @require_POST
 @ratelimit(key='user', rate='20/m', block=False)
 def stream_message(request):
-    if getattr(request, 'limited', False):
-        return _RATE_EXCEEDED
     """
     SSE endpoint. Streams tokens from RAGService.stream_ask().
 
@@ -186,6 +184,12 @@ def stream_message(request):
     After the stream finishes the full response is assembled from token
     events and saved to the DB as a QueryLog so chat history is consistent.
     """
+    # The rate-limit check previously sat ABOVE this docstring, which made the
+    # string a no-op expression rather than __doc__ — the SSE event shapes
+    # documented here were invisible to help() and every IDE.
+    if getattr(request, 'limited', False):
+        return _RATE_EXCEEDED
+
     try:
         body = json.loads(request.body)
     except json.JSONDecodeError:

@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from ..serializers import ModelPredictionSerializer, AIModelListSerializer
 from ..throttling import PredictionThrottle
 from django.db.models import F
+from healthcompass.errors import client_error
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def run_model_prediction(request, slug):
         AIModel.objects.filter(pk=model.pk).update(run_count=F('run_count') + 1)
         return Response(ModelPredictionSerializer(pred).data, status=status.HTTP_201_CREATED)
     except Exception as exc:
-        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(client_error(exc, context='predictions'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
