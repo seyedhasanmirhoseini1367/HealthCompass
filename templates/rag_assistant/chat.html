@@ -420,6 +420,9 @@ async function sendMessage() {
 
         } else if (payload.type === 'meta') {
           renderModeBadge(assistantWrap, payload.mode || 'personal');
+          if (payload.mode === 'consent_required') {
+            renderConsentAction(assistantWrap, payload.consent_url);
+          }
 
         } else if (payload.type === 'error') {
           typing.style.display = 'none';
@@ -567,6 +570,34 @@ function renderModeBadge(wrap, mode) {
   badge.textContent = label;
   const sourcesRow = wrap.querySelector('.sources-row');
   if (sourcesRow) wrap.insertBefore(badge, sourcesRow);
+}
+
+// The assistant refuses without consent and used to name "Privacy & Consent
+// settings" in prose, with no link — and the page had none anywhere in the UI
+// either, so the refusal was a dead end. Consent is a control the patient is
+// entitled to exercise, so the refusal carries the way to exercise it.
+function renderConsentAction(wrap, url) {
+  if (wrap.querySelector('.consent-action')) return;
+
+  // Same-origin path only. The URL arrives over the wire, and an absolute or
+  // scheme-relative one would turn this into an open redirect on a button the
+  // patient is being told to trust.
+  const href = (typeof url === 'string' && /^\/[^/]/.test(url))
+    ? url : '/accounts/consent/';
+
+  const row = document.createElement('div');
+  row.className = 'consent-action';
+  row.style.cssText = 'margin-top:.75rem';
+
+  const link = document.createElement('a');
+  link.href = href;
+  link.className = 'btn btn-primary';
+  link.style.cssText = 'font-size:.82rem;padding:.42rem .9rem';
+  link.textContent = 'Open Privacy & Consent settings';
+
+  row.appendChild(link);
+  const sourcesRow = wrap.querySelector('.sources-row');
+  if (sourcesRow) wrap.insertBefore(row, sourcesRow); else wrap.appendChild(row);
 }
 
 function renderChart(wrap, data) {

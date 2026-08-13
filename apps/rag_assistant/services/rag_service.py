@@ -140,8 +140,16 @@ class RAGService:
         except ConsentRequired as exc:
             # Emitted as ordinary stream events so existing clients render the
             # message in the chat transcript instead of failing the connection.
+            #
+            # consent_url is carried as structured data rather than embedded in
+            # the prose: the message told the patient to go to "Privacy &
+            # Consent settings" and gave them no way to get there — the page had
+            # no link anywhere in the UI. A URL field lets the web client render
+            # a button and a mobile client route to its own screen, without
+            # either having to parse English.
+            from django.urls import reverse
             yield f'data: {json.dumps({"type": "token", "content": exc.message})}\n\n'
-            yield f'data: {json.dumps({"type": "meta", "provider": "consent_required", "chunks": 0, "safety_routed": False, "triggered_rules": ["consent_required"], "mode": "consent_required", "consent_purpose": exc.purpose})}\n\n'
+            yield f'data: {json.dumps({"type": "meta", "provider": "consent_required", "chunks": 0, "safety_routed": False, "triggered_rules": ["consent_required"], "mode": "consent_required", "consent_purpose": exc.purpose, "consent_url": reverse("accounts:consent")})}\n\n'
             yield f'data: {json.dumps({"type": "done"})}\n\n'
             return
 
