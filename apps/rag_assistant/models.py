@@ -39,7 +39,72 @@ class MedicalDocument(models.Model):
         return f'{self.title} [{self.document_type}] — {self.patient}'
 
 
-class MedicalChunk(models.Model):
+class EmbeddingProvenanceMixin(models.Model):
+    """
+    Records which embedding model produced the stored vector.
+
+    Without this, the only record of the embedding model is the global
+    RAG_CONFIG['EMBEDDING_MODEL'] setting, so swapping models leaves the
+    database full of vectors from a different space with nothing to
+    distinguish them — cosine similarity keeps returning numbers, they are
+    just meaningless. That is how the text-embedding-004 → gemini-embedding-001
+    deprecation went unnoticed.
+
+    All fields are nullable/blank: rows written before this mixin existed keep
+    their vectors and simply report unknown provenance.
+    """
+    embedding_model         = models.CharField(
+                                max_length=100, blank=True, default='',
+                                help_text="Model that produced `embedding`, e.g. "
+                                          "'models/gemini-embedding-001'. Empty means the "
+                                          "vector predates provenance tracking.")
+    embedding_model_version = models.CharField(
+                                max_length=50, blank=True, default='',
+                                help_text='Provider-reported model version, when the API '
+                                          'exposes one. Gemini currently does not.')
+    embedding_dimensions    = models.PositiveIntegerField(
+                                null=True, blank=True,
+                                help_text='Length of the stored vector, recorded at write time.')
+    embedded_at             = models.DateTimeField(
+                                null=True, blank=True,
+                                help_text='When `embedding` was generated (not when the row was created).')
+
+    # ── Indexing state ────────────────────────────────────────────────────────
+    #
+    # A NULL `embedding` used to be the only signal, and it conflated five
+    # different situations: never attempted, attempt failed, consent refused,
+    # provider returned a zero vector, and batch truncation. Retrieval excludes
+    # NULL-embedded chunks, so any of those made a medical record permanently
+    # invisible to the assistant while the patient still saw it in their record
+    # list — with no error, no log and nothing to retry from.
+    #
+    # These fields make the difference explicit and therefore recoverable.
+    class EmbeddingStatus(models.TextChoices):
+        PENDING  = 'pending',  'Pending'     # created, not yet attempted
+        EMBEDDED = 'embedded', 'Embedded'    # vector stored and usable
+        FAILED   = 'failed',   'Failed'      # attempt failed — retryable
+        BLOCKED  = 'blocked',  'Blocked'     # consent/egress refused — not an error
+
+    embedding_status      = models.CharField(
+                                max_length=10, choices=EmbeddingStatus.choices,
+                                default=EmbeddingStatus.PENDING, db_index=True,
+                                help_text='Explicit indexing state. NULL embedding alone cannot '
+                                          'distinguish "not tried yet" from "failed permanently".')
+    embedding_error       = models.CharField(
+                                max_length=300, blank=True, default='',
+                                help_text='Short reason for the last failure. Empty when not failed.')
+    embedding_attempts    = models.PositiveIntegerField(
+                                default=0,
+                                help_text='How many times embedding has been attempted for this row.')
+    embedding_attempted_at = models.DateTimeField(
+                                null=True, blank=True,
+                                help_text='When embedding was last attempted, successful or not.')
+
+    class Meta:
+        abstract = True
+
+
+class MedicalChunk(EmbeddingProvenanceMixin):
     """A single text chunk from a MedicalDocument, with its embedding."""
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document    = models.ForeignKey(MedicalDocument, on_delete=models.CASCADE,
@@ -57,13 +122,15 @@ class MedicalChunk(models.Model):
         indexes = [
             models.Index(fields=['patient']),
             models.Index(fields=['document', 'chunk_index']),
+            # Supports staleness sweeps: .exclude(embedding_model=<active>)
+            models.Index(fields=['embedding_model']),
         ]
 
     def __str__(self):
         return f'Chunk {self.chunk_index} of {self.document.title}'
 
 
-class GeneralKnowledgeChunk(models.Model):
+class GeneralKnowledgeChunk(EmbeddingProvenanceMixin):
     """A chunk from a curated public health source (Käypä hoito, Terveyskirjasto, THL)."""
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title       = models.CharField(max_length=300)
@@ -80,6 +147,7 @@ class GeneralKnowledgeChunk(models.Model):
         indexes = [
             models.Index(fields=['topic']),
             models.Index(fields=['source_name']),
+            models.Index(fields=['embedding_model']),
         ]
 
     def __str__(self):

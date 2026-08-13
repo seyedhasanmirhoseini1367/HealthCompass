@@ -1,4 +1,4 @@
-﻿import json
+import json
 from datetime import timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -12,6 +12,7 @@ from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import HealthAlert
 from apps.notifications.models import Notification
 from apps.accounts.models import CustomUser, PatientDoctorRelationship, DoctorAccessLog
+from apps.accounts.safe_json import script_safe_json
 
 
 @login_required
@@ -331,8 +332,8 @@ def monitoring(request):
         'embedding_pct':          embedding_pct,
         'total_documents':        total_documents,
         'docs_by_type':           docs_by_type,
-        'chart_labels_json':      json.dumps(chart_labels),
-        'chart_data_json':        json.dumps(chart_data),
+        'chart_labels_json':      script_safe_json(chart_labels),
+        'chart_data_json':        script_safe_json(chart_data),
         # AI Models
         'total_models':           total_models,
         'active_models':          active_models,

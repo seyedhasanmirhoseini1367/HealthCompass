@@ -4,15 +4,18 @@ import logging
 from django.db.models import Count
 from django.http import StreamingHttpResponse
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from ..throttling import AI_THROTTLES
 
 logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes(AI_THROTTLES)
 def assistant_ask(request):
     from apps.rag_assistant.models import ChatSession, QueryLog
     from apps.rag_assistant.services.rag_service import RAGService
@@ -25,7 +28,7 @@ def assistant_ask(request):
     if session_id:
         try:
             session = ChatSession.objects.get(pk=session_id, patient=request.user)
-        except ChatSession.DoesNotExist:
+        except Exception:
             session = ChatSession.objects.create(patient=request.user, title=query[:60])
     else:
         session = ChatSession.objects.create(patient=request.user, title=query[:60])
@@ -62,16 +65,23 @@ def assistant_ask(request):
         triggered_rules        = triggered_rules,
     )
 
-    return Response({
+    payload = {
         'answer':     response_text,
         'sources':    sources,
         'session_id': str(session.pk),
         'message_id': str(log.pk),
-    })
+    }
+    if provider == 'consent_required':
+        # Deliberately still 200 with the message in `answer`: existing chat
+        # clients render it inline, which is better UX than an error toast.
+        # The extra field lets newer clients show a dedicated consent prompt.
+        payload['consent_required'] = 'external_llm'
+    return Response(payload)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes(AI_THROTTLES)
 def assistant_stream(request):
     """
     JWT-authenticated SSE counterpart to `assistant_ask`, for the mobile app.
@@ -98,7 +108,7 @@ def assistant_stream(request):
     if session_id:
         try:
             session = ChatSession.objects.get(pk=session_id, patient=request.user)
-        except ChatSession.DoesNotExist:
+        except Exception:
             session = ChatSession.objects.create(patient=request.user, title=query[:60])
     else:
         session = ChatSession.objects.create(patient=request.user, title=query[:60])
@@ -195,10 +205,11 @@ def assistant_sessions(request):
 @api_view(['GET', 'DELETE', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def assistant_session_detail(request, session_id):
+    from django.core.exceptions import ValidationError
     from apps.rag_assistant.models import ChatSession
     try:
         session = ChatSession.objects.get(pk=session_id, patient=request.user)
-    except ChatSession.DoesNotExist:
+    except (ChatSession.DoesNotExist, ValidationError, ValueError):
         return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'DELETE':

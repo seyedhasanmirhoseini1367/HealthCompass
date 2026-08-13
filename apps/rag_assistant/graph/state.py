@@ -32,6 +32,11 @@ class HealthState(TypedDict):
     # the standard similarity-ranked context so the LLM can reason about trends.
     trajectory_context: str   # '' when not a temporal query
 
+    # Which temporal question was asked: 'latest' | 'previous' | 'trend' | None.
+    # Distinguishes "what is my latest glucose" (one value) from
+    # "is it getting worse" (the whole series) — both route to trajectory.
+    temporal_mode:  Optional[str]
+
     # ── Query Understanding (set by understand_node) ───────────────────────────
     # rewritten_query: standalone version of the question with conversation
     #   context baked in so follow-ups like "what about last year?" become

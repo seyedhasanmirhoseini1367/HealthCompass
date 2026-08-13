@@ -743,6 +743,12 @@ class SSEContractTests(django.test.SimpleTestCase):
         grd_inst = self._grd_inst()
 
         with (
+            # ask() now gates on consent before entering the pipeline. Consent
+            # itself is covered in apps/accounts/test_consent.py; this test is
+            # about the SSE contract, and the patient here is a mock with no DB
+            # row, so the gate is stubbed to keep the test focused (and to keep
+            # this a SimpleTestCase).
+            patch('apps.accounts.consent.enforce_for_ai', return_value=None),
             patch(f'{_GRAPH}.health_graph_routing') as mock_routing,
             patch(f'{_GRD_SVC}.GuardrailService') as grd_cls,
             patch(f'{_GEN_SVC}.generate_streaming',

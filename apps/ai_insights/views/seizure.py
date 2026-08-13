@@ -5,8 +5,10 @@ from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
 
 from ..models import AIModel, ModelPrediction
+from django.db.models import F
 
 logger = logging.getLogger(__name__)
 
@@ -17,19 +19,37 @@ def seizure_analysis(request):
         return render(request, 'ai_insights/seizure_analysis.html', {})
 
     import requests as http_requests
+    from apps.accounts.consent import ConsentRequired
+    from apps.accounts.egress import ExternalProcessingGuard
+
     signal_file = request.FILES.get('signal_file')
     if not signal_file:
         return JsonResponse({'success': False, 'error': 'No file uploaded.'}, status=400)
+
+    # Checked before the file is read. Note this view is csrf_exempt and does not
+    # require login, so an anonymous caller reaches it: ExternalProcessingGuard
+    # returns False for AnonymousUser once this point is enforced.
+    try:
+        ExternalProcessingGuard.check(request.user, 'insights.seizure_proxy')
+    except ConsentRequired as exc:
+        return JsonResponse(
+            {'success': False, 'error': exc.message, 'consent_required': exc.purpose},
+            status=403,
+        )
 
     try:
         resp = http_requests.post(
             'https://hasanai.net/seizure-comparison/predict/',
             files={'signal_file': (signal_file.name, signal_file.read(), signal_file.content_type)},
             timeout=120,
+            # The destination is a literal, so there is no SSRF sink here —
+            # but a hijacked or compromised host could 302 this upload at an
+            # internal address. Refuse to follow it.
+            allow_redirects=False,
         )
         resp.raise_for_status()
         data = resp.json()
-        data['ai_interpretation'] = _generate_seizure_interpretation(data)
+        data['ai_interpretation'] = _generate_seizure_interpretation(data, user=request.user)
 
         if request.user.is_authenticated:
             try:
@@ -65,7 +85,7 @@ def seizure_analysis(request):
                     risk_score=risk_score,
                     interpretation=data.get('ai_interpretation', ''),
                 )
-                AIModel.objects.filter(pk=ai_model.pk).update(run_count=ai_model.run_count + 1)
+                AIModel.objects.filter(pk=ai_model.pk).update(run_count=F('run_count') + 1)
             except Exception as save_err:
                 logger.warning('Could not save seizure prediction: %s', save_err)
 
@@ -92,14 +112,33 @@ def seizure_realtime(request):
 
 
 @csrf_exempt
+@ratelimit(key='ip', rate='20/h', method='POST', block=False)
 def seizure_realtime_load(request):
     """Parse uploaded parquet/csv and return raw signal as JSON."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    # Unauthenticated and CPU-bound: without a limit an anonymous caller can pin
+    # workers parsing large frames. Kept open (not login-gated) so the public
+    # demo still works.
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests. Please wait and try again.'},
+                            status=429)
     import io
     uploaded_files = request.FILES.getlist('files')
     if not uploaded_files:
         return JsonResponse({'error': 'No files uploaded.'}, status=400)
+
+    # This endpoint does not go through validate_upload, so bound the input here
+    # as well: pandas will happily materialise whatever it is handed.
+    from django.conf import settings as _s
+    max_bytes = int(getattr(_s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024))
+    total = sum(getattr(f, 'size', 0) or 0 for f in uploaded_files)
+    if total > max_bytes:
+        return JsonResponse(
+            {'error': f'Upload too large ({total // (1024 * 1024)} MB). '
+                      f'Maximum is {max_bytes // (1024 * 1024)} MB.'},
+            status=413,
+        )
     try:
         import pandas as pd
         frames, file_meta, ref_cols = [], [], None
@@ -146,10 +185,14 @@ def seizure_realtime_models(request):
 
 
 @csrf_exempt
+@ratelimit(key='ip', rate='120/h', method='POST', block=False)
 def seizure_realtime_predict_chunk(request):
     """Run local ONNX inference on a 10-second EEG window."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Too many requests. Please wait and try again.'},
+                            status=429)
     import json as _json
     try:
         body = _json.loads(request.body)
@@ -170,9 +213,18 @@ def seizure_realtime_predict_chunk(request):
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-def _generate_seizure_interpretation(data: dict) -> str:
-    """Generate a clinical AI interpretation of the ensemble EEG result."""
+def _generate_seizure_interpretation(data: dict, user=None) -> str:
+    """
+    Generate a clinical AI interpretation of the ensemble EEG result.
+
+    Falls back to the built-in static wording when external processing is not
+    permitted, so the analysis result is still shown without sending this
+    recording's classification to an LLM provider.
+    """
     from django.conf import settings
+    from apps.accounts.egress import ExternalProcessingGuard
+
+    allow_external = ExternalProcessingGuard.allows(user, 'insights.seizure_interpretation')
 
     ensemble_label = data.get('ensemble_label', 'Unknown')
     votes          = data.get('ensemble_votes', {})
@@ -204,7 +256,7 @@ Write a concise 4-6 sentence clinical interpretation. Include:
 
 Write in plain paragraphs, no markdown, no bullet points."""
 
-    gemini_key = getattr(settings, 'GEMINI_API_KEY', '')
+    gemini_key = getattr(settings, 'GEMINI_API_KEY', '') if allow_external else ''
     if gemini_key:
         try:
             from google import genai
@@ -224,7 +276,7 @@ Write in plain paragraphs, no markdown, no bullet points."""
         except Exception as e:
             logger.warning('Gemini seizure interpretation failed: %s', e)
 
-    anthropic_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    anthropic_key = getattr(settings, 'ANTHROPIC_API_KEY', '') if allow_external else ''
     if anthropic_key:
         try:
             import anthropic

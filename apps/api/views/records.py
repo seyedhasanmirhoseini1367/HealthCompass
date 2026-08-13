@@ -1,6 +1,7 @@
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -8,6 +9,7 @@ from apps.medical_records.models import MedicalRecord
 from apps.medical_records.services import MedicalRecordService, validate_upload
 from ..serializers import (MedicalRecordSerializer, MedicalRecordUploadSerializer,
                             MedicalRecordDetailSerializer)
+from ..throttling import OCRThrottle, UploadThrottle
 
 
 @api_view(['GET'])
@@ -34,7 +36,8 @@ def records_list(request):
 def record_detail(request, pk):
     try:
         record = MedicalRecord.objects.get(pk=pk, patient=request.user)
-    except MedicalRecord.DoesNotExist:
+    except (MedicalRecord.DoesNotExist, ValidationError, ValueError):
+        # A malformed UUID must read as 'not found', not blow up with a 500.
         return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
     return Response(MedicalRecordDetailSerializer(record).data)
 
@@ -44,7 +47,8 @@ def record_detail(request, pk):
 def record_delete(request, pk):
     try:
         record = MedicalRecord.objects.get(pk=pk, patient=request.user)
-    except MedicalRecord.DoesNotExist:
+    except (MedicalRecord.DoesNotExist, ValidationError, ValueError):
+        # A malformed UUID must read as 'not found', not blow up with a 500.
         return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
     record.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
@@ -52,6 +56,7 @@ def record_delete(request, pk):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def record_upload(request):
     serializer = MedicalRecordUploadSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
@@ -62,6 +67,7 @@ def record_upload(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def upload_pdf_api(request):
     pdf_file = request.FILES.get('pdf_file') or request.FILES.get('file')
     if not pdf_file:
@@ -88,6 +94,7 @@ def upload_pdf_api(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def upload_text_api(request):
     raw_text = (request.data.get('text') or '').strip()
     if not raw_text:
@@ -106,6 +113,7 @@ def upload_text_api(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def upload_kanta_api(request):
     xml_file = request.FILES.get('xml_file') or request.FILES.get('file')
     if not xml_file:
@@ -131,6 +139,7 @@ def upload_kanta_api(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def upload_wearable_api(request):
     data_file = request.FILES.get('data_file') or request.FILES.get('file')
     if not data_file:
@@ -156,6 +165,7 @@ def upload_wearable_api(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([OCRThrottle])
 def scan_ocr_api(request):
     image = request.FILES.get('image')
     if not image:
@@ -166,8 +176,15 @@ def scan_ocr_api(request):
         return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
 
     result = MedicalRecordService.ocr_image(
-        image.read(), mime_type=image.content_type or 'image/jpeg'
+        image.read(), mime_type=image.content_type or 'image/jpeg', user=request.user,
     )
+    if result.get('consent_required'):
+        # 403 with a machine-readable body: existing clients already handle
+        # {'error': ...}; new clients can branch on consent_required.
+        return Response(
+            {'error': result['error'], 'consent_required': result['consent_required']},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     if result.get('error'):
         return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({'text': result['text']})

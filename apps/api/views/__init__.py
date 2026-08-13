@@ -20,6 +20,9 @@ from .predictions import (
 from .appointments import appointments_list_create, appointment_detail
 from .assistant import assistant_ask, assistant_stream, assistant_sessions, assistant_session_detail
 from .icu import icu_dashboard_api, seizure_realtime_analyze
+from .consent import (consent_list, consent_grant, consent_revoke,
+                      consent_history_view)
+from .export import export_status, export_download
 
 __all__ = [
     'login', 'register', 'forgot_password', 'me', 'register_fcm_token',
@@ -34,4 +37,6 @@ __all__ = [
     'appointments_list_create', 'appointment_detail',
     'assistant_ask', 'assistant_sessions', 'assistant_session_detail',
     'icu_dashboard_api', 'seizure_realtime_analyze',
+    'consent_list', 'consent_grant', 'consent_revoke', 'consent_history_view',
+    'export_status', 'export_download',
 ]

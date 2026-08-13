@@ -10,10 +10,29 @@ import csv
 import json
 import logging
 from datetime import datetime, date
+# XML hardening is mandatory, never optional.
+#
+# This previously fell back to `xml.etree.ElementTree` when defusedxml was
+# missing, "for local dev". The fallback was silent — no error, no log — and
+# defusedxml was absent from the environment where the whole test suite passed,
+# so every green run was compatible with the hardening being switched off.
+# Measured: stdlib ElementTree expands a three-level nested-entity document from
+# 10 to 1000 characters; the standard nine-level form expands to gigabytes, so
+# an uploaded Kanta file could exhaust memory. defusedxml raises
+# EntitiesForbidden on the same input.
+#
+# Failing at import is deliberate: a missing security control must stop the
+# application, not degrade it quietly. defusedxml is a pinned dependency.
 try:
     import defusedxml.ElementTree as ET
-except ImportError:
-    from xml.etree import ElementTree as ET  # fallback for local dev without defusedxml
+    from defusedxml.common import DefusedXmlException
+except ImportError as exc:  # pragma: no cover - exercised via reload in tests
+    raise ImportError(
+        'defusedxml is required for XML parsing and is not installed. '
+        'It protects the Kanta XML upload path against entity-expansion '
+        'attacks. Install it (see requirements.txt) rather than removing this '
+        'check — the stdlib XML parser is not a safe substitute.'
+    ) from exc
 
 logger = logging.getLogger(__name__)
 
@@ -204,13 +223,19 @@ def _extract_lab_values_regex(text: str) -> list:
 
 
 def _structure_medical_text_with_ai(text: str,
-                                     table_lab_values: list | None = None) -> dict | None:
+                                     table_lab_values: list | None = None,
+                                     allow_external: bool = True) -> dict | None:
     """
     Call Gemini to extract structured medical data from free-form text.
 
     table_lab_values: pre-parsed lab rows from PDF table extraction.  When
     non-empty they take priority over AI-extracted values (structured cells are
     more accurate than AI parsing of flattened text).
+
+    allow_external: when False the document text is never sent to Gemini and the
+    local regex/table path is used instead. Callers pass the result of the
+    consent check here — the decision is made where the user is known, and this
+    function stays free of request context.
 
     Priority for lab_values: table > AI text > regex fallback.
     """
@@ -223,7 +248,9 @@ def _structure_medical_text_with_ai(text: str,
             return table_lab_values
         return ai_values or _extract_lab_values_regex(text)
 
-    if not api_key:
+    # Same local path is taken when the key is absent and when external
+    # processing is not permitted — no document text leaves the process either way.
+    if not api_key or not allow_external:
         lab_values = _best_lab_values()
         return ({'record_type': 'lab_result', 'title': 'Lab Results',
                  'date': _extract_date_regex(text),
@@ -293,6 +320,17 @@ class KantaXMLParser:
             root = ET.fromstring(xml_bytes)
         except ET.ParseError as e:
             return {'error': str(e), 'records': []}
+        except DefusedXmlException as e:
+            # A document defusedxml refuses (entity expansion, external entity,
+            # DTD retrieval). Rejection is the point; it is reported through the
+            # same {'error': ...} contract `create_from_kanta` already handles so
+            # the upload fails cleanly instead of raising a 500 — these
+            # exceptions derive from ValueError, not ParseError, so without this
+            # branch they would escape the parser entirely.
+            logger.warning('Rejected unsafe XML upload: %s', type(e).__name__)
+            from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+            ops_emit(OpsEvent.UNSAFE_DOCUMENT_REJECTED, error_type=type(e).__name__)
+            return {'error': f'Unsafe XML rejected: {type(e).__name__}', 'records': []}
 
         # Handle both single CDA document and bundle of documents
         # Kanta exports can be either a single ClinicalDocument or
@@ -560,10 +598,33 @@ class WearableParser:
         except ImportError:
             return {'device': 'unknown', 'data_points': [], 'count': 0,
                     'errors': ['pandas is required to read Parquet files.']}
+        # Parquet is compressed, so a small upload can expand to an enormous
+        # frame — MAX_UPLOAD_BYTES bounds the input but not the expansion.
+        # pyarrow can read the row count from the footer without materialising
+        # any data, so the bomb is rejected before it is decompressed.
+        from django.conf import settings as _s
+        max_rows = int(getattr(_s, 'MAX_PARSED_ROWS', 200_000))
+        try:
+            import pyarrow.parquet as _pq
+            num_rows = _pq.ParquetFile(io.BytesIO(data_bytes)).metadata.num_rows
+            if num_rows > max_rows:
+                return {'device': 'unknown', 'data_points': [], 'count': 0,
+                        'errors': [f'File contains {num_rows:,} rows, which exceeds the '
+                                   f'{max_rows:,}-row import limit.']}
+        except ImportError:
+            pass    # pyarrow absent: fall through, pandas will do its best
+        except Exception as e:
+            return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+
         try:
             df = pd.read_parquet(io.BytesIO(data_bytes))
         except Exception as e:
             return {'device': 'unknown', 'data_points': [], 'count': 0, 'errors': [str(e)]}
+
+        if len(df) > max_rows:
+            return {'device': 'unknown', 'data_points': [], 'count': 0,
+                    'errors': [f'File contains {len(df):,} rows, which exceeds the '
+                               f'{max_rows:,}-row import limit.']}
 
         device = self._detect_device(filename, list(df.columns))
         data_points, errors = [], []
@@ -889,17 +950,17 @@ WearableCSVParser = WearableParser  # backward-compat alias
 class TextParser:
     """Parse free-form pasted medical text and structure it with Gemini."""
 
-    def parse(self, text: str) -> dict:
+    def parse(self, text: str, use_ai: bool = True) -> dict:
         result = {
             'raw_text': text,
             'structured': None,
         }
         if text.strip():
-            result['structured'] = self._structure_with_ai(text)
+            result['structured'] = self._structure_with_ai(text, use_ai=use_ai)
         return result
 
-    def _structure_with_ai(self, text: str) -> dict | None:
-        return _structure_medical_text_with_ai(text)
+    def _structure_with_ai(self, text: str, use_ai: bool = True) -> dict | None:
+        return _structure_medical_text_with_ai(text, allow_external=use_ai)
 
 
 # ─── PDF Parser ──────────────────────────────────────────────────────────────

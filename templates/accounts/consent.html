@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Privacy &amp; Consent — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.cs-page { max-width:760px; margin:0 auto; }
+.cs-page h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0 0 .35rem; }
+.cs-intro { font-size:.85rem; color:#64748b; margin-bottom:1.4rem; line-height:1.55; }
+
+.cs-item { background:white; border:1.5px solid var(--border); border-radius:12px;
+           padding:1rem 1.1rem; margin-bottom:.85rem; }
+.cs-item.required { border-color:#c7d2fe; }
+.cs-item.reconsent { border-color:#fcd34d; background:#fffbeb; }
+
+.cs-row { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.cs-label { font-size:.95rem; font-weight:700; color:#1e293b; margin:0 0 .3rem; }
+.cs-desc { font-size:.82rem; color:#475569; line-height:1.55; margin:0; }
+.cs-meta { font-size:.72rem; color:#94a3b8; margin-top:.5rem; }
+
+.cs-badge { display:inline-block; padding:.12rem .5rem; border-radius:5px;
+            font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+.cs-badge.on  { background:#dcfce7; color:#15803d; }
+.cs-badge.off { background:#fee2e2; color:#b91c1c; }
+.cs-badge.req { background:#e0e7ff; color:#4338ca; margin-left:.35rem; }
+.cs-badge.stale { background:#fef3c7; color:#b45309; }
+
+.cs-actions { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:.4rem; }
+.cs-btn { padding:.4rem .95rem; border-radius:8px; font-size:.78rem; font-weight:700;
+          border:none; cursor:pointer; }
+.cs-btn.grant  { background:#6366f1; color:white; }
+.cs-btn.revoke { background:white; color:#b91c1c; border:1.5px solid #fecaca; }
+
+.cs-note { font-size:.78rem; color:#64748b; background:#f8fafc; border-radius:9px;
+           padding:.7rem .9rem; margin:1.3rem 0; line-height:1.55; }
+
+.cs-history { margin-top:2rem; }
+.cs-history h2 { font-size:.95rem; font-weight:800; color:var(--text); margin:0 0 .3rem; }
+.cs-history-sub { font-size:.76rem; color:#94a3b8; margin-bottom:.7rem; }
+.cs-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+.cs-table th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em;
+               color:#94a3b8; padding:.4rem .5rem; border-bottom:1.5px solid var(--border); }
+.cs-table td { padding:.45rem .5rem; border-bottom:1px solid #f1f5f9; color:#334155; }
+.cs-empty { font-size:.8rem; color:#94a3b8; padding:.8rem 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cs-page">
+  <h1>Privacy &amp; Consent</h1>
+  <p class="cs-intro">
+    You choose what HealthCompass may do with your health data. Each item below is a
+    separate decision — granting one does not grant the others, and you can withdraw
+    any of them at any time.
+  </p>
+
+  {% for c in consents %}
+    <div class="cs-item {% if c.required %}required{% endif %} {% if c.needs_reconsent %}reconsent{% endif %}">
+      <div class="cs-row">
+        <div style="flex:1; min-width:240px;">
+          <p class="cs-label">
+            {{ c.label }}
+            {% if c.granted %}
+              <span class="cs-badge on">Granted</span>
+            {% elif c.needs_reconsent %}
+              <span class="cs-badge stale">Needs renewal</span>
+            {% else %}
+              <span class="cs-badge off">Not granted</span>
+            {% endif %}
+            {% if c.required %}<span class="cs-badge req">Required for AI</span>{% endif %}
+          </p>
+          <p class="cs-desc">{{ c.description }}</p>
+          <p class="cs-meta">
+            Current version: {{ c.current_version }}
+            {% if c.granted_at %}
+              · You agreed on {{ c.granted_at|date:"j M Y, H:i" }}
+              {% if c.needs_reconsent %}
+                to version {{ c.granted_version }}, which has since been updated.
+              {% endif %}
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="cs-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="purpose" value="{{ c.purpose }}">
+            {% if c.granted %}
+              <input type="hidden" name="action" value="revoke">
+              <button type="submit" class="cs-btn revoke">Withdraw</button>
+            {% else %}
+              <input type="hidden" name="action" value="grant">
+              <button type="submit" class="cs-btn grant">
+                {% if c.needs_reconsent %}Renew{% else %}Grant{% endif %}
+              </button>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="cs-note">
+    <strong>What withdrawing means.</strong> Withdrawing consent stops future
+    processing for that purpose — it does not delete data already stored. To remove
+    your data entirely, use <em>Delete account</em> in your profile. Withdrawing
+    consent for external AI providers disables the AI assistant, but the rest of
+    HealthCompass keeps working.
+  </div>
+
+  <div class="cs-history">
+    <h2>Consent history</h2>
+    <p class="cs-history-sub">
+      Every decision is kept as a record, including withdrawals. This is your audit trail.
+    </p>
+    {% if history %}
+      <table class="cs-table">
+        <thead>
+          <tr><th>Purpose</th><th>Version</th><th>Status</th><th>Granted</th><th>Withdrawn</th></tr>
+        </thead>
+        <tbody>
+          {% for h in history %}
+            <tr>
+              <td>{{ h.get_purpose_display }}</td>
+              <td>{{ h.version }}</td>
+              <td>{{ h.get_status_display }}</td>
+              <td>{% if h.granted_at %}{{ h.granted_at|date:"j M Y, H:i" }}{% else %}—{% endif %}</td>
+              <td>{% if h.revoked_at %}{{ h.revoked_at|date:"j M Y, H:i" }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="cs-empty">No consent decisions recorded yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

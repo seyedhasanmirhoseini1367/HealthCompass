@@ -11,9 +11,23 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def generate_interpretation(ai_model, result: dict, input_data: dict) -> str:
-    """Generate a patient-friendly explanation.  Tries Groq → Gemini → static."""
+def generate_interpretation(ai_model, result: dict, input_data: dict, user=None) -> str:
+    """
+    Generate a patient-friendly explanation.  Tries Groq → Gemini → static.
+
+    The prompt carries this patient's model inputs and risk result, so it is
+    patient-specific health data. When external processing is not permitted the
+    built-in static interpretation is returned instead — the prediction itself
+    still works, only the generated wording is withheld.
+
+    `user` is optional for backward compatibility; callers that know the patient
+    pass it so the consent check can run before the prompt is built.
+    """
     from django.conf import settings
+    from apps.accounts.egress import ExternalProcessingGuard
+
+    if not ExternalProcessingGuard.allows(user, 'insights.interpretation'):
+        return _static_interpretation(result)
 
     guide = ai_model.interpretation_guide.strip()
     if not guide:
@@ -62,7 +76,8 @@ Do NOT use markdown. Write in plain paragraphs."""
     if groq_key:
         try:
             from groq import Groq
-            client = Groq(api_key=groq_key)
+            client = Groq(api_key=groq_key,
+                          timeout=int(settings.RAG_CONFIG.get('PROVIDER_TIMEOUT', 45)))
             resp = client.chat.completions.create(
                 model      = settings.RAG_CONFIG.get('GROQ_MODEL', 'llama-3.1-8b-instant'),
                 messages   = [{'role': 'user', 'content': prompt}],
@@ -80,7 +95,11 @@ Do NOT use markdown. Write in plain paragraphs."""
         try:
             from google import genai
             from google.genai import types
-            client   = genai.Client(api_key=gemini_key)
+            _ms = int(settings.RAG_CONFIG.get('PROVIDER_TIMEOUT', 45)) * 1000
+            try:
+                client = genai.Client(api_key=gemini_key, http_options={'timeout': _ms})
+            except TypeError:
+                client = genai.Client(api_key=gemini_key)
             model_id = settings.RAG_CONFIG.get('GEMINI_MODEL', 'gemini-2.5-flash')
             config_kwargs = dict(temperature=0.4, max_output_tokens=1024)
             if 'gemini-2.5' in model_id:

@@ -2,14 +2,17 @@
 import logging
 
 from django.contrib import messages
-from django.contrib.auth import login, logout, update_session_auth_hash
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordResetView
 from django.core.cache import cache
 from django.http import Http404, HttpResponse
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
 from allauth.socialaccount.views import SignupView as BaseSocialSignupView
+from django_ratelimit.decorators import ratelimit
 
 from .models import (PatientProfile, DoctorProfile, DataScientistProfile,
                      HospitalAdminProfile, EmergencyCardView)
@@ -57,11 +60,27 @@ class AutoCompleteSocialSignup(BaseSocialSignupView):
 
 
 class SafePasswordResetView(PasswordResetView):
-    """Wraps Django's PasswordResetView — always redirects to done page even if email fails."""
+    """Wraps Django's PasswordResetView — always redirects to done page even if email fails.
+
+    Rate limited by IP: each POST sends an email, so an unthrottled endpoint lets
+    anyone use the app as a spam relay and probe which addresses are registered.
+    """
     template_name = 'accounts/password_reset.html'
     email_template_name = 'accounts/email/password_reset_email.txt'
     subject_template_name = 'accounts/email/password_reset_subject.txt'
     success_url = reverse_lazy('accounts:password_reset_done')
+
+    # block=False rather than block=True: django-ratelimit's blocking mode raises
+    # Ratelimited, a PermissionDenied subclass, which Django renders as 403.
+    # Rate limiting should say 429 so clients can back off correctly.
+    @method_decorator(
+        ratelimit(key='ip', rate=settings.RATELIMIT_PASSWORD_RESET, method='POST', block=False)
+    )
+    def post(self, request, *args, **kwargs):
+        if getattr(request, 'limited', False):
+            return render(request, self.template_name,
+                          {'form': self.get_form()}, status=429)
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         try:
@@ -72,16 +91,40 @@ class SafePasswordResetView(PasswordResetView):
             return HttpResponseRedirect(self.get_success_url())
 
 
+@ratelimit(key='ip', rate=settings.RATELIMIT_REGISTER, method='POST', block=False)
 def register_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard:home")
+    if getattr(request, 'limited', False):
+        messages.error(request, "Too many sign-up attempts. Please try again later.")
+        return render(request, "accounts/register.html", {"form": RegisterForm()}, status=429)
     if request.method == "POST":
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
             PatientProfile.objects.create(user=user)
-            login(request, user)
-            messages.success(request, f"Welcome to HealthCompass, {user.get_full_name() or user.username}!")
+
+            # Three backends are configured, so login() cannot infer which one
+            # authenticated this user and raises ValueError if simply handed the
+            # object. Re-authenticating with the credentials just submitted is
+            # the backend-safe route: it walks AUTHENTICATION_BACKENDS, sets
+            # user.backend, and still enforces every backend check (including
+            # user_can_authenticate) rather than asserting a login that the
+            # auth stack never actually approved.
+            auth_user = authenticate(
+                request,
+                username=user.username,
+                password=form.cleaned_data["password1"],
+            )
+            if auth_user is None:
+                # Account exists but could not be authenticated — send them to
+                # the normal login flow rather than failing the whole request.
+                logger.warning('Post-registration authenticate() failed for %s', user.pk)
+                messages.success(request, "Your account was created. Please log in.")
+                return redirect("accounts:login")
+
+            login(request, auth_user)
+            messages.success(request, f"Welcome to HealthCompass, {auth_user.get_full_name() or auth_user.username}!")
             return redirect("dashboard:home")
         messages.error(request, "Please correct the errors below.")
     else:
@@ -89,9 +132,16 @@ def register_view(request):
     return render(request, "accounts/register.html", {"form": form})
 
 
+@ratelimit(key='ip', rate=settings.RATELIMIT_LOGIN, method='POST', block=False)
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard:home")
+    # Keyed by IP rather than username: an attacker controls the username field,
+    # so a per-username limit is trivially sidestepped and also lets one attacker
+    # lock a known victim out of their own account.
+    if getattr(request, 'limited', False):
+        messages.error(request, "Too many login attempts. Please wait a minute and try again.")
+        return render(request, "accounts/login.html", {"form": LoginForm(request)}, status=429)
     if request.method == "POST":
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
@@ -132,6 +182,80 @@ def profile_view(request):
     elif user.is_hospital_admin:
         profile, _ = HospitalAdminProfile.objects.get_or_create(user=user, defaults={'hospital_name': ''})
     return render(request, "accounts/profile.html", {"profile": profile})
+
+
+@login_required
+def consent_settings(request):
+    """
+    Privacy & Consent page: view current status, grant or withdraw each purpose.
+
+    Each purpose is its own control — there is deliberately no single
+    "accept everything" action, because the purposes describe genuinely
+    different processing and a user must be able to accept one and decline
+    another.
+    """
+    from .consent import consent_history, consent_status, grant_consent, revoke_consent
+    from .models import ConsentPurpose
+
+    if request.method == "POST":
+        purpose = request.POST.get("purpose", "")
+        action  = request.POST.get("action", "")
+        if purpose not in ConsentPurpose.values:
+            messages.error(request, "Unknown consent option.")
+            return redirect("accounts:consent")
+
+        label = dict(ConsentPurpose.choices)[purpose]
+        if action == "grant":
+            grant_consent(request.user, purpose)
+            messages.success(request, f"Consent granted: {label}.")
+        elif action == "revoke":
+            revoke_consent(request.user, purpose)
+            messages.success(request, f"Consent withdrawn: {label}.")
+        else:
+            messages.error(request, "Unknown action.")
+        return redirect("accounts:consent")
+
+    return render(request, "accounts/consent.html", {
+        "consents": consent_status(request.user),
+        "history":  consent_history(request.user)[:50],
+    })
+
+
+@login_required
+@ratelimit(key='user', rate='5/h', method='POST', block=False)
+def data_export(request):
+    """
+    Download every piece of personal data HealthCompass holds for the caller.
+
+    POST-only for the download itself so it is not triggered by a link preview
+    or prefetch. The subject is always request.user — there is no parameter that
+    could name a different account.
+    """
+    from django.http import FileResponse
+    from .export import EXPORT_VERSION, EXCLUSIONS, CATEGORIES, build_export
+
+    if request.method == "POST":
+        if getattr(request, 'limited', False):
+            messages.error(request, "Too many export requests. Please try again later.")
+            return redirect("accounts:data_export")
+        try:
+            archive, filename = build_export(request.user)
+        except Exception:
+            logger.exception('Data export failed for user %s', request.user.pk)
+            messages.error(request, "Sorry, the export could not be generated. Please try again.")
+            return redirect("accounts:data_export")
+
+        response = FileResponse(archive, as_attachment=True, filename=filename,
+                                content_type='application/zip')
+        # Never let a proxy or the browser retain a copy of a health archive.
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        return response
+
+    return render(request, "accounts/data_export.html", {
+        'export_version': EXPORT_VERSION,
+        'categories':     [name for name, _f, _b in CATEGORIES],
+        'exclusions':     EXCLUSIONS,
+    })
 
 
 def _profile_form_for(user, data=None):

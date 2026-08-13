@@ -138,6 +138,77 @@ class DoctorAccessLog(models.Model):
         return f'{self.actor} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
 
 
+class ConsentPurpose(models.TextChoices):
+    """
+    Separate purposes, deliberately not a single "I agree".
+
+    Each names one distinct processing activity a user can accept or decline on
+    its own. EXTERNAL_LLM is called out separately from AI_PROCESSING because it
+    is the only one that transmits health data to third-party processors
+    (Groq, Google, Anthropic, OpenAI) outside this system.
+    """
+    AI_PROCESSING       = 'ai_processing',       'AI analysis of my health data'
+    EXTERNAL_LLM        = 'external_llm',        'Sending my health data to external AI providers'
+    DOCUMENT_PROCESSING = 'document_processing', 'Automated reading of my uploaded documents'
+    DATA_SHARING        = 'data_sharing',        'Sharing my records with linked clinicians'
+    RESEARCH            = 'research',            'Use of anonymised data for research'
+
+
+class Consent(models.Model):
+    """
+    One row per consent decision, append-only.
+
+    Granting writes a row. Revoking stamps `revoked_at` and flips `status` on
+    that row rather than deleting it; granting again afterwards writes a *new*
+    row. The history of who consented to what, when, and under which version is
+    therefore never overwritten — which is the point of recording consent at all.
+
+    A partial unique constraint allows at most one GRANTED row per
+    (user, purpose); any number of REVOKED rows may accumulate behind it.
+
+    Version: the text the user agreed to is versioned in
+    settings.CONSENT_VERSIONS. Consent recorded against an older version no
+    longer counts as consent for the current text — see
+    apps.accounts.consent.has_consent().
+    """
+    class Status(models.TextChoices):
+        GRANTED = 'granted', 'Granted'
+        REVOKED = 'revoked', 'Revoked'
+
+    user       = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                    related_name='consents')
+    purpose    = models.CharField(max_length=32, choices=ConsentPurpose.choices)
+    version    = models.CharField(max_length=20,
+                    help_text='Version of the consent text the user agreed to, e.g. "v1".')
+    status     = models.CharField(max_length=10, choices=Status.choices, default=Status.GRANTED)
+    granted_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'purpose'],
+                condition=models.Q(status='granted'),
+                name='unique_active_consent_per_user_purpose',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'purpose', 'status']),
+        ]
+
+    def __str__(self):
+        # Deliberately identifies the decision, not its content — this string
+        # can reach admin listings.
+        return f'{self.user_id}: {self.purpose} [{self.status}@{self.version}]'
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == self.Status.GRANTED and self.revoked_at is None
+
+
 class PatientDoctorRelationship(models.Model):
     patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='my_doctors')
     doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='my_patients')

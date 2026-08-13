@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Download your data — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.dx-page { max-width:720px; margin:0 auto; }
+.dx-page h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0 0 .35rem; }
+.dx-intro { font-size:.85rem; color:#64748b; margin-bottom:1.4rem; line-height:1.55; }
+
+.dx-card { background:white; border:1.5px solid var(--border); border-radius:12px;
+           padding:1.1rem 1.2rem; margin-bottom:1rem; }
+.dx-card h2 { font-size:.9rem; font-weight:800; color:#1e293b; margin:0 0 .6rem; }
+
+.dx-list { list-style:none; padding:0; margin:0; display:grid;
+           grid-template-columns:1fr 1fr; gap:.3rem .9rem; }
+@media(max-width:520px){ .dx-list { grid-template-columns:1fr; } }
+.dx-list li { font-size:.82rem; color:#334155; display:flex; align-items:center; gap:.45rem; }
+.dx-list li::before { content:'✓'; color:#15803d; font-weight:800; }
+
+.dx-excl { list-style:none; padding:0; margin:0; }
+.dx-excl li { font-size:.8rem; color:#475569; line-height:1.5; margin-bottom:.5rem;
+              padding-left:1.1rem; position:relative; }
+.dx-excl li::before { content:'✕'; position:absolute; left:0; color:#b91c1c; font-weight:800; }
+.dx-excl b { color:#1e293b; }
+
+.dx-warn { font-size:.82rem; color:#92400e; background:#fffbeb; border:1.5px solid #fcd34d;
+           border-radius:10px; padding:.8rem .95rem; margin:1.2rem 0; line-height:1.55; }
+
+.dx-btn { display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.3rem;
+          border-radius:9px; font-size:.88rem; font-weight:700; border:none;
+          background:#6366f1; color:white; cursor:pointer; }
+.dx-btn:hover { opacity:.9; }
+.dx-meta { font-size:.72rem; color:#94a3b8; margin-top:.7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dx-page">
+  <h1>Download your data</h1>
+  <p class="dx-intro">
+    Get a copy of everything HealthCompass stores about you, as a ZIP file containing
+    machine-readable JSON plus your original uploaded documents. This is your right of
+    access and portability under GDPR Articles 15 and 20.
+  </p>
+
+  <div class="dx-card">
+    <h2>What's included</h2>
+    <ul class="dx-list">
+      {% for category in categories %}
+        <li>{{ category|cut:"_"|capfirst }}{% if category == 'rag_index' %} (search index){% endif %}</li>
+      {% endfor %}
+      <li>Your uploaded files</li>
+    </ul>
+  </div>
+
+  <div class="dx-card">
+    <h2>What's deliberately left out</h2>
+    <ul class="dx-excl">
+      {% for item in exclusions %}
+        <li><b>{{ item.item|capfirst }}</b> — {{ item.reason }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="dx-warn">
+    <strong>This file contains your full medical history.</strong> It is not encrypted.
+    Save it somewhere private, and treat sending it to anyone as handing over your
+    complete health record.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="dx-btn">Download my data (.zip)</button>
+  </form>
+  <p class="dx-meta">
+    Export format version {{ export_version }} · generated when you click, nothing is stored on our servers.
+  </p>
+</div>
+{% endblock %}

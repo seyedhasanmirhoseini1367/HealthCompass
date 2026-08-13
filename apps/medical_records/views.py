@@ -293,7 +293,13 @@ def scan_ocr(request):
         return JsonResponse({'error': msg}, status=400)
 
     result = MedicalRecordService.ocr_image(image.read(),
-                                             mime_type=image.content_type or 'image/jpeg')
+                                             mime_type=image.content_type or 'image/jpeg',
+                                             user=request.user)
+    if result.get('consent_required'):
+        return JsonResponse(
+            {'error': result['error'], 'consent_required': result['consent_required']},
+            status=403,
+        )
     if result.get('error'):
         return JsonResponse({'error': result['error']}, status=500)
     return JsonResponse({'text': result['text']})

@@ -61,3 +61,15 @@ RAG_SYSTEM_DOCUMENTATION.*
 
 # Sensitive credential files — ignore only the specific file, not the whole directory
 docs/TEST_ACCOUNTS.txt
+
+# Generated evaluation output — never committed.
+#
+# These are build artefacts (corpus runs, A/B results, charts), and some are
+# DERIVED FROM CREDENTIALED DATA: evaluation/mimic_subset_manifest.json carries
+# real MIMIC-III subject_id values and the local dataset path. PhysioNet's
+# licence prohibits redistributing dataset-derived content, and this repository
+# has a public remote.
+#
+# Leading slash is load-bearing: a bare "evaluation/" would also match
+# scripts/evaluation/, which holds the evaluation CODE and must stay tracked.
+/evaluation/

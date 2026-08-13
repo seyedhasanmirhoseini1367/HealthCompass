@@ -183,6 +183,11 @@ FIREBASE_CREDENTIALS_JSON = config('FIREBASE_CREDENTIALS_JSON', default='')
 # ── RAG Configuration ──────────────────────────────────────────────────────────
 RAG_CONFIG = {
     'EMBEDDING_MODEL':   'models/gemini-embedding-001',
+    # Output dimension of EMBEDDING_MODEL. Stored per chunk alongside the vector
+    # so a model swap is detectable instead of silently degrading retrieval.
+    # Changing EMBEDDING_MODEL without changing this (or vice versa) will cause
+    # existing chunks to be reported stale rather than mixed into the index.
+    'EMBEDDING_DIM':     3072,
     'CHUNK_SIZE':        200,
     'CHUNK_OVERLAP':     40,
     'TOP_K':             6,
@@ -207,12 +212,31 @@ RAG_CONFIG = {
     'ANTHROPIC_MODEL':   'claude-haiku-4-5-20251001',
     'OPENAI_MODEL':      'gpt-4o-mini',
     'MAX_TOKENS':        1200,
+    # Wall-clock ceiling for a single provider call. Must stay well below the
+    # gunicorn worker timeout (120s) so a slow provider surfaces as a handled
+    # fallback rather than a killed worker. Without this the SDK defaults apply —
+    # OpenAI and Anthropic default to 600s, which is long enough for a handful of
+    # hung requests to occupy every thread in the pool.
+    'PROVIDER_TIMEOUT':  config('LLM_TIMEOUT_SECONDS', default=45, cast=int),
+    # Indexing runs off-request; a tighter bound keeps a stuck batch from
+    # pinning a background thread indefinitely.
+    'EMBED_TIMEOUT':     config('EMBED_TIMEOUT_SECONDS', default=60, cast=int),
     'VECTOR_STORE_PATH': str(BASE_DIR / 'rag_vector_store'),
 }
 
-# File upload limits (50 MB)
+# File upload limits.
+# NOTE: neither of these caps how large an uploaded FILE may be.
+#   DATA_UPLOAD_MAX_MEMORY_SIZE is measured against the request body excluding
+#   file upload data; FILE_UPLOAD_MAX_MEMORY_SIZE is only the point at which an
+#   upload spools from memory to a temp file.
+# MAX_UPLOAD_BYTES is the actual per-file ceiling, enforced in
+# apps/medical_records/services.py::validate_upload.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
+MAX_UPLOAD_BYTES = config('MAX_UPLOAD_BYTES', default=25 * 1024 * 1024, cast=int)
+# Row ceiling for tabular imports (parquet/CSV). Compressed formats can
+# expand far beyond MAX_UPLOAD_BYTES, so the expansion is bounded too.
+MAX_PARSED_ROWS = config('MAX_PARSED_ROWS', default=200_000, cast=int)
 
 # ── Proxy / HTTPS (Railway terminates SSL at edge) ────────────────────────────
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -274,6 +298,68 @@ else:
 # any deployment targeting regulated health data contexts such as Kanta/THL).
 QUERYLOG_RETENTION_DAYS = config('QUERYLOG_RETENTION_DAYS', default=90, cast=int)
 
+# ── Consent ────────────────────────────────────────────────────────────────────
+# Version of the consent text for each purpose. Bump a value when the wording
+# materially changes: consent recorded against an older version stops counting,
+# and the user is asked again. Never reuse a version number for different text.
+CONSENT_VERSIONS = {
+    'ai_processing':       'v1',
+    'external_llm':        'v1',
+    'document_processing': 'v1',
+    'data_sharing':        'v1',
+    'research':            'v1',
+}
+
+# Purposes that BLOCK the corresponding feature when not granted.
+#
+# Only external_llm is enforced today, because it is the only purpose whose
+# absence has a clean, implementable meaning in the current product: refuse to
+# transmit health data to third-party AI providers. The other purposes are
+# recorded and shown to the user but do not gate anything yet — enforcing
+# document_processing, for example, would require an ingestion path that works
+# without the external parser, which does not exist.
+#
+# Deployment note: enforcement is default-deny. Existing users have no consent
+# rows and will be blocked from the AI assistant until they grant it. That is
+# the legally correct behaviour — consent must be affirmative and cannot be
+# back-filled — but it is a visible change, so stage the rollout by shipping the
+# consent UI first and setting this afterwards.
+CONSENT_REQUIRED_PURPOSES = config(
+    'CONSENT_REQUIRED_PURPOSES', default='external_llm', cast=Csv(),
+)
+
+# Which registered egress points block when consent is absent.
+# See apps/accounts/egress.py for the full matrix.
+#
+#   'rag'  — the points already covered by the RAGService gate, i.e. everything
+#            reached by ASKING a question. It deliberately excludes
+#            rag.embed_documents, which is reached by UPLOADING a record and was
+#            never behind that gate — see RAG_PIPELINE_POINTS in egress.py.
+#            This is the current default, so widening the boundary is a
+#            deliberate act rather than a side effect of deploying.
+#   'all'  — every PHI-bearing point: document parsing, OCR, prediction
+#            interpretation and the seizure proxy included.
+#   Or an explicit comma-separated list of point ids for a staged rollout, e.g.
+#            CONSENT_ENFORCED_EGRESS=rag,records.ocr,insights.seizure_proxy
+#
+# Impact of moving to 'all': users who have not granted external_llm consent
+# stop having uploads OCR'd and LLM-parsed (regex extraction still runs), get
+# the static prediction interpretation instead of the generated one, cannot use
+# the seizure analysis, and have new records left unindexed until they consent.
+# Nothing is deleted and nothing already processed is affected.
+CONSENT_ENFORCED_EGRESS = config('CONSENT_ENFORCED_EGRESS', default='rag', cast=Csv())
+
+# ── Embedding provenance enforcement ───────────────────────────────────────────
+# When False (default), chunks embedded before provenance tracking existed
+# (embedding_model == '') are still usable provided their vector dimension
+# matches RAG_CONFIG['EMBEDDING_DIM'].  This keeps pre-existing production
+# embeddings working without a re-embed.
+#
+# Set to True once `python manage.py backfill_embedding_provenance` has stamped
+# every legacy row.  In strict mode, unknown-provenance chunks are excluded from
+# retrieval, so a model swap can never silently mix vector spaces.
+EMBEDDING_STRICT_PROVENANCE = config('EMBEDDING_STRICT_PROVENANCE', default=False, cast=bool)
+
 # ── Production security headers ────────────────────────────────────────────────
 # Railway terminates SSL at the edge, so no SECURE_SSL_REDIRECT needed.
 if not DEBUG:
@@ -309,7 +395,20 @@ LOGGING = {
         'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
         'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
         'allauth': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
-        'apps': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+        # DEBUG only when DEBUG is on. In production this logger carries per-query
+        # retrieval detail for every request; the volume buries the ERROR lines
+        # that actually need attention. No patient content is logged at any level
+        # (queries are logged as q_len, never as text), so this is about signal,
+        # not disclosure.
+        'apps': {'handlers': ['console'],
+                 'level': 'DEBUG' if DEBUG else 'INFO',
+                 'propagate': False},
+        # Structured operational events — see healthcompass/observability.py.
+        # Separated from 'apps' so a log drain or alert rule can subscribe to
+        # failures that make medical data unretrievable or unnotified without
+        # also ingesting routine application logging.
+        'healthcompass.ops': {'handlers': ['console'], 'level': 'INFO',
+                              'propagate': False},
     },
 }
 
@@ -326,7 +425,43 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+    # Baseline ceiling for every API endpoint. Deliberately generous — it exists
+    # to stop runaway clients and scripted abuse, not to shape normal traffic.
+    # Endpoints that are expensive (AI, uploads, inference) or security-sensitive
+    # (auth) declare a tighter scope via apps/api/throttling.py.
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'user':           config('THROTTLE_USER',           default='1000/hour'),
+        'anon':           config('THROTTLE_ANON',           default='100/hour'),
+        # Authentication — keyed by IP. Burst stops credential stuffing;
+        # sustained stops slow distributed guessing from one address.
+        'auth_burst':     config('THROTTLE_AUTH_BURST',     default='10/min'),
+        'auth_sustained': config('THROTTLE_AUTH_SUSTAINED', default='60/hour'),
+        'register':       config('THROTTLE_REGISTER',       default='5/hour'),
+        'password_reset': config('THROTTLE_PASSWORD_RESET', default='5/hour'),
+        # Expensive operations — keyed by user.
+        'ai':             config('THROTTLE_AI',             default='20/min'),
+        'ai_daily':       config('THROTTLE_AI_DAILY',       default='300/day'),
+        'upload':         config('THROTTLE_UPLOAD',         default='60/hour'),
+        'ocr':            config('THROTTLE_OCR',            default='30/hour'),
+        'prediction':     config('THROTTLE_PREDICTION',     default='60/hour'),
+        # Export reads every record and file the user owns.
+        'export':         config('THROTTLE_EXPORT',         default='5/hour'),
+    },
 }
+
+# Rate limits for the server-rendered (non-DRF) auth views, applied with
+# django-ratelimit. Kept separate from DRF scopes because those views are not
+# DRF and are keyed by IP rather than by authenticated user.
+RATELIMIT_LOGIN          = config('RATELIMIT_LOGIN',          default='10/m')
+RATELIMIT_REGISTER       = config('RATELIMIT_REGISTER',       default='5/h')
+RATELIMIT_PASSWORD_RESET = config('RATELIMIT_PASSWORD_RESET', default='5/h')
+
+# Set True in tests that are not specifically exercising throttling.
+RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(hours=1),

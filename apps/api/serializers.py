@@ -36,6 +36,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Self-service registration always creates a PATIENT.
+
+    `role` is deliberately NOT a writable field. It was previously accepted from
+    the request body and passed straight to create_user() while `is_approved`
+    defaults to True, so anyone could self-register as `doctor`,
+    `data_scientist`, `hospital_admin` or `admin` and inherit that role's
+    privileges. The server-rendered signup form never exposed `role`, so this
+    only ever affected the API.
+
+    Professional roles are assigned by an administrator (Django admin), which is
+    also where `is_approved` is granted.
+    """
     password   = serializers.CharField(write_only=True, min_length=8)
     password2  = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=False, allow_blank=True)
@@ -43,12 +56,17 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = CustomUser
-        fields = ['email', 'password', 'password2', 'first_name', 'last_name', 'role']
+        fields = ['email', 'password', 'password2', 'first_name', 'last_name']
 
     def validate(self, data):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
         return data
+
+    def validate_email(self, value):
+        if CustomUser.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('An account with this email already exists.')
+        return value
 
     def create(self, validated_data):
         validated_data.pop('password2')
@@ -58,7 +76,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
-            role=validated_data.get('role', 'patient'),
+            role=CustomUser.Role.PATIENT,
         )
         return user
 

@@ -58,6 +58,16 @@ urlpatterns = [
     path('assistant/sessions/',                   views.assistant_sessions,       name='assistant_sessions'),
     path('assistant/sessions/<str:session_id>/',  views.assistant_session_detail, name='assistant_session_detail'),
 
+    # Consent (privacy)
+    path('consent/',          views.consent_list,         name='consent_list'),
+    path('consent/grant/',    views.consent_grant,        name='consent_grant'),
+    path('consent/revoke/',   views.consent_revoke,       name='consent_revoke'),
+    path('consent/history/',  views.consent_history_view, name='consent_history'),
+
+    # Data export (GDPR Art. 15 / 20)
+    path('export/',          views.export_status,   name='export_status'),
+    path('export/download/', views.export_download, name='export_download'),
+
     # Seizure Analysis
     path('seizure-analysis/',      views.seizure_analysis,      name='seizure_analysis'),
 

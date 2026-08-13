@@ -1,4 +1,4 @@
-﻿# rag_assistant/graph/nodes.py
+# rag_assistant/graph/nodes.py
 """
 LangGraph nodes for the HealthCompass RAG pipeline.
 
@@ -93,16 +93,29 @@ def understand_node(state: HealthState) -> Dict[str, Any]:
     question = state['question']
     history  = state.get('history', [])
 
+    # The classifier sends the question to Groq, so it needs the patient for the
+    # egress check. Resolved from the id already carried in the graph state.
+    user = None
     try:
-        qi = understand(question, history)
+        from django.contrib.auth import get_user_model
+        user = get_user_model().objects.filter(pk=state.get('patient_id')).first()
+    except Exception:
+        pass
+
+    try:
+        qi = understand(question, history, user=user)
+        # The question itself is health data — a patient asking about a
+        # diagnosis reveals the diagnosis. Log the routing decision, never the
+        # text, so ordinary application logs stay free of clinical content.
         logger.info(
-            'understand_node: mode=%s route=%s intent=%s temporal=%s via_llm=%s q=%r',
-            qi.mode, qi.route, qi.intent, qi.is_temporal, qi.via_llm, question[:60],
+            'understand_node: mode=%s route=%s intent=%s temporal=%s via_llm=%s q_len=%d',
+            qi.mode, qi.route, qi.intent, qi.is_temporal, qi.via_llm, len(question),
         )
         return {
             'route':           qi.route,
             'rewritten_query': qi.rewritten_query,
             'mode':            qi.mode,
+            'temporal_mode':   qi.temporal_mode,
         }
     except Exception as exc:
         logger.warning('understand_node failed (%s) — falling back to _detect_route', exc)
@@ -110,6 +123,7 @@ def understand_node(state: HealthState) -> Dict[str, Any]:
             'route':           _detect_route(question),
             'rewritten_query': question,
             'mode':            'personal',
+            'temporal_mode':   None,
         }
 
 
@@ -223,7 +237,7 @@ def router_node(state: HealthState) -> Dict[str, Any]:
             logger.warning('router_node cold-start check failed (proceeding normally): %s', exc)
 
     # Route already set by understand_node — echo it so LangGraph sees a non-empty update.
-    logger.debug('router_node: route=%s q=%r', state.get('route'), state['question'][:60])
+    logger.debug('router_node: route=%s q_len=%d', state.get('route'), len(state['question']))
     return {'route': state.get('route', 'general')}
 
 
@@ -288,7 +302,8 @@ def trajectory_node(state: HealthState) -> Dict[str, Any]:
         User    = get_user_model()
         patient = User.objects.get(pk=state['patient_id'])
         svc     = TrajectoryService()
-        context, source_chunks = svc.get_trajectory_context(patient, query)
+        context, source_chunks = svc.get_trajectory_context(
+            patient, query, temporal_mode=state.get('temporal_mode'))
 
         if context:
             logger.info(
@@ -313,7 +328,7 @@ def trajectory_node(state: HealthState) -> Dict[str, Any]:
 
 def _retrieve(
     state:         HealthState,
-    document_type: Optional[str] = None,
+    document_type                = None,   # str | tuple[str, ...] | None
     top_k:         Optional[int] = None,
     query_intent:  Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -342,8 +357,17 @@ def _retrieve(
 def lab_results_node(state: HealthState) -> Dict[str, Any]:
     return _retrieve(state, 'lab_result', query_intent='lab_results')
 
+#: A medication's *status* is recorded in clinical notes far more often than in
+#: the prescription that started it ("metformin discontinued due to GI
+#: intolerance"). Restricting this route to 'medication' meant a discontinuation
+#: could never become a candidate, and the assistant answered questions about
+#: current medication from the prescription alone — confidently, and wrong.
+#: Deliberately narrow: notes are admitted, lab results and wearables are not.
+MEDICATION_STATUS_TYPES = ('medication', 'note')
+
+
 def medications_node(state: HealthState) -> Dict[str, Any]:
-    return _retrieve(state, 'medication', query_intent='medication')
+    return _retrieve(state, MEDICATION_STATUS_TYPES, query_intent='medication')
 
 def wearable_node(state: HealthState) -> Dict[str, Any]:
     return _retrieve(state, 'wearable', query_intent='general')

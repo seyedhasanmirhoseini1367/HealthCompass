@@ -22,11 +22,13 @@ from typing import Dict, List, Optional, Tuple
 
 from django.db.models import Q
 
+from apps.rag_assistant.services.biomarkers import BIOMARKERS, detect as _detect
+from apps.rag_assistant.services.text_match import matches as _text_matches
+
 
 def _biomarker_alias_match(alias: str, q: str) -> bool:
-    if ' ' in alias:
-        return alias in q
-    return bool(re.search(r'\b' + re.escape(alias) + r'\b', q))
+    """Retained for callers; delegates to the shared matcher."""
+    return _text_matches(alias, q)
 
 logger = logging.getLogger(__name__)
 
@@ -36,51 +38,10 @@ _CHART_KEYWORDS = [
     'show me a', 'show my', 'draw', 'display my data', 'show a',
 ]
 
-# Biomarker canonical name → list of parameter_name substrings to match in DB.
-# More specific entries must come before shorter/ambiguous ones.
-_BIOMARKERS: Dict[str, List[str]] = {
-    'creatinine': [
-        'creatinine', 'serum creatinine', 'creat', 'kidney function',
-    ],
-    'hba1c': [
-        'hba1c', 'hemoglobin a1c', 'haemoglobin a1c', 'glycated hemoglobin',
-        'glycated haemoglobin', 'a1c',
-    ],
-    'egfr': [
-        'egfr', 'gfr', 'glomerular filtration rate', 'estimated gfr',
-    ],
-    'glucose': [
-        'fasting glucose', 'blood glucose', 'blood sugar', 'glucose',
-        'fbs', 'rbs', 'random blood sugar',
-    ],
-    'cholesterol': [
-        'total cholesterol', 'ldl cholesterol', 'hdl cholesterol',
-        'ldl', 'hdl', 'cholesterol', 'triglyceride',
-    ],
-    'hemoglobin': [
-        'hemoglobin', 'haemoglobin', 'hgb', 'hb level',
-    ],
-    'blood_pressure': [
-        'systolic', 'diastolic', 'blood pressure', 'bp',
-    ],
-    'heart_rate': [
-        'heart rate', 'resting heart rate', 'pulse rate', 'bpm',
-    ],
-    'weight': [
-        'body weight', 'weight', 'bmi',
-    ],
-    'tsh': [
-        'thyroid stimulating hormone', 'tsh', 'thyroid function',
-    ],
-    'vitamin_d': [
-        '25-hydroxyvitamin d', '25(oh)d', 'vitamin d', 'vit d',
-    ],
-    'sodium': ['sodium', 'serum sodium', 'na+'],
-    'potassium': ['potassium', 'serum potassium', 'k+'],
-    'urea': ['blood urea nitrogen', 'bun', 'urea'],
-    'wbc': ['white blood cell', 'white blood count', 'wbc', 'leukocyte'],
-    'platelets': ['platelet count', 'platelet', 'plt', 'thrombocyte'],
-}
+# Biomarker vocabulary lives in services/biomarkers.py — the single source of
+# truth shared with the query classifier. Re-exported under the original name
+# so the rest of this module (and its callers) are unaffected.
+_BIOMARKERS = BIOMARKERS
 
 # Duplicate keyword list kept for backward compat with callers; the router
 # uses its own copy. Single source of truth is planned for QueryUnderstanding.
@@ -113,17 +74,28 @@ class TrajectoryService:
         return any(kw in q for kw in _CHART_KEYWORDS)
 
     def detect_biomarker(self, query: str) -> Optional[str]:
-        q = query.lower()
-        for canonical, aliases in _BIOMARKERS.items():
-            if any(_biomarker_alias_match(alias, q) for alias in aliases):
-                return canonical
-        return None
+        """Canonical biomarker named in *query*. Shared with the classifier."""
+        return _detect(query)
 
     def get_trajectory_context(
         self,
         patient,
         query: str,
+        temporal_mode: Optional[str] = None,
     ) -> Tuple[str, List[Dict]]:
+        """
+        Build chronological context for a temporal question.
+
+        `temporal_mode` says WHICH temporal question was asked:
+          'latest'   — one value: the most recent
+          'previous' — one value: the second most recent
+          'trend'    — the whole series (default, and what this always did)
+
+        The full series is included in every mode, because a latest-value answer
+        still benefits from the surrounding history; what changes is which point
+        is called out at the top, so the model is not left to infer "most recent"
+        from an ordered list it may read in either direction.
+        """
         biomarker = self.detect_biomarker(query)
         if not biomarker:
             return self._general_temporal_context(patient)
@@ -134,7 +106,20 @@ class TrajectoryService:
         if not trajectory_points:
             return '', []
 
-        context = self._format_trajectory(biomarker, trajectory_points)
+        context = self._format_trajectory(biomarker, trajectory_points, temporal_mode)
+
+        # Surface genuine contradictions (same analyte, same date, different
+        # values) alongside the series. Progression is already visible in the
+        # trajectory itself and is deliberately not flagged.
+        try:
+            from apps.rag_assistant.services.conflict_service import (
+                analyze_lab_values, format_conflict_notice)
+            notice = format_conflict_notice(analyze_lab_values(patient, parameter=biomarker))
+            if notice:
+                context = f'{context}\n\n{notice}'
+        except Exception as exc:
+            logger.warning('conflict analysis skipped (%s)', type(exc).__name__)
+
         return context, source_chunks
 
     # ── Primary: ORM-based loading from ParsedLabValue ────────────────────────
@@ -224,6 +209,10 @@ class TrajectoryService:
 
         if trajectory_points:
             trajectory_points.sort(key=lambda x: x['date'])
+            # This path starts from ParsedLabValue, which has no link to the RAG
+            # document — so the citation fields have to be resolved separately
+            # or the answer ships with no sources at all.
+            self._attach_document_metadata(patient, trajectory_points)
             source_chunks = [
                 {'text': p['text'], 'score': 1.0, 'metadata': p['metadata']}
                 for p in trajectory_points
@@ -236,6 +225,92 @@ class TrajectoryService:
             biomarker,
         )
         return self._load_trajectory_from_chunks(patient, aliases)
+
+
+    # ── Citation metadata for the ORM path ────────────────────────────────────
+
+    def _attach_document_metadata(self, patient, trajectory_points: List[Dict]) -> None:
+        """
+        Fill in document_id (and, when unambiguous, chunk offsets) on points
+        built from ParsedLabValue rows.
+
+        Why this is needed: the ORM trajectory path walks
+        ParsedLabValue -> MedicalRecord, which never touches MedicalDocument.
+        _build_sources() keys every citation off `document_id` and silently drops
+        any chunk without one, so before this the entire latest/previous/trend
+        family answered correctly with an empty sources panel.
+
+        Nothing is invented. A record with no indexed document simply keeps no
+        document_id, and _build_sources() then omits it — an absent citation is
+        honest, a fabricated one is not.
+
+        Both lookups are filtered by `patient`, not only by record id, so this
+        cannot widen the scope of what a user can be shown even if a record id
+        were somehow mismatched.
+        """
+        from apps.rag_assistant.models import MedicalChunk, MedicalDocument
+
+        record_ids = {
+            p['metadata'].get('record_id') for p in trajectory_points
+            if p['metadata'].get('record_id')
+        }
+        if not record_ids:
+            return
+
+        documents = {}
+        for doc in (MedicalDocument.objects
+                    .filter(patient=patient, record_id__in=record_ids)
+                    .order_by('record_id', '-created_at')):
+            # First document wins; process_record replaces documents rather than
+            # accumulating them, so in practice there is exactly one per record.
+            documents.setdefault(str(doc.record_id), doc)
+        if not documents:
+            return
+
+        chunks_by_document: Dict[str, List] = {}
+        for chunk in MedicalChunk.objects.filter(
+            patient=patient, document_id__in=[d.id for d in documents.values()]
+        ):
+            chunks_by_document.setdefault(str(chunk.document_id), []).append(chunk)
+
+        for point in trajectory_points:
+            meta = point['metadata']
+            doc = documents.get(meta.get('record_id'))
+            if doc is None:
+                continue
+
+            meta['document_id'] = str(doc.id)
+            meta.setdefault('document_title', doc.title)
+            meta.setdefault('document_type', doc.document_type)
+
+            offsets = self._locate_offsets(
+                chunks_by_document.get(str(doc.id), []), meta.get('parameter_name'))
+            if offsets:
+                meta['start_offset'], meta['end_offset'] = offsets
+
+    @staticmethod
+    def _locate_offsets(chunks: List, parameter_name):
+        """
+        Character range of the chunk this analyte came from, or None.
+
+        Only returned when EXACTLY ONE chunk in the document mentions the
+        analyte. Chunk windows overlap, so a parameter near a boundary appears in
+        two chunks and there is no basis for choosing between them — pointing at
+        the wrong passage is worse than pointing at none.
+        """
+        if not parameter_name or not chunks:
+            return None
+
+        needle = str(parameter_name).lower()
+        matches = [c for c in chunks if needle in (c.content or '').lower()]
+        if len(matches) != 1:
+            return None
+
+        meta = matches[0].metadata or {}
+        start, end = meta.get('start_offset'), meta.get('end_offset')
+        if isinstance(start, int) and isinstance(end, int):
+            return start, end
+        return None
 
     # ── Fallback: chunk text scan (legacy / non-lab records) ─────────────────
 
@@ -334,13 +409,21 @@ class TrajectoryService:
 
     # ── Format trajectory for LLM ─────────────────────────────────────────────
 
-    def _format_trajectory(self, biomarker: str, points: List[Dict]) -> str:
+    def _format_trajectory(self, biomarker: str, points: List[Dict],
+                           temporal_mode: Optional[str] = None) -> str:
         display = biomarker.replace('_', ' ').title()
         lines = [
             f"=== TEMPORAL TRAJECTORY: {display.upper()} ===",
             "Ordered chronologically (oldest → newest).",
             "",
         ]
+
+        # State the answer to a point-in-time question explicitly rather than
+        # leaving the model to pick the right end of an ordered list.
+        answer_line = self._point_in_time_line(display, points, temporal_mode)
+        if answer_line:
+            lines.append(answer_line)
+            lines.append("")
 
         numeric_series: List[Tuple] = []
         for i, pt in enumerate(points, 1):
@@ -378,6 +461,38 @@ class TrajectoryService:
             lines.append(f"\n[{i}] {date_label}:\n{excerpt}")
 
         return "\n".join(lines)
+
+    def _point_in_time_line(self, display: str, points: List[Dict],
+                            temporal_mode: Optional[str]) -> str:
+        """
+        One line naming the value the question actually asked for.
+
+        Returns '' for trend questions and whenever the requested point does not
+        exist — asking for the previous value when only one reading is on file
+        has no answer, and inventing one would be worse than saying nothing.
+        """
+        if temporal_mode not in ('latest', 'previous'):
+            return ''
+        if not points:
+            return ''
+
+        index = -1 if temporal_mode == 'latest' else -2
+        if len(points) < abs(index):
+            if temporal_mode == 'previous':
+                return ('ANSWER TO THE QUESTION ASKED: only one reading is on file, '
+                        'so there is no previous value.')
+            return ''
+
+        pt = points[index]
+        date_label = (pt['date'].strftime('%d %B %Y')
+                      if isinstance(pt['date'], date) else pt['date_str'])
+        if pt['value'] is None:
+            return ''
+        value = f"{pt['value']} {pt['unit']}".strip()
+        flag = ' [ABNORMAL]' if pt.get('is_abnormal') else ''
+        label = 'MOST RECENT' if temporal_mode == 'latest' else 'PREVIOUS (second most recent)'
+        return (f"ANSWER TO THE QUESTION ASKED — {label} {display}: "
+                f"{value}{flag}, recorded {date_label}.")
 
     def _compute_trend(self, values: List[Tuple]) -> str:
         import math

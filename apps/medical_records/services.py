@@ -33,22 +33,46 @@ _MAGIC = {
     'gif':     [(0, b'GIF8')],
     'webp':    [(0, b'RIFF')],
     'parquet': [(0, b'PAR1')],
+    # xlsx is a ZIP container; anything not starting with the local-file-header
+    # signature is not a workbook whatever it is named.
+    'xlsx':    [(0, b'PK\x03\x04')],
 }
+
+#: Extensions accepted as images anywhere in the app. SVG is deliberately absent:
+#: it is an XML document that can carry <script>, and serving one from our own
+#: origin would run that script as first-party code.
+IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
 _UNSAFE_NAME_RE = re.compile(r'[^\w\-.]')
 _MAX_FILENAME_LEN = 200
 
 
+def _max_upload_bytes() -> int:
+    from django.conf import settings as s
+    return int(getattr(s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024))
+
+
 def validate_upload(file_obj, allowed_exts: list) -> tuple:
     """
-    Validate an uploaded file by magic bytes and extension.
+    Validate an uploaded file by size, extension and magic bytes.
 
     Returns (ok: bool, payload: str) where payload is the sanitized filename
     on success, or a human-readable error message on failure.
+
+    The size check matters: Django's DATA_UPLOAD_MAX_MEMORY_SIZE is calculated
+    against the request body *excluding* file upload data, and
+    FILE_UPLOAD_MAX_MEMORY_SIZE is only the spool-to-disk threshold — neither
+    caps how large an uploaded file may be. Without this, uploads are unbounded.
     """
-    raw_name  = os.path.basename(file_obj.name or 'upload')
+    raw_name  = os.path.basename((file_obj.name or 'upload').replace('\\', '/'))
     safe_name = _UNSAFE_NAME_RE.sub('_', raw_name)[:_MAX_FILENAME_LEN] or 'upload'
     ext       = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+
+    size = getattr(file_obj, 'size', None)
+    limit = _max_upload_bytes()
+    if size is not None and size > limit:
+        return False, (f'File is too large ({size // (1024 * 1024)} MB). '
+                       f'Maximum accepted size is {limit // (1024 * 1024)} MB.')
 
     if allowed_exts and ext not in allowed_exts:
         return False, f'File type ".{ext}" not allowed. Accepted: {", ".join(allowed_exts)}'
@@ -63,7 +87,33 @@ def validate_upload(file_obj, allowed_exts: list) -> tuple:
     return True, safe_name
 
 
+def validate_image_upload(file_obj) -> tuple:
+    """
+    Validate a user-supplied image by its actual bytes.
+
+    The declared Content-Type is attacker-controlled and must never be the basis
+    of this decision: an SVG announced as image/png was previously stored
+    verbatim and then served from our own origin.
+    """
+    return validate_upload(file_obj, IMAGE_EXTS)
+
+
 # ── Shared helpers ────────────────────────────────────────────────────────────
+
+def _coerce_record_type(value, default=None):
+    """
+    Constrain a record type to the declared choices.
+
+    Django does not validate `choices` on save(), so a value taken from a
+    request body — or invented by an LLM parsing a document — is stored verbatim
+    unless it is checked here. Anything unrecognised falls back rather than
+    raising: the record is still worth keeping.
+    """
+    default = default or MedicalRecord.RecordType.OTHER
+    valid = {c for c, _label in MedicalRecord.RecordType.choices}
+    return value if value in valid else default
+
+
 
 def _map_doc_type(doc_type_str: str) -> str:
     s = doc_type_str.lower()
@@ -82,21 +132,97 @@ def _map_doc_type(doc_type_str: str) -> str:
     return MedicalRecord.RecordType.OTHER
 
 
-def _check_critical(entry: dict) -> bool:
-    name = entry.get('name', '').lower()
-    try:
-        value = float(str(entry.get('value', '')).replace(',', '.'))
-    except (ValueError, TypeError):
+# ── Critical-value detection ──────────────────────────────────────────────────
+#
+# This used to compare the RAW uploaded number against thresholds written in SI
+# units, before normalisation had happened. Two ways that went wrong:
+#
+#   * A US-format record reporting glucose 140 mg/dL evaluated 140 > 25 and was
+#     flagged CRITICAL, firing a HealthAlert and a push notification.
+#   * The check ran on the Kanta path only, so whether a genuinely critical
+#     value was noticed depended on which file format the patient uploaded.
+#
+# Detection now happens inside _save_lab_value(), after normalisation, so all
+# three ingestion paths share one implementation by construction.
+#
+# The thresholds themselves are unchanged clinically. They are declared in the
+# SI units they were originally written in and converted to canonical units by
+# `normalize()` at import, so the conversion factor has exactly one source of
+# truth (unit_normalizer) and cannot drift from the one used on real values.
+#
+#: analyte -> (source_low, source_high, source_unit). None = no bound.
+_CRITICAL_SOURCE_THRESHOLDS = {
+    'hemoglobin': (70.0, 200.0, 'g/L'),      # -> g/dL   (÷10)
+    'glucose':    (2.5,  25.0,  'mmol/L'),   # -> mg/dL  (×18.016)
+    'creatinine': (None, 1000.0, 'µmol/L'),  # -> mg/dL  (÷88.4)
+    # No conversion exists for these two, so `normalize()` passes them through
+    # and the numbers stand as written.
+    'potassium':  (2.5,  6.5,   'mmol/L'),
+    'sodium':     (120.0, 160.0, 'mmol/L'),
+}
+
+# Units that are numerically interchangeable for these analytes: mEq/L equals
+# mmol/L for singly-charged ions (K+, Na+). Accepting both preserves the
+# detection that already worked for US-format records.
+_UNIT_EQUIVALENTS = {'mmol/l': {'mmol/l', 'meq/l'}}
+
+# Troponin previously carried a `> 10` rule. It is deliberately NOT included:
+# the codebase has no conversion entry for it and no other reference, so the
+# intended unit is undeterminable — ng/mL and ng/L differ by 1000×. Comparing
+# without knowing which would be the exact defect this change exists to remove.
+# Restore it by adding a threshold WITH its unit once that is established.
+
+
+def _build_critical_thresholds() -> dict:
+    """Convert the SI thresholds above into canonical units via normalize()."""
+    from .unit_normalizer import normalize as _norm
+    table = {}
+    for analyte, (low, high, unit) in _CRITICAL_SOURCE_THRESHOLDS.items():
+        canon_low, canon_unit, _o, _k = (
+            _norm(analyte, str(low), unit) if low is not None else (None, None, None, True))
+        canon_high, canon_unit_h, _o, _k = (
+            _norm(analyte, str(high), unit) if high is not None else (None, None, None, True))
+        table[analyte] = (canon_low, canon_high, (canon_unit or canon_unit_h or unit).lower())
+    return table
+
+
+_CRITICAL_THRESHOLDS = _build_critical_thresholds()
+
+
+def _is_critical(parameter_name: str, canonical_value, canonical_unit: str,
+                 unit_known: bool) -> bool:
+    """
+    Decide criticality from the CANONICAL representation only.
+
+    Returns False — never a guess — when the value is unparseable, the unit was
+    not recognised, or the unit does not match the one the threshold is written
+    in. A missed alert is recoverable; an alert derived from an incompatible
+    unit comparison is not.
+    """
+    if canonical_value is None or not unit_known:
         return False
-    thresholds = {
-        'hemoglobin': (value < 70 or value > 200),
-        'glucose':    (value < 2.5 or value > 25),
-        'potassium':  (value < 2.5 or value > 6.5),
-        'sodium':     (value < 120 or value > 160),
-        'creatinine': value > 1000,
-        'troponin':   value > 10,
-    }
-    return any(k in name and v for k, v in thresholds.items())
+
+    name = (parameter_name or '').lower()
+    observed = (canonical_unit or '').lower().strip()
+
+    # Longest name first: 'hemoglobin a1c' must not be matched by 'hemoglobin'.
+    for analyte in sorted(_CRITICAL_THRESHOLDS, key=len, reverse=True):
+        if analyte not in name:
+            continue
+        low, high, expected = _CRITICAL_THRESHOLDS[analyte]
+        accepted = _UNIT_EQUIVALENTS.get(expected, {expected})
+        if observed not in accepted:
+            # Right analyte, wrong/unknown unit — refuse to compare.
+            logger.warning(
+                'Skipping critical check for %s: value is in %r but the '
+                'threshold is defined in %r', parameter_name, canonical_unit, expected)
+            return False
+        if low is not None and canonical_value < low:
+            return True
+        if high is not None and canonical_value > high:
+            return True
+        return False
+    return False
 
 
 def _create_alert(record: MedicalRecord, abnormal_count: int) -> None:
@@ -124,15 +250,26 @@ def _create_alert(record: MedicalRecord, abnormal_count: int) -> None:
             )
     except Exception as exc:
         logger.warning('Could not create alert for record %s: %s', record.pk, exc)
+        # The patient is NOT notified of abnormal values when this happens.
+        from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+        ops_emit(OpsEvent.ALERT_CREATION_FAILED, record_id=str(record.pk),
+                 abnormal_count=abnormal_count, error_type=type(exc).__name__)
 
 
-def _save_lab_value(record, lv: dict, *, is_critical: bool = False,
-                    measured_at=None) -> bool:
-    """Create one ParsedLabValue row. Returns True if is_abnormal."""
+def _save_lab_value(record, lv: dict, *, measured_at=None) -> bool:
+    """
+    Create one ParsedLabValue row. Returns True if is_abnormal.
+
+    Criticality is decided HERE, immediately after normalisation, because this
+    is the single point every ingestion path passes through. Callers must not
+    pass a precomputed flag: doing so is what allowed the Kanta path to use a
+    raw-value comparison while the PDF and text paths computed nothing at all.
+    """
     _val_str = str(lv.get('value', ''))
     _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
         lv.get('name', ''), _val_str, lv.get('unit', ''),
     )
+    is_critical = _is_critical(lv.get('name', ''), _canonical, _canon_unit, _unit_known)
     is_ab = lv.get('is_abnormal', False) or is_critical
     ParsedLabValue.objects.create(
         record=record,
@@ -160,14 +297,19 @@ class MedicalRecordService:
                         record_type=None,
                         filename: str = 'document.pdf') -> dict:
         from django.core.files.base import ContentFile
+        from apps.accounts.egress import ExternalProcessingGuard
         from .parsers import PDFParser
 
-        parsed = PDFParser().parse(pdf_bytes, use_ai=True)
+        # The consent decision is made here, where the owner is known, and
+        # passed down as a flag: text extraction and table parsing are local and
+        # always run, only the Gemini structuring step is withheld.
+        use_ai = ExternalProcessingGuard.allows(user, 'records.parse')
+        parsed = PDFParser().parse(pdf_bytes, use_ai=use_ai)
         if parsed.get('error'):
             return {'error': parsed['error']}
 
         structured = parsed.get('structured') or {}
-        rtype  = record_type or structured.get('record_type') or MedicalRecord.RecordType.OTHER
+        rtype  = _coerce_record_type(record_type or structured.get('record_type'))
         title  = structured.get('title') or filename.rsplit('.', 1)[0]
 
         rec_date = None
@@ -212,13 +354,15 @@ class MedicalRecordService:
                          record_type: str = 'auto',
                          title_override: str = '',
                          date_override=None) -> dict:
+        from apps.accounts.egress import ExternalProcessingGuard
         from .parsers import TextParser
 
-        parsed     = TextParser().parse(raw_text)
+        use_ai     = ExternalProcessingGuard.allows(user, 'records.parse')
+        parsed     = TextParser().parse(raw_text, use_ai=use_ai)
         structured = parsed.get('structured') or {}
 
-        rtype = (structured.get('record_type', MedicalRecord.RecordType.OTHER)
-                 if record_type == 'auto' else record_type)
+        rtype = _coerce_record_type(
+            structured.get('record_type') if record_type == 'auto' else record_type)
         title = title_override or structured.get('title') or raw_text[:60].strip().replace('\n', ' ')
 
         rec_date = date_override
@@ -249,11 +393,19 @@ class MedicalRecordService:
                 record.save(update_fields=['is_flagged'])
                 _create_alert(record, flagged)
 
-        try:
-            from apps.rag_assistant.services.rag_service import RAGService
-            RAGService().index_record(record)
-        except Exception as exc:
-            logger.warning('RAG indexing failed for record %s: %s', record.pk, exc)
+        # Indexing is NOT triggered here.
+        #
+        # This path used to call RAGService().index_record(record) explicitly
+        # while the post_save signal was already indexing the same record — the
+        # PDF and Kanta paths did not, so text uploads indexed twice and the
+        # others once. Because process_record() deletes every document for a
+        # record before recreating it, the two runs interleaved as
+        # delete/delete/create/create and left two documents and two chunk sets
+        # for one upload: duplicated evidence at retrieval time and double the
+        # embedding cost. Ten records in the development database carry that
+        # damage.
+        #
+        # The signal is now the single trigger for every ingestion path.
 
         return {
             'record':     record,
@@ -302,8 +454,6 @@ class MedicalRecordService:
                         if entry.get('kind') != 'lab':
                             continue
 
-                        is_critical = _check_critical(entry)
-
                         ref_range = ''
                         if entry.get('ref_low') and entry.get('ref_high'):
                             ref_range = f"{entry['ref_low']} – {entry['ref_high']}"
@@ -326,9 +476,7 @@ class MedicalRecordService:
                             'ref_range':   ref_range,
                             'is_abnormal': entry.get('is_abnormal', False),
                         }
-                        if _save_lab_value(record, lv,
-                                           is_critical=is_critical,
-                                           measured_at=measured_at):
+                        if _save_lab_value(record, lv, measured_at=measured_at):
                             flagged += 1
                         lab_values_created += 1
 
@@ -400,8 +548,43 @@ class MedicalRecordService:
         }
 
     @staticmethod
-    def ocr_image(image_bytes: bytes, mime_type: str = 'image/jpeg') -> dict:
+    def ocr_image(image_bytes: bytes, *, mime_type: str = 'image/jpeg', user) -> dict:
+        """
+        OCR an uploaded document image via Gemini vision.
+
+        `user` — the owner of the image — is a REQUIRED keyword argument. It was
+        briefly optional for caller compatibility, which meant a caller that
+        forgot it got permissive behaviour by default: exactly the wrong failure
+        mode for a function that ships a medical document to a third party.
+        Omitting it now raises TypeError, so the image cannot be transmitted
+        without someone having decided whose it is.
+
+        Fail-closed twice over:
+          1. An anonymous or missing user is refused outright, regardless of
+             CONSENT_ENFORCED_EGRESS — OCR of a medical document by nobody is
+             never legitimate, so this does not wait on the rollout switch.
+          2. An authenticated user is then checked against the egress guard.
+
+        Both checks run BEFORE the bytes reach any client. There is no local OCR
+        fallback, so a refusal ends the operation rather than degrading it.
+        """
         from django.conf import settings as s
+        from apps.accounts.consent import ConsentRequired
+        from apps.accounts.egress import ExternalProcessingGuard
+
+        from apps.accounts.models import ConsentPurpose
+
+        if user is None or not getattr(user, 'is_authenticated', False):
+            return {
+                'error': 'Document OCR requires a signed-in account.',
+                'consent_required': ConsentPurpose.EXTERNAL_LLM,
+            }
+
+        try:
+            ExternalProcessingGuard.check(user, 'records.ocr')
+        except ConsentRequired as exc:
+            return {'error': exc.message, 'consent_required': exc.purpose}
+
         try:
             from google import genai
             from google.genai import types

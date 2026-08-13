@@ -10,6 +10,7 @@ from django.db.models.functions import TruncMonth
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 
+from apps.accounts.safe_json import script_safe_json
 from ..models import AIModel, ModelPrediction, HealthAlert
 from ..services import (
     get_patient_biomarker_data,
@@ -86,16 +87,16 @@ def health_view(request):
     )
 
     return render(request, 'ai_insights/health.html', {
-        'trending_json':          json.dumps(trending_biomarkers),
-        'pop_avg_json':           json.dumps(pop_avg),
-        'pop_trending_json':      json.dumps(pop_trending_personal),
+        'trending_json':          script_safe_json(trending_biomarkers),
+        'pop_avg_json':           script_safe_json(pop_avg),
+        'pop_trending_json':      script_safe_json(pop_trending_personal),
         'latest_values':          latest_values,
-        'records_type_json':      json.dumps(records_by_type),
-        'upload_labels_json':     json.dumps(upload_labels),
-        'upload_counts_json':     json.dumps(upload_counts),
-        'alerts_summary_json':    json.dumps(alerts_summary),
-        'pred_labels_json':       json.dumps(pred_labels),
-        'pred_scores_json':       json.dumps(pred_scores),
+        'records_type_json':      script_safe_json(records_by_type),
+        'upload_labels_json':     script_safe_json(upload_labels),
+        'upload_counts_json':     script_safe_json(upload_counts),
+        'alerts_summary_json':    script_safe_json(alerts_summary),
+        'pred_labels_json':       script_safe_json(pred_labels),
+        'pred_scores_json':       script_safe_json(pred_scores),
         'latest_risk':            latest_risk,
         'total_records':          total_records,
         'total_biomarkers':       total_biomarkers,
@@ -139,14 +140,14 @@ def population_view(request):
     risk_buckets, pop_avg_risk, _ = get_population_risk_buckets()
 
     return render(request, 'ai_insights/population.html', {
-        'trending_json':       json.dumps(pop_trending),
+        'trending_json':       script_safe_json(pop_trending),
         'latest_values':       pop_latest,
-        'alerts_summary_json': json.dumps(alerts_summary),
-        'records_type_json':   json.dumps(records_by_type),
-        'upload_labels_json':  json.dumps(upload_labels),
-        'upload_counts_json':  json.dumps(upload_counts),
-        'risk_labels_json':    json.dumps(list(risk_buckets.keys())),
-        'risk_counts_json':    json.dumps(list(risk_buckets.values())),
+        'alerts_summary_json': script_safe_json(alerts_summary),
+        'records_type_json':   script_safe_json(records_by_type),
+        'upload_labels_json':  script_safe_json(upload_labels),
+        'upload_counts_json':  script_safe_json(upload_counts),
+        'risk_labels_json':    script_safe_json(list(risk_buckets.keys())),
+        'risk_counts_json':    script_safe_json(list(risk_buckets.values())),
         'pop_avg_risk':        pop_avg_risk,
         'total_patients':      total_patients,
         'total_biomarkers':    total_biomarkers,
@@ -251,14 +252,14 @@ def patient_analytics(request):
     pop_safety_pct     = round(pop_safety_total / max(pop_total_queries, 1) * 100, 1)
 
     ctx = {
-        'trending_json':         json.dumps(trending_biomarkers),
+        'trending_json':         script_safe_json(trending_biomarkers),
         'latest_values':         latest_values,
-        'records_type_json':     json.dumps(records_by_type),
-        'upload_labels_json':    json.dumps(upload_labels),
-        'upload_counts_json':    json.dumps(upload_counts),
-        'alerts_summary_json':   json.dumps(alerts_summary),
-        'pred_labels_json':      json.dumps(pred_labels),
-        'pred_scores_json':      json.dumps(pred_scores),
+        'records_type_json':     script_safe_json(records_by_type),
+        'upload_labels_json':    script_safe_json(upload_labels),
+        'upload_counts_json':    script_safe_json(upload_counts),
+        'alerts_summary_json':   script_safe_json(alerts_summary),
+        'pred_labels_json':      script_safe_json(pred_labels),
+        'pred_scores_json':      script_safe_json(pred_scores),
         'recent_alerts':         recent_alerts,
         'latest_risk':           latest_risk,
         'total_records':         total_records,
@@ -266,12 +267,12 @@ def patient_analytics(request):
         'unread_alerts':         unread_alerts,
         'last_record_date':      last_record_date,
         'has_data':              total_records > 0,
-        'pop_mode_dist_json':    json.dumps(pop_mode_dist),
-        'pop_query_labels_json': json.dumps(pop_query_labels),
-        'pop_query_counts_json': json.dumps(pop_query_counts),
-        'pop_topics_json':       json.dumps(pop_topics),
-        'pop_safety_labels_json':json.dumps(pop_safety_labels),
-        'pop_safety_counts_json':json.dumps(pop_safety_counts),
+        'pop_mode_dist_json':    script_safe_json(pop_mode_dist),
+        'pop_query_labels_json': script_safe_json(pop_query_labels),
+        'pop_query_counts_json': script_safe_json(pop_query_counts),
+        'pop_topics_json':       script_safe_json(pop_topics),
+        'pop_safety_labels_json':script_safe_json(pop_safety_labels),
+        'pop_safety_counts_json':script_safe_json(pop_safety_counts),
         'pop_total_users':       pop_total_users,
         'pop_total_queries':     pop_total_queries,
         'pop_total_sessions':    pop_total_sessions,

@@ -1,0 +1,81 @@
+# Deployment gate — the test suite must pass before code reaches production.
+#
+# Until this existed, nothing ran the suite automatically: tests were executed
+# by hand on a developer machine, and Railway deployed whatever was pushed.
+#
+# The suite is deliberately runnable with NO secrets. It needs only SECRET_KEY
+# (any value), uses the SQLite fallback, and every external provider call in the
+# tests is patched. Verified: 653 tests pass with all four AI provider keys
+# empty, Firebase empty and no network. Keys are therefore NOT configured here —
+# if a test ever starts requiring one it will fail loudly rather than silently
+# skipping, which is the property that makes this a gate rather than a formality.
+#
+# DATABASE_URL is deliberately left UNSET, not set to "". dj_database_url
+# returns {} for an empty-but-set value, which yields a database with no ENGINE
+# and fails every test for a reason unrelated to the change under test.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      SECRET_KEY: ci-secret-key-not-used-for-anything-real
+      DEBUG: "False"
+      ALLOWED_HOSTS: 127.0.0.1,localhost
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the development environment the pins were verified against.
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Catches the failure mode this workflow exists for: a security-critical
+      # dependency going missing. parsers.py raises on a missing defusedxml, but
+      # this reports it as a clear step failure instead of a stack trace buried
+      # in test output.
+      - name: Verify security-critical dependencies are present
+        run: |
+          python -c "import defusedxml; print('defusedxml', defusedxml.__version__)"
+          python -c "import cryptography; print('cryptography', cryptography.__version__)"
+
+      - name: Check for dependency conflicts
+        run: pip check
+
+      - name: Django system checks
+        run: python manage.py check
+
+      # NOT YET ENABLED — `python manage.py makemigrations --check --dry-run`
+      # currently reports drift on ai_insights.AIModel.model_file: migration
+      # 0001 records help_text "Upload .pkl or .h5 model file" while the model
+      # now says "Upload a .onnx model file". help_text produces no SQL, so this
+      # is state-only drift and carries no data-integrity risk — but the check
+      # would fail on arrival, and a gate that is expected to be red teaches
+      # people to ignore it. Generate the no-op migration, then enable this step
+      # in the same change. Tracked in docs/PROJECT_AUDIT_ROADMAP.md.
+
+      - name: Run test suite
+        run: python manage.py test apps --verbosity 2

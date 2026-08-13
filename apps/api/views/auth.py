@@ -1,17 +1,20 @@
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..serializers import UserSerializer, RegisterSerializer
+from ..throttling import (AUTH_THROTTLES, PasswordResetThrottle, RegisterThrottle,
+                          UploadThrottle)
 
 User = get_user_model()
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes(AUTH_THROTTLES)
 def login(request):
     identifier = request.data.get('email', '').strip()
     password   = request.data.get('password', '')
@@ -46,6 +49,7 @@ def login(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([RegisterThrottle])
 def register(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
@@ -61,6 +65,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([PasswordResetThrottle])
 def forgot_password(request):
     email = request.data.get('email', '').strip().lower()
     if not email:
@@ -108,14 +113,21 @@ def profile_update(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([UploadThrottle])
 def profile_picture_upload(request):
+    from apps.medical_records.services import validate_image_upload
+
     pic = request.FILES.get('profile_picture')
     if not pic:
         return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
-    allowed = ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
-    if pic.content_type not in allowed:
-        return Response({'error': 'Only JPEG, PNG, WebP, or GIF images are accepted.'},
-                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Validated by magic bytes, not by the client-declared Content-Type: that
+    # header is attacker-controlled, and an SVG announced as image/png used to
+    # be stored verbatim and then served from our own origin.
+    ok, message = validate_image_upload(pic)
+    if not ok:
+        return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
     user = request.user
     if user.profile_picture:
         try:
@@ -129,6 +141,7 @@ def profile_picture_upload(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes(AUTH_THROTTLES)
 def change_password(request):
     old_pw = request.data.get('old_password', '')
     new_pw = request.data.get('new_password', '')

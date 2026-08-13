@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 from ..services.utils import _sanitize
+from django.db.models import F
 
 
 def model_list(request):
@@ -124,7 +125,7 @@ def run_prediction(request, slug):
             raise ValueError(result.get('error', 'Prediction failed'))
 
         risk_score     = result.get('risk_score')
-        interpretation = generate_interpretation(model, result, input_data)
+        interpretation = generate_interpretation(model, result, input_data, user=request.user)
 
         prediction = ModelPrediction.objects.create(
             model=model,
@@ -136,7 +137,7 @@ def run_prediction(request, slug):
             interpretation=interpretation,
         )
 
-        AIModel.objects.filter(pk=model.pk).update(run_count=model.run_count + 1)
+        AIModel.objects.filter(pk=model.pk).update(run_count=F('run_count') + 1)
 
         from apps.notifications.models import Notification
         Notification.objects.create(

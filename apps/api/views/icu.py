@@ -1,9 +1,11 @@
 import io
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from ..throttling import PredictionThrottle
 
 
 @api_view(['GET'])
@@ -55,11 +57,16 @@ def icu_dashboard_api(request):
         {'delta': 'T+6.0h',  'source': 'LAB',   'label': 'Platelet Count', 'value': '148 K/uL'},
     ]
     return Response({
+        # Synthetic demo patient — identifiers deliberately prefixed DEMO- and
+        # outside any real dataset's range. The values used here previously
+        # matched MIMIC-IV's identifier ranges and date-shifting; they are not
+        # repeated in this comment. Kept in sync with
+        # apps/ai_insights/views/icu.py.
         'patient': {
-            'subject_id': 10016742, 'stay_id': 37057036,
+            'subject_id': 'DEMO-900001', 'stay_id': 'DEMO-900002',
             'age': 67, 'gender': 'Male',
             'unit': 'Medical ICU (MICU)',
-            'intime': '2178-07-03 22:45', 'los_days': 3.25,
+            'intime': '2026-07-03 22:45', 'los_days': 3.25,
             'admission_type': 'Emergency', 'n_events': 1842,
             'outcome': 'Deceased',
         },
@@ -75,6 +82,7 @@ def icu_dashboard_api(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PredictionThrottle])
 def seizure_realtime_analyze(request):
     """
     Accept a parquet/csv EEG file. Run the local ONNX ensemble across

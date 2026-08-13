@@ -4,6 +4,7 @@ import random as _random
 
 import pandas as _pd
 from django.shortcuts import render
+from apps.accounts.safe_json import script_safe_json
 
 _DATA_BASE  = getattr(__import__('django.conf', fromlist=['settings']).settings, 'ICU_DEMO_DATA_PATH', '')
 _INDEX_PATH = os.path.join(_DATA_BASE, 'index.csv') if _DATA_BASE else ''
@@ -161,10 +162,21 @@ def _icu_mock_context():
     sofa_raw = {'Respiratory': 3, 'Coagulation': 1, 'Liver': 1,
                 'Cardiovascular': 2, 'Neurological': 4, 'Renal': 4}
     sofa_display = [{'name': k, 'score': v, 'color': _icu_sofa_color(v)} for k, v in sofa_raw.items()]
+    # Synthetic demo patient. Identifiers are deliberately prefixed DEMO- and
+    # outside any real dataset's range.
+    #
+    # The values used here previously matched MIMIC-IV's subject_id/stay_id
+    # ranges and its characteristic date-shifting, i.e. credentialed-dataset
+    # content committed to a public repository. They are not repeated here: a
+    # comment quoting them would leave the identifiers in the file it removed
+    # them from. The surrounding vitals were always synthetic
+    # (_random.uniform), so nothing clinical is lost by making the identity
+    # synthetic too.
     patient = {
-        'subject_id': 10016742, 'stay_id': 37057036, 'age': 67, 'gender': 'Male',
+        'subject_id': 'DEMO-900001', 'stay_id': 'DEMO-900002',
+        'age': 67, 'gender': 'Male',
         'unit': 'Medical ICU (MICU)', 'unit_short': 'MICU',
-        'intime': '2178-07-03 22:45', 'los_days': 3.25,
+        'intime': '2026-07-03 22:45', 'los_days': 3.25,
         'admission_type': 'EW EMER.', 'n_events': 1842,
         'hospital_expire_flag': 1, 'discharge_location': 'DIED',
     }
@@ -192,11 +204,11 @@ def _icu_mock_context():
     eeg_labels, eeg_prob = _icu_mock_eeg()
     return {
         'real_data': False, 'patients': [], 'selected_id': None, 'patient': patient,
-        'vitals': {k: json.dumps(v) for k, v in vitals.items()},
-        'labs':   {k: json.dumps(v) for k, v in labs.items()},
+        'vitals': {k: script_safe_json(v) for k, v in vitals.items()},
+        'labs':   {k: script_safe_json(v) for k, v in labs.items()},
         'sofa_scores': sofa_display, 'sofa_total': sum(sofa_raw.values()),
         'lab_snap': lab_snap, 'events': events,
-        'eeg_labels': json.dumps(eeg_labels), 'eeg_prob': json.dumps(eeg_prob),
+        'eeg_labels': script_safe_json(eeg_labels), 'eeg_prob': script_safe_json(eeg_prob),
     }
 
 
@@ -248,10 +260,10 @@ def icu_demo(request):
     ctx = {
         'real_data': True, 'patients': patients, 'selected_id': selected_id,
         'patient': patient,
-        'vitals': {k: json.dumps(v) for k, v in vitals.items()},
-        'labs':   {k: json.dumps(v) for k, v in labs.items()},
+        'vitals': {k: script_safe_json(v) for k, v in vitals.items()},
+        'labs':   {k: script_safe_json(v) for k, v in labs.items()},
         'sofa_scores': sofa_display, 'sofa_total': sofa_total,
         'lab_snap': _icu_lab_snapshot(df), 'events': _icu_events(df),
-        'eeg_labels': json.dumps(eeg_labels), 'eeg_prob': json.dumps(eeg_prob),
+        'eeg_labels': script_safe_json(eeg_labels), 'eeg_prob': script_safe_json(eeg_prob),
     }
     return render(request, 'ai_insights/icu/demo.html', ctx)

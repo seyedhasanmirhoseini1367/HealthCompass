@@ -3,7 +3,10 @@ builder = "NIXPACKS"
 
 [deploy]
 startCommand = "bash startup.sh"
-healthcheckPath = "/health/"
+# /health/ is liveness only — it returns 200 as long as the process is up, so a
+# container with a dead database or cache was reported healthy and kept serving.
+# /health/ready/ checks those dependencies and returns 503 when they are down.
+healthcheckPath = "/health/ready/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3

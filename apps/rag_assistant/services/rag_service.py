@@ -69,7 +69,16 @@ class RAGService:
         full response tuple — same shape callers expect.
         """
         import json
+        from apps.accounts.consent import ConsentRequired, enforce_for_ai
         from apps.rag_assistant.graph.graph import stream_graph
+
+        # Consent gate before anything reaches an external provider. Placed here
+        # rather than at each view because ask() and stream_ask() are the only
+        # two doors into the pipeline, for both the web UI and the mobile API.
+        try:
+            enforce_for_ai(patient)
+        except ConsentRequired as exc:
+            return exc.message, [], 'consent_required', 0, False, ['consent_required']
 
         tokens:          List[str]  = []
         sources:         List[Dict] = []
@@ -122,7 +131,20 @@ class RAGService:
             data: {"type": "done"}
             data: {"type": "error",   "message": "..."}
         """
+        import json
+        from apps.accounts.consent import ConsentRequired, enforce_for_ai
         from apps.rag_assistant.graph.graph import stream_graph
+
+        try:
+            enforce_for_ai(patient)
+        except ConsentRequired as exc:
+            # Emitted as ordinary stream events so existing clients render the
+            # message in the chat transcript instead of failing the connection.
+            yield f'data: {json.dumps({"type": "token", "content": exc.message})}\n\n'
+            yield f'data: {json.dumps({"type": "meta", "provider": "consent_required", "chunks": 0, "safety_routed": False, "triggered_rules": ["consent_required"], "mode": "consent_required", "consent_purpose": exc.purpose})}\n\n'
+            yield f'data: {json.dumps({"type": "done"})}\n\n'
+            return
+
         yield from stream_graph(
             query         = query,
             patient       = patient,
@@ -136,10 +158,28 @@ class RAGService:
         from apps.rag_assistant.models import MedicalChunk, MedicalDocument
         from apps.medical_records.models import MedicalRecord
 
+        from apps.rag_assistant.services.embedding_service import audit_embeddings
+
         total_records   = MedicalRecord.objects.filter(patient=patient).count()
         total_docs      = MedicalDocument.objects.filter(patient=patient).count()
         total_chunks    = MedicalChunk.objects.filter(patient=patient).count()
         embedded_chunks = MedicalChunk.objects.filter(patient=patient, embedding__isnull=False).count()
+
+        # Why coverage is short, not just that it is. A chunk with no vector is
+        # excluded from retrieval, so without this an operator could see 60%
+        # coverage and have no way to tell a failed embedding (retryable, and
+        # the record is invisible to the assistant meanwhile) from a patient who
+        # declined external processing (working as intended).
+        Status = MedicalChunk.EmbeddingStatus
+        unembedded = MedicalChunk.objects.filter(patient=patient, embedding__isnull=True)
+        pending_chunks = unembedded.filter(embedding_status=Status.PENDING).count()
+        failed_chunks  = unembedded.filter(embedding_status=Status.FAILED).count()
+        blocked_chunks = unembedded.filter(embedding_status=Status.BLOCKED).count()
+
+        # Embedded-but-incompatible chunks count toward coverage yet contribute
+        # nothing to retrieval, so report them separately rather than letting a
+        # healthy-looking coverage_pct hide a stale index.
+        provenance = audit_embeddings(MedicalChunk, MedicalChunk.objects.filter(patient=patient))
 
         return {
             'medical_records':  total_records,
@@ -147,6 +187,12 @@ class RAGService:
             'total_chunks':     total_chunks,
             'embedded_chunks':  embedded_chunks,
             'coverage_pct':     round(embedded_chunks / max(total_chunks, 1) * 100, 1),
+            'pending_chunks':   pending_chunks,
+            'failed_chunks':    failed_chunks,
+            'blocked_chunks':   blocked_chunks,
+            'usable_chunks':    provenance['compatible'],
+            'stale_chunks':     provenance['stale'],
+            'embedding_model':  provenance['active_model'],
         }
 
     # ── Cold-start helper ──────────────────────────────────────────────────────

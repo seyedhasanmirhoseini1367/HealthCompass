@@ -2,11 +2,13 @@ import logging
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..serializers import ModelPredictionSerializer, AIModelListSerializer
+from ..throttling import PredictionThrottle
+from django.db.models import F
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +25,10 @@ def my_predictions(request):
 @permission_classes([IsAuthenticated])
 def prediction_detail_api(request, pk):
     from apps.ai_insights.models import ModelPrediction
+    from django.core.exceptions import ValidationError
     try:
         pred = ModelPrediction.objects.get(pk=pk, patient=request.user)
-    except ModelPrediction.DoesNotExist:
+    except (ModelPrediction.DoesNotExist, ValidationError, ValueError):
         return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
     return Response(ModelPredictionSerializer(pred).data)
 
@@ -54,6 +57,7 @@ def ai_model_detail(request, slug):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PredictionThrottle])
 def run_model_prediction(request, slug):
     from apps.ai_insights.models import AIModel, ModelPrediction
     from apps.ai_insights.services.utils import _sanitize
@@ -73,14 +77,14 @@ def run_model_prediction(request, slug):
         result = _sanitize(run_model(model, input_data, None))
         if not result.get('success'):
             raise ValueError(result.get('error', 'Prediction failed'))
-        interpretation = generate_interpretation(model, result, input_data)
+        interpretation = generate_interpretation(model, result, input_data, user=request.user)
         pred = ModelPrediction.objects.create(
             model=model, patient=request.user,
             input_data=input_data, result=result,
             risk_score=result.get('risk_score'),
             interpretation=interpretation,
         )
-        AIModel.objects.filter(pk=model.pk).update(run_count=model.run_count + 1)
+        AIModel.objects.filter(pk=model.pk).update(run_count=F('run_count') + 1)
         return Response(ModelPredictionSerializer(pred).data, status=status.HTTP_201_CREATED)
     except Exception as exc:
         return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -88,20 +92,36 @@ def run_model_prediction(request, slug):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([PredictionThrottle])
 def seizure_analysis(request):
     """Proxy EEG parquet/CSV file to hasanai.net seizure comparison API."""
     import requests as http_requests
     from apps.ai_insights.models import AIModel, ModelPrediction
 
+    from apps.accounts.consent import ConsentRequired
+    from apps.accounts.egress import ExternalProcessingGuard
+
     uploaded_file = request.FILES.get('signal_file')
     if not uploaded_file:
         return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Checked before the file is read, so the EEG bytes never leave the process
+    # without consent. hasanai.net is a third party outside this system.
+    try:
+        ExternalProcessingGuard.check(request.user, 'insights.seizure_proxy')
+    except ConsentRequired as exc:
+        return Response({'error': exc.message, 'consent_required': exc.purpose},
+                        status=status.HTTP_403_FORBIDDEN)
 
     try:
         resp = http_requests.post(
             'https://hasanai.net/seizure-comparison/predict/',
             files={'signal_file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)},
             timeout=120,
+            # The destination is a literal, so there is no SSRF sink here —
+            # but a hijacked or compromised host could 302 this upload at an
+            # internal address. Refuse to follow it.
+            allow_redirects=False,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -142,7 +162,7 @@ def seizure_analysis(request):
             result=data,
             risk_score=risk_score,
         )
-        AIModel.objects.filter(pk=ai_model.pk).update(run_count=ai_model.run_count + 1)
+        AIModel.objects.filter(pk=ai_model.pk).update(run_count=F('run_count') + 1)
         data['prediction_id'] = str(pred.pk)
     except Exception as save_err:
         logger.warning('Could not save seizure prediction: %s', save_err)

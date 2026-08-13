@@ -32,6 +32,25 @@ class LoginForm(AuthenticationForm):
 
 
 class ProfileForm(forms.ModelForm):
+
+    def clean_profile_picture(self):
+        """
+        Validate by magic bytes, not by the browser-declared content type.
+
+        Django's ImageField validation only runs through a form, and even then
+        Pillow accepts formats we do not want to serve back — notably SVG-like
+        payloads slipped past a permissive check. Reuse the same allowlist the
+        API uses so both surfaces agree.
+        """
+        pic = self.cleaned_data.get('profile_picture')
+        if not pic or not hasattr(pic, 'read'):
+            return pic
+        from apps.medical_records.services import validate_image_upload
+        ok, message = validate_image_upload(pic)
+        if not ok:
+            raise forms.ValidationError(message)
+        return pic
+
     class Meta:
         model   = CustomUser
         fields  = ["first_name", "last_name", "email", "phone_number", "date_of_birth", "profile_picture"]

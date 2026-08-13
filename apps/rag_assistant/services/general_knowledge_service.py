@@ -13,10 +13,12 @@ Classification is keyword-based (no LLM call) so it adds <5ms latency.
 """
 import logging
 import re
+from collections import Counter
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -80,14 +82,23 @@ class GeneralKnowledgeService:
         Return up to top_k dicts: {'text', 'score', 'metadata', 'source_url'}.
         """
         from apps.rag_assistant.models import GeneralKnowledgeChunk
-        from apps.rag_assistant.services.embedding_service import EmbeddingService
+        from apps.rag_assistant.services.embedding_service import (
+            COMPAT_OK, EmbeddingService, _log_incompatible,
+            active_embedding_dim, active_embedding_model,
+            classify_embedding, strict_provenance,
+        )
 
         chunks = GeneralKnowledgeChunk.objects.exclude(embedding=None)
         if not chunks.exists():
             logger.warning('GeneralKnowledgeService: no indexed chunks in DB')
             return []
 
+        active_model = active_embedding_model()
+        active_dim   = active_embedding_dim()
+        strict       = strict_provenance()
+
         texts, vectors, meta = [], [], []
+        skipped = Counter()
         for c in chunks:
             try:
                 raw = bytes(c.embedding)
@@ -96,6 +107,22 @@ class GeneralKnowledgeService:
                     vec = pickle.loads(raw)
                 else:
                     vec = np.frombuffer(raw, dtype=np.float32)
+
+                # Without this, vectors of differing length reach np.array()
+                # below and produce a ragged/object array — a hard failure or,
+                # worse, a silently meaningless similarity matrix.
+                status = classify_embedding(
+                    stored_model = getattr(c, 'embedding_model', ''),
+                    stored_dim   = getattr(c, 'embedding_dimensions', None),
+                    actual_dim   = len(vec),
+                    active_model = active_model,
+                    active_dim   = active_dim,
+                    strict       = strict,
+                )
+                if status != COMPAT_OK:
+                    skipped[status] += 1
+                    continue
+
                 texts.append(c.content)
                 vectors.append(vec)
                 meta.append({
@@ -108,6 +135,8 @@ class GeneralKnowledgeService:
                 })
             except Exception:
                 continue
+
+        _log_incompatible('GeneralKnowledgeService.retrieve', skipped)
 
         if not texts:
             return []
@@ -194,7 +223,9 @@ class GeneralKnowledgeService:
         Returns number of chunks created.
         """
         from apps.rag_assistant.models import GeneralKnowledgeChunk
-        from apps.rag_assistant.services.embedding_service import EmbeddingService
+        from apps.rag_assistant.services.embedding_service import (
+            EmbeddingService, active_embedding_model,
+        )
 
         emb     = EmbeddingService()
         created = 0
@@ -218,6 +249,10 @@ class GeneralKnowledgeService:
                         'topic':       topic,
                         'content':     chunk_text,
                         'embedding':   vec.astype(np.float32).tobytes(),
+                        'embedding_model':         active_embedding_model(),
+                        'embedding_model_version': settings.RAG_CONFIG.get('EMBEDDING_MODEL_VERSION', ''),
+                        'embedding_dimensions':    int(len(vec)),
+                        'embedded_at':             timezone.now(),
                     },
                 )
                 created += 1

@@ -1,48 +1,82 @@
-# NOTE: versions are unpinned for flexibility during active development.
-# Before go-live, run: pip install pip-tools && pip-compile requirements.txt
-# This produces requirements.lock with exact hashes for reproducible builds.
-django>=5.2
-pillow
-python-decouple
-google-genai
-groq
-onnxruntime
-defusedxml
-django-storages[s3]
-boto3
-rank-bm25
-openai
-scikit-learn
-pdfplumber
-pandas
-numpy
-anthropic
-pyarrow
-joblib
-scipy
+# Direct dependencies, pinned to the versions verified by the test suite.
+#
+# Every version below is the one installed in the environment where the full
+# suite passes (653 tests, keyless, SQLite — see docs/PROJECT_AUDIT_ROADMAP.md
+# P0-4). They were NOT resolved fresh: resolving would pick newer releases than
+# the tested set and change working behaviour, which is the opposite of what
+# pinning is for. To move a version, change it here deliberately and re-run the
+# suite.
+#
+# Why pinned here rather than in a constraints file: Railway builds with
+# Nixpacks, which auto-detects this file and runs `pip install -r
+# requirements.txt` at build time. A PIP_CONSTRAINT environment variable would
+# fail *open* if it were ever unset — the build would succeed while installing
+# unpinned versions, which is worse than no pinning because it looks solved.
+#
+# KNOWN LIMITATION — transitive dependencies are not locked. A full lock must be
+# generated on the deploy platform (Linux/CPython 3.11); a `pip freeze` taken on
+# a Windows development machine can omit platform-conditional packages and would
+# be a false guarantee. Tracked as a follow-up in the roadmap.
+
+django==5.2.12
+pillow==12.2.0
+python-decouple==3.8
+google-genai==1.72.0
+groq==1.2.0
+onnxruntime==1.28.0
+
+# SECURITY-CRITICAL — do not remove.
+# Hardens the Kanta XML upload path against entity-expansion attacks.
+# apps/medical_records/parsers.py raises ImportError at import time when this is
+# missing, rather than falling back to the stdlib parser. That fallback used to
+# be silent, and this package was absent from the environment where the whole
+# suite passed — so a green test run was compatible with the protection being
+# switched off. See apps/medical_records/test_xml_hardening.py.
+defusedxml==0.7.1
+
+django-storages[s3]==1.14.6
+boto3==1.43.70
+rank-bm25==0.2.2
+openai==2.54.0
+scikit-learn==1.8.0
+pdfplumber==0.11.9
+pandas==3.0.2
+numpy==2.4.4
+anthropic==0.88.0
+pyarrow==23.0.1
+joblib==1.5.3
+scipy==1.17.1
 langgraph==0.2.28
-# Google OAuth — allow any 65.x but not 66+ which may have breaking changes
-django-allauth>=65.0.0,<66.0.0
-PyJWT
-requests
+
+# Google OAuth. Was `>=65.0.0,<66.0.0`; 66+ may have breaking changes, and
+# allauth 65.x has a known interaction documented in the project memory
+# (never combine a settings APP key with a DB SocialApp).
+django-allauth==65.16.1
+
+PyJWT==2.12.1
+requests==2.33.1
+
 # Mobile API
-djangorestframework
-djangorestframework-simplejwt
-django-cors-headers
-firebase-admin
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+firebase-admin==7.5.0
+
 # Security: field-level encryption + rate limiting
-# cryptography package provides Fernet (AES-128-CBC + HMAC-SHA256) for
+# cryptography provides Fernet (AES-128-CBC + HMAC-SHA256) for
 # EncryptedCharField in apps/accounts/fields.py.
 # It is already a transitive dependency of several packages (google-genai,
 # anthropic, etc.) — listed here explicitly to guarantee it is present.
-cryptography
-django-ratelimit
+cryptography==46.0.6
+django-ratelimit==4.1.0
+
 # Cache backend for django-ratelimit (multi-worker safe) and population insights.
 # Django 4.0+ built-in Redis backend uses this package directly.
 # Set CACHE_URL=redis://... in env to activate; falls back to locmem in dev.
-redis
+redis==8.1.0
+
 # Production server & database
-gunicorn
-psycopg2-binary
-whitenoise
-dj-database-url
+gunicorn==26.0.0
+psycopg2-binary==2.9.12
+whitenoise==6.12.0
+dj-database-url==3.1.2
