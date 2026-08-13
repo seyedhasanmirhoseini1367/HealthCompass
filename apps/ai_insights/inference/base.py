@@ -265,15 +265,77 @@ class InferenceHandler:
             )
 
     def _build_tabular_df(self, input_data: dict) -> pd.DataFrame:
-        """Convert form POST data to a one-row DataFrame in schema order."""
+        """
+        Convert form POST data to a one-row DataFrame in schema order.
+
+        Refuses rather than substitutes. This previously did:
+
+            val = input_data.get(key, 0)          # missing feature  -> 0
+            try:    row[key] = float(...)
+            except: row[key] = 0.0                # '' or 'N/A'      -> 0.0
+
+        and fed the result straight into the ONNX session. Because the view
+        builds input_data with request.POST.get(key, ''), an entirely empty form
+        produced an all-zeros feature vector and a confident prediction. Zero is
+        physiologically impossible for glucose, BMI, blood pressure and age, but
+        it is a *valid-looking* number, so nothing downstream objected — and a
+        fabricated score could cross the 0.75 threshold that raises a HealthAlert.
+
+        A missing required feature is not a zero. Every key in input_schema is
+        treated as required: if the model author declared it, the model expects
+        it.
+
+        Declared bounds are enforced too, where the schema carries min/max. That
+        is the model author's own declaration being honoured, not a clinical
+        judgement invented here.
+        """
         schema = self.ai_model.input_schema or {}
-        row = {}
-        for key in (schema.keys() if schema else input_data.keys()):
-            val = input_data.get(key, 0)
+        keys   = list(schema.keys()) if schema else list(input_data.keys())
+
+        row, missing, invalid, out_of_range = {}, [], [], []
+
+        for key in keys:
+            raw = input_data.get(key, None)
+
+            if raw is None or str(raw).strip() == '':
+                missing.append(key)
+                continue
+
             try:
-                row[key] = float(str(val).replace(',', '.'))
+                value = float(str(raw).strip().replace(',', '.'))
             except (TypeError, ValueError):
-                row[key] = 0.0
+                invalid.append(f'{key}={raw!r}')
+                continue
+
+            if value != value or value in (float('inf'), float('-inf')):
+                invalid.append(f'{key}={raw!r}')
+                continue
+
+            spec = schema.get(key)
+            if isinstance(spec, dict):
+                low, high = spec.get('min'), spec.get('max')
+                if (low is not None and value < float(low)) or \
+                   (high is not None and value > float(high)):
+                    out_of_range.append(f'{key}={value:g} (expected {low}–{high})')
+                    continue
+
+            row[key] = value
+
+        problems = []
+        if missing:
+            problems.append(f'missing: {", ".join(sorted(missing))}')
+        if invalid:
+            problems.append(f'not a number: {", ".join(sorted(invalid))}')
+        if out_of_range:
+            problems.append(f'outside the declared range: {", ".join(sorted(out_of_range))}')
+
+        if problems:
+            raise InferenceError(
+                'Cannot run this model — ' + '; '.join(problems) + '. '
+                'Every field the model declares is required, and a missing value '
+                'is not treated as zero.'
+            )
+
         return pd.DataFrame([row])
 
     # ── Shared parsing utilities ──────────────────────────────────────────────

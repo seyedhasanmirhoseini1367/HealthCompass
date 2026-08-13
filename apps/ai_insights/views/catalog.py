@@ -148,7 +148,14 @@ def run_prediction(request, slug):
             link=f'/insights/prediction/{prediction.pk}/',
         )
 
-        if risk_score and risk_score >= 0.75:
+        # A demo result must never raise a clinical alert.
+        #
+        # _rule_based_demo_result() computes an invented weighted sum for models
+        # with no uploaded model file. That score can exceed 0.75, which used to
+        # create a real HealthAlert titled "High risk detected" and a push
+        # notification — a fabricated number presented to the patient as a
+        # clinical finding. Alerts are for model output, not for placeholders.
+        if risk_score and risk_score >= 0.75 and not result.get('demo'):
             from ..models import HealthAlert
             HealthAlert.objects.create(
                 patient=request.user,

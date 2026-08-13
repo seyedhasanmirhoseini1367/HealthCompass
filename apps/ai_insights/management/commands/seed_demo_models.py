@@ -17,7 +17,7 @@ DEMO_MODELS = [
 
     # ── Tabular ───────────────────────────────────────────────────────────────
     {
-        'name':        'Diabetes Risk Predictor',
+        'name':        '[DEMO] Diabetes Risk Predictor',
         'slug':        'diabetes-risk-predictor',
         'category':    'diabetes',
         'input_type':  'tabular',
@@ -46,14 +46,16 @@ DEMO_MODELS = [
         ),
     },
     {
-        'name':        'Cardiovascular Risk Score (SCORE2)',
+        'name':        '[DEMO] Cardiovascular Risk Estimator',
         'slug':        'cardiovascular-risk-score',
         'category':    'cardiovascular',
         'input_type':  'tabular',
         'description': (
-            'Estimates 10-year risk of fatal or non-fatal cardiovascular events. '
-            'Based on the ESC SCORE2 framework using age, sex, systolic blood '
-            'pressure, total cholesterol, HDL, and smoking status.'
+            'DEMONSTRATION ONLY — no trained model is attached, so this returns a '
+            'rule-based placeholder score, not a validated cardiovascular risk '
+            'estimate. It does NOT implement SCORE2 or any published instrument. '
+            'Collects age, systolic blood pressure, cholesterol and smoking status '
+            'to demonstrate the input form and result flow.'
         ),
         'input_schema': {
             'age':          {'label': 'Age',                          'type': 'int',   'min': 18, 'max': 100},
@@ -67,15 +69,16 @@ DEMO_MODELS = [
             'labels': {'0': 'Low risk (<5%)', '1': 'Moderate risk (5–10%)', '2': 'High risk (>10%)'},
         },
         'interpretation_guide': (
-            'SCORE2 estimates 10-year cardiovascular risk. '
-            'Low risk means lifestyle changes alone are usually sufficient. '
-            'Moderate risk may warrant statin therapy discussion. '
-            'High risk requires immediate clinical evaluation and likely medication. '
-            'Always verify with a cardiologist before any treatment decision.'
+            'DEMONSTRATION MODEL — no trained model file is attached, so the score '
+            'is produced by a rule-based placeholder and has no clinical meaning. '
+            'Do not describe the output as a cardiovascular risk estimate, do not '
+            'compare it to any published instrument, and do not suggest treatment '
+            'of any kind. State plainly that this is a demonstration of the input '
+            'and result flow, and that any health concern belongs with a doctor.'
         ),
     },
     {
-        'name':        'Chronic Kidney Disease Stage Classifier',
+        'name':        '[DEMO] Chronic Kidney Disease Stage Classifier',
         'slug':        'ckd-stage-classifier',
         'category':    'general',
         'input_type':  'tabular',
@@ -111,7 +114,7 @@ DEMO_MODELS = [
 
     # ── Medical Image ─────────────────────────────────────────────────────────
     {
-        'name':        'Chest X-Ray Pathology Detector',
+        'name':        '[DEMO] Chest X-Ray Pathology Detector',
         'slug':        'chest-xray-pathology-detector',
         'category':    'general',
         'input_type':  'image',
@@ -138,7 +141,7 @@ DEMO_MODELS = [
         ),
     },
     {
-        'name':        'Diabetic Retinopathy Grader',
+        'name':        '[DEMO] Diabetic Retinopathy Grader',
         'slug':        'diabetic-retinopathy-grader',
         'category':    'diabetes',
         'input_type':  'image',
@@ -165,7 +168,7 @@ DEMO_MODELS = [
         ),
     },
     {
-        'name':        'Brain MRI Tumour Segmentation',
+        'name':        '[DEMO] Brain MRI Tumour Segmentation',
         'slug':        'brain-mri-tumour-segmentation',
         'category':    'neurology',
         'input_type':  'image',
@@ -187,7 +190,7 @@ DEMO_MODELS = [
 
     # ── Signals / EEG / ECG ───────────────────────────────────────────────────
     {
-        'name':        'EEG Seizure Detector',
+        'name':        '[DEMO] EEG Seizure Detector',
         'slug':        'eeg-seizure-detector',
         'category':    'neurology',
         'input_type':  'eeg_csv',
@@ -210,7 +213,7 @@ DEMO_MODELS = [
         'handler_slug': 'eeg_csv',
     },
     {
-        'name':        'ECG Arrhythmia Classifier',
+        'name':        '[DEMO] ECG Arrhythmia Classifier',
         'slug':        'ecg-arrhythmia-classifier',
         'category':    'cardiovascular',
         'input_type':  'eeg_csv',
@@ -238,7 +241,7 @@ DEMO_MODELS = [
         ),
     },
     {
-        'name':        'PPG-Based Stress Level Estimator',
+        'name':        '[DEMO] PPG-Based Stress Level Estimator',
         'slug':        'ppg-stress-estimator',
         'category':    'wearable',
         'input_type':  'eeg_csv',
@@ -263,7 +266,7 @@ DEMO_MODELS = [
 
     # ── Wearable / Tabular file ───────────────────────────────────────────────
     {
-        'name':        'Sleep Quality Analyser',
+        'name':        '[DEMO] Sleep Quality Analyser',
         'slug':        'sleep-quality-analyser',
         'category':    'wearable',
         'input_type':  'parquet',
@@ -290,7 +293,7 @@ DEMO_MODELS = [
         ),
     },
     {
-        'name':        'Wearable Activity & Recovery Score',
+        'name':        '[DEMO] Wearable Activity & Recovery Score',
         'slug':        'wearable-activity-recovery',
         'category':    'wearable',
         'input_type':  'parquet',
@@ -318,7 +321,7 @@ DEMO_MODELS = [
 
     # ── Oncology ──────────────────────────────────────────────────────────────
     {
-        'name':        'Breast Cancer Risk Stratifier',
+        'name':        '[DEMO] Breast Cancer Risk Stratifier',
         'slug':        'breast-cancer-risk-stratifier',
         'category':    'oncology',
         'input_type':  'tabular',

@@ -118,12 +118,38 @@ Do NOT use markdown. Write in plain paragraphs."""
     return _static_interpretation(result)
 
 
+#: Prefixed to every interpretation of a rule-based result.
+#
+# The LLM prompt already carries a demo note, but this deterministic path is the
+# one used whenever external processing is not permitted or the provider fails —
+# and it said nothing. A patient who declined external processing was told
+# "This score suggests elevated risk. We recommend speaking with your doctor
+# soon" about a number produced by an invented weighted sum.
+_DEMO_PREFIX = (
+    'DEMONSTRATION RESULT — this model has no trained model file, so the score '
+    'below comes from a simple rule-based placeholder, not from a validated '
+    'medical model. It is not a risk assessment and must not be used to make '
+    'any health decision. '
+)
+
+
 def _static_interpretation(result: dict) -> str:
     risk  = result.get('risk_score')
     label = result.get('label', '')
+    prefix = _DEMO_PREFIX if result.get('demo') else ''
+
     if risk is None:
-        return (f'Prediction complete: {label}. '
-                'Please consult your doctor to understand what this means for your health.')
+        return prefix + (
+            f'Prediction complete: {label}. '
+            'Please consult your doctor to understand what this means for your health.')
+    if prefix:
+        # Deliberately no risk-band language for a fabricated score: describing
+        # an invented number as "elevated risk" is the misrepresentation this
+        # prefix exists to prevent.
+        return prefix + (
+            f'The placeholder produced: {label}. '
+            'Ask your doctor about any health concern — this output carries no '
+            'clinical meaning.')
     if risk >= 0.75:
         return (
             f'Your result shows {label}. This score suggests elevated risk. '
