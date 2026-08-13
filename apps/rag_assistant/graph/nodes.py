@@ -314,10 +314,18 @@ def trajectory_node(state: HealthState) -> Dict[str, Any]:
         return {
             'trajectory_context': context,
             'context_chunks':     source_chunks,
+            'retrieval_failed':   False,
         }
     except Exception as exc:
+        # Same distinction as _retrieve: a trend we could not compute is not a
+        # trend that does not exist.
         logger.exception('trajectory_node failed: %s', exc)
-        return {'trajectory_context': '', 'context_chunks': []}
+        from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+        ops_emit(OpsEvent.RETRIEVAL_FAILED,
+                 patient_id=state.get('patient_id'),
+                 error_type=type(exc).__name__)
+        return {'trajectory_context': '', 'context_chunks': [],
+                'retrieval_failed': True}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -346,10 +354,24 @@ def _retrieve(
             top_k         = top_k,
             query_intent  = query_intent,
         )
-        return {'context_chunks': chunks, 'trajectory_context': ''}
+        return {'context_chunks': chunks, 'trajectory_context': '',
+                'retrieval_failed': False}
     except Exception as exc:
+        # An empty result and a failed search are not the same answer.
+        #
+        # This branch used to return an empty chunk list, which is exactly what
+        # a patient with no matching records also produces. Generation then ran
+        # with no context and told the patient "there are no recent lab results
+        # available" — a claim about their health, caused by a provider outage.
+        # The flag travels with the state so the caller can say what actually
+        # happened instead of inventing a clinical answer.
         logger.exception('Retrieval failed: %s', exc)
-        return {'context_chunks': [], 'trajectory_context': ''}
+        from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+        ops_emit(OpsEvent.RETRIEVAL_FAILED,
+                 patient_id=state.get('patient_id'),
+                 error_type=type(exc).__name__)
+        return {'context_chunks': [], 'trajectory_context': '',
+                'retrieval_failed': True}
 
 
 def lab_results_node(state: HealthState) -> Dict[str, Any]:

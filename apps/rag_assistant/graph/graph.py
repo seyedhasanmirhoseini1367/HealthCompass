@@ -58,6 +58,17 @@ from .nodes import (
 
 logger = logging.getLogger(__name__)
 
+#: Shown when the records could not be searched. It says what happened, does not
+#: pretend to know anything about the patient's records, and does not blame them
+#: for a fault on our side. Deliberately not phrased as a clinical statement.
+RETRIEVAL_UNAVAILABLE_MESSAGE = (
+    "I couldn't search your medical records just now — this is a temporary "
+    "problem on our side, not a result about your health. Please try again in "
+    "a few minutes.\n\nYour records are unaffected, and you can still view them "
+    "directly under **My Records**. If this keeps happening, please contact "
+    "support."
+)
+
 # Retrieval / context-building nodes reachable from router_node
 ROUTE_TO_NODE = {
     'cold_start':  'cold_start_node',
@@ -178,6 +189,7 @@ def stream_graph(
             'context_chunks':     [],
             'session_id':         session_id,
             'history':            history or [],
+            'retrieval_failed':   False,
             'llm_provider':       '',
             'trajectory_context': '',
             'rewritten_query':    '',
@@ -199,6 +211,29 @@ def stream_graph(
             yield f'data: {json.dumps({"type": "token", "content": answer})}\n\n'
             yield 'data: {"type": "sources", "sources": []}\n\n'
             yield f'data: {json.dumps({"type": "meta", "provider": "safety_gate", "chunks": 0, "mode": "emergency", "safety_routed": True, "triggered_rules": []})}\n\n'
+            yield 'data: {"type": "done"}\n\n'
+            return
+
+        # ── Retrieval could not run ───────────────────────────────────────────
+        #
+        # Distinct from retrieval returning nothing. When the search itself
+        # failed — an embedding-provider outage, a quota exhaustion, a bug — we
+        # do not know what is in this patient's records, so we must not let
+        # generation proceed with an empty context and answer as though we did.
+        # It previously said "there are no recent lab results available", which
+        # is a statement about the patient's health caused by an infrastructure
+        # failure, and indistinguishable to them from the truth.
+        #
+        # This refuses for every mode, including general-knowledge questions
+        # that would not have used the records anyway. Answering some questions
+        # during an outage and not others would make the failure look like a
+        # property of the question; a plain "try again shortly" is worse service
+        # for a few seconds and never misleading.
+        if rstate.get('retrieval_failed'):
+            logger.error('stream_graph: retrieval unavailable for patient %s', patient.pk)
+            yield f'data: {json.dumps({"type": "token", "content": RETRIEVAL_UNAVAILABLE_MESSAGE})}\n\n'
+            yield 'data: {"type": "sources", "sources": []}\n\n'
+            yield f'data: {json.dumps({"type": "meta", "provider": "unavailable", "chunks": 0, "mode": "retrieval_unavailable", "safety_routed": False, "triggered_rules": ["retrieval_unavailable"]})}\n\n'
             yield 'data: {"type": "done"}\n\n'
             return
 

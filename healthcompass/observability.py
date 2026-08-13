@@ -72,6 +72,9 @@ class Event:
     ACCESS_LOG_FAILED = 'ACCESS_LOG_FAILED'
     #: One inference took long enough to be worth looking at.
     INFERENCE_SLOW = 'INFERENCE_SLOW'
+    #: Retrieval raised. The patient's records could not be searched at all —
+    #: distinct from searching them and finding nothing.
+    RETRIEVAL_FAILED = 'RETRIEVAL_FAILED'
 
 
 #: Events that mean a patient may be seeing incomplete or missing medical
@@ -83,6 +86,7 @@ PATIENT_IMPACTING = frozenset({
     Event.INGESTION_PARSE_FAILED,
     Event.ALERT_CREATION_FAILED,
     Event.RETRIEVAL_MISSING_EMBEDDINGS,
+    Event.RETRIEVAL_FAILED,
     Event.ERASURE_INCOMPLETE,
     Event.ACCESS_LOG_FAILED,
 })

@@ -15,6 +15,16 @@ class HealthState(TypedDict):
     # Retrieval
     context_chunks: List[Dict[str, Any]]
 
+    # True when retrieval RAISED — the records could not be searched at all.
+    #
+    # An empty context_chunks list has two completely different meanings: "we
+    # searched and this patient has nothing relevant" and "we could not search".
+    # They were indistinguishable, so an embedding-provider outage reached the
+    # patient as "there are no recent lab results available" — a statement about
+    # their health, made because of an infrastructure failure. This flag is what
+    # keeps the second case from being reported as the first.
+    retrieval_failed: bool
+
     # Session / history
     session_id:     Optional[str]
     history:        List[Dict[str, str]]
