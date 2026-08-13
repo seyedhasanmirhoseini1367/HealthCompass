@@ -1,6 +1,14 @@
 """
 One-time script: convert the three .pth seizure models to .onnx with dynamic time_steps.
 Run with the local venv: .venv\Scripts\python convert_to_onnx.py
+
+NOTE: its inputs are no longer in the repo. apps/ai_insights/model_weights/*.pth
+were removed once the exported .onnx files became the only thing the serving
+path loads (seizure_inference.py is ONNX-only). This script was the sole
+remaining reader of them, so it cannot run as-is. The weights are recoverable
+from git history if the models ever need re-exporting:
+
+    git show 5adb2b2:apps/ai_insights/model_weights/cnn_transformer.pth > cnn_transformer.pth
 """
 import sys
 import os

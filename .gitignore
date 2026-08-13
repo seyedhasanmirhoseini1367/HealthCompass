@@ -50,8 +50,9 @@ Thumbs.db
 *.pt
 *.pth
 *.onnx
-# Exception: EEG seizure models are small enough to ship in repo
-!apps/ai_insights/model_weights/*.pth
+# Exception: the EEG seizure models are small enough to ship in the repo.
+# ONNX only — the .pth weights they were exported from are no longer tracked;
+# nothing in the serving path loads them (seizure_inference.py is ONNX-only).
 !apps/ai_insights/model_weights/*.onnx
 
 # Analysis docs generated locally

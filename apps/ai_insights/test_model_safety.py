@@ -190,6 +190,19 @@ class NoSeededModelTests(TestCase):
     (audit finding API-3).
     """
 
+    def test_a_fresh_database_holds_no_demo_models(self):
+        """
+        The property the whole change exists for. A fresh test database runs
+        migrations and nothing else, so a [DEMO] row here means something seeds
+        them — a data migration, an AppConfig.ready(), a fixture — and the
+        catalog would fill up again on its own.
+        """
+        from apps.ai_insights.models import AIModel
+
+        demo = list(AIModel.objects.filter(name__startswith='[DEMO]')
+                    .values_list('slug', flat=True))
+        self.assertEqual(demo, [], f'demo models are being seeded from somewhere: {demo}')
+
     def test_the_seeder_is_gone(self):
         import pathlib
         self.assertFalse(
@@ -232,7 +245,17 @@ class NoSeededModelTests(TestCase):
 
 
 class RemoveDemoModelsCommandTests(TestCase):
-    """The one-off cleanup for databases earlier deploys already seeded."""
+    """
+    The one-off cleanup for databases earlier deploys already seeded.
+
+    Two things it must get right beyond deleting rows:
+
+      * `ModelPrediction.model` is CASCADE and Django does not touch storage on
+        cascade, so every `input_file` becomes an unreachable blob unless the
+        paths are collected before the delete.
+      * Matching is by slug, and a slug is not proof of identity. A real
+        submitted model holding one of these slugs must abort the run.
+    """
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -245,80 +268,192 @@ class RemoveDemoModelsCommandTests(TestCase):
             'demo_rm_pat', email='demo_rm_pat@test.invalid', password='pw',
             role='patient')
 
-    def _demo(self, name='[DEMO] Diabetes Risk Predictor'):
+    def _demo(self, slug='diabetes-risk-predictor',
+              name='[DEMO] Diabetes Risk Predictor'):
         from apps.ai_insights.models import AIModel
         return AIModel.objects.create(
-            data_scientist=self.scientist, name=name, description='d')
+            data_scientist=self.scientist, name=name, slug=slug, description='d')
 
-    def _real(self):
-        from apps.ai_insights.models import AIModel
-        return AIModel.objects.create(
-            data_scientist=self.scientist, name='Retinopathy Grader v2',
-            description='a real uploaded model')
+    def _prediction(self, model, *, with_file=True):
+        from django.core.files.base import ContentFile
 
-    def test_demo_models_are_deleted(self):
+        from apps.ai_insights.models import ModelPrediction
+        prediction = ModelPrediction.objects.create(
+            model=model, patient=self.patient)
+        if with_file:
+            prediction.input_file.save('eeg.csv', ContentFile(b'a,b\n1,2\n'), save=True)
+        return prediction
+
+    # ── dry run is the default ───────────────────────────────────────────────
+
+    def test_the_default_is_a_dry_run(self):
         from django.core.management import call_command
 
         from apps.ai_insights.models import AIModel
         self._demo()
-        self._demo('[DEMO] EEG Seizure Detector')
-
         call_command('remove_demo_models', verbosity=0)
+        self.assertEqual(AIModel.objects.count(), 1)
+
+    def test_the_dry_run_reports_rows_predictions_and_files(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        model = self._demo()
+        self._prediction(model, with_file=True)
+        self._prediction(model, with_file=False)
+
+        out = StringIO()
+        call_command('remove_demo_models', stdout=out)
+        report = out.getvalue()
+
+        self.assertIn('diabetes-risk-predictor', report)
+        self.assertIn('2 prediction(s)', report)
+        self.assertIn('1 with an input file', report)
+
+    def test_the_dry_run_names_slugs_that_are_absent(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command('remove_demo_models', stdout=out)
+        self.assertIn('absent', out.getvalue())
+
+    # ── deleting ─────────────────────────────────────────────────────────────
+
+    def test_confirm_deletes_the_models(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel
+        self._demo()
+        self._demo(slug='eeg-seizure-detector', name='[DEMO] EEG Seizure Detector')
+
+        call_command('remove_demo_models', confirm=True, verbosity=0)
         self.assertEqual(AIModel.objects.count(), 0)
 
-    def test_real_models_are_left_alone(self):
+    def test_a_model_outside_the_slug_list_is_untouched(self):
         from django.core.management import call_command
 
         from apps.ai_insights.models import AIModel
         self._demo()
-        real = self._real()
+        real = AIModel.objects.create(
+            data_scientist=self.scientist, name='Retinopathy Grader v2',
+            slug='retinopathy-grader-v2', description='a real uploaded model')
 
-        call_command('remove_demo_models', verbosity=0)
+        call_command('remove_demo_models', confirm=True, verbosity=0)
         self.assertEqual(list(AIModel.objects.values_list('pk', flat=True)), [real.pk])
 
-    def test_dry_run_changes_nothing(self):
+    def test_prediction_input_files_are_removed_from_storage(self):
+        """
+        ACCEPTANCE. CASCADE deletes the row that names the file and leaves the
+        bytes; nothing could then find them, because the only reference is gone.
+        """
         from django.core.management import call_command
+
+        model = self._demo()
+        prediction = self._prediction(model)
+        storage, name = prediction.input_file.storage, prediction.input_file.name
+        self.assertTrue(storage.exists(name))
+
+        # File removal is deliberately deferred to transaction.on_commit, which
+        # a TestCase never reaches — its wrapping transaction is rolled back.
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command('remove_demo_models', confirm=True, verbosity=0)
+
+        self.assertFalse(storage.exists(name), 'input file orphaned on storage')
+
+    def test_predictions_are_deleted_with_the_model(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import ModelPrediction
+        model = self._demo()
+        self._prediction(model)
+
+        call_command('remove_demo_models', confirm=True, verbosity=0)
+        self.assertEqual(ModelPrediction.objects.count(), 0)
+
+    def test_a_file_that_cannot_be_deleted_is_logged_with_its_prediction(self):
+        """A silently orphaned blob of patient input is what nobody finds later."""
+        from unittest.mock import patch as _patch
+
+        from django.core.management import call_command
+
+        model = self._demo()
+        prediction = self._prediction(model)
+
+        with _patch('django.db.models.fields.files.FieldFile.delete',
+                    side_effect=OSError('storage unavailable')):
+            with self.assertLogs(
+                    'apps.ai_insights.management.commands.remove_demo_models',
+                    level='ERROR') as logs:
+                with self.captureOnCommitCallbacks(execute=True):
+                    call_command('remove_demo_models', confirm=True, verbosity=0)
+
+        joined = '\n'.join(logs.output)
+        self.assertIn(str(prediction.pk), joined)
+
+    # ── slug collision ───────────────────────────────────────────────────────
+
+    def test_a_real_model_holding_a_demo_slug_aborts_the_run(self):
+        """ACCEPTANCE. A slug collision means the premise is wrong — stop."""
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
 
         from apps.ai_insights.models import AIModel
-        self._demo()
-        call_command('remove_demo_models', dry_run=True, verbosity=0)
+        AIModel.objects.create(
+            data_scientist=self.scientist, name='Real Diabetes Model',
+            slug='diabetes-risk-predictor', description='submitted by a researcher')
+
+        with self.assertRaises(CommandError):
+            call_command('remove_demo_models', confirm=True, verbosity=0)
         self.assertEqual(AIModel.objects.count(), 1)
 
-    def test_it_refuses_to_silently_delete_prediction_history(self):
+    def test_a_collision_stops_the_run_rather_than_skipping_that_row(self):
         """
-        Deleting a model cascades to its predictions. A demo result is still
-        something a patient ran and can see, so this is a decision to be taken
-        deliberately rather than as a side effect of tidying up.
+        The other eleven are not deleted either. If one assumption is wrong,
+        the rest are not trustworthy enough to act on.
         """
         from django.core.management import call_command
+        from django.core.management.base import CommandError
 
-        from apps.ai_insights.models import AIModel, ModelPrediction
-        model = self._demo()
-        ModelPrediction.objects.create(model=model, patient=self.patient)
+        from apps.ai_insights.models import AIModel
+        self._demo(slug='eeg-seizure-detector', name='[DEMO] EEG Seizure Detector')
+        AIModel.objects.create(
+            data_scientist=self.scientist, name='Real Diabetes Model',
+            slug='diabetes-risk-predictor', description='submitted by a researcher')
 
-        call_command('remove_demo_models', verbosity=0)
+        with self.assertRaises(CommandError):
+            call_command('remove_demo_models', confirm=True, verbosity=0)
+        self.assertEqual(AIModel.objects.count(), 2)
 
-        self.assertEqual(AIModel.objects.count(), 1)
-        self.assertEqual(ModelPrediction.objects.count(), 1)
-
-    def test_force_deletes_predictions_too(self):
+    def test_a_dry_run_also_refuses_on_a_collision(self):
         from django.core.management import call_command
+        from django.core.management.base import CommandError
 
-        from apps.ai_insights.models import AIModel, ModelPrediction
-        model = self._demo()
-        ModelPrediction.objects.create(model=model, patient=self.patient)
+        from apps.ai_insights.models import AIModel
+        AIModel.objects.create(
+            data_scientist=self.scientist, name='Real Diabetes Model',
+            slug='diabetes-risk-predictor', description='submitted by a researcher')
 
-        call_command('remove_demo_models', force=True, verbosity=0)
+        with self.assertRaises(CommandError):
+            call_command('remove_demo_models', verbosity=0)
 
-        self.assertEqual(AIModel.objects.count(), 0)
-        self.assertEqual(ModelPrediction.objects.count(), 0)
+    # ── idempotency ──────────────────────────────────────────────────────────
 
     def test_running_it_twice_is_harmless(self):
         from django.core.management import call_command
 
         self._demo()
-        call_command('remove_demo_models', verbosity=0)
-        call_command('remove_demo_models', verbosity=0)   # must not raise
+        call_command('remove_demo_models', confirm=True, verbosity=0)
+        call_command('remove_demo_models', confirm=True, verbosity=0)  # must not raise
+
+    def test_the_slug_list_matches_what_the_seeder_created(self):
+        """Twelve slugs, copied verbatim before the seeder was deleted."""
+        from apps.ai_insights.management.commands.remove_demo_models import DEMO_SLUGS
+
+        self.assertEqual(len(DEMO_SLUGS), 12)
+        self.assertEqual(len(set(DEMO_SLUGS)), 12, 'duplicate slug in the list')
 
 
 class ModelUploadValidationTests(TestCase):

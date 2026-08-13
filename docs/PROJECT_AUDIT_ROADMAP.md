@@ -39,7 +39,7 @@ reverted.
 | NEW-22 | `appointments/0003` refuses to drop a table holding rows, and reversal — which used to delete every appointment — now raises. A sweep test flags any other migration that drops a table | `appointments/test_migration_safety.py` |
 | CI-1 | `makemigrations --check` enabled as a gate, once the one outstanding difference (a help_text, no SQL) was recorded in `ai_insights/0004`. Lint gate added with a narrow rule set that passes today — see `ruff.toml` | CI workflow |
 | AIM-1 | Model provenance: `AIModel.version` + `model_file_sha256`, stamped onto each `ModelPrediction` at creation and never rewritten, so a result stays attributable to the weights that produced it. `intended_use` added for review | `ai_insights/test_provenance.py` |
-| API-3 | `seed_demo_models` is deleted and no longer runs on every container start. The twelve `[DEMO]` models it wrote are removed by `remove_demo_models`, which refuses to take patients' prediction history with them unless told to. This also closes P0-1 at the source: none of those placeholder models exist to impersonate a clinical instrument any more | `ai_insights/test_model_safety.py::NoSeededModelTests`, `::RemoveDemoModelsCommandTests` |
+| API-3 | **Resolved by removing the seeder, not by making it idempotent.** An idempotent seeder would still have written twelve placeholder models into production on every boot — the finding was that a deploy mutates application data, and re-running it "safely" does not fix that. `seed_demo_models` is deleted, the startup hook is gone, and `remove_demo_models` clears what earlier deploys wrote: dry run by default, `--confirm` to act, aborts on a slug collision with a real model, and removes each prediction's `input_file` after the delete commits so CASCADE cannot orphan it. This also closes P0-1 at the source — no placeholder model exists to impersonate a clinical instrument any more | `ai_insights/test_model_safety.py::NoSeededModelTests`, `::RemoveDemoModelsCommandTests` |
 | AIM-2 | Inference bounded by input size before the call. A wall-clock timeout is **not** implemented and would be misleading if it were: onnxruntime's `run()` cannot be interrupted, so a thread-join "timeout" returns to the request while the computation keeps a core. Slow runs emit `INFERENCE_SLOW` | `ai_insights/test_provenance.py::InputSizeBoundTests` |
 
 Still open and unchanged: SEC-4 (Fernet salt), SEC-5 (process), DM-4 (no Medication /
@@ -259,7 +259,7 @@ DM-2 is a latent risk, not a present vulnerability.
 |---|---|---|---|
 | API-1 | **`apps/api/tests.py` contains 0 tests.** 40+ endpoints — the entire mobile contract — have no functional coverage. Only `test_security.py` (31 tests) exercises security properties | High | `grep -c "def test" apps/api/tests.py` → 0 |
 | API-2 | No idempotency keys on upload endpoints; a retried mobile upload creates a duplicate record (compounds DM-1) | Medium | `apps/api/urls.py:20-25` |
-| API-3 | `seed_demo_models` runs on **every** startup, mutating production data on each restart | Medium | `startup.sh` "[2.5/3]" |
+| API-3 | `seed_demo_models` runs on **every** startup, mutating production data on each restart — **RESOLVED, see §0** | Medium | `startup.sh` "[2.5/3]" |
 | API-4 | Background indexing uses a per-process `ThreadPoolExecutor(2)`; gunicorn runs 2 workers × 8 threads → up to 4 concurrent indexers each holding a DB connection | Medium | `apps/rag_assistant/signals.py:34`; `startup.sh` gunicorn line |
 
 ---
@@ -413,7 +413,7 @@ DM-6 type discipline on values (M) · DM-7 backup before migrate (S, config)
 
 ### P4 — Reliability
 OPS-3 migration safety (S) · OPS-4 error tracking (S) · OPS-5 test backups (M) ·
-API-3 stop seeding on every boot (S) · API-4 bound indexer concurrency (S) ·
+~~API-3 stop seeding on every boot~~ (done: seeder deleted) · API-4 bound indexer concurrency (S) ·
 indexer/deletion race (S) · OPS-6 healthcheck → `/health/ready/` (S) · OPS-7 pin Python (S)
 
 ### P5 — Testing / evaluation

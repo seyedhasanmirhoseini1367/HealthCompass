@@ -11,7 +11,7 @@ ls -la
 
 # ── collectstatic ─────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [1/3] Running collectstatic (verbose)..."
+echo ">>> [1/5] Running collectstatic (verbose)..."
 python manage.py collectstatic --noinput --verbosity 2
 
 echo ""
@@ -35,7 +35,7 @@ echo "OK: ./staticfiles/ exists with ${STATIC_COUNT} file(s)."
 
 # ── migrations ────────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [2/3] Running migrations..."
+echo ">>> [2/5] Running migrations..."
 python manage.py migrate --noinput
 echo ""
 echo ">>> Migration status (appointments):"
@@ -44,7 +44,7 @@ python manage.py showmigrations appointments || echo "(appointments app not foun
 # ── superuser (one-time bootstrap) ───────────────────────────────────────────
 if [ "$CREATE_ADMIN" = "true" ]; then
     echo ""
-    echo ">>> [2.5/3] Creating superuser (CREATE_ADMIN=true)..."
+    echo ">>> [3/5] Creating superuser (CREATE_ADMIN=true)..."
     python manage.py shell -c "
 import os
 from django.contrib.auth import get_user_model
@@ -78,12 +78,12 @@ fi
 
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
 echo ""
-echo ">>> [2.7/3] Ensuring Google SocialApp credentials in DB..."
+echo ">>> [4/5] Ensuring Google SocialApp credentials in DB..."
 python manage.py ensure_social_app || echo "WARNING: ensure_social_app failed — check logs above"
 
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [3/3] Starting gunicorn on 0.0.0.0:${PORT}..."
+echo ">>> [5/5] Starting gunicorn on 0.0.0.0:${PORT}..."
 exec gunicorn healthcompass.wsgi:application \
     --bind 0.0.0.0:$PORT \
     --workers 2 \
