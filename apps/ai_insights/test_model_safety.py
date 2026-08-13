@@ -243,6 +243,34 @@ class NoSeededModelTests(TestCase):
             for command in forbidden:
                 self.assertNotIn(command, code, f'startup.sh runs {command}')
 
+    def test_demo_removal_on_deploy_stays_behind_an_env_gate(self):
+        """
+        The deployment has no shell, so the cleanup runs from startup.sh. That
+        is only acceptable while it is opt-in: an ungated `remove_demo_models
+        --confirm` would make every deploy a destructive one, which is the same
+        mistake as the seeder, pointed the other way.
+        """
+        import pathlib
+
+        startup = pathlib.Path('startup.sh')
+        if not startup.exists():
+            self.skipTest('startup.sh not present in this checkout')
+
+        lines = startup.read_text(encoding='utf-8-sig').splitlines()
+        calls = [i for i, line in enumerate(lines)
+                 if 'remove_demo_models' in line.split('#', 1)[0]]
+        if not calls:
+            self.skipTest('startup.sh does not run the cleanup')
+
+        # Every call must sit inside an `if [ "$REMOVE_DEMO_MODELS" = ... ]`
+        # block: look back for the guard and forward for its `fi`.
+        for index in calls:
+            preceding = '\n'.join(lines[max(0, index - 12):index])
+            self.assertIn('REMOVE_DEMO_MODELS', preceding,
+                          f'line {index + 1} runs the cleanup without an env gate')
+            self.assertIn('if [', preceding,
+                          f'line {index + 1} is not inside a conditional')
+
 
 class RemoveDemoModelsCommandTests(TestCase):
     """

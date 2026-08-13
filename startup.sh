@@ -11,7 +11,7 @@ ls -la
 
 # ── collectstatic ─────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [1/5] Running collectstatic (verbose)..."
+echo ">>> [1/6] Running collectstatic (verbose)..."
 python manage.py collectstatic --noinput --verbosity 2
 
 echo ""
@@ -35,7 +35,7 @@ echo "OK: ./staticfiles/ exists with ${STATIC_COUNT} file(s)."
 
 # ── migrations ────────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [2/5] Running migrations..."
+echo ">>> [2/6] Running migrations..."
 python manage.py migrate --noinput
 echo ""
 echo ">>> Migration status (appointments):"
@@ -44,7 +44,7 @@ python manage.py showmigrations appointments || echo "(appointments app not foun
 # ── superuser (one-time bootstrap) ───────────────────────────────────────────
 if [ "$CREATE_ADMIN" = "true" ]; then
     echo ""
-    echo ">>> [3/5] Creating superuser (CREATE_ADMIN=true)..."
+    echo ">>> [3/6] Creating superuser (CREATE_ADMIN=true)..."
     python manage.py shell -c "
 import os
 from django.contrib.auth import get_user_model
@@ -64,26 +64,38 @@ else:
 " || echo "Superuser creation failed — check logs above."
 fi
 
-# Demo AI models are NOT seeded here.
+# ── remove seeded demo AI models (one-time, opt-in) ──────────────────────────
 #
-# `seed_demo_models` used to run on every container start, writing twelve
-# placeholder models into the production database on each restart. They existed
-# to keep the catalog from looking empty before any real model was uploaded, and
-# they are no longer wanted. The command is gone; `remove_demo_models` clears
-# what earlier deploys already wrote, and is run deliberately rather than on
-# every boot.
+# Demo models are NOT seeded here any more. `seed_demo_models` used to run on
+# every container start, writing twelve placeholder models into the production
+# database on each restart; the command and that hook are gone.
 #
-# Nothing belongs in this file that mutates application data unprompted — a
-# deploy should not change what a user sees in their catalog.
+# This block clears what those earlier deploys already wrote, for deployments
+# with no shell access where a one-off command cannot be run by hand. It is
+# gated on an environment variable for the same reason the superuser block
+# above is: a deploy must not change what a user sees unless someone
+# deliberately asked it to. Unset REMOVE_DEMO_MODELS once it has run — leaving
+# it set is harmless (there is nothing left to delete, and the command says so)
+# but the variable is a record of intent, not a setting.
+#
+# The dry run goes first so the deploy log keeps a permanent record of exactly
+# what was there before anything was deleted. That is the review step you would
+# otherwise get from reading the output before typing --confirm.
+if [ "$REMOVE_DEMO_MODELS" = "true" ]; then
+    echo ""
+    echo ">>> [4/6] Removing seeded demo AI models (REMOVE_DEMO_MODELS=true)..."
+    python manage.py remove_demo_models || echo "WARNING: demo model report failed — check logs above"
+    python manage.py remove_demo_models --confirm || echo "WARNING: demo model removal failed — check logs above"
+fi
 
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
 echo ""
-echo ">>> [4/5] Ensuring Google SocialApp credentials in DB..."
+echo ">>> [5/6] Ensuring Google SocialApp credentials in DB..."
 python manage.py ensure_social_app || echo "WARNING: ensure_social_app failed — check logs above"
 
 # ── gunicorn ──────────────────────────────────────────────────────────────────
 echo ""
-echo ">>> [5/5] Starting gunicorn on 0.0.0.0:${PORT}..."
+echo ">>> [6/6] Starting gunicorn on 0.0.0.0:${PORT}..."
 exec gunicorn healthcompass.wsgi:application \
     --bind 0.0.0.0:$PORT \
     --workers 2 \
