@@ -34,10 +34,40 @@ class MedicalRecord(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
     is_flagged  = models.BooleanField(default=False, help_text='Flagged by AI as having abnormal values')
 
+    # Identity of the ingested artifact, for idempotent upload.
+    #
+    # Re-uploading the same document used to create a second MedicalRecord and a
+    # second full set of ParsedLabValue rows. conflict_service then reported the
+    # result to the patient as a `duplicate` clinical finding — the system
+    # describing its own ingestion defect as a data conflict — and every
+    # trajectory calculation counted the reading twice.
+    #
+    # Scope is deliberately the ARTIFACT, not the facts. Two blood draws that
+    # happen to carry identical values on different dates are two real events and
+    # must both survive; only the same bytes arriving twice is a duplicate.
+    #
+    # Blank for rows created before this field existed and for any path that
+    # cannot compute a stable fingerprint. The uniqueness constraint below is
+    # partial for exactly that reason, so historical rows are never invalidated.
+    content_hash = models.CharField(
+        max_length=64, blank=True, default='', db_index=True,
+        help_text='SHA-256 of the ingested content. Empty when unknown '
+                  '(pre-existing rows); such rows are exempt from de-duplication.')
+
     class Meta:
         ordering = ['-record_date', '-uploaded_at']
         indexes = [
             models.Index(fields=['patient', '-record_date']),
+        ]
+        constraints = [
+            # The database-level guarantee. The application checks first for a
+            # graceful response, but two concurrent identical uploads would both
+            # pass that check; this is what actually prevents the second row.
+            models.UniqueConstraint(
+                fields=['patient', 'content_hash'],
+                condition=~models.Q(content_hash=''),
+                name='unique_record_content_per_patient',
+            ),
         ]
 
     def __str__(self):

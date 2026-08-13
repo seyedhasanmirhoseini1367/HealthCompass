@@ -100,6 +100,48 @@ def validate_image_upload(file_obj) -> tuple:
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
+def content_fingerprint(payload) -> str:
+    """
+    SHA-256 over the identifying content of an ingested artifact.
+
+    `payload` may be bytes (a file), a string (pasted text), or a JSON-safe
+    structure (one document out of a Kanta bundle). Structures are serialised
+    with sorted keys so an equivalent document always produces the same digest.
+
+    Returns '' when there is nothing to fingerprint, which leaves the record
+    exempt from de-duplication rather than colliding every empty upload into one
+    row.
+    """
+    import hashlib
+    import json
+
+    if payload is None:
+        return ''
+    if isinstance(payload, bytes):
+        data = payload
+    elif isinstance(payload, str):
+        data = payload.encode('utf-8')
+    else:
+        data = json.dumps(payload, sort_keys=True, default=str).encode('utf-8')
+
+    if not data.strip():
+        return ''
+    return hashlib.sha256(data).hexdigest()
+
+
+def find_duplicate(user, content_hash: str):
+    """
+    The already-ingested record for this artifact, if there is one.
+
+    Scope is (patient, content_hash): the same document uploaded by two
+    different patients is two records, because it is two people's data.
+    """
+    if not content_hash:
+        return None
+    return MedicalRecord.objects.filter(
+        patient=user, content_hash=content_hash).first()
+
+
 def _coerce_record_type(value, default=None):
     """
     Constrain a record type to the declared choices.
@@ -300,6 +342,18 @@ class MedicalRecordService:
         from apps.accounts.egress import ExternalProcessingGuard
         from .parsers import PDFParser
 
+        # Idempotency check first, before any parsing. Re-uploading a document
+        # previously produced a second record and a second full set of lab
+        # values; returning early also avoids re-running the Gemini extraction
+        # and re-spending that quota on bytes already ingested.
+        digest = content_fingerprint(pdf_bytes)
+        existing = find_duplicate(user, digest)
+        if existing is not None:
+            logger.info('create_from_pdf: identical document already ingested '
+                        '(record %s) — returning it unchanged', existing.pk)
+            return {'record': existing, 'flagged': 0, 'page_count': 0,
+                    'structured': bool(existing.parsed_data), 'duplicate': True}
+
         # The consent decision is made here, where the owner is known, and
         # passed down as a flag: text extraction and table parsing are local and
         # always run, only the Gemini structuring step is withheld.
@@ -326,6 +380,7 @@ class MedicalRecordService:
                 source=MedicalRecord.Source.MANUAL_UPLOAD,
                 title=title,
                 file=ContentFile(pdf_bytes, name=filename),
+                content_hash=digest,
                 raw_text=parsed.get('raw_text', ''),
                 parsed_data=structured,
                 notes=notes,
@@ -357,6 +412,14 @@ class MedicalRecordService:
         from apps.accounts.egress import ExternalProcessingGuard
         from .parsers import TextParser
 
+        digest = content_fingerprint(raw_text)
+        existing = find_duplicate(user, digest)
+        if existing is not None:
+            logger.info('create_from_text: identical content already ingested '
+                        '(record %s) — returning it unchanged', existing.pk)
+            return {'record': existing, 'flagged': 0,
+                    'structured': bool(existing.parsed_data), 'duplicate': True}
+
         use_ai     = ExternalProcessingGuard.allows(user, 'records.parse')
         parsed     = TextParser().parse(raw_text, use_ai=use_ai)
         structured = parsed.get('structured') or {}
@@ -378,6 +441,7 @@ class MedicalRecordService:
                 record_type=rtype,
                 source=MedicalRecord.Source.MANUAL_UPLOAD,
                 title=title,
+                content_hash=digest,
                 raw_text=raw_text,
                 parsed_data=structured,
                 notes=notes,
@@ -422,6 +486,7 @@ class MedicalRecordService:
             return {'error': parsed['error']}
 
         records_created = 0
+        records_skipped = 0          # already ingested from an earlier import
         lab_values_created = 0
         total_flagged = 0
         record_ids = []
@@ -435,12 +500,23 @@ class MedicalRecordService:
                 except ValueError:
                     pass
 
+            # Fingerprint the individual document, not the upload. A Kanta
+            # bundle produces one record per document, so hashing the XML would
+            # make every document in it collide with its siblings. Re-importing
+            # an export that overlaps a previous one is the common case here.
+            doc_digest = content_fingerprint(doc)
+            already = find_duplicate(user, doc_digest)
+            if already is not None:
+                records_skipped += 1
+                continue
+
             with transaction.atomic():
                 record = MedicalRecord.objects.create(
                     patient=user,
                     record_type=rtype,
                     source=MedicalRecord.Source.KANTA_XML,
                     title=doc.get('title') or doc.get('type') or 'Kanta Record',
+                    content_hash=doc_digest,
                     parsed_data=doc,
                     notes=notes,
                     record_date=rec_date,
@@ -488,6 +564,7 @@ class MedicalRecordService:
 
         return {
             'records_created':    records_created,
+            'records_skipped':    records_skipped,
             'lab_values_created': lab_values_created,
             'flagged':            total_flagged,
             'record_ids':         record_ids,
@@ -498,6 +575,15 @@ class MedicalRecordService:
                              filename: str = '',
                              notes: str = '') -> dict:
         from .parsers import WearableParser
+
+        # Re-uploading the same export previously duplicated every data point.
+        digest = content_fingerprint(data_bytes)
+        existing = find_duplicate(user, digest)
+        if existing is not None:
+            logger.info('create_from_wearable: identical export already ingested '
+                        '(record %s) — returning it unchanged', existing.pk)
+            return {'record': existing, 'data_points': 0, 'device': '',
+                    'errors': [], 'duplicate': True}
 
         try:
             parsed = WearableParser().parse(data_bytes, filename=filename)
@@ -533,6 +619,7 @@ class MedicalRecordService:
                 record_type=MedicalRecord.RecordType.WEARABLE,
                 source=MedicalRecord.Source.WEARABLE_CSV,
                 title=f'{device.replace("_", " ").title()} — {filename}',
+                content_hash=digest,
                 parsed_data={'device': device, 'count': dp_count},
                 notes=notes,
             )
