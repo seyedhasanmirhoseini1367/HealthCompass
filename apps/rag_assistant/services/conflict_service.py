@@ -38,88 +38,30 @@ DUPLICATE   = 'duplicate'
 SINGLE      = 'single'
 
 
-def _fact_key(lab) -> str:
-    """Analyte identity. Lowercased so 'Glucose' and 'glucose' group together."""
-    return (lab.parameter_name or '').strip().lower()
-
-
-def _observation_date(lab):
+def _classify_group(name: str, facts: List) -> Dict[str, Any]:
     """
-    The date the measurement belongs to.
+    Classify one analyte's readings.
 
-    `measured_at` is the clinical time when present; otherwise the parent
-    record's date. Falls back to None, which excludes the row from same-date
-    comparison — an undated value cannot contradict anything.
+    `facts` are clinical_facts.Observation instances, loaded with exact analyte
+    matching. Exact matching is required here: alias grouping would place
+    fasting glucose and random glucose under one name and report two
+    legitimately different tests as contradicting each other — the precise false
+    alarm this module exists to avoid.
     """
-    if lab.measured_at:
-        return lab.measured_at.date()
-    return lab.record.record_date if lab.record_id else None
-
-
-def _comparable_value(lab):
-    """
-    A value two rows can be compared on, or None when they cannot be.
-
-    Prefers `canonical_value` because the unit normaliser has already reconciled
-    SI vs conventional units there. When the unit was not recognised
-    (`unit_known=False`) the raw number is not comparable to anything, so this
-    returns None and the pair is never called a conflict.
-    """
-    if lab.canonical_value is not None and lab.unit_known:
-        return round(float(lab.canonical_value), 6)
-    return None
-
-
-def analyze_lab_values(patient, parameter: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    Group a patient's lab values by analyte and classify each group.
-
-    Returns one entry per analyte:
-
-        {
-          'parameter':    'glucose',
-          'status':       'progression' | 'conflict' | 'duplicate' | 'single',
-          'observations': [ {date, value, unit, record_title, record_id, abnormal}, ... ],
-          'conflicts':    [ {date, values: [...], sources: [...]}, ... ],
-        }
-
-    Read-only. Dates and sources are preserved on every observation so the
-    generation layer can attribute anything it says.
-    """
-    from apps.medical_records.models import ParsedLabValue
-
-    qs = (ParsedLabValue.objects
-          .filter(record__patient=patient)
-          .select_related('record')
-          .order_by('parameter_name', 'measured_at'))
-    if parameter:
-        qs = qs.filter(parameter_name__icontains=parameter)
-
-    grouped = defaultdict(list)
-    for lab in qs:
-        key = _fact_key(lab)
-        if key:
-            grouped[key].append(lab)
-
-    results = []
-    for name, labs in sorted(grouped.items()):
-        results.append(_classify_group(name, labs))
-    return results
-
-
-def _classify_group(name: str, labs: List) -> Dict[str, Any]:
     observations, by_date = [], defaultdict(list)
 
-    for lab in labs:
-        obs_date = _observation_date(lab)
+    for fact in facts:
+        obs_date = fact.date
         entry = {
             'date':         obs_date.isoformat() if obs_date else None,
-            'value':        lab.value,
-            'canonical':    _comparable_value(lab),
-            'unit':         lab.unit,
-            'abnormal':     bool(lab.is_abnormal),
-            'record_title': lab.record.title if lab.record_id else None,
-            'record_id':    str(lab.record_id) if lab.record_id else None,
+            'value':        fact.raw_value,
+            # None when the unit could not be resolved, so an incomparable
+            # number never contradicts a comparable one.
+            'canonical':    fact.value if fact.comparable else None,
+            'unit':         fact.unit,
+            'abnormal':     fact.is_abnormal,
+            'record_title': fact.record_title,
+            'record_id':    fact.record_id,
         }
         observations.append(entry)
         if obs_date is not None:
@@ -165,6 +107,44 @@ def _classify_group(name: str, labs: List) -> Dict[str, Any]:
         'observations': observations,
         'conflicts':    conflicts,
     }
+
+
+def analyze_lab_values(patient, parameter: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Group a patient's lab values by analyte and classify each group.
+
+    Returns one entry per analyte:
+
+        {
+          'parameter':    'glucose',
+          'status':       'progression' | 'conflict' | 'duplicate' | 'single',
+          'observations': [ {date, value, canonical, unit, abnormal,
+                             record_title, record_id}, ... ],
+          'conflicts':    [ {date, values: [...], sources: [...]}, ... ],
+        }
+
+    Read-only. Dates and sources are preserved on every observation so the
+    generation layer can attribute anything it says.
+
+    Selection semantics — which rows count, which date a reading belongs to,
+    when two values are comparable, and what happens to several readings on one
+    date — come from the clinical fact layer, so this module and the trajectory
+    path cannot drift apart again. They previously disagreed in four ways.
+    """
+    from apps.medical_records import clinical_facts
+
+    # exact=True is required, not incidental: see _classify_group.
+    names = clinical_facts.analytes_for(patient)
+    if parameter:
+        needle = parameter.strip().lower()
+        names = [n for n in names if needle in n]
+
+    results = []
+    for name in sorted(names):
+        facts = clinical_facts.series(patient, name, exact=True)
+        if facts:
+            results.append(_classify_group(name, facts))
+    return results
 
 
 def format_conflict_notice(groups: List[Dict[str, Any]]) -> str:
