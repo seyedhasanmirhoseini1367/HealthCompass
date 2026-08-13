@@ -919,7 +919,8 @@ consumes untrusted chunk text, carries its own boundary system message.
 | `send_appointment_reminders` | Driven by `railway.cron.toml` |
 | `load_knowledge_base` | Ingest curated Finnish clinical sources |
 | `ensure_social_app` | Creates the Google `SocialApp` row on startup |
-| `seed_demo_models` / `seed_population` / `seed_trajectory_patient` | Demo & test data |
+| `seed_population` / `seed_trajectory_patient` | Test data (run by hand, never on deploy) |
+| `remove_demo_models` | One-off cleanup of the twelve `[DEMO]` models earlier deploys seeded |
 
 > There is **no** data-export command and **no** command to re-encrypt legacy
 > plaintext `national_id` rows.

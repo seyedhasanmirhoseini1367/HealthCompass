@@ -64,10 +64,17 @@ else:
 " || echo "Superuser creation failed — check logs above."
 fi
 
-# ── Seed demo AI models ───────────────────────────────────────────────────────
-echo ""
-echo ">>> [2.5/3] Seeding demo AI models..."
-python manage.py seed_demo_models || echo "WARNING: seed_demo_models failed — check logs above"
+# Demo AI models are NOT seeded here.
+#
+# `seed_demo_models` used to run on every container start, writing twelve
+# placeholder models into the production database on each restart. They existed
+# to keep the catalog from looking empty before any real model was uploaded, and
+# they are no longer wanted. The command is gone; `remove_demo_models` clears
+# what earlier deploys already wrote, and is run deliberately rather than on
+# every boot.
+#
+# Nothing belongs in this file that mutates application data unprompted — a
+# deploy should not change what a user sees in their catalog.
 
 # ── Google OAuth SocialApp ────────────────────────────────────────────────────
 echo ""

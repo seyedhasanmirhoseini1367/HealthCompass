@@ -177,36 +177,148 @@ class DemoAlertSuppressionTests(TestCase):
                       'HealthAlert creation must exclude demo results')
 
 
-class SeededModelHonestyTests(TestCase):
+class NoSeededModelTests(TestCase):
     """
-    P0-1 — seeded models must not impersonate published clinical instruments.
+    The twelve seeded [DEMO] models are gone, along with the command that
+    created them.
 
-    All twelve are seeded active with no model file, so all twelve run the
-    rule-based placeholder.
+    P0-1 was about those models impersonating published clinical instruments —
+    one was named after SCORE2 while running an invented weighted sum. Removing
+    them removes that whole class of problem, but only if nothing puts them
+    back: `seed_demo_models` ran on *every* container start, so the models
+    reappeared after each deploy no matter how many times they were deleted
+    (audit finding API-3).
     """
+
+    def test_the_seeder_is_gone(self):
+        import pathlib
+        self.assertFalse(
+            pathlib.Path(
+                'apps/ai_insights/management/commands/seed_demo_models.py'
+            ).exists(),
+            'the demo seeder is back; deleting demo models is pointless while '
+            'a deploy recreates them'
+        )
+
+    def test_startup_does_not_seed_models(self):
+        import pathlib
+
+        startup = pathlib.Path('startup.sh')
+        if not startup.exists():
+            self.skipTest('startup.sh not present in this checkout')
+
+        for line in startup.read_text(encoding='utf-8-sig').splitlines():
+            code = line.split('#', 1)[0]
+            self.assertNotIn('seed_demo_models', code,
+                             'startup.sh seeds demo models on every boot')
+
+    def test_startup_does_not_seed_application_data_at_all(self):
+        """
+        A deploy must not change what a user sees. Superuser creation and the
+        OAuth app are infrastructure; seeding models, patients or records is
+        application data and does not belong in a boot script.
+        """
+        import pathlib
+
+        startup = pathlib.Path('startup.sh')
+        if not startup.exists():
+            self.skipTest('startup.sh not present in this checkout')
+
+        forbidden = ('seed_demo_models', 'seed_population', 'seed_trajectory_patient')
+        for line in startup.read_text(encoding='utf-8-sig').splitlines():
+            code = line.split('#', 1)[0]
+            for command in forbidden:
+                self.assertNotIn(command, code, f'startup.sh runs {command}')
+
+
+class RemoveDemoModelsCommandTests(TestCase):
+    """The one-off cleanup for databases earlier deploys already seeded."""
 
     def setUp(self):
-        import pathlib
-        self.source = pathlib.Path(
-            'apps/ai_insights/management/commands/seed_demo_models.py'
-        ).read_text(encoding='utf-8-sig')
+        from django.contrib.auth import get_user_model
 
-    def test_every_seeded_model_is_marked_demo_in_its_name(self):
-        import re
-        names = re.findall(r"'name':\s+'([^']+)'", self.source)
-        self.assertEqual(len(names), 12)
-        unmarked = [n for n in names if not n.startswith('[DEMO]')]
-        self.assertEqual(unmarked, [],
-                         f'seeded models must be visibly demo: {unmarked}')
+        User = get_user_model()
+        self.scientist = User.objects.create_user(
+            'demo_rm_ds', email='demo_rm_ds@test.invalid', password='pw',
+            role='data_scientist')
+        self.patient = User.objects.create_user(
+            'demo_rm_pat', email='demo_rm_pat@test.invalid', password='pw',
+            role='patient')
 
-    def test_no_seeded_model_claims_to_implement_a_published_instrument(self):
+    def _demo(self, name='[DEMO] Diabetes Risk Predictor'):
+        from apps.ai_insights.models import AIModel
+        return AIModel.objects.create(
+            data_scientist=self.scientist, name=name, description='d')
+
+    def _real(self):
+        from apps.ai_insights.models import AIModel
+        return AIModel.objects.create(
+            data_scientist=self.scientist, name='Retinopathy Grader v2',
+            description='a real uploaded model')
+
+    def test_demo_models_are_deleted(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel
+        self._demo()
+        self._demo('[DEMO] EEG Seizure Detector')
+
+        call_command('remove_demo_models', verbosity=0)
+        self.assertEqual(AIModel.objects.count(), 0)
+
+    def test_real_models_are_left_alone(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel
+        self._demo()
+        real = self._real()
+
+        call_command('remove_demo_models', verbosity=0)
+        self.assertEqual(list(AIModel.objects.values_list('pk', flat=True)), [real.pk])
+
+    def test_dry_run_changes_nothing(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel
+        self._demo()
+        call_command('remove_demo_models', dry_run=True, verbosity=0)
+        self.assertEqual(AIModel.objects.count(), 1)
+
+    def test_it_refuses_to_silently_delete_prediction_history(self):
         """
-        The rule-based fallback is an invented weighted sum. Naming it after
-        SCORE2 asserted a validated instrument the code does not implement.
+        Deleting a model cascades to its predictions. A demo result is still
+        something a patient ran and can see, so this is a decision to be taken
+        deliberately rather than as a side effect of tidying up.
         """
-        self.assertNotIn("'[DEMO] Cardiovascular Risk Score (SCORE2)'", self.source)
-        self.assertNotIn('Based on the ESC SCORE2 framework', self.source)
-        self.assertNotIn('SCORE2 estimates 10-year cardiovascular risk', self.source)
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel, ModelPrediction
+        model = self._demo()
+        ModelPrediction.objects.create(model=model, patient=self.patient)
+
+        call_command('remove_demo_models', verbosity=0)
+
+        self.assertEqual(AIModel.objects.count(), 1)
+        self.assertEqual(ModelPrediction.objects.count(), 1)
+
+    def test_force_deletes_predictions_too(self):
+        from django.core.management import call_command
+
+        from apps.ai_insights.models import AIModel, ModelPrediction
+        model = self._demo()
+        ModelPrediction.objects.create(model=model, patient=self.patient)
+
+        call_command('remove_demo_models', force=True, verbosity=0)
+
+        self.assertEqual(AIModel.objects.count(), 0)
+        self.assertEqual(ModelPrediction.objects.count(), 0)
+
+    def test_running_it_twice_is_harmless(self):
+        from django.core.management import call_command
+
+        self._demo()
+        call_command('remove_demo_models', verbosity=0)
+        call_command('remove_demo_models', verbosity=0)   # must not raise
 
 
 class ModelUploadValidationTests(TestCase):
