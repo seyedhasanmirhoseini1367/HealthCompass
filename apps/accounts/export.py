@@ -435,14 +435,18 @@ def _access_history(user):
             'accessed_at': _dt(a.accessed_at),
             'resource':    a.resource,
             # Professional identity of the accessing clinician: the minimum
-            # needed for this log to be meaningful to the subject.
-            'accessed_by': (a.actor.get_full_name() or a.actor.username) if a.actor_id else 'deleted account',
+            # needed for this log to be meaningful to the subject. Falls back to
+            # the label captured at access time when the account has since been
+            # deleted — "someone read your records" is not an answer.
+            'accessed_by': ((a.actor.get_full_name() or a.actor.username) if a.actor_id
+                            else (a.actor_label or 'deleted account')),
         } for a in accesses.order_by('-accessed_at')],
         'linked_clinicians': [{
             'doctor_name': l.doctor.get_full_name() or l.doctor.username,
             'specialty':   getattr(getattr(l.doctor, 'doctor_profile', None), 'specialty', ''),
             'hospital':    l.hospital,
-            'is_active':   l.is_active,
+            'status':      l.status,
+            'decided_at':  _dt(l.decided_at),
             'linked_at':   _dt(l.created_at),
         } for l in links.order_by('-created_at')],
         # Timestamps only: the stored IP hash identifies a third-party viewer.

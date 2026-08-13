@@ -137,7 +137,8 @@ class DoctorAccessAuthorizationTests(TestCase):
             role='doctor',
         )
         PatientDoctorRelationship.objects.create(
-            patient=self.patient, doctor=self.linked_doctor, is_active=True,
+            patient=self.patient, doctor=self.linked_doctor,
+            status=PatientDoctorRelationship.Status.ACTIVE,
         )
         self.record = MedicalRecord.objects.create(
             patient=self.patient, title='Confidential Diagnosis',
@@ -168,8 +169,8 @@ class DoctorAccessAuthorizationTests(TestCase):
         rel = PatientDoctorRelationship.objects.get(
             patient=self.patient, doctor=self.linked_doctor,
         )
-        rel.is_active = False
-        rel.save(update_fields=['is_active'])
+        rel.status = PatientDoctorRelationship.Status.REVOKED
+        rel.save(update_fields=['status'])
 
         self.client.force_login(self.linked_doctor)
         resp = self.client.get(f'/dashboard/patient/{self.patient.pk}/records/')

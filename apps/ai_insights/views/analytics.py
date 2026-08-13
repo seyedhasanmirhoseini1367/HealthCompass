@@ -108,6 +108,14 @@ def health_view(request):
 
 @login_required
 def population_view(request):
+    # Cohort statistics, not patient-facing. This view was @login_required only,
+    # so any patient could read biomarker averages, alert counts and risk
+    # buckets over every other patient in the deployment.
+    from apps.accounts.authz import can_view_population_analytics
+    if not can_view_population_analytics(request.user):
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard:home')
+
     from apps.medical_records.models import MedicalRecord
 
     User = get_user_model()

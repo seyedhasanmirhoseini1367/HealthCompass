@@ -2,7 +2,7 @@
 """
 LangGraph StateGraph for HealthCompass RAG.
 
-Full pipeline (left to right):
+Pipeline (left to right):
 
     safety_gate_node
         │
@@ -16,21 +16,30 @@ Full pipeline (left to right):
                                   ├── cold_start ──► cold_start_node ──┐
                                   ├── trajectory ──► trajectory_node   │
                                   ├── lab_results ► lab_results_node   │
-                                  ├── medications ► medications_node   ├──► generate_node
-                                  ├── wearable  ──► wearable_node      │         │
-                                  ├── diagnosis ──► diagnosis_node     │         ▼
-                                  ├── records   ──► records_node ──────┘    verify_node
-                                  └── general   ──► general_node               │
-                                                               needs_retry=True ──► records_node
-                                                               cold_start/emergency ──────────► END
-                                                               needs_retry=False ─────────────► END
+                                  ├── medications ► medications_node   ├──► END
+                                  ├── wearable  ──► wearable_node      │
+                                  ├── diagnosis ──► diagnosis_node     │
+                                  ├── records   ──► records_node ──────┘
+                                  └── general   ──► general_node
 
-Phase-1 change: understand_node (QueryUnderstanding) sits between safety_gate and router.
+The graph resolves retrieval state only. Generation happens in stream_graph(),
+which calls generate_streaming() directly, so tokens can only come from
+generation — never from QueryUnderstanding or another internal node.
+
+There used to be a second, fuller graph here (`build_graph` / `health_graph`)
+with generate_node, verify_node and a retry-on-empty-retrieval loop. It was
+compiled at import and never invoked by any caller: rag_service, the API and the
+eval harness all use the routing graph. It has been removed rather than left in
+place, because README and ARCHITECTURE described its verify/retry step as if it
+protected answers in production, and it did not. Retrieval returning no chunks
+is still not retried anywhere; that is a real gap, and it is now visible instead
+of appearing solved.
+
+understand_node (QueryUnderstanding) sits between safety_gate and router:
   • Replaces duplicate _detect_route() / _is_temporal() logic in router_node with
     the shared understand() service (keyword → LLM fallback, history-aware rewriting).
-  • router_node is now a cold-start gate only — route/mode already set by understand_node.
+  • router_node is a cold-start gate only — route/mode already set by understand_node.
   • Retrieval nodes use rewritten_query instead of question so follow-ups resolve correctly.
-  • No behaviour change for the legacy stream_ask() path (it calls understand() directly).
 """
 import logging
 
@@ -45,7 +54,6 @@ from .nodes import (
     trajectory_node,
     lab_results_node, medications_node, wearable_node,
     diagnosis_node, records_node, general_node,
-    generate_node, verify_node,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,82 +85,8 @@ def _route_from_router(state: HealthState) -> str:
     return ROUTE_TO_NODE.get(state.get('route', 'general'), 'general_node')
 
 
-def _route_from_verify(state: HealthState) -> str:
-    """
-    cold_start and emergency routes always end here (no retry possible).
-    All other routes: retry via records_node if no chunks, else END.
-    """
-    route = state.get('route', '')
-    if route in ('cold_start', 'emergency'):
-        return END
-    if state.get('needs_retry', False):
-        logger.debug('verify → retry via records_node')
-        return 'records_node'
-    return END
-
-
-# ── Graph construction ─────────────────────────────────────────────────────────
-
-def build_graph() -> StateGraph:
-    graph = StateGraph(HealthState)
-
-    # ── Nodes ──────────────────────────────────────────────────────────────────
-    graph.add_node('safety_gate_node',  safety_gate_node)
-    graph.add_node('understand_node',   understand_node)
-    graph.add_node('router_node',       router_node)
-    graph.add_node('cold_start_node',   cold_start_node)
-    graph.add_node('trajectory_node',   trajectory_node)
-    graph.add_node('lab_results_node',  lab_results_node)
-    graph.add_node('medications_node',  medications_node)
-    graph.add_node('wearable_node',     wearable_node)
-    graph.add_node('diagnosis_node',    diagnosis_node)
-    graph.add_node('records_node',      records_node)
-    graph.add_node('general_node',      general_node)
-    graph.add_node('generate_node',     generate_node)
-    graph.add_node('verify_node',       verify_node)
-
-    # ── Entry point: safety gate ───────────────────────────────────────────────
-    graph.set_entry_point('safety_gate_node')
-
-    # ── safety_gate → END (emergency) | understand_node (safe) ───────────────
-    graph.add_conditional_edges(
-        'safety_gate_node',
-        _route_from_safety_gate,
-        {'understand_node': 'understand_node', END: END},
-    )
-
-    # ── understand_node → router_node (unconditional) ─────────────────────────
-    graph.add_edge('understand_node', 'router_node')
-
-    # ── router → retrieval / context node ─────────────────────────────────────
-    graph.add_conditional_edges(
-        'router_node',
-        _route_from_router,
-        {v: v for v in ROUTE_TO_NODE.values()},
-    )
-
-    # ── All retrieval/context nodes → generate ─────────────────────────────────
-    for node_name in ROUTE_TO_NODE.values():
-        graph.add_edge(node_name, 'generate_node')
-
-    # ── generate → verify ──────────────────────────────────────────────────────
-    graph.add_edge('generate_node', 'verify_node')
-
-    # ── verify → retry (records_node) | END ───────────────────────────────────
-    graph.add_conditional_edges(
-        'verify_node',
-        _route_from_verify,
-        {'records_node': 'records_node', END: END},
-    )
-
-    return graph
-
-
-# ── Routing-only graph (used by stream_graph) ─────────────────────────────────
-# Runs safety_gate → understand → router → retrieval node → END.
-# generate_node is intentionally absent: stream_graph() calls
-# generate_streaming() directly so tokens come only from generation,
-# never from QueryUnderstanding or other internal nodes.
+# ── Graph construction ────────────────────────────────────────────────────────
+# safety_gate → understand → router → retrieval node → END.
 
 def _build_routing_graph() -> StateGraph:
     graph = StateGraph(HealthState)
@@ -188,8 +122,7 @@ def _build_routing_graph() -> StateGraph:
     return graph
 
 
-# Compiled graphs — imported by rag_service.py
-health_graph         = build_graph().compile()
+# Compiled graph — imported by rag_service.py and the eval harness.
 health_graph_routing = _build_routing_graph().compile()
 
 
@@ -223,8 +156,10 @@ def stream_graph(
         2. GeneralKnowledgeService called here for general/hybrid modes (the
            retrieval nodes only fetch personal records).
         3. generate_streaming() called with retrieval state for token-by-token SSE.
-        4. GuardrailService buffer: first 500 chars buffered for in-place
-           softening, then get_appended_disclaimers() on the full text.
+        4. GuardrailService.soften_stream_prefix() softens diagnosis language
+           continuously across the whole stream (holding back a short lookahead
+           tail), then get_appended_disclaimers() adds disclaimers once, at the
+           end.
     """
     import json
     from apps.rag_assistant.services.generation_service import (
@@ -243,8 +178,6 @@ def stream_graph(
             'context_chunks':     [],
             'session_id':         session_id,
             'history':            history or [],
-            'needs_retry':        False,
-            'retry_count':        0,
             'llm_provider':       '',
             'trajectory_context': '',
             'rewritten_query':    '',
@@ -295,11 +228,16 @@ def stream_graph(
 
         gen_mode = mode if mode != 'history_followup' else 'personal'
 
-        # ── Phase 2: streaming generation with guardrail buffer ────────────────
-        _GUARDRAIL_BUF   = 500
+        # ── Phase 2: streaming generation with guardrail softening ─────────────
+        #
+        # Softening runs over the WHOLE answer, not just its opening. The old
+        # code buffered 500 characters, softened those, and forwarded everything
+        # after that untouched — so a definitive diagnosis stated later in the
+        # answer, which is exactly where a model states its conclusion, reached
+        # the patient verbatim. It also called apply(), which appends
+        # disclaimers, putting one mid-response and then again at the end.
         _svc             = GuardrailService()
-        _buf             = ''
-        _buf_flushed     = False
+        _pending         = ''
         collected_tokens = []
 
         for token in generate_streaming(
@@ -311,18 +249,14 @@ def stream_graph(
             general_chunks   = general_chunks,
         ):
             collected_tokens.append(token)
-            if not _buf_flushed:
-                _buf += token
-                if len(_buf) >= _GUARDRAIL_BUF:
-                    safe_buf, _ = _svc.apply(_buf)
-                    yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
-                    _buf_flushed = True
-            else:
-                yield f'data: {json.dumps({"type": "token", "content": token})}\n\n'
+            _pending += token
+            safe_text, _pending = _svc.soften_stream_prefix(_pending)
+            if safe_text:
+                yield f'data: {json.dumps({"type": "token", "content": safe_text})}\n\n'
 
-        if not _buf_flushed:
-            safe_buf, _ = _svc.apply(_buf)
-            yield f'data: {json.dumps({"type": "token", "content": safe_buf})}\n\n'
+        safe_text, _pending = _svc.soften_stream_prefix(_pending, final=True)
+        if safe_text:
+            yield f'data: {json.dumps({"type": "token", "content": safe_text})}\n\n'
 
         full_response = ''.join(collected_tokens)
         extra_text, rules_fired = _svc.get_appended_disclaimers(full_response)

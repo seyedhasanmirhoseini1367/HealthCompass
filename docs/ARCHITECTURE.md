@@ -136,11 +136,17 @@ safety_gate_node
                             └─► general_node
                                      │
                                      ▼
-                              generate_node ─► verify_node ─► END
+                                    END
 ```
 
-A second `_build_routing_graph()` variant stops before generation so the SSE
-streaming path can stream tokens directly from the provider.
+The graph stops before generation. `stream_graph()` then calls
+`generate_streaming()` directly, so tokens can only come from generation and
+never from an internal node such as QueryUnderstanding.
+
+A fuller graph with `generate_node`, `verify_node` and a retry-on-empty-retrieval
+loop used to be compiled alongside this one. Nothing invoked it, so its
+verify/retry step never ran; it has been removed. Empty retrieval is not retried
+anywhere today.
 
 Supporting services in `apps/rag_assistant/services/`:
 
@@ -195,11 +201,12 @@ RetrievalService.retrieve  (the non-trajectory path)
   9. MMR                                 diversity, λ=0.6, widened to top_k×5
  10. LLM rerank                          Groq; falls back to Stage-1 order on any error
   ▼
-generate_node ....................... _resolve_context_and_prompt → one of 4 system
+generate_streaming() ................ _resolve_context_and_prompt → one of 4 system
   │                                    prompts; context fenced as untrusted data
   │                                    Groq → Gemini → Anthropic → OpenAI → static
   ▼
-verify_node ......................... may re-route once if the answer looks empty
+guardrail softening ................. diagnosis language softened across the whole
+  │                                    stream; disclaimers appended once, at the end
   ▼
 answer + sources (deduplicated per document)
 ```

@@ -14,6 +14,10 @@ urlpatterns = [
     path("delete/",          views.delete_account,  name="delete_account"),
     path("consent/",                 views.consent_settings,       name="consent"),
     path("export/",                  views.data_export,            name="data_export"),
+    # Patient control over who may read their records (NEW-05).
+    path("my-doctors/",                    views.my_doctors,            name="my_doctors"),
+    path("my-doctors/<int:pk>/approve/",   views.approve_doctor_access, name="approve_doctor_access"),
+    path("my-doctors/<int:pk>/revoke/",    views.revoke_doctor_access,  name="revoke_doctor_access"),
     path("emergency-card/",          views.emergency_card,         name="emergency_card"),
     path("emergency-card/revoke/",   views.revoke_emergency_token, name="revoke_emergency_token"),
     path("emergency-card/toggle/",   views.toggle_emergency_card,  name="toggle_emergency_card"),

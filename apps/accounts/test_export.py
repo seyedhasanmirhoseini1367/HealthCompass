@@ -298,7 +298,8 @@ class ExportIsolationTests(_FixtureMixin, TestCase):
             username='doc', email='doc@example.com', password='pw-doc-1', role='doctor',
         )
         PatientDoctorRelationship.objects.create(
-            patient=self.subject, doctor=doctor, is_active=True,
+            patient=self.subject, doctor=doctor,
+            status=PatientDoctorRelationship.Status.ACTIVE,
         )
         DoctorAccessLog.objects.create(
             actor=doctor, patient=self.subject, resource='patient_records',

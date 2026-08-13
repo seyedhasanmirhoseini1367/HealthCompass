@@ -24,6 +24,21 @@ class CustomUser(AbstractUser):
     is_approved = models.BooleanField(default=True,
         help_text='Patients are auto-approved. Doctors, Data Scientists, and Hospital Admins require admin approval.')
 
+    def save(self, *args, **kwargs):
+        """
+        Normalise the email to lower case on every write.
+
+        Uniqueness on `email` is case-sensitive in PostgreSQL while the auth
+        backend resolves with `email__iexact`, so 'Hasan@x.com' and 'hasan@x.com'
+        could both exist and a login by email landed in whichever row the
+        database happened to return first — non-deterministic authentication
+        into one of two accounts. Normalising on write means the existing unique
+        constraint enforces case-insensitive identity by itself.
+        """
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.username} ({self.get_role_display()})'
 
@@ -53,8 +68,9 @@ class PatientProfile(models.Model):
                                   'treat as highest-sensitivity PII.')
     emergency_token = models.UUIDField(default=uuid.uuid4, unique=True,
                           help_text='Token for public emergency card URL')
-    emergency_card_enabled = models.BooleanField(default=True,
-                          help_text='Patient can disable to block all public access to their card')
+    emergency_card_enabled = models.BooleanField(default=False,
+                          help_text='Opt-in. When True, the card is readable by anyone '
+                                    'holding the token URL, with no login.')
 
     def regenerate_emergency_token(self):
         self.emergency_token = uuid.uuid4()
@@ -125,6 +141,21 @@ class DoctorAccessLog(models.Model):
                     'accounts.CustomUser', on_delete=models.SET_NULL,
                     null=True, related_name='access_log_received',
                     help_text='The patient whose data was accessed')
+    # Who the actor was, captured when the access happened.
+    #
+    # `actor` is SET_NULL so that deleting an account cannot delete audit rows.
+    # But that left the row saying only that *someone* had read this patient's
+    # data: delete the doctor's account and the accountability is gone, which is
+    # precisely the case an audit trail exists for. The label is written at
+    # access time and never updated afterwards.
+    #
+    # The patient side is deliberately NOT denormalised. Anonymising the patient
+    # reference on erasure is intentional (see accounts.services.purge_user_data);
+    # copying their identity here would defeat it.
+    actor_label = models.CharField(
+                    max_length=200, blank=True, default='',
+                    help_text='Username and role of the actor at access time. '
+                              'Survives deletion of the account.')
     resource    = models.CharField(
                     max_length=300,
                     help_text='e.g. "patient_records" or "record:<uuid>"')
@@ -134,8 +165,16 @@ class DoctorAccessLog(models.Model):
         indexes = [models.Index(fields=['patient', '-accessed_at'])]
         ordering = ['-accessed_at']
 
+    def save(self, *args, **kwargs):
+        if not self.actor_label and self.actor_id:
+            actor = self.actor
+            role = getattr(actor, 'role', '') or ''
+            self.actor_label = f'{actor.username} ({role})' if role else actor.username
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.actor} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
+        who = self.actor or self.actor_label or 'deleted account'
+        return f'{who} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
 
 
 class ConsentPurpose(models.TextChoices):
@@ -210,15 +249,45 @@ class Consent(models.Model):
 
 
 class PatientDoctorRelationship(models.Model):
+    """
+    A doctor's access to a patient's records.
+
+    Access used to be granted unilaterally: a hospital admin created the link
+    with `is_active=True` and the doctor could read the records immediately. The
+    patient was notified afterwards and had no way to revoke it — `remove_link`
+    is scoped to `linked_by=request.user`, so only the admin who created a link
+    could remove it, and no patient-facing path existed at all. For a
+    GDPR-scoped health product, a data subject who cannot terminate a third
+    party's access to their records is a compliance problem.
+
+    `status` replaces the old `is_active` boolean rather than sitting beside it,
+    so there is one answer to "may this doctor read these records" instead of
+    two fields that can disagree. Only ACTIVE grants access.
+    """
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Awaiting patient approval'
+        ACTIVE  = 'active',  'Active'
+        REVOKED = 'revoked', 'Revoked'
+
     patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='my_doctors')
     doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='my_patients')
     linked_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL,
                     null=True, blank=True, related_name='relationships_created')
     hospital = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+    status = models.CharField(max_length=10, choices=Status.choices,
+                    default=Status.PENDING, db_index=True,
+                    help_text='Only "active" grants the doctor access to records.')
+    decided_at = models.DateTimeField(null=True, blank=True,
+                    help_text='When the patient approved or revoked this link.')
 
     class Meta:
         unique_together = ['patient', 'doctor']
+        indexes = [models.Index(fields=['patient', 'status'])]
 
-    def __str__(self): return f'{self.patient.username} <-> Dr. {self.doctor.username}'
+    def __str__(self):
+        return f'{self.patient.username} <-> Dr. {self.doctor.username} [{self.status}]'
+
+    @property
+    def grants_access(self) -> bool:
+        return self.status == self.Status.ACTIVE

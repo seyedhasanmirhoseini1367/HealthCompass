@@ -480,8 +480,6 @@ def _retrieve_for_item(patient, question: str):
         'context_chunks':     [],
         'session_id':         None,
         'history':            [],
-        'needs_retry':        False,
-        'retry_count':        0,
         'llm_provider':       '',
         'trajectory_context': '',
         'rewritten_query':    '',

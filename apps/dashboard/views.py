@@ -32,7 +32,9 @@ def home(request):
         template = 'dashboard/patient.html'
 
     elif user.is_doctor:
-        rels = PatientDoctorRelationship.objects.filter(doctor=user, is_active=True).select_related('patient')
+        rels = PatientDoctorRelationship.objects.filter(
+            doctor=user, status=PatientDoctorRelationship.Status.ACTIVE
+        ).select_related('patient')
         pids = list(rels.values_list('patient_id', flat=True))
         ctx['patient_count'] = len(pids)
         ctx['relationships'] = rels[:10]
@@ -54,7 +56,17 @@ def home(request):
             linked_by=user).select_related('patient', 'doctor').order_by('-created_at')
         ctx['relationships'] = rels[:20]
         ctx['total_links'] = rels.count()
-        ctx['all_patients'] = CustomUser.objects.filter(role='patient', is_active=True).order_by('username')
+        # Deliberately NOT the platform roster.
+        #
+        # This handed every hospital admin CustomUser.objects.filter(role='patient')
+        # — the complete list of every patient on the platform, by name. An admin
+        # needs to find one specific person they are already dealing with, which
+        # an exact-email lookup answers without enumerating everyone else.
+        query = (request.GET.get('patient_email') or '').strip()
+        ctx['patient_query'] = query
+        ctx['all_patients'] = (
+            CustomUser.objects.filter(role='patient', is_active=True, email__iexact=query)
+            if query else CustomUser.objects.none())
         ctx['all_doctors'] = CustomUser.objects.filter(role='doctor', is_active=True).select_related('doctor_profile').order_by('username')
         ctx['total_patients'] = ctx['all_patients'].count()
         ctx['total_doctors'] = ctx['all_doctors'].count()
@@ -87,7 +99,7 @@ def patient_records(request, patient_pk):
         PatientDoctorRelationship,
         doctor=request.user,
         patient=patient,
-        is_active=True
+        status=PatientDoctorRelationship.Status.ACTIVE,
     )
 
     DoctorAccessLog.objects.create(
@@ -120,7 +132,7 @@ def doctor_record_detail(request, record_pk):
         PatientDoctorRelationship,
         doctor=request.user,
         patient=record.patient,
-        is_active=True
+        status=PatientDoctorRelationship.Status.ACTIVE,
     )
 
     DoctorAccessLog.objects.create(
@@ -154,27 +166,51 @@ def create_link(request):
             messages.error(request, 'Invalid patient or doctor selected.')
             return redirect('dashboard:home')
 
-        _, created = PatientDoctorRelationship.objects.get_or_create(
+        # Hospital scope. Without it, ANY hospital admin could link ANY doctor
+        # to ANY patient on the platform — HospitalAdminProfile.hospital_name
+        # existed and was never consulted.
+        admin_hospital = (getattr(getattr(request.user, 'hospital_admin_profile', None),
+                                  'hospital_name', '') or '').strip().lower()
+        doctor_hospital = (getattr(getattr(doctor, 'doctor_profile', None),
+                                   'hospital', '') or '').strip().lower()
+        if not admin_hospital or doctor_hospital != admin_hospital:
+            messages.error(
+                request,
+                'You can only link doctors affiliated with your own hospital. '
+                'Check the doctor’s hospital on their profile.')
+            return redirect('dashboard:home')
+
+        # Created PENDING, not active. Access to a person's medical records is
+        # the patient's decision, not an administrative one.
+        rel, created = PatientDoctorRelationship.objects.get_or_create(
             patient=patient,
             doctor=doctor,
-            defaults={'linked_by': request.user, 'is_active': True}
+            defaults={'linked_by': request.user,
+                      'hospital': admin_hospital,
+                      'status': PatientDoctorRelationship.Status.PENDING},
         )
 
         if created:
-            # Notify both parties
             Notification.objects.create(
                 user=patient,
                 type=Notification.Type.SYSTEM,
-                title='Doctor linked to your account',
-                message=f'Dr. {doctor.get_full_name() or doctor.username} has been linked to your account.',
+                title='A doctor has requested access to your records',
+                message=(f'Dr. {doctor.get_full_name() or doctor.username} has requested '
+                         f'access to your medical records. Review it in your account — '
+                         f'no records are shared until you approve.'),
+                link='/accounts/my-doctors/',
             )
             Notification.objects.create(
                 user=doctor,
                 type=Notification.Type.SYSTEM,
-                title='New patient linked',
-                message=f'{patient.get_full_name() or patient.username} has been linked to your account.',
+                title='Access request sent',
+                message=(f'A request to access {patient.get_full_name() or patient.username}’s '
+                         f'records is awaiting their approval.'),
             )
-            messages.success(request, f'Successfully linked {patient.username} ↔ Dr. {doctor.username}.')
+            messages.success(
+                request,
+                f'Request sent to {patient.username}. '
+                f'Dr. {doctor.username} gets access only once the patient approves.')
         else:
             messages.warning(request, 'This patient–doctor link already exists.')
 

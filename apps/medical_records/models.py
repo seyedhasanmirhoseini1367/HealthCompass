@@ -34,6 +34,23 @@ class MedicalRecord(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
     is_flagged  = models.BooleanField(default=False, help_text='Flagged by AI as having abnormal values')
 
+    # When this record's RAG index was last built successfully.
+    #
+    # Indexing is dispatched to an in-process ThreadPoolExecutor with an
+    # unbounded in-memory queue. A 200-record Kanta import queues 200 jobs; if
+    # the container is redeployed the queue evaporates and those records are
+    # simply never chunked. `retry_failed_embeddings` cannot help — it recovers
+    # chunks whose embedding is NULL, and a record that never reached
+    # DocumentProcessor has no chunk row to find.
+    #
+    # The failure the patient sees is the same one CB-2 was about: the record is
+    # in their list, and the assistant says it has no such record. NULL here
+    # makes those records findable so a sweep can reindex them.
+    indexed_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text='Set when RAG indexing last succeeded. NULL means this record '
+                  'is not searchable by the assistant.')
+
     # Identity of the ingested artifact, for idempotent upload.
     #
     # Re-uploading the same document used to create a second MedicalRecord and a
@@ -77,6 +94,16 @@ class MedicalRecord(models.Model):
 class ParsedLabValue(models.Model):
     """Individual values extracted from lab results."""
     record          = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='lab_values')
+    # Denormalised owner. Isolation used to depend on every caller remembering
+    # to join `record__patient`; all of them did, but nothing enforced it, and a
+    # single forgotten filter would mix one patient's analytes into another's
+    # results. MedicalDocument and MedicalChunk already denormalise the patient,
+    # so this also makes the pattern consistent across the models that hold PHI.
+    #
+    # Derived, never independently set: save() takes it from the parent record,
+    # so the two cannot drift apart.
+    patient         = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                        related_name='lab_values', null=True, blank=True)
     parameter_name  = models.CharField(max_length=200)
     value           = models.CharField(max_length=100)
     unit            = models.CharField(max_length=50, blank=True)
@@ -92,6 +119,28 @@ class ParsedLabValue(models.Model):
     is_abnormal     = models.BooleanField(default=False)
     is_critical     = models.BooleanField(default=False)
     measured_at     = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        # Without an ordering, row order is whatever the engine returns, and it
+        # differs between the SQLite used in development and the Postgres used
+        # in production. Anything reading "the values on this record" — the
+        # doctor's record page, the export, the serializers — was relying on
+        # that. Chronological with an explicit tiebreak makes it the same
+        # everywhere.
+        #
+        # nulls_last is stated explicitly because the default differs by engine:
+        # SQLite sorts NULLs first ascending, Postgres sorts them last. Undated
+        # values belong after dated ones, not silently at the top.
+        ordering = [models.F('measured_at').asc(nulls_last=True), 'id']
+        indexes = [
+            models.Index(fields=['patient', 'parameter_name']),
+        ]
+
+    def save(self, *args, **kwargs):
+        # The parent record is the single source of truth for ownership.
+        if self.record_id and self.patient_id != self.record.patient_id:
+            self.patient_id = self.record.patient_id
+        super().save(*args, **kwargs)
 
     def __str__(self):
         flag = ' [!]' if self.is_critical else (' [abnormal]' if self.is_abnormal else '')
@@ -111,13 +160,24 @@ class WearableDataPoint(models.Model):
         OTHER        = 'other',        'Other'
 
     record      = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='wearable_points')
+    # Denormalised owner — see the note on ParsedLabValue.patient.
+    patient     = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                    related_name='wearable_points', null=True, blank=True)
     metric      = models.CharField(max_length=20, choices=Metric.choices, default=Metric.OTHER)
     value       = models.FloatField()
     unit        = models.CharField(max_length=20, blank=True)
     recorded_at = models.DateTimeField()
 
     class Meta:
-        ordering = ['recorded_at']
+        ordering = ['recorded_at', 'id']
+        indexes = [
+            models.Index(fields=['patient', 'metric', 'recorded_at']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.record_id and self.patient_id != self.record.patient_id:
+            self.patient_id = self.record.patient_id
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.get_metric_display()}: {self.value} {self.unit} @ {self.recorded_at}'

@@ -82,7 +82,7 @@ User question
                          (or assembled synchronously for ask())
 ```
 
-`stream_ask()` uses a routing-only subgraph (no `generate_node`) that resolves retrieval state, then calls `generate_streaming()` directly for token-by-token SSE output. `ask()` consumes the same SSE stream and assembles the full response tuple synchronously.
+`stream_ask()` uses a routing-only graph that resolves retrieval state, then calls `generate_streaming()` directly for token-by-token SSE output. Generation is deliberately not a graph node, so only generation tokens can reach the client. `ask()` consumes the same SSE stream and assembles the full response tuple synchronously.
 
 ### Routing
 
@@ -132,9 +132,9 @@ Both streaming (SSE, token-by-token) and non-streaming modes are supported acros
 - Definitive diagnosis statement (`you have diabetes`) → language softened + diagnostic disclaimer
 - Emergency / alarming language → urgent care reminder appended
 
-### Self-correction (LangGraph path only)
+### Self-correction — not implemented
 
-After generation, `verify_node` checks for empty context (no chunks retrieved). If true and fewer than 2 retries have been attempted, the graph loops back through `records_node` for a broader retrieval pass.
+This section previously described a `verify_node` that retried retrieval when no chunks came back. That node existed only in a second graph which no caller ever invoked, so the retry never ran in any request. The dead graph has been removed; retrieval returning nothing is currently **not** retried. Treat this as an open gap, not a shipped feature.
 
 ### Streaming
 

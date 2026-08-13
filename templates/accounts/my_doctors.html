@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Who can see my records{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;margin:0 auto">
+
+  <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:.4rem">Who can see my records</h1>
+  <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.5rem">
+    A clinic can request access to your medical records, but nothing is shared
+    until you approve it. You can withdraw access at any time.
+  </p>
+
+  {% if not links %}
+    {# Empty state: this page is reachable from a notification, so arriving with
+       nothing to show is a normal case rather than an error. #}
+    <div style="border:1px solid var(--border);border-radius:12px;padding:2rem;text-align:center;color:var(--muted)">
+      <p style="font-size:.95rem">No doctor has requested access to your records.</p>
+      <p style="font-size:.82rem;margin-top:.4rem">
+        If a clinic asks for access, the request will appear here for you to approve or decline.
+      </p>
+    </div>
+  {% else %}
+    {% for link in links %}
+      <div style="border:1px solid var(--border);border-radius:12px;padding:1rem 1.1rem;margin-bottom:.8rem">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:700">
+              Dr. {{ link.doctor.get_full_name|default:link.doctor.username }}
+            </div>
+            <div style="font-size:.82rem;color:var(--muted);margin-top:.15rem">
+              {% if link.doctor.doctor_profile.specialty %}{{ link.doctor.doctor_profile.specialty }} · {% endif %}
+              {% if link.doctor.doctor_profile.hospital %}{{ link.doctor.doctor_profile.hospital }}{% endif %}
+            </div>
+            <div style="font-size:.78rem;color:var(--muted);margin-top:.35rem">
+              Requested {{ link.created_at|date:"j M Y" }}
+              {% if link.decided_at %} · you responded {{ link.decided_at|date:"j M Y" }}{% endif %}
+            </div>
+          </div>
+
+          <div style="text-align:right">
+            {% if link.status == 'active' %}
+              <span style="display:inline-block;background:#dcfce7;color:#15803d;border-radius:999px;padding:.2rem .7rem;font-size:.75rem;font-weight:700">
+                Can view your records
+              </span>
+              <form method="post" action="{% url 'accounts:revoke_doctor_access' link.pk %}" style="margin-top:.6rem">
+                {% csrf_token %}
+                <button type="submit"
+                        style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;padding:.4rem .9rem;font-size:.82rem;font-weight:700;cursor:pointer">
+                  Withdraw access
+                </button>
+              </form>
+
+            {% elif link.status == 'pending' %}
+              <span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:999px;padding:.2rem .7rem;font-size:.75rem;font-weight:700">
+                Awaiting your decision
+              </span>
+              <div style="display:flex;gap:.5rem;margin-top:.6rem;justify-content:flex-end">
+                <form method="post" action="{% url 'accounts:approve_doctor_access' link.pk %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:.4rem .9rem;font-size:.82rem;font-weight:700;cursor:pointer">
+                    Allow
+                  </button>
+                </form>
+                <form method="post" action="{% url 'accounts:revoke_doctor_access' link.pk %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          style="background:#fff;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;padding:.4rem .9rem;font-size:.82rem;font-weight:700;cursor:pointer">
+                    Decline
+                  </button>
+                </form>
+              </div>
+
+            {% else %}
+              <span style="display:inline-block;background:#f1f5f9;color:#475569;border-radius:999px;padding:.2rem .7rem;font-size:.75rem;font-weight:700">
+                No access
+              </span>
+              <div style="font-size:.72rem;color:var(--muted);margin-top:.5rem;max-width:200px">
+                Revoked links are kept so your access history stays complete.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+</div>
+{% endblock %}

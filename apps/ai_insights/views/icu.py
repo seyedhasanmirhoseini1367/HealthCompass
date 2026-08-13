@@ -1,6 +1,6 @@
 import json
 import os
-import random as _random
+import random  # local Random() below — never the module-level RNG
 
 import pandas as _pd
 from django.shortcuts import render
@@ -137,7 +137,10 @@ def _icu_unit_abbr(full):
 
 
 def _icu_mock_eeg(seed=7):
-    _random.seed(seed)
+    # random.Random(...) rather than random.seed(...): seeding the
+    # module-level RNG is process-wide state, so a concurrent request
+    # elsewhere using random would get its sequence reset.
+    _random = random.Random(seed)
     labels = [f'{i}:00' for i in range(24)]
     prob = [round(_random.uniform(0.01, 0.15), 3) for _ in range(18)]
     prob += [round(_random.uniform(0.55, 0.82), 3) for _ in range(3)]
@@ -146,7 +149,10 @@ def _icu_mock_eeg(seed=7):
 
 
 def _icu_mock_context():
-    _random.seed(42)
+    # random.Random(...) rather than random.seed(...): seeding the
+    # module-level RNG is process-wide state, so a concurrent request
+    # elsewhere using random would get its sequence reset.
+    _random = random.Random(42)
     vitals = {
         'hr':   [[i * 0.5, round(92 + _random.uniform(-8, 8), 1)] for i in range(60)],
         'map':  [[i * 0.5, round(63 + _random.uniform(-8, 6), 1)] for i in range(60)],

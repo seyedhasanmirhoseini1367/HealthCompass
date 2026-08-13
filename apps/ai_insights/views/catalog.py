@@ -8,12 +8,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from ..models import AIModel, ModelPrediction
 from ..forms import SubmitModelForm
-from ..inference.interpretation import generate_interpretation, _rule_based_demo_result
+from ..inference.interpretation import generate_interpretation
 
 logger = logging.getLogger(__name__)
 
 
 from ..services.utils import _sanitize
+from ..inference.base import InferenceError
+from healthcompass.errors import client_error
 from django.db.models import F
 
 
@@ -79,47 +81,15 @@ def run_prediction(request, slug):
 
         input_file = request.FILES.get('input_file') or None
 
-        handler_slug = model.handler_slug or ''
+        # Handler resolution and dispatch live in inference.run_model, shared
+        # with the mobile API. They were duplicated here, and the mobile copy
+        # imported a module that no longer existed — two definitions of "how a
+        # model runs" is how the web and mobile paths drift apart.
+        from ..inference import run_model
 
-        # Auto-route when handler_slug is not set in admin
-        if not handler_slug and model.model_file:
-            ext = model.model_file.name.rsplit('.', 1)[-1].lower()
-            _ext_map: dict[str, dict[str, str]] = {
-                'onnx': {
-                    'tabular': 'tabular_passthrough',
-                    'image':   'image_classifier',
-                    'eeg_csv': 'eeg_csv',
-                    'parquet': 'tabular_passthrough',
-                    'file':    'tabular_passthrough',
-                },
-                'pt':  {'eeg_csv': 'eeg_csv', 'parquet': 'eeg_csv'},
-                'pth': {'eeg_csv': 'eeg_csv', 'parquet': 'eeg_csv'},
-            }
-            handler_slug = _ext_map.get(ext, {}).get(model.input_type, '')
-
-        logger.info('run_prediction: model=%s handler_slug=%r (resolved=%r)',
-                    model.slug, model.handler_slug, handler_slug)
-
-        if handler_slug:
-            from ..inference import get_handler
-            model.handler_slug = handler_slug
-            handler = get_handler(model)
-            result = handler.run(
-                uploaded_file=input_file,
-                input_data=input_data if not input_file else None,
-            )
-        elif not model.model_file:
-            # No model file uploaded — return a demo/rule-based result
-            result = _rule_based_demo_result(model, input_data, input_file)
-        else:
-            ext = model.model_file.name.rsplit('.', 1)[-1].upper()
-            raise ValueError(
-                f'No handler configured for model "{model.name}" ({ext} file). '
-                'Set handler_slug in Django Admin → AI Models → this model. '
-                'Available handlers: seizure_eeg, eeg_csv, image_classifier, tabular_passthrough.'
-            )
-
-        result = _sanitize(result)
+        logger.info('run_prediction: model=%s handler_slug=%r',
+                    model.slug, model.handler_slug)
+        result = _sanitize(run_model(model, input_data, input_file))
 
         if not result.get('success'):
             raise ValueError(result.get('error', 'Prediction failed'))
@@ -175,12 +145,25 @@ def run_prediction(request, slug):
         messages.success(request, f'Prediction complete: {result.get("label")}')
         return redirect('ai_insights:prediction_detail', pk=prediction.pk)
 
-    except Exception as exc:
-        err_msg = str(exc)
-        logger.exception('run_prediction error for model %s: %s', slug, err_msg)
+    except InferenceError as exc:
+        # InferenceError is the one exception type whose message is WRITTEN for
+        # the patient — "missing: age, glucose", "expected CSV, you uploaded
+        # .PDF". Named explicitly rather than inlining str(exc) so it is
+        # distinguishable from an internal leak, both to a reader and to the
+        # sweep in apps/accounts/test_error_disclosure.py.
+        user_facing_message = str(exc)
         if is_ajax:
-            return JsonResponse({'success': False, 'error': err_msg})
-        messages.error(request, f'Prediction failed: {err_msg}')
+            return JsonResponse({'success': False, 'error': user_facing_message})
+        messages.error(request, f'Prediction failed: {user_facing_message}')
+        return redirect('ai_insights:model_detail', slug=slug)
+
+    except Exception as exc:
+        # Anything else is internal: admin instructions, provider errors and
+        # stack detail were previously rendered straight into the page.
+        payload = client_error(exc, context='run_prediction', log=logger)
+        if is_ajax:
+            return JsonResponse({'success': False, **payload})
+        messages.error(request, f"{payload['error']} (ref {payload['reference']})")
         return redirect('ai_insights:model_detail', slug=slug)
 
 
@@ -219,7 +202,19 @@ def submit_model(request):
     return render(request, 'ai_insights/submit_model.html', {'form': form})
 
 
+@login_required
 def debug_handlers(request):
+    """
+    Handler/model diagnostics. Staff only.
+
+    This had no decorator at all: any anonymous visitor could enumerate every
+    registered inference handler and every model's slug, handler_slug and
+    input_type — including PENDING and REJECTED models that are not otherwise
+    visible anywhere.
+    """
+    if not request.user.is_staff:
+        raise PermissionDenied
+
     from ..inference import list_handlers
     models = AIModel.objects.values('slug', 'handler_slug', 'input_type')
     lines = ['=== Registered handlers ===']

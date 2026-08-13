@@ -24,10 +24,8 @@ cold_start_node  — new LangGraph node (was service-layer only before).
 
 *_node           — retrieval scoped to a medical domain.
 
-generate_node    — LLM generation (Gemini → Anthropic → OpenAI).
-
-verify_node      — retries ONLY when no chunks were retrieved (max 2×).
-                   Skips retry for cold_start and emergency routes.
+Generation is deliberately NOT a node: stream_graph() calls generate_streaming()
+directly so only generation tokens can reach the client.
 """
 import logging
 import re
@@ -383,69 +381,14 @@ def general_node(state: HealthState) -> Dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# GENERATE
+# GENERATION happens outside the graph
 # ══════════════════════════════════════════════════════════════════════════════
-
-def generate_node(state: HealthState) -> Dict[str, Any]:
-    """
-    Call the LLM.  Uses trajectory_context (when set) as a context_override
-    with the trajectory system prompt so the LLM reasons about temporal change.
-    Also handles cold_start context overrides the same way.
-    """
-    try:
-        from apps.rag_assistant.services.generation_service import generate
-        trajectory_context = state.get('trajectory_context', '')
-        answer, _, provider = generate(
-            chunks           = state.get('context_chunks', []),
-            query            = state['question'],
-            history          = state.get('history', []),
-            context_override = trajectory_context,
-        )
-        return {'answer': answer, 'llm_provider': provider}
-    except Exception as exc:
-        logger.exception('Generation failed: %s', exc)
-        return {
-            'answer':       'I was unable to generate a response. Please try again.',
-            'llm_provider': 'error',
-        }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# VERIFY / RETRY
-# ══════════════════════════════════════════════════════════════════════════════
-
-def verify_node(state: HealthState) -> Dict[str, Any]:
-    """
-    Decides whether to retry retrieval + generation.
-
-    Special routes that must NEVER retry:
-        'cold_start' — no records exist; retry would loop forever.
-        'emergency'  — safety gate fired; answer already set.
-
-    For all other routes: retries when no context chunks were retrieved
-    AND the retry limit (2×) has not been reached.
-    """
-    route       = state.get('route', '')
-    retry_count = state.get('retry_count', 0)
-
-    # Cold-start and emergency routes: always terminate cleanly — no retry possible.
-    # retry_count is not incremented here because no retrieval attempt was made.
-    if route in ('cold_start', 'emergency'):
-        return {
-            'needs_retry':        False,
-            'retry_count':        retry_count,
-            'trajectory_context': state.get('trajectory_context', ''),
-        }
-
-    no_chunks   = len(state.get('context_chunks', [])) == 0
-    needs_retry = no_chunks and retry_count < 2
-
-    if needs_retry:
-        logger.debug('verify → retry (no chunks, attempt %d)', retry_count + 1)
-
-    return {
-        'needs_retry':    needs_retry,
-        'retry_count':    retry_count + 1,
-        # Clear trajectory context on retry so records_node works normally
-        'trajectory_context': '' if needs_retry else state.get('trajectory_context', ''),
-    }
+#
+# generate_node and verify_node used to live here, wired into a second graph
+# (`health_graph`) that nothing ever invoked. Generation is done by
+# stream_graph() calling generate_streaming() directly, so tokens can only come
+# from generation and never from an internal node.
+#
+# verify_node's retry-on-empty-retrieval loop was never reachable either. Its
+# removal changes no behaviour — it was already not running — but it does remove
+# the impression that empty retrieval is retried somewhere. It is not.

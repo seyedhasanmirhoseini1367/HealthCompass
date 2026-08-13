@@ -78,6 +78,14 @@ def analytics(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def population_insights(request):
+    # Same cohort data as the web population view, and it had the same gap:
+    # authentication alone, so any patient's mobile token returned statistics
+    # over every other patient. Checked before the cache read — a cached payload
+    # must not become a way around the check.
+    from apps.accounts.authz import can_view_population_analytics
+    if not can_view_population_analytics(request.user):
+        return Response({'error': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
+
     cached = cache.get('api:population_insights')
     if cached is not None:
         return Response(cached)

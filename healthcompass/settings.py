@@ -234,6 +234,13 @@ RAG_CONFIG = {
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
 MAX_UPLOAD_BYTES = config('MAX_UPLOAD_BYTES', default=25 * 1024 * 1024, cast=int)
+
+# Model files are legitimately larger than clinical documents, so they get their
+# own ceiling rather than being forced under the record limit. Enforced in
+# apps/ai_insights/forms.py; there was previously no limit on model uploads at
+# all, and no format or content check either.
+MAX_MODEL_UPLOAD_BYTES = config('MAX_MODEL_UPLOAD_BYTES',
+                                default=200 * 1024 * 1024, cast=int)
 # Row ceiling for tabular imports (parquet/CSV). Compressed formats can
 # expand far beyond MAX_UPLOAD_BYTES, so the expansion is bounded too.
 MAX_PARSED_ROWS = config('MAX_PARSED_ROWS', default=200_000, cast=int)

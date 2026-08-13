@@ -62,7 +62,13 @@ def ai_model_detail(request, slug):
 def run_model_prediction(request, slug):
     from apps.ai_insights.models import AIModel, ModelPrediction
     from apps.ai_insights.services.utils import _sanitize
-    from apps.ai_insights.runner import run_model, generate_interpretation
+    # apps.ai_insights.runner no longer exists — it was split into
+    # inference/ and interpretation.py. This import raised
+    # ModuleNotFoundError on every call, so POST /api/v1/ai-models/<slug>/run/
+    # returned 500 for the entire life of the endpoint, uncaught because it
+    # sits above the try and untested because apps/api had no tests.
+    from apps.ai_insights.inference import run_model
+    from apps.ai_insights.inference.interpretation import generate_interpretation
     try:
         model = AIModel.objects.get(slug=slug, status='active')
     except AIModel.DoesNotExist:

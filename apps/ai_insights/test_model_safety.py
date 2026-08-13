@@ -207,3 +207,130 @@ class SeededModelHonestyTests(TestCase):
         self.assertNotIn("'[DEMO] Cardiovascular Risk Score (SCORE2)'", self.source)
         self.assertNotIn('Based on the ESC SCORE2 framework', self.source)
         self.assertNotIn('SCORE2 estimates 10-year cardiovascular risk', self.source)
+
+
+class ModelUploadValidationTests(TestCase):
+    """
+    P1 — model_file had no validation of any kind.
+
+    base.py blocks pickle/Keras/joblib/PyTorch at LOAD time because
+    deserialising them executes arbitrary code, but that is after the file is
+    already stored. Rejecting at upload keeps it out of storage entirely.
+    """
+
+    def setUp(self):
+        from apps.ai_insights.forms import SubmitModelForm
+        self.form_cls = SubmitModelForm
+        self.base = {'name': 'M', 'category': 'general', 'input_type': 'tabular',
+                     'description': 'd', 'interpretation_guide': '',
+                     'handler_slug': '', 'input_schema_text': '{}',
+                     'output_schema_text': '{}', 'handler_config_text': ''}
+
+    def _upload(self, name, content=b'not-a-model'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile(name, content)
+
+    def test_pickle_is_rejected_at_upload(self):
+        """ACCEPTANCE — a code-executing format never reaches storage."""
+        form = self.form_cls(self.base, {'model_file': self._upload('model.pkl')})
+        self.assertFalse(form.is_valid())
+        self.assertIn('model_file', form.errors)
+
+    def test_pytorch_is_rejected_at_upload(self):
+        form = self.form_cls(self.base, {'model_file': self._upload('model.pt')})
+        self.assertFalse(form.is_valid())
+
+    def test_non_onnx_bytes_named_onnx_are_rejected(self):
+        """A renamed file must not pass — the check parses, it does not trust the name."""
+        form = self.form_cls(self.base, {'model_file': self._upload('model.onnx')})
+        self.assertFalse(form.is_valid())
+        self.assertIn('model_file', form.errors)
+
+    def test_oversized_model_is_rejected(self):
+        from django.test import override_settings
+        with override_settings(MAX_MODEL_UPLOAD_BYTES=10):
+            form = self.form_cls(
+                self.base, {'model_file': self._upload('model.onnx', b'x' * 1000)})
+            self.assertFalse(form.is_valid())
+
+    def test_submitting_without_a_model_file_is_still_allowed(self):
+        """File-less models are the demo path and must keep working."""
+        form = self.form_cls(self.base, {})
+        self.assertTrue(form.is_valid(), form.errors)
+
+
+class SharedInferenceEntryPointTests(TestCase):
+    """
+    P1 — the mobile API imported apps.ai_insights.runner, which does not exist.
+
+    Every call raised ModuleNotFoundError, so POST /api/v1/ai-models/<slug>/run/
+    returned 500 for the whole life of the endpoint. Both callers now share one
+    dispatch rather than keeping two divergent copies.
+    """
+
+    def test_run_model_is_importable(self):
+        from apps.ai_insights.inference import run_model
+        self.assertTrue(callable(run_model))
+
+    def test_nothing_imports_the_dead_module(self):
+        """
+        Parsed with ast, not matched as text: the comments explaining why the
+        import was removed necessarily name the module, and a text scan would
+        flag the explanation as the offence.
+        """
+        import ast
+        import pathlib
+
+        offenders = []
+        for path in pathlib.Path('apps').rglob('*.py'):
+            if 'test_' in path.name:
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+            except SyntaxError:                       # pragma: no cover
+                self.fail(f'could not parse {path}')
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    if 'ai_insights.runner' in node.module:
+                        offenders.append(f'{path}:{node.lineno}')
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if 'ai_insights.runner' in alias.name:
+                            offenders.append(f'{path}:{node.lineno}')
+
+        self.assertEqual(offenders, [],
+                         f'apps.ai_insights.runner does not exist: {offenders}')
+
+    def test_web_view_does_not_duplicate_handler_dispatch(self):
+        import pathlib
+        source = pathlib.Path(
+            'apps/ai_insights/views/catalog.py').read_text(encoding='utf-8-sig')
+        self.assertNotIn('_ext_map', source,
+                         'handler dispatch belongs in inference.run_model only')
+
+
+class DebugEndpointTests(TestCase):
+    """P1 — debug_handlers was unauthenticated."""
+
+    def test_anonymous_cannot_read_the_handler_dump(self):
+        """ACCEPTANCE — it enumerated every model incl. PENDING and REJECTED."""
+        from django.urls import reverse
+        response = self.client.get(reverse('ai_insights:debug_handlers'))
+        self.assertIn(response.status_code, (302, 403))
+
+    def test_ordinary_patient_cannot_read_it(self):
+        from django.urls import reverse
+        user = get_user_model().objects.create_user(
+            username='dbg', password='pw-test-only', email='dbg@example.com')
+        self.client.force_login(user)
+        self.assertEqual(
+            self.client.get(reverse('ai_insights:debug_handlers')).status_code, 403)
+
+    def test_staff_can_read_it(self):
+        from django.urls import reverse
+        staff = get_user_model().objects.create_user(
+            username='dbgstaff', password='pw-test-only', email='s@example.com',
+            is_staff=True)
+        self.client.force_login(staff)
+        self.assertEqual(
+            self.client.get(reverse('ai_insights:debug_handlers')).status_code, 200)

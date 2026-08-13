@@ -17,6 +17,15 @@ _RATE_EXCEEDED = JsonResponse(
 
 logger = logging.getLogger(__name__)
 
+#: Longest accepted question.
+#
+# There was no cap. DATA_UPLOAD_MAX_MEMORY_SIZE is 50 MB and does not restrict a
+# single JSON field, so a multi-megabyte "question" was accepted, sent to the LLM
+# provider at cost, and stored verbatim in QueryLog.query — a TextField with no
+# database ceiling.
+MAX_QUESTION_CHARS = 4000
+
+
 
 # ─── Chat UI ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +68,16 @@ def chat_view(request):
 # ─── New session ──────────────────────────────────────────────────────────────
 
 @login_required
+@require_POST
 def new_session(request):
+    """
+    Start a new chat session. POST only.
+
+    This was a GET that created a database row, so
+    <img src="/assistant/new/"> on any page created a ChatSession for every
+    logged-in visitor who loaded it — unbounded, unrated, and CSRF-exempt by
+    construction because GET is exempt.
+    """
     session = ChatSession.objects.create(
         patient=request.user,
         title='New Chat',
@@ -82,6 +100,12 @@ def send_message(request):
 
     query = body.get('message', '').strip()
     session_id = body.get('session_id')
+
+    if len(query) > MAX_QUESTION_CHARS:
+        return JsonResponse(
+            {'error': f'Message is too long ({len(query)} characters). '
+                      f'Please keep questions under {MAX_QUESTION_CHARS}.'},
+            status=400)
 
     if not query:
         return JsonResponse({'error': 'Empty message'}, status=400)
@@ -197,6 +221,12 @@ def stream_message(request):
 
     query      = body.get('message', '').strip()
     session_id = body.get('session_id')
+
+    if len(query) > MAX_QUESTION_CHARS:
+        return JsonResponse(
+            {'error': f'Message is too long ({len(query)} characters). '
+                      f'Please keep questions under {MAX_QUESTION_CHARS}.'},
+            status=400)
 
     if not query:
         return JsonResponse({'error': 'Empty message'}, status=400)

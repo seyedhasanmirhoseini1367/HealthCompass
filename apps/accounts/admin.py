@@ -89,7 +89,7 @@ class HospitalAdminProfileAdmin(admin.ModelAdmin):
 
 @admin.register(PatientDoctorRelationship)
 class PatientDoctorRelationshipAdmin(admin.ModelAdmin):
-    list_display  = ('patient', 'doctor', 'linked_by', 'is_active', 'created_at')
-    list_filter   = ('is_active',)
+    list_display  = ('patient', 'doctor', 'linked_by', 'status', 'created_at')
+    list_filter   = ('status',)
     search_fields = ('patient__username', 'doctor__username')
-    list_editable = ('is_active',)
+    list_editable = ('status',)

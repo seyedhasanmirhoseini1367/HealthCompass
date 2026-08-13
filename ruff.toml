@@ -1,0 +1,27 @@
+# Lint configuration.
+#
+# The selected rules are deliberately narrow: syntax errors (E9), undefined
+# names (F821/F822/F823), broken comparisons (F63) and unreachable-ish
+# constructs (F7). Every one of them is a bug that would fail at runtime, not a
+# style preference — an undefined name in an error branch is exactly the kind of
+# defect that only surfaces when something has already gone wrong.
+#
+# This set passes on the codebase today, which is what makes it usable as a CI
+# gate. A gate that is expected to be red teaches people to ignore it.
+#
+# NOT enabled yet: F401 (unused imports), F841 (unused locals), E711/E712
+# (comparisons to None/True) and flake8-bugbear. Together they report 79 issues,
+# mostly in scripts/ and management commands. Worth cleaning, but that is a
+# separate change with its own review — turning them on now would break the
+# gate on arrival.
+line-length = 100
+
+exclude = [
+    ".venv",
+    "staticfiles",
+    "evaluation",      # local evaluation data, not part of the application
+    "*/migrations/*",  # generated; style rules do not apply
+]
+
+[lint]
+select = ["E9", "F63", "F7", "F82"]

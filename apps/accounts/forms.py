@@ -19,8 +19,16 @@ class RegisterForm(UserCreationForm):
         fields = ["username", "first_name", "last_name", "email", "password1", "password2"]
 
     def clean_email(self):
-        email = self.cleaned_data['email']
-        if CustomUser.objects.filter(email=email).exists():
+        """
+        Reject a duplicate regardless of case.
+
+        This checked `filter(email=email)` — an exact match — while the login
+        backend resolves with `__iexact`. So 'A@x.com' could be registered after
+        'a@x.com' existed, and which account a later email login reached was
+        decided by row order.
+        """
+        email = (self.cleaned_data['email'] or '').strip().lower()
+        if CustomUser.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError("An account with this email already exists.")
         return email
 

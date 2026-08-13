@@ -56,6 +56,10 @@ def _index_in_background(record_pk: str):
         record = MedicalRecord.objects.get(pk=record_pk)
         svc    = RAGService()
         n      = svc.index_record(record)
+        # Stamp only on success: the column is what a sweep uses to find records
+        # whose indexing never ran or never finished.
+        from django.utils import timezone as _tz
+        MedicalRecord.objects.filter(pk=record_pk).update(indexed_at=_tz.now())
         logger.info('Auto-indexed record %s → %d chunks', record_pk, n)
     except Exception as exc:
         logger.error('Auto-index failed for record %s: %s', record_pk, exc)

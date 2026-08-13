@@ -65,17 +65,24 @@ jobs:
       - name: Check for dependency conflicts
         run: pip check
 
+      # Narrow on purpose — see ruff.toml. Only rules that flag runtime bugs
+      # (syntax errors, undefined names, broken comparisons) are enabled, so
+      # this gate is green today and a failure means something is actually
+      # wrong rather than merely untidy.
+      - name: Lint
+        run: |
+          pip install ruff==0.6.9
+          ruff check .
+
       - name: Django system checks
         run: python manage.py check
 
-      # NOT YET ENABLED — `python manage.py makemigrations --check --dry-run`
-      # currently reports drift on ai_insights.AIModel.model_file: migration
-      # 0001 records help_text "Upload .pkl or .h5 model file" while the model
-      # now says "Upload a .onnx model file". help_text produces no SQL, so this
-      # is state-only drift and carries no data-integrity risk — but the check
-      # would fail on arrival, and a gate that is expected to be red teaches
-      # people to ignore it. Generate the no-op migration, then enable this step
-      # in the same change. Tracked in docs/PROJECT_AUDIT_ROADMAP.md.
+      # A model changed without its migration is how production and the code
+      # drift apart silently. Enabled once the one outstanding difference — a
+      # help_text on AIModel.model_file, no SQL involved — was recorded in
+      # ai_insights migration 0004.
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
 
       - name: Run test suite
         run: python manage.py test apps --verbosity 2

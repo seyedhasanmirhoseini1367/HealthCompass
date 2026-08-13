@@ -63,22 +63,17 @@ def readiness(request):
 
 
 def _user_can_access_media(user, relative_path: str) -> bool:
-    """Return True if user is allowed to download this media file."""
-    if user.is_staff:
-        return True
-    from apps.medical_records.models import MedicalRecord
-    from apps.ai_insights.models import ModelPrediction
-    # Patient's own medical record
-    if MedicalRecord.objects.filter(file=relative_path, patient=user).exists():
-        return True
-    # Patient's own prediction input
-    if ModelPrediction.objects.filter(input_file=relative_path, patient=user).exists():
-        return True
-    # User's own profile picture
-    pic = getattr(user, 'profile_picture', None)
-    if pic and pic.name == relative_path:
-        return True
-    return False
+    """
+    Return True if user is allowed to download this media file.
+
+    The rule lives in apps.accounts.authz so the web and API surfaces cannot
+    drift apart. Two things changed there: `is_staff` no longer grants a silent
+    bypass (it still grants access, but the access is recorded), and a doctor
+    with an ACTIVE patient link can now open the file behind a record they are
+    already permitted to read.
+    """
+    from apps.accounts.authz import can_access_media
+    return can_access_media(user, relative_path)
 
 
 def serve_media(request, path):

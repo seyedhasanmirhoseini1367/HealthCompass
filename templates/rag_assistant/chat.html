@@ -154,9 +154,12 @@ footer{display:none!important}
 <div class="chat-layout">
   <!-- Sidebar: session list -->
   <div class="sidebar">
-    <a href="{% url 'rag_assistant:new_session' %}" class="new-chat-btn">
-      <i class="fas fa-plus"></i> New chat
-    </a>
+    <form method="post" action="{% url 'rag_assistant:new_session' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="new-chat-btn">
+        <i class="fas fa-plus"></i> New chat
+      </button>
+    </form>
     <div class="sidebar-title">Recent chats</div>
     {% for s in sessions %}
     <div class="session-row {% if s.pk == session.pk %}active{% endif %}"
@@ -187,9 +190,12 @@ footer{display:none!important}
         <span class="drawer-title">Chats</span>
         <button onclick="closeMobileDrawer()" class="drawer-close">&times;</button>
       </div>
-      <a href="{% url 'rag_assistant:new_session' %}" class="new-chat-btn mb-xs">
+      <form method="post" action="{% url 'rag_assistant:new_session' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="new-chat-btn mb-xs">
         <i class="fas fa-plus"></i> New chat
-      </a>
+        </button>
+      </form>
       {% for s in sessions %}
       <div class="session-row {% if s.pk == session.pk %}active{% endif %}" id="msrow-{{ s.pk }}">
         <a href="/assistant/?session={{ s.pk }}" class="session-item">{{ s.title|truncatechars:34 }}</a>
@@ -785,7 +791,15 @@ async function deleteSession(pk, rowId) {
     if (data.ok) {
       const row = document.getElementById(rowId);
       row.remove();
-      if (row.classList.contains('active')) window.location.href = '/assistant/new/';
+      if (row.classList.contains('active')) {
+        // new_session is POST-only now — a GET that creates a row was
+        // CSRF-exempt by construction.
+        const f = document.createElement('form');
+        f.method = 'POST'; f.action = '/assistant/new/';
+        const t = document.createElement('input');
+        t.type = 'hidden'; t.name = 'csrfmiddlewaretoken'; t.value = CSRF;
+        f.appendChild(t); document.body.appendChild(f); f.submit();
+      }
     }
   }, 'Delete Chat');
 }

@@ -143,6 +143,8 @@ class Command(BaseCommand):
                         val, unit, ref, is_abnormal = _make_value(bio, year_offset)
                         values_to_create.append(ParsedLabValue(
                             record=rec,
+                            # bulk_create skips save(), so set the owner here.
+                            patient=user,
                             parameter_name=bio[0],
                             value=val,
                             unit=unit,

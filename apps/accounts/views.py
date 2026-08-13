@@ -10,12 +10,15 @@ from django.http import Http404, HttpResponse
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
 from allauth.socialaccount.views import SignupView as BaseSocialSignupView
 from django_ratelimit.decorators import ratelimit
 
 from .models import (PatientProfile, DoctorProfile, DataScientistProfile,
-                     HospitalAdminProfile, EmergencyCardView)
+                     HospitalAdminProfile, EmergencyCardView,
+                     PatientDoctorRelationship, DoctorAccessLog)
 from .forms import (RegisterForm, LoginForm, ProfileForm, PasswordChangeForm,
                     PatientProfileForm, DoctorProfileForm, DataScientistProfileForm)
 
@@ -382,11 +385,27 @@ def change_password(request):
 # ── Emergency card ────────────────────────────────────────────────────────────
 
 def _get_client_ip(request) -> str:
-    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    return forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+    """
+    The client address, taken from REMOTE_ADDR.
 
+    X-Forwarded-For is NOT consulted. Its first element is whatever the client
+    put there — proxies append, they do not overwrite — so trusting it let any
+    caller send a fresh value per request and:
 
-@login_required
+      * bypass the emergency-card rate limit entirely (30/min became unlimited),
+        enabling brute-force enumeration of emergency_token UUIDs;
+      * poison EmergencyCardView.ip_hash, destroying the audit trail's value.
+
+    django-ratelimit's key='ip' already uses REMOTE_ADDR for exactly this
+    reason, so the hand-rolled helper was strictly weaker than the library
+    already in the project.
+
+    If a real proxy is ever terminated in front of this app, the correct fix is
+    to parse XFF from the RIGHT, trusting only as many hops as are actually
+    deployed — not to read element zero.
+    """
+    return request.META.get('REMOTE_ADDR', '') or ''
+
 def emergency_card(request):
     """Patient's own emergency card view with QR code and recent access summary."""
     import base64, io
@@ -483,3 +502,78 @@ def delete_account(request):
             return redirect("home")
         messages.error(request, "Incorrect password. Account not deleted.")
     return render(request, "accounts/delete_account.html")
+
+
+# ── Patient control over who can read their records ──────────────────────────
+#
+# None of this existed. A hospital admin created a link and the doctor could
+# read the records immediately; the patient was told afterwards and had no way
+# to stop it. `remove_link` in the dashboard is scoped to linked_by=<the admin
+# who created it>, so not even a different admin could revoke one. For a
+# GDPR-scoped health product, a data subject who cannot terminate a third
+# party's access to their own records is a compliance problem, not a UX gap.
+
+@login_required
+def my_doctors(request):
+    """Every access request and grant on this patient's records."""
+    links = (PatientDoctorRelationship.objects
+             .filter(patient=request.user)
+             .select_related('doctor', 'doctor__doctor_profile')
+             .order_by('-created_at'))
+    return render(request, 'accounts/my_doctors.html', {
+        'links':   links,
+        'Status':  PatientDoctorRelationship.Status,
+    })
+
+
+@login_required
+@require_POST
+def approve_doctor_access(request, pk):
+    """Grant a pending request. POST only — this changes who can read PHI."""
+    link = get_object_or_404(PatientDoctorRelationship, pk=pk, patient=request.user)
+
+    if link.status == PatientDoctorRelationship.Status.REVOKED:
+        messages.error(request, 'This access was revoked and cannot be re-approved '
+                                'here. Ask your clinic to send a new request.')
+        return redirect('accounts:my_doctors')
+
+    link.status = PatientDoctorRelationship.Status.ACTIVE
+    link.decided_at = timezone.now()
+    link.save(update_fields=['status', 'decided_at'])
+
+    # The access log is the record patients can later ask to see; a grant is as
+    # much a part of that history as a read.
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=request.user,
+        resource=f'access_granted:doctor:{link.doctor_id}')
+    logger.info('Patient %s granted record access to doctor %s',
+                request.user.pk, link.doctor_id)
+
+    messages.success(request, f'Dr. {link.doctor.get_full_name() or link.doctor.username} '
+                              f'can now view your records.')
+    return redirect('accounts:my_doctors')
+
+
+@login_required
+@require_POST
+def revoke_doctor_access(request, pk):
+    """
+    Withdraw a doctor's access. POST only.
+
+    The row is kept rather than deleted: who had access, and when it ended, is
+    exactly the history the audit trail exists to preserve.
+    """
+    link = get_object_or_404(PatientDoctorRelationship, pk=pk, patient=request.user)
+
+    link.status = PatientDoctorRelationship.Status.REVOKED
+    link.decided_at = timezone.now()
+    link.save(update_fields=['status', 'decided_at'])
+
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=request.user,
+        resource=f'access_revoked:doctor:{link.doctor_id}')
+    logger.info('Patient %s revoked record access from doctor %s',
+                request.user.pk, link.doctor_id)
+
+    messages.success(request, 'Access revoked. That doctor can no longer view your records.')
+    return redirect('accounts:my_doctors')

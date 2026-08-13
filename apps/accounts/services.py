@@ -26,21 +26,55 @@ def purge_user_data(user) -> None:
     of the index handles the gap; for a per-user right-to-erasure guarantee,
     migrate to a per-user index or a DB-backed vector store.
     """
+    from apps.ai_insights.models import AIModel, ModelPrediction
+    from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+
+    user_pk = user.pk
+
+    # ── 1. Collect every file this user owns, BEFORE deleting any row ────────
+    #
+    # Previously only the profile picture and MedicalRecord.file were removed.
+    # ModelPrediction.input_file (uploaded EEG/images submitted for inference)
+    # and AIModel.model_file for data-scientist accounts were left on disk. The
+    # DB rows cascaded away, so those files became unreachable through
+    # _user_can_access_media — which checks a row that no longer exists — and
+    # could not even be found and removed through the application afterwards.
+    # An erasure request that leaves the data present is not fulfilled.
+    targets = []
+    if user.profile_picture:
+        targets.append(('profile_picture', user.profile_picture))
+    for record in user.medical_records.all():
+        if record.file:
+            targets.append((f'record:{record.pk}', record.file))
+    for prediction in ModelPrediction.objects.filter(patient=user):
+        if prediction.input_file:
+            targets.append((f'prediction:{prediction.pk}', prediction.input_file))
+    for model in AIModel.objects.filter(data_scientist=user):
+        if model.model_file:
+            targets.append((f'ai_model:{model.pk}', model.model_file))
+
+    # ── 2. Delete the DB rows first — CASCADE handles everything linked ──────
     with transaction.atomic():
-        # ── 1. Profile picture ────────────────────────────────────────────────
-        if user.profile_picture:
-            try:
-                user.profile_picture.delete(save=False)
-            except Exception as exc:
-                logger.warning('Could not delete profile picture for user %s: %s', user.pk, exc)
-
-        # ── 2. Medical record files (PDFs, images, etc.) ──────────────────────
-        for record in user.medical_records.select_related().all():
-            if record.file:
-                try:
-                    record.file.delete(save=False)
-                except Exception as exc:
-                    logger.warning('Could not delete file for record %s: %s', record.pk, exc)
-
-        # ── 3. Delete the user — CASCADE handles all linked DB rows ───────────
         user.delete()
+
+    # ── 3. Only then remove the files ────────────────────────────────────────
+    #
+    # Deliberately OUTSIDE the transaction. File deletion has no compensating
+    # action: if the transaction rolled back, the rows would return while the
+    # bytes were already gone irreversibly. Doing it after the commit means the
+    # worst case is an orphaned file, which is recoverable, rather than a record
+    # pointing at nothing, which is not.
+    failed = 0
+    for label, field_file in targets:
+        try:
+            field_file.delete(save=False)
+        except Exception as exc:
+            failed += 1
+            logger.error('Erasure: could not delete %s for user %s: %s',
+                         label, user_pk, exc)
+
+    if failed:
+        # A silently skipped file is an unfulfilled erasure request, so this is
+        # an operational event rather than a warning line.
+        ops_emit(OpsEvent.ERASURE_INCOMPLETE, user_id=user_pk,
+                 files_remaining=failed, files_total=len(targets))

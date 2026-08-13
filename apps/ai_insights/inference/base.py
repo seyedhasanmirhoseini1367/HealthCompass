@@ -18,15 +18,34 @@ For PyTorch models (EEG handlers), override run() entirely and load weights
 with torch.load(..., weights_only=True) + model.load_state_dict().
 """
 
+import logging
 import os
 import io
 from dataclasses import dataclass, field as _dc_field
 import numpy as np
 import pandas as pd
 
+logger = logging.getLogger(__name__)
+
 # Formats that allow arbitrary code execution when deserialised.
 # _load_model() hard-blocks every one of these — only ONNX is accepted.
 _BLOCKED_FORMATS = frozenset({'pkl', 'pickle', 'h5', 'keras', 'joblib', 'pt', 'pth'})
+
+#: Beyond this, a single inference is reported as an operational event. Not a
+#: limit — nothing is cancelled — but a slow model should be visible rather than
+#: showing up only as a request that took a while.
+_SLOW_INFERENCE_SECONDS = 10.0
+
+#: Ceiling on what one inference may be asked to chew through. A CSV inside the
+#: upload limit can still expand into millions of cells, and onnxruntime cannot
+#: be interrupted once running, so the bound has to be applied before the call
+#: rather than during it. Overridable per deployment.
+_DEFAULT_MAX_INPUT_CELLS = 5_000_000
+
+
+def _max_input_cells() -> int:
+    from django.conf import settings
+    return int(getattr(settings, 'MAX_INFERENCE_INPUT_CELLS', _DEFAULT_MAX_INPUT_CELLS))
 
 
 class InferenceError(ValueError):
@@ -155,10 +174,32 @@ class InferenceHandler:
             feature_df    = self._build_tabular_df(input_data or {})
             input_summary = {'source': 'manual form', 'fields': len(input_data or {})}
 
+        self._check_input_size(feature_df)
+
         sess       = self._load_model()    # always InferenceSession after security fix
         input_name = sess.get_inputs()[0].name
         X          = feature_df.values.astype(np.float32)
-        outputs    = sess.run(None, {input_name: X})
+
+        # Inference is bounded by input size and thread count rather than by a
+        # wall clock. onnxruntime's run() cannot be interrupted: a "timeout"
+        # implemented with a thread join would return control to the request
+        # while the computation carried on holding a core, which is worse than
+        # no timeout because the load becomes invisible. A real hard limit needs
+        # process isolation; until that exists, the duration is measured so a
+        # slow model is visible instead of merely suspected.
+        import time
+        started = time.monotonic()
+        outputs = sess.run(None, {input_name: X})
+        elapsed = time.monotonic() - started
+
+        if elapsed > _SLOW_INFERENCE_SECONDS:
+            from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+            logger.warning('Inference took %.1fs (%d rows x %d features)',
+                           elapsed, feature_df.shape[0], feature_df.shape[1])
+            ops_emit(OpsEvent.INFERENCE_SLOW, level=logging.WARNING,
+                     seconds=round(elapsed, 2),
+                     rows=int(feature_df.shape[0]),
+                     features=int(feature_df.shape[1]))
 
         raw_pred = outputs[0]
         proba    = None
@@ -251,6 +292,23 @@ class InferenceHandler:
             f'Unsupported model format: .{ext}. '
             'Only .onnx is accepted.'
         )
+
+    def _check_input_size(self, feature_df: pd.DataFrame) -> None:
+        """
+        Refuse an input large enough to tie up a worker indefinitely.
+
+        Told plainly, with the numbers, because the patient can act on it: their
+        file is too big, and a smaller one will work.
+        """
+        rows, cols = feature_df.shape
+        cells = rows * cols
+        limit = _max_input_cells()
+        if cells > limit:
+            raise InferenceError(
+                f'This input is too large to analyse: {rows:,} rows × {cols:,} '
+                f'columns ({cells:,} values, limit {limit:,}). '
+                f'Upload a shorter recording or a smaller extract.'
+            )
 
     def _validate_features(self, feature_df: pd.DataFrame) -> None:
         expected_n = self.cfg.get('expected_n_features')

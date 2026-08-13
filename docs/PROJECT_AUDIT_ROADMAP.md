@@ -1,6 +1,6 @@
 # HealthCompass — Project Audit & Roadmap
 
-**Status:** Audit complete — awaiting review. No remediation started.
+**Status:** Audit complete. Remediation in progress — see the resolution log below.
 **Audit date:** 2026-08-13
 **Scope:** Whole system (not RAG-specific). 31,381 LOC, 8 Django apps, 630 tests.
 **Method:** Read-only inspection of code, models, migrations, templates, configuration,
@@ -10,6 +10,40 @@ criteria, MIMIC data or production configuration was modified during this audit.
 > **Rule applied throughout:** every finding below cites a file, a test, a
 > configuration value, or a reproducible observation. Where something could not be
 > verified it is marked **UNCERTAIN** rather than guessed.
+
+---
+
+## 0. Resolution log
+
+Findings closed since the audit. The finding text below is left exactly as written
+so the original reasoning stays readable; this table is the only place that says
+what has since changed. Each row names the test that would fail if the fix were
+reverted.
+
+| ID | Resolved by | Regression test |
+|---|---|---|
+| SEC-1 | Staff media access still allowed, now written to `DoctorAccessLog`. Rule moved to `apps/accounts/authz.py` so web and API cannot drift | `accounts/test_authz.py::MediaAccessTests::test_staff_access_is_recorded` |
+| SEC-2 | `population_view` and the API's `population_insights` require a research/admin role. Checked before the cache read | `accounts/test_authz.py::PopulationAnalyticsTests` |
+| SEC-3 | `DoctorAccessLog.actor_label` captures the actor at access time; FK stays SET_NULL so rows survive. Patient side deliberately still anonymised | `accounts/test_authz.py::AccessLogDurabilityTests` |
+| SEC-6 | Doctors with an ACTIVE link can download their patient's files; the access is logged | `accounts/test_authz.py::MediaAccessTests::test_a_linked_doctor_can_download_the_file` |
+| DM-2 | `patient` FK denormalised onto `ParsedLabValue` and `WearableDataPoint`, derived from the parent record in `save()`, backfilled by migration `0007` | `medical_records/test_data_model.py::LabValueOwnerTests` |
+| DM-3 | `Meta.ordering` on both models, with NULL placement stated explicitly rather than inherited from the engine | `medical_records/test_data_model.py::OrderingTests` |
+| API-1 | 27 functional tests: anonymous sweep driven from the URLconf, patient-scoping on every object endpoint, read and write paths | `api/test_endpoints.py` |
+| A-1 | Dead `health_graph` (generate_node, verify_node, retry loop) removed. README/ARCHITECTURE/PLAN_STATUS corrected — the retry never ran, and grounding is now recorded as MISSING rather than PARTIAL | `rag_assistant/test_graph_liveness.py` |
+| NEW-13 | Guardrail softening covers the whole stream instead of the first 500 characters; disclaimers appended once, at the end | `rag_assistant/test_guardrail_streaming.py` |
+| NEW-18 | Magic-byte checks accept multi-anchor signatures (WebP needs RIFF *and* WEBP), text formats rejected on NUL bytes, size measured when `.size` is absent | `medical_records/test_upload_validation.py` |
+| NEW-19 | Erasure collects every owned file including prediction inputs and model artifacts, deletes rows in a transaction and files after it commits, emits `ERASURE_INCOMPLETE` on failure | `accounts/test_erasure_and_indexing.py::ErasureCompletenessTests` |
+| NEW-20 | `MedicalRecord.indexed_at` marks what was actually indexed; `reindex_unindexed_records` sweeps the rest | `accounts/test_erasure_and_indexing.py::UnindexedRecordSweepTests` |
+| NEW-21 | Not a defect — `export.py` already uses a context manager for the file handle | — |
+| NEW-11 | Not a defect — Django 5 resolves ambiguous DST times through `fold`; verified against 2026-10-25 and 2027-03-28 | — |
+| NEW-22 | `appointments/0003` refuses to drop a table holding rows, and reversal — which used to delete every appointment — now raises. A sweep test flags any other migration that drops a table | `appointments/test_migration_safety.py` |
+| CI-1 | `makemigrations --check` enabled as a gate, once the one outstanding difference (a help_text, no SQL) was recorded in `ai_insights/0004`. Lint gate added with a narrow rule set that passes today — see `ruff.toml` | CI workflow |
+| AIM-1 | Model provenance: `AIModel.version` + `model_file_sha256`, stamped onto each `ModelPrediction` at creation and never rewritten, so a result stays attributable to the weights that produced it. `intended_use` added for review | `ai_insights/test_provenance.py` |
+| AIM-2 | Inference bounded by input size before the call. A wall-clock timeout is **not** implemented and would be misleading if it were: onnxruntime's `run()` cannot be interrupted, so a thread-join "timeout" returns to the request while the computation keeps a core. Slow runs emit `INFERENCE_SLOW` | `ai_insights/test_provenance.py::InputSizeBoundTests` |
+
+Still open and unchanged: SEC-4 (Fernet salt), SEC-5 (process), DM-4 (no Medication /
+Condition model), DM-5, DM-6, DM-7, a hard inference timeout (needs process
+isolation), and everything under P4 and beyond.
 
 ---
 

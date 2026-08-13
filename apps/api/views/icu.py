@@ -13,9 +13,15 @@ from healthcompass.errors import client_error
 @permission_classes([IsAuthenticated])
 def icu_dashboard_api(request):
     """Return ICU demo context as JSON for the mobile app."""
-    import random as _random
+    import random  # local Random() below — never the module-level RNG
 
-    _random.seed(42)
+    # random.Random(...) rather than random.seed(...): seeding the
+
+    # module-level RNG is process-wide state, so a concurrent request
+
+    # elsewhere using random would get its sequence reset.
+
+    _random = random.Random(42)
     vitals = {
         'hr':   [[i * 0.5, round(92 + _random.uniform(-8, 8), 1)]  for i in range(60)],
         'map':  [[i * 0.5, round(63 + _random.uniform(-8, 6), 1)]  for i in range(60)],

@@ -670,9 +670,15 @@ class SSEContractTests(django.test.SimpleTestCase):
         self.assertIsInstance(sources_ev['sources'], list)
 
     def _grd_inst(self):
-        """GuardrailService instance mock: no-op apply, no disclaimers."""
+        """
+        GuardrailService instance mock: pass-through softening, no disclaimers.
+
+        soften_stream_prefix() replaced the old 500-char apply() buffer in the
+        streaming path (NEW-13). Here it releases everything immediately and
+        softens nothing, so this test measures the SSE contract only.
+        """
         inst = MagicMock()
-        inst.apply.side_effect = lambda t: (t, [])
+        inst.soften_stream_prefix.side_effect = lambda pending, final=False: (pending, '')
         inst.get_appended_disclaimers.return_value = ('', [])
         return inst
 

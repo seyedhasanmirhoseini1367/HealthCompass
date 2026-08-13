@@ -24,19 +24,32 @@ logger = logging.getLogger(__name__)
 
 # ── File-upload validation ────────────────────────────────────────────────────
 
+#: Extension -> list of accepted signatures. A signature is a list of
+#: (offset, bytes) pairs that must ALL match, so a format needing two anchors
+#: can express that.
 _MAGIC = {
-    'pdf':     [(0, b'%PDF-')],
-    'xml':     [(0, b'<?xml'), (3, b'<?xml')],   # bare + UTF-8 BOM prefix
-    'jpg':     [(0, b'\xff\xd8\xff')],
-    'jpeg':    [(0, b'\xff\xd8\xff')],
-    'png':     [(0, b'\x89PNG\r\n')],
-    'gif':     [(0, b'GIF8')],
-    'webp':    [(0, b'RIFF')],
-    'parquet': [(0, b'PAR1')],
+    'pdf':     [[(0, b'%PDF-')]],
+    'xml':     [[(0, b'<?xml')], [(3, b'<?xml')]],   # bare + UTF-8 BOM prefix
+    'jpg':     [[(0, b'\xff\xd8\xff')]],
+    'jpeg':    [[(0, b'\xff\xd8\xff')]],
+    'png':     [[(0, b'\x89PNG\r\n')]],
+    'gif':     [[(0, b'GIF8')]],
+    # RIFF alone is not WebP — it is the container used by WAV and AVI too, so
+    # a renamed .wav passed this check. WebP additionally carries 'WEBP' at
+    # offset 8.
+    'webp':    [[(0, b'RIFF'), (8, b'WEBP')]],
+    'parquet': [[(0, b'PAR1')]],
     # xlsx is a ZIP container; anything not starting with the local-file-header
-    # signature is not a workbook whatever it is named.
-    'xlsx':    [(0, b'PK\x03\x04')],
+    # signature is not a workbook whatever it is named. Note this accepts any
+    # ZIP — decompression bounds are a separate concern (see MAX_PARSED_ROWS,
+    # which bounds rows but not expansion).
+    'xlsx':    [[(0, b'PK\x03\x04')]],
 }
+
+#: Text formats have no signature to check. Rejecting NUL bytes is the one
+#: cheap structural test available: a text document does not contain them, and
+#: a binary payload renamed .csv almost always does.
+_TEXT_EXTS = frozenset({'csv', 'json', 'txt', 'tsv'})
 
 #: Extensions accepted as images anywhere in the app. SVG is deliberately absent:
 #: it is an XML document that can carry <script>, and serving one from our own
@@ -45,6 +58,9 @@ IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
 _UNSAFE_NAME_RE = re.compile(r'[^\w\-.]')
 _MAX_FILENAME_LEN = 200
+#: Extensions are short. Bounding this stops a pathological name from consuming
+#: the whole budget and leaving no stem.
+_MAX_EXT_LEN = 16
 
 
 def _max_upload_bytes() -> int:
@@ -64,13 +80,35 @@ def validate_upload(file_obj, allowed_exts: list) -> tuple:
     FILE_UPLOAD_MAX_MEMORY_SIZE is only the spool-to-disk threshold — neither
     caps how large an uploaded file may be. Without this, uploads are unbounded.
     """
-    raw_name  = os.path.basename((file_obj.name or 'upload').replace('\\', '/'))
-    safe_name = _UNSAFE_NAME_RE.sub('_', raw_name)[:_MAX_FILENAME_LEN] or 'upload'
-    ext       = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+    raw_name = os.path.basename((file_obj.name or 'upload').replace('\\', '/'))
+    cleaned  = _UNSAFE_NAME_RE.sub('_', raw_name)
 
-    size = getattr(file_obj, 'size', None)
+    # Truncate the STEM, not the whole name. Cutting at a fixed length removed
+    # the extension from long filenames, so a legitimate 250-character Kanta
+    # export was rejected as having no type at all.
+    stem, dot, ext_part = cleaned.rpartition('.')
+    if dot and ext_part:
+        ext_part  = ext_part[:_MAX_EXT_LEN]
+        stem      = stem[:_MAX_FILENAME_LEN - len(ext_part) - 1] or 'upload'
+        safe_name = f'{stem}.{ext_part}'
+        ext       = ext_part.lower()
+    else:
+        safe_name = cleaned[:_MAX_FILENAME_LEN] or 'upload'
+        ext       = ''
+
     limit = _max_upload_bytes()
-    if size is not None and size > limit:
+    size = getattr(file_obj, 'size', None)
+    if size is None:
+        # A file object without .size previously skipped the limit entirely.
+        # Measure it rather than waving it through — an unbounded upload is the
+        # thing this check exists to prevent.
+        try:
+            file_obj.seek(0, os.SEEK_END)
+            size = file_obj.tell()
+            file_obj.seek(0)
+        except Exception:
+            return False, 'Could not determine the size of this upload. Upload rejected.'
+    if size > limit:
         return False, (f'File is too large ({size // (1024 * 1024)} MB). '
                        f'Maximum accepted size is {limit // (1024 * 1024)} MB.')
 
@@ -78,11 +116,23 @@ def validate_upload(file_obj, allowed_exts: list) -> tuple:
         return False, f'File type ".{ext}" not allowed. Accepted: {", ".join(allowed_exts)}'
 
     if ext in _MAGIC:
-        header  = file_obj.read(16)
+        header = file_obj.read(32)
         file_obj.seek(0)
-        matched = any(header[off:off + len(sig)] == sig for off, sig in _MAGIC[ext])
+        # Every (offset, bytes) pair in a signature must match; any one
+        # signature matching is enough.
+        matched = any(
+            all(header[off:off + len(sig)] == sig for off, sig in signature)
+            for signature in _MAGIC[ext]
+        )
         if not matched:
             return False, f'File content does not match its declared type (.{ext}). Upload rejected.'
+
+    elif ext in _TEXT_EXTS:
+        header = file_obj.read(4096)
+        file_obj.seek(0)
+        if b'\x00' in header:
+            return False, (f'This .{ext} file contains binary data. '
+                           f'Upload rejected.')
 
     return True, safe_name
 
@@ -623,8 +673,12 @@ class MedicalRecordService:
                 parsed_data={'device': device, 'count': dp_count},
                 notes=notes,
             )
+            # bulk_create does not call save(), so the denormalised owner is set
+            # here explicitly. A row without it would be invisible to any
+            # patient-scoped query.
             for obj in objs:
                 obj.record = record
+                obj.patient = user
             WearableDataPoint.objects.bulk_create(objs, batch_size=500)
 
         return {

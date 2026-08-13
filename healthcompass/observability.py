@@ -64,8 +64,14 @@ class Event:
     ALERT_CREATION_FAILED = 'ALERT_CREATION_FAILED'
     #: Every LLM provider failed; the user received the fallback message.
     LLM_ALL_PROVIDERS_FAILED = 'LLM_ALL_PROVIDERS_FAILED'
+    #: A right-to-erasure request left files behind. Legally significant.
+    ERASURE_INCOMPLETE = 'ERASURE_INCOMPLETE'
     #: Retrieval excluded chunks that have no embedding.
     RETRIEVAL_MISSING_EMBEDDINGS = 'RETRIEVAL_MISSING_EMBEDDINGS'
+    #: PHI was disclosed but the access trail could not be written.
+    ACCESS_LOG_FAILED = 'ACCESS_LOG_FAILED'
+    #: One inference took long enough to be worth looking at.
+    INFERENCE_SLOW = 'INFERENCE_SLOW'
 
 
 #: Events that mean a patient may be seeing incomplete or missing medical
@@ -77,6 +83,8 @@ PATIENT_IMPACTING = frozenset({
     Event.INGESTION_PARSE_FAILED,
     Event.ALERT_CREATION_FAILED,
     Event.RETRIEVAL_MISSING_EMBEDDINGS,
+    Event.ERASURE_INCOMPLETE,
+    Event.ACCESS_LOG_FAILED,
 })
 
 

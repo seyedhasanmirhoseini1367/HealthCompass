@@ -174,6 +174,67 @@ class GuardrailService:
             return True, _EMERGENCY_GATE_RESPONSE
         return False, ''
 
+    # ── Streaming softener ───────────────────────────────────────────────────
+    #
+    # The streaming path used to buffer the first 500 characters, run apply() on
+    # that buffer, and then forward every later token untouched. Two failures
+    # came out of that:
+    #
+    #   * Softening covered only the opening of the answer. A definitive
+    #     diagnosis stated after ~500 characters — which is where a model
+    #     usually reaches its conclusion — was streamed to the patient verbatim.
+    #   * apply() *appends disclaimers*, so a rule firing inside the buffer put
+    #     a disclaimer in the middle of the response, and the end-of-stream
+    #     get_appended_disclaimers() then appended it a second time. With no
+    #     rule firing, the soft consult reminder appeared mid-answer instead.
+    #
+    # soften_stream_prefix() replaces it: it releases text continuously while
+    # holding back a short tail, so every "you have <condition>" phrase gets its
+    # full lookahead window no matter where in the answer it appears, and it
+    # never appends anything — disclaimers stay at the end where they belong.
+
+    #: Characters held back from release so the softening lookahead can see past
+    #: the trigger phrase. The pattern allows 80 characters between "you have"
+    #: and the condition name, and the longest condition is 23 characters; 160
+    #: leaves comfortable margin.
+    STREAM_LOOKAHEAD = 160
+
+    def soften_stream_prefix(self, pending: str, *, final: bool = False) -> Tuple[str, str]:
+        """
+        Release the settled part of *pending*, softened; keep the rest.
+
+        Returns (text_to_emit, still_pending). Emitted text is never re-examined,
+        so a phrase is only released once the lookahead window behind it has
+        arrived — or once the stream ends and no more will (`final=True`).
+
+        The emitted text is the response itself, unchanged apart from softening;
+        no disclaimer is ever added here.
+        """
+        if final:
+            cut = len(pending)
+        else:
+            cut = len(pending) - self.STREAM_LOOKAHEAD
+            if cut <= 0:
+                return '', pending
+
+        out: List[str] = []
+        last = 0
+        # Matched against the WHOLE pending buffer, so a phrase near the cut can
+        # still see its condition word; only matches that begin before the cut
+        # are released.
+        for match in _DIAGNOSIS_SOFTEN_RE.finditer(pending):
+            if match.start() >= cut:
+                break
+            out.append(pending[last:match.start()])
+            out.append(f'your results may suggest you {match.group(1)}')
+            last = match.end()
+
+        if last < cut:
+            out.append(pending[last:cut])
+            last = cut
+
+        return ''.join(out), pending[last:]
+
     def get_appended_disclaimers(self, response: str) -> Tuple[str, List[str]]:
         """
         Return (text_to_append, rules_fired) WITHOUT modifying the response text.
