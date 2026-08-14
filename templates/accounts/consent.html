@@ -32,6 +32,12 @@
 .cs-note { font-size:.78rem; color:#64748b; background:#f8fafc; border-radius:9px;
            padding:.7rem .9rem; margin:1.3rem 0; line-height:1.55; }
 
+.cs-restore { font-size:.78rem; color:#92400e; background:#fffbeb;
+              border:1px solid #fde68a; border-radius:9px;
+              padding:.6rem .8rem; margin:.6rem 0 0; line-height:1.5; }
+.cs-restore strong { color:#78350f; }
+.cs-restore ul { margin:.35rem 0 0; padding-left:1.1rem; }
+
 .cs-history { margin-top:2rem; }
 .cs-history h2 { font-size:.95rem; font-weight:800; color:var(--text); margin:0 0 .3rem; }
 .cs-history-sub { font-size:.76rem; color:#94a3b8; margin-bottom:.7rem; }
@@ -77,6 +83,38 @@
               {% endif %}
             {% endif %}
           </p>
+
+          {% comment %}
+            Withdrawing clinician sharing closes every link at once without
+            ending the links themselves, so switching it back on here restores
+            all of them together. That was only ever said on the approval
+            screen, which a patient re-enabling from this page never sees — and
+            this is the moment several people silently regain access.
+
+            dictsort before regroup because PatientDoctorRelationship declares
+            no Meta.ordering: regroup only collapses ADJACENT equal keys, so
+            unsorted rows would produce several 'active' groups and undercount.
+            Nothing renders when no link is still active — there is then nothing
+            to restore and nothing to warn about.
+          {% endcomment %}
+          {% if c.purpose == 'data_sharing' and not c.granted %}
+            {% regroup user.my_doctors.all|dictsort:"status" by status as cs_links %}
+            {% for grp in cs_links %}{% if grp.grouper == 'active' %}
+              <div class="cs-restore">
+                <strong>Turning this back on restores record access for
+                {{ grp.list|length }} clinician{{ grp.list|length|pluralize }}</strong>
+                whose link is still active:
+                <ul>
+                  {% for link in grp.list %}
+                    <li>{{ link.doctor.get_full_name|default:link.doctor.username }}{% if link.hospital %} — {{ link.hospital }}{% endif %}</li>
+                  {% endfor %}
+                </ul>
+                Withdrawing this consent closed their access but did not end the
+                links. To end one permanently, revoke it under
+                <a href="{% url 'accounts:my_doctors' %}">My doctors</a>.
+              </div>
+            {% endif %}{% endfor %}
+          {% endif %}
         </div>
 
         <div class="cs-actions">
