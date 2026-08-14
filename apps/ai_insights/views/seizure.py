@@ -54,9 +54,12 @@ def seizure_analysis(request):
 
         if request.user.is_authenticated:
             try:
-                admin_user = (
-                    get_user_model().objects.filter(is_staff=True).first() or request.user
-                )
+                # No owner: this model is provisioned by the platform, not
+                # submitted by anyone. It used to be attributed to
+                # `User.objects.filter(is_staff=True).first()`, which made an
+                # administrative flag decide data ownership — the owner changed
+                # if staff changed, and deleting that account cascaded the model
+                # and every patient's prediction history away with it.
                 ai_model, _ = AIModel.objects.get_or_create(
                     slug='eeg-seizure-detection',
                     defaults={
@@ -64,8 +67,16 @@ def seizure_analysis(request):
                         'description': 'Ensemble seizure detection via hasanai.net external API.',
                         'category':    AIModel.Category.NEUROLOGY,
                         'input_type':  AIModel.InputType.PARQUET,
-                        'status':      AIModel.Status.ACTIVE,
-                        'data_scientist': admin_user,
+                        # PENDING, not ACTIVE. This row is created on the first
+                        # analysis any authenticated user runs, so creating it
+                        # active meant an ordinary user action published a model
+                        # to the catalog with no review at all. It exists to be
+                        # the FK target for ModelPrediction rows; nothing about
+                        # the seizure feature needs it active, and an operator
+                        # can approve and activate it if it should be listed.
+                        'status':      AIModel.Status.PENDING,
+                        'data_scientist': None,
+                        'is_system':      True,
                     },
                 )
                 label = data.get('ensemble_label', '')

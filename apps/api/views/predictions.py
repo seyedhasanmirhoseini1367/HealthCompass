@@ -140,7 +140,7 @@ def seizure_analysis(request):
 
     try:
         User = get_user_model()
-        admin_user = User.objects.filter(is_staff=True).first() or request.user
+        # Platform-provisioned, unowned — see ai_insights/views/seizure.py.
         ai_model, _ = AIModel.objects.get_or_create(
             slug='eeg-seizure-detection',
             defaults={
@@ -148,8 +148,12 @@ def seizure_analysis(request):
                 'description': 'Ensemble seizure detection via hasanai.net external API.',
                 'category': AIModel.Category.NEUROLOGY,
                 'input_type': AIModel.InputType.PARQUET,
-                'status': AIModel.Status.ACTIVE,
-                'data_scientist': admin_user,
+                # PENDING, not ACTIVE — see the same provisioning in
+                # ai_insights/views/seizure.py. An ordinary user running an
+                # analysis must not publish a model to the catalog unreviewed.
+                'status': AIModel.Status.PENDING,
+                'data_scientist': None,
+                'is_system': True,
             },
         )
         label      = data.get('ensemble_label', '')

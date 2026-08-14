@@ -28,8 +28,31 @@ class AIModel(models.Model):
         FILE     = 'file',     'Generic file'
 
     id                   = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    data_scientist       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-                             related_name='submitted_models')
+    # SET_NULL, not CASCADE.
+    #
+    # The seizure integration used to pick its owner with
+    # `User.objects.filter(is_staff=True).first()`, so an administrative flag
+    # decided data ownership. Combined with CASCADE here and CASCADE on
+    # ModelPrediction.model, deleting that staff account destroyed the model AND
+    # every patient's seizure prediction history with it — reachable through the
+    # admin's reject action, a bulk delete, or that admin's own GDPR erasure.
+    #
+    # Nulling the owner keeps the model and its predictions while still letting
+    # the account be erased, which is what both obligations require at once.
+    # PROTECT would have preserved the data by making erasure impossible, and
+    # erasure is not optional.
+    data_scientist       = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='submitted_models',
+                             help_text='The data scientist who submitted this model. '
+                                       'NULL for system-provisioned models, and for '
+                                       'models whose submitter has been erased.')
+    # Distinguishes "provisioned by the platform" from "submitter was erased",
+    # which a NULL owner alone cannot express. Set at creation and never by a
+    # user action, so it cannot be used to adopt or disown a model.
+    is_system            = models.BooleanField(default=False,
+                             help_text='Provisioned by the platform rather than '
+                                       'submitted by a data scientist.')
     name                 = models.CharField(max_length=200)
     slug                 = models.SlugField(max_length=220, unique=True, blank=True)
     description          = models.TextField()
@@ -92,7 +115,16 @@ class AIModel(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.name} by {self.data_scientist.username} [{self.status}]'
+        owner = (self.data_scientist.username if self.data_scientist_id
+                 else ('system' if self.is_system else 'no owner'))
+        return f'{self.name} by {owner} [{self.status}]'
+
+    #: The only way into ACTIVE. Activation is what makes a model patient-facing,
+    #: so it is the one transition that must be earned rather than assigned.
+    #:
+    #: Deliberately narrow: every other transition the four states allow is left
+    #: alone. This is not a general state machine, it is one gate on one edge.
+    ACTIVATION_REQUIRES = 'approved'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -103,14 +135,75 @@ class AIModel(models.Model):
             self._loaded_model_file = self.model_file.name if self.model_file else ''
         except Exception:
             self._loaded_model_file = None
+        # The status this row had when it was read, so save() can tell an
+        # activation from a row that was already active.
+        #
+        # NOT guarded on self.pk: `id` is a UUIDField with a default, so a
+        # brand-new instance already has one and this would record its INTENDED
+        # status as its loaded status — letting a model be created straight into
+        # ACTIVE. Creation is detected by `_state.adding` at save time instead,
+        # which is only reliable there (Django clears it after __init__ when
+        # loading from the database, not before).
+        try:
+            self._loaded_status = self.status
+        except Exception:
+            self._loaded_status = None
+
+    def _check_activation(self):
+        """
+        Refuse to become ACTIVE from anywhere except APPROVED.
+
+        Activation used to be assignable from any state and at creation time, so
+        a model that had never been reviewed could be serving patients: the
+        admin's activate action updated any selection straight to active, and
+        the seizure integration created its model row with status=ACTIVE on the
+        first analysis anyone ran.
+
+        Enforced in save() rather than only in clean() because save() is what
+        every path actually calls — the admin change form, the changelist's
+        inline status editor, and any code doing obj.status = ...; obj.save().
+        full_clean() is not called by save(), so a clean()-only rule would be
+        advisory.
+
+        NOT enforced against queryset.update(), which bypasses model save() by
+        design. There is exactly one such call in the codebase (the admin
+        activate action) and it filters on the approved state itself; a test
+        asserts no second one appears.
+        """
+        from django.core.exceptions import ValidationError
+
+        if self.status != self.Status.ACTIVE:
+            return
+
+        creating = self._state.adding
+        if not creating and self._loaded_status == self.Status.ACTIVE:
+            return          # already active; saving other fields is fine
+
+        if creating or self._loaded_status != self.ACTIVATION_REQUIRES:
+            was = 'a new record' if creating else self._loaded_status
+            raise ValidationError({
+                'status': (
+                    f'A model can only be activated from "{self.ACTIVATION_REQUIRES}"; '
+                    f'this one is {was}. Approve it first — activation is what makes '
+                    f'it visible to patients.'
+                )
+            })
+
+    def clean(self):
+        # For the admin form and anything calling full_clean(): the same rule,
+        # surfaced as a field error instead of an exception page.
+        super().clean()
+        self._check_activation()
 
     def save(self, *args, **kwargs):
         if not self.slug:
             from django.utils.text import slugify
             self.slug = slugify(self.name)
+        self._check_activation()
         self._refresh_file_digest()
         super().save(*args, **kwargs)
         self._loaded_model_file = self.model_file.name if self.model_file else ''
+        self._loaded_status = self.status
 
     def _refresh_file_digest(self):
         """

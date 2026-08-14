@@ -50,7 +50,15 @@
   </div>
   <h1>{{ model.name }}</h1>
   <div class="model-meta">
-    <span><i class="fas fa-user"></i> {{ model.data_scientist.get_full_name|default:model.data_scientist.username }}</span>
+    {% comment %}
+      A model can legitimately have no owner: platform-provisioned models never
+      had one, and a submitter's account may since have been erased. Rendering
+      the bare attribute produced an empty byline in both cases and said nothing.
+    {% endcomment %}
+    <span><i class="fas fa-user"></i>
+      {% if model.data_scientist %}{{ model.data_scientist.get_full_name|default:model.data_scientist.username }}
+      {% elif model.is_system %}HealthCompass platform
+      {% else %}Submitter no longer registered{% endif %}</span>
     <span><i class="fas fa-play-circle"></i> {{ model.run_count }} runs</span>
     <span><i class="fas fa-calendar"></i> {{ model.created_at|date:"M d, Y" }}</span>
     <span><i class="fas fa-database"></i> {{ model.get_input_type_display }}</span>
