@@ -177,6 +177,127 @@ class DoctorAccessLog(models.Model):
         return f'{who} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
 
 
+class SharingGrant(models.Model):
+    """
+    A patient sharing part of their record with another person they choose.
+
+    The clinical case is "let my daughter check on me" and "tell me if something
+    is wrong with my father". Neither is served by the two mechanisms that
+    already exist: `PatientDoctorRelationship` is created by a hospital admin
+    for a clinician, and the emergency card is an unauthenticated token readable
+    by anyone holding the URL.
+
+    Shaped after PatientDoctorRelationship on purpose — one row per pair, a
+    status, an explicit revocation — because that is the vocabulary this
+    codebase already uses for "X may read Y's records", and a second, differently
+    shaped answer to the same question is how the two drift apart.
+
+    The patient is the only source of authority
+    -------------------------------------------
+    They create it, they revoke it, and nobody creates one on their behalf. An
+    administrator may revoke an abusive grant and read its metadata; that is
+    deliberately not symmetric, because removing access can be justified for
+    someone else's safety while granting it cannot.
+
+    Scopes are separate booleans rather than one "shared" flag. "Tell me if
+    something is wrong, but do not read my file" is the case people actually
+    want, and it is unreachable with a single switch.
+    """
+    class Status(models.TextChoices):
+        ACTIVE  = 'active',  'Active'
+        REVOKED = 'revoked', 'Revoked'
+
+    patient   = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='shares_granted',
+                  help_text='The person whose data is shared. The only authority '
+                            'that can create this row.')
+    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='shares_received')
+
+    # What is shared. Nothing is implied: a grant with no scope grants nothing.
+    can_view_records      = models.BooleanField(default=False,
+                              help_text='Medical records, lab values and the files behind them.')
+    can_view_alerts       = models.BooleanField(default=False,
+                              help_text='That an alert exists and how severe — not its values.')
+    can_view_appointments = models.BooleanField(default=False)
+
+    status      = models.CharField(max_length=10, choices=Status.choices,
+                    default=Status.ACTIVE, db_index=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    # Optional time bound. NULL means ongoing — the common case for family.
+    expires_at  = models.DateTimeField(null=True, blank=True,
+                    help_text='After this instant the grant gives nothing, without '
+                              'anyone having to revoke it.')
+    # Optional data bound. NULL means the share follows the record forward;
+    # a timestamp freezes it to what existed at that moment.
+    data_cutoff = models.DateTimeField(null=True, blank=True,
+                    help_text='When set, only records uploaded before this instant '
+                              'are visible.')
+
+    revoked_at  = models.DateTimeField(null=True, blank=True)
+    revoked_by  = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True,
+                    blank=True, related_name='shares_revoked',
+                    help_text='The patient, or an administrator acting on a report.')
+    revoke_reason = models.CharField(max_length=200, blank=True, default='')
+
+    class Meta:
+        # One row per pair, like PatientDoctorRelationship. A second grant
+        # between the same two people would mean two answers to "may they read
+        # this", and revoking one would leave the other standing.
+        constraints = [
+            models.UniqueConstraint(fields=['patient', 'recipient'],
+                                    name='unique_sharing_grant_per_pair'),
+            # Sharing with yourself is not sharing, and a self-grant would make
+            # "who else can see this" wrong on the patient's own screen.
+            models.CheckConstraint(check=~models.Q(patient=models.F('recipient')),
+                                   name='sharing_grant_not_self'),
+        ]
+        indexes = [
+            models.Index(fields=['recipient', 'status']),
+            models.Index(fields=['patient', 'status']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return (f'{self.patient.username} → {self.recipient.username} '
+                f'[{self.status}]')
+
+    @property
+    def is_effective(self) -> bool:
+        """
+        Whether this grant gives anything right now.
+
+        Expiry is evaluated here rather than by whoever remembers to filter:
+        a time comparison that each caller repeats is a time comparison one
+        caller will eventually get wrong, and this one fails open.
+        """
+        from django.utils import timezone
+
+        if self.status != self.Status.ACTIVE:
+            return False
+        if self.expires_at is None:
+            return True
+        try:
+            return timezone.now() < self.expires_at
+        except TypeError:
+            # A naive or unusable expires_at cannot be compared safely. Deny:
+            # an unevaluable time bound is not an absent one.
+            return False
+
+    def allows(self, scope: str) -> bool:
+        """True when this grant is effective AND covers *scope*."""
+        return self.is_effective and bool(getattr(self, f'can_view_{scope}', False))
+
+    def revoke(self, *, by, reason: str = '') -> None:
+        from django.utils import timezone
+
+        self.status = self.Status.REVOKED
+        self.revoked_at = timezone.now()
+        self.revoked_by = by if getattr(by, 'pk', None) else None
+        self.revoke_reason = reason[:200]
+        self.save(update_fields=['status', 'revoked_at', 'revoked_by', 'revoke_reason'])
+
+
 class AdminAuditEvent(models.Model):
     """
     What an administrator did to the system, as opposed to who read a patient.
@@ -207,6 +328,9 @@ class AdminAuditEvent(models.Model):
         MODEL_ACTIVATED  = 'model_activated',  'AI model activated'
         MODEL_REJECTED   = 'model_rejected',   'AI model rejected'
         ESCALATION_DENIED = 'escalation_denied', 'Authority change refused'
+        VALUE_CORRECTED  = 'value_corrected',  'Clinical value corrected'
+        SHARE_REVOKED    = 'share_revoked',    'Sharing grant revoked by admin'
+        SHARE_DENIED     = 'share_denied',     'Sharing action refused'
 
     actor        = models.ForeignKey(
                      'accounts.CustomUser', on_delete=models.SET_NULL, null=True,

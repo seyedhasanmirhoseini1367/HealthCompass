@@ -497,3 +497,23 @@ DATE_FORMAT_PREFERENCE = config('DATE_FORMAT_PREFERENCE', default='eu')
 # deterministic and free from SQLite "table is locked" race conditions.
 import sys as _sys
 RAG_AUTO_INDEX_SYNC = 'test' in _sys.argv
+
+# ── Test uploads go to a throwaway directory ──────────────────────────────────
+#
+# The suite writes real files: every test that saves a MedicalRecord, a
+# prediction input or a profile picture lands one in MEDIA_ROOT and nothing
+# removes it. A full run left well over a thousand unreferenced files in the
+# development media directory, discovered when `reconcile_orphaned_files`
+# reported 1231 orphans out of 3399 files.
+#
+# Two consequences, both bad. Developer machines accumulate patient-shaped test
+# data indefinitely, and — worse — no file test ever ran against a clean
+# baseline, so anything reasoning about "which files exist" was judging
+# accumulated debris. The orphan reconciliation tests had to isolate themselves
+# to mean anything.
+#
+# A per-run temporary directory fixes both. It is NOT cleaned up on exit: the
+# OS reclaims it, and keeping it lets a failed run be inspected afterwards.
+if 'test' in _sys.argv:
+    import tempfile as _tempfile
+    MEDIA_ROOT = Path(_tempfile.mkdtemp(prefix='healthcompass-test-media-'))

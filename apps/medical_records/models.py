@@ -142,9 +142,107 @@ class ParsedLabValue(models.Model):
             self.patient_id = self.record.patient_id
         super().save(*args, **kwargs)
 
+    def effective(self):
+        """
+        The reading that currently stands: the newest correction, or this row.
+
+        Every consumer that asks "what is this value" must come through here.
+        Reading the row's own fields answers "what was extracted", which is a
+        different question and only correct when nothing has superseded it.
+
+        Returns an object exposing the same value/unit/canonical_value/
+        unit_known/is_abnormal/is_critical attributes either way, so callers do
+        not branch.
+        """
+        correction = self.corrections.first()      # Meta.ordering: newest first
+        return correction if correction is not None else self
+
+    @property
+    def is_corrected(self) -> bool:
+        return self.corrections.exists()
+
     def __str__(self):
         flag = ' [!]' if self.is_critical else (' [abnormal]' if self.is_abnormal else '')
         return f'{self.parameter_name}: {self.value} {self.unit}{flag}'
+
+
+class LabValueCorrection(models.Model):
+    """
+    A corrected reading for a lab value, appended rather than written over it.
+
+    Values come from LLM extraction of uploaded documents, so they can be wrong:
+    a misread digit, a unit the parser did not recognise. A wrong unit can raise
+    a false critical alert, so corrections have to be possible. Until now the
+    only way was to edit the ParsedLabValue row in the Django admin, which
+    destroyed what the document actually said.
+
+    That matters beyond tidiness. The original extraction is evidence — of what
+    the source document contained and of what the patient was told at the time.
+    An alert that fired on 5.2 cannot be explained by a row that now reads 52,
+    and "the system said X" becomes unanswerable.
+
+    So the original row is never mutated. A correction supersedes it, and both
+    remain readable.
+
+    Chain shape, deliberately flat
+    ------------------------------
+    Every correction points at the ORIGINAL ParsedLabValue, never at the
+    correction before it. Correcting a correction appends another row against
+    the same original. This makes a cycle structurally impossible rather than
+    something to detect and reject, and "the effective value" is simply the most
+    recent row — resolved by (created_at, id), so two corrections in the same
+    tick still have one deterministic answer.
+
+    Nothing here decides clinical questions. A correction records that a human
+    with the authority to do so asserted a different value, and why.
+    """
+    # Auto-increment, deliberately NOT a UUID like the document-level models.
+    # `Meta.ordering` uses the id to break a created_at tie, and that is only a
+    # chronological tiebreak if ids increase. UUID4 is random, so two
+    # corrections written in the same tick resolved to whichever one happened to
+    # sort higher — the effective clinical value decided by chance.
+    original      = models.ForeignKey('ParsedLabValue', on_delete=models.CASCADE,
+                      related_name='corrections',
+                      help_text='The extracted value this supersedes. Never modified.')
+
+    # The corrected reading, in the same shape as ParsedLabValue so the two are
+    # interchangeable to every consumer.
+    value           = models.CharField(max_length=100)
+    unit            = models.CharField(max_length=50, blank=True)
+    canonical_value = models.FloatField(null=True, blank=True)
+    original_unit   = models.CharField(max_length=50, blank=True)
+    unit_known      = models.BooleanField(default=True)
+    is_abnormal     = models.BooleanField(default=False)
+    is_critical     = models.BooleanField(default=False)
+
+    # Provenance. Required — a correction with no stated reason is
+    # indistinguishable from a mistake, and this row is evidence too.
+    reason        = models.TextField(
+                      help_text='Why the extracted value was wrong. Recorded verbatim.')
+    source        = models.CharField(max_length=200, blank=True, default='',
+                      help_text='What the correction was based on — e.g. "re-read of '
+                                'the source PDF", "laboratory confirmation".')
+    actor         = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                      null=True, blank=True, related_name='lab_value_corrections')
+    # Survives deletion of the account, for the same reason DoctorAccessLog
+    # denormalises its actor: a correction by "someone" is not accountable.
+    actor_label   = models.CharField(max_length=200, blank=True, default='')
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Newest first: the effective value is the head of this ordering.
+        ordering = ['-created_at', '-id']
+        indexes = [models.Index(fields=['original', '-created_at'])]
+
+    def __str__(self):
+        return f'correction of {self.original_id} → {self.value} {self.unit}'.strip()
+
+    def save(self, *args, **kwargs):
+        if not self.actor_label and self.actor_id:
+            role = getattr(self.actor, 'role', '') or ''
+            self.actor_label = (f'{self.actor.username} ({role})' if role
+                                else self.actor.username)
+        super().save(*args, **kwargs)
 
 
 class WearableDataPoint(models.Model):

@@ -74,6 +74,11 @@ class Observation:
     parameter_name: str
     record_id:     Optional[str]
     record_title:  Optional[str]
+    # True when a correction supersedes what was extracted from the document.
+    # Callers that quote a value to a patient or clinician can then say so:
+    # "5.2 (corrected)" is a different statement from "5.2", and the difference
+    # matters when someone is comparing the answer against the source document.
+    corrected:     bool = False
 
     @property
     def comparable(self) -> bool:
@@ -149,18 +154,35 @@ def _observation_date(lab):
 
 
 def _to_observation(lab) -> Observation:
+    """
+    Build the typed fact from the reading that currently stands.
+
+    `lab.effective()` returns the newest correction when one exists and the row
+    itself otherwise. This is the one place the substitution happens: every
+    accessor in this module goes through here, so latest(), previous(),
+    on_date(), contested_dates() and trend all became correction-aware together
+    rather than each remembering.
+
+    The identity of the fact — which analyte, which date, which record — always
+    comes from the original row. A correction changes what was measured, not
+    when or from which document, and letting it move those would make the
+    timeline unreconstructable.
+    """
+    current = lab.effective()
+
     return Observation(
-        value          = lab.canonical_value if lab.unit_known else None,
-        unit           = lab.unit or '',
-        raw_value      = lab.value or '',
-        original_unit  = lab.original_unit or lab.unit or '',
+        value          = current.canonical_value if current.unit_known else None,
+        unit           = current.unit or '',
+        raw_value      = current.value or '',
+        original_unit  = current.original_unit or current.unit or '',
         date           = _observation_date(lab),
-        is_abnormal    = bool(lab.is_abnormal),
-        is_critical    = bool(lab.is_critical),
-        unit_known     = bool(lab.unit_known),
+        is_abnormal    = bool(current.is_abnormal),
+        is_critical    = bool(current.is_critical),
+        unit_known     = bool(current.unit_known),
         parameter_name = lab.parameter_name or '',
         record_id      = str(lab.record_id) if lab.record_id else None,
         record_title   = lab.record.title if lab.record_id else None,
+        corrected      = current is not lab,
     )
 
 

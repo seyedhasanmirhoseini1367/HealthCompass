@@ -79,15 +79,25 @@ def get_population_biomarker_stats(biomarker_names=None):
     if cached is not None:
         return cached
 
-    qs = ParsedLabValue.objects.select_related('record').values(
-        'parameter_name', 'value', 'unit',
-        'record__record_date', 'record__uploaded_at',
-    )
+    # Model instances rather than .values(): a corrected reading supersedes the
+    # extracted one, and `effective()` is where that is decided. Aggregating the
+    # raw column would publish numbers the system no longer stands behind.
+    qs = (ParsedLabValue.objects
+          .select_related('record')
+          .prefetch_related('corrections'))
     if biomarker_names:
         qs = qs.filter(parameter_name__in=biomarker_names)
 
     per_unit_monthly = defaultdict(lambda: defaultdict(list))
-    for lv in qs:
+    for row in qs:
+        current = row.effective()
+        lv = {
+            'parameter_name': row.parameter_name,
+            'value': current.value,
+            'unit': current.unit,
+            'record__record_date': row.record.record_date,
+            'record__uploaded_at': row.record.uploaded_at,
+        }
         try:
             numeric = float(lv['value'])
         except (ValueError, TypeError):

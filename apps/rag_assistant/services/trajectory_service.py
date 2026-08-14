@@ -167,6 +167,11 @@ class TrajectoryService:
                 continue
             seen_record_dates.add(key)
 
+            # The reading that currently stands: a correction supersedes what
+            # was extracted, and a trend drawn from superseded numbers is a
+            # trend of what the parser misread rather than of the patient.
+            row = row.effective()
+
             # Use canonical_value when available (post-migration rows).
             # For legacy rows without canonical_value, re-normalize on the fly
             # and skip if the unit is still unrecognised after normalisation.

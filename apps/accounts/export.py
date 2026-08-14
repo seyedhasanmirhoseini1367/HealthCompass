@@ -220,6 +220,19 @@ def _medical_records(user):
                 'is_abnormal':     lv.is_abnormal,
                 'is_critical':     lv.is_critical,
                 'measured_at':     _dt(lv.measured_at),
+                # Both, deliberately. The export is everything held about the
+                # subject, and a corrected value without the original hides what
+                # the source document said and what any alert fired on.
+                'corrections': [{
+                    'value':           c.value,
+                    'unit':            c.unit,
+                    'canonical_value': c.canonical_value,
+                    'reason':          c.reason,
+                    'source':          c.source,
+                    'corrected_by':    c.actor_label,
+                    'corrected_at':    _dt(c.created_at),
+                } for c in lv.corrections.all()],
+                'effective_value': lv.effective().value,
             } for lv in rec.lab_values.all()],
             'wearable_points': [{
                 'metric':      wp.metric,
