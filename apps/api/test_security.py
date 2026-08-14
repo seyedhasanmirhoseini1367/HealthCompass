@@ -170,8 +170,10 @@ class OwnedResourceIDORTests(_TwoUserMixin, APITestCase):
         )
         ai_model = AIModel.objects.create(
             data_scientist=self.victim, name='Risk Model',
-            description='d', status='active',
+            description='d', status='approved',
         )
+        ai_model.status = 'active'
+        ai_model.save(update_fields=['status'])
         self.prediction = ModelPrediction.objects.create(
             model=ai_model, patient=self.victim,
             input_data={}, result={'label': 'high risk'}, risk_score=0.91,

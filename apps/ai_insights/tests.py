@@ -251,7 +251,9 @@ class ModelStatusEnforcementTest(TestCase):
             data_scientist=self.ds_owner,
             input_schema={},
             output_schema={'labels': {'0': 'Low', '1': 'High'}},
-            status=AIModel.Status.ACTIVE,
+            # Created approved, then activated: a model can no longer be
+            # created ACTIVE, so the fixture uses the real lifecycle.
+            status=AIModel.Status.APPROVED,
         )
 
     def _post(self, user, status=None) -> int:
@@ -409,7 +411,7 @@ class PopulationRiskBucketsServiceTest(TestCase):
             name='Risk Test Model', description='test',
             data_scientist=self.ds,
             input_schema={}, output_schema={},
-            status=AIModel.Status.ACTIVE,
+            status=AIModel.Status.APPROVED,
         )
 
     def _add_prediction(self, risk_score):

@@ -104,8 +104,11 @@ class _FixtureMixin:
             message='High potassium', source_record=record,
         )
         ai_model = AIModel.objects.create(
-            data_scientist=user, name=f'{username} Model', description='d', status='active',
+            data_scientist=user, name=f'{username} Model', description='d',
+            status='approved',
         )
+        ai_model.status = 'active'
+        ai_model.save(update_fields=['status'])
         ModelPrediction.objects.create(
             model=ai_model, patient=user, input_data={'age': 61},
             result={'label': f'{username} high risk'}, risk_score=0.9,

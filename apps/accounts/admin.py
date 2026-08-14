@@ -33,17 +33,99 @@ def _send_approval_email(user, approved):
     send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
 
 
+#: Fields that confer authority rather than describe a person.
+#:
+#: They are not editable anywhere in this admin. Django's default UserAdmin
+#: puts is_staff, is_superuser, groups and user_permissions in a "Permissions"
+#: fieldset, so any account able to change users could promote itself — or
+#: anyone else — to superuser in one form submission, unlogged. `role` belongs
+#: here too: it is what every clinical authorization check reads.
+AUTHORITY_FIELDS = ('is_staff', 'is_superuser', 'groups', 'user_permissions', 'role')
+
+
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
+    """
+    User management WITHOUT privilege management.
+
+    Everything an operator needs day to day — approving registrations, fixing a
+    name or email, disabling an account — stays available. Granting system
+    authority does not, and is deliberately left to the shell (`createsuperuser`,
+    or an explicit `manage.py shell` edit), which is auditable at the deployment
+    level and cannot be reached by a hijacked browser session.
+
+    This is enforcement, not concealment: a field absent from `fieldsets` is
+    absent from the ModelForm, so a hand-crafted POST naming it is ignored by
+    the form rather than applied. `_reject_authority_change` is the backstop for
+    anything that reaches save_model by another route.
+    """
     list_display   = ('username', 'email', 'get_full_name', 'role', 'is_approved', 'is_active', 'date_joined')
     list_filter    = ('role', 'is_approved', 'is_active')
     list_editable  = ('is_approved',)
     search_fields  = ('username', 'email', 'first_name', 'last_name')
     actions        = ['approve_users', 'reject_users']
-    fieldsets      = UserAdmin.fieldsets + (
-        ('HealthCompass', {'fields': ('role', 'profile_picture', 'phone_number',
-                                      'date_of_birth', 'is_approved')}),
+
+    # UserAdmin.fieldsets rebuilt rather than extended: the inherited
+    # "Permissions" block is the escalation surface, so it is replaced by one
+    # that keeps only is_active (disabling an account is user management, not
+    # privilege management).
+    fieldsets = (
+        (None,               {'fields': ('username', 'password')}),
+        ('Personal info',    {'fields': ('first_name', 'last_name', 'email')}),
+        ('Account status',   {'fields': ('is_active',),
+                              'description': 'System authority (staff, superuser, '
+                                             'groups, permissions) and clinical role '
+                                             'are intentionally not editable here.'}),
+        ('Important dates',  {'fields': ('last_login', 'date_joined')}),
+        ('HealthCompass',    {'fields': ('role', 'profile_picture', 'phone_number',
+                                         'date_of_birth', 'is_approved')}),
     )
+
+    def get_readonly_fields(self, request, obj=None):
+        """
+        `role` is shown so an operator can see what an account is, and is
+        writable for other people's accounts — reassigning a clinical role is
+        ordinary user management. On your OWN account it is read-only: changing
+        your own role is self-escalation whatever the target role happens to be.
+        """
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.pk == request.user.pk:
+            readonly.append('role')
+        return tuple(readonly)
+
+    def save_model(self, request, obj, form, change):
+        """
+        Backstop. The form cannot carry these fields, but this catches anything
+        that reaches here another way — a subclass, a future fieldset edit, or a
+        code path that constructs the form itself.
+        """
+        if change and obj.pk:
+            self._reject_authority_change(request, obj)
+        super().save_model(request, obj, form, change)
+
+    def _reject_authority_change(self, request, obj):
+        from django.core.exceptions import PermissionDenied
+
+        stored = CustomUser.objects.filter(pk=obj.pk).only(
+            'is_staff', 'is_superuser', 'role').first()
+        if stored is None:
+            return
+
+        changed = [f for f in ('is_staff', 'is_superuser', 'role')
+                   if getattr(obj, f) != getattr(stored, f)]
+        if not changed:
+            return
+
+        # Someone else's clinical role may be reassigned; authority flags may
+        # not be changed here by anyone, and nobody may change their own role.
+        if changed == ['role'] and obj.pk != request.user.pk:
+            return
+
+        raise PermissionDenied(
+            f'Refusing to change {", ".join(changed)} through the user admin. '
+            f'System authority is granted from the shell, and no account may '
+            f'alter its own role.'
+        )
 
     @admin.action(description='✅ Approve selected users')
     def approve_users(self, request, queryset):

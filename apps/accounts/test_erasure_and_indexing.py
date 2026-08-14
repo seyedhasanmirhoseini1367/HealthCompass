@@ -100,12 +100,19 @@ class ErasureCompletenessTests(TestCase):
         self.assertFalse(User.objects.filter(pk=pk).exists())
 
     def test_a_failed_file_delete_is_reported_not_swallowed(self):
-        """A silently skipped file is an unfulfilled erasure request."""
+        """
+        A silently skipped file is an unfulfilled erasure request.
+
+        Patches the STORAGE rather than FieldFile.delete: erasure now goes
+        through `erase_uploaded_file`, which calls storage.delete directly, so
+        patching the old call site would have made this test pass without ever
+        exercising the failure it exists to check.
+        """
         from unittest.mock import patch
 
         self._record_with_file()
         from apps.accounts.services import purge_user_data
-        with patch('django.db.models.fields.files.FieldFile.delete',
+        with patch('django.core.files.storage.FileSystemStorage.delete',
                    side_effect=OSError('storage unavailable')):
             with self.assertLogs('healthcompass.ops', level='ERROR') as logs:
                 purge_user_data(self.user)
@@ -120,7 +127,7 @@ class ErasureCompletenessTests(TestCase):
         from apps.accounts import services
         source = inspect.getsource(services.purge_user_data)
         atomic_at = source.index('transaction.atomic')
-        delete_at = source.index('field_file.delete')
+        delete_at = source.index('erase_uploaded_file(')
         self.assertGreater(delete_at, atomic_at,
                            'file deletion must follow the transaction, not sit inside it')
 

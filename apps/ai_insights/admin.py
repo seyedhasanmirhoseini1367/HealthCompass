@@ -45,12 +45,30 @@ class AIModelAdmin(admin.ModelAdmin):
 
     @admin.action(description='🟢 Set selected models to Active')
     def activate_models(self, request, queryset):
-        count = queryset.update(
+        # Only approved models. This used to update the whole selection
+        # straight to active, so a model that had never been reviewed could be
+        # made patient-facing by selecting it and choosing this action — the
+        # approve step was skippable, not merely skipped.
+        #
+        # The filter is the enforcement HERE because queryset.update() bypasses
+        # Model.save() by design, so AIModel._check_activation() cannot see it.
+        # Skipped rows are reported rather than silently ignored.
+        eligible = queryset.filter(status='approved')
+        skipped = queryset.exclude(status='approved').count()
+
+        count = eligible.update(
             status='active',
             reviewed_by=request.user,
             reviewed_at=timezone.now(),
         )
         self.message_user(request, f'{count} model(s) activated.')
+        if skipped:
+            self.message_user(
+                request,
+                f'{skipped} model(s) were not activated because they are not '
+                f'approved. Approve them first.',
+                level='WARNING',
+            )
 
     @admin.action(description='❌ Reject selected models')
     def reject_models(self, request, queryset):

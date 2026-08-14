@@ -344,8 +344,11 @@ class PredictionEgressTests(TestCase):
         )
         from apps.ai_insights.models import AIModel
         self.model = AIModel.objects.create(
-            data_scientist=self.user, name='Cardio Risk', description='d', status='active',
+            data_scientist=self.user, name='Cardio Risk', description='d',
+            status='approved',
         )
+        self.model.status = 'active'
+        self.model.save(update_fields=['status'])
 
     def _interpret(self):
         from apps.ai_insights.inference.interpretation import generate_interpretation

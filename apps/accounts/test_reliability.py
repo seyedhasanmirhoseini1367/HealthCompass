@@ -197,8 +197,11 @@ class ConcurrentCounterTests(TransactionTestCase):
             username='cnt', email='cnt@example.com', password='pw-count-1',
         )
         self.model = AIModel.objects.create(
-            data_scientist=self.user, name='Counter', description='d', status='active',
+            data_scientist=self.user, name='Counter', description='d',
+            status='approved',
         )
+        self.model.status = 'active'
+        self.model.save(update_fields=['status'])
 
     def test_concurrent_increments_do_not_lose_updates(self):
         from django.db.models import F

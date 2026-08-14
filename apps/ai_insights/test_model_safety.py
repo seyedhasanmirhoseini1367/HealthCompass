@@ -56,7 +56,9 @@ class InputRefusalTests(TestCase):
             username='ai-input', password='pw-test-only', email='ai@example.com')
         self.model = AIModel.objects.create(
             data_scientist=self.user, name='T', description='d',
-            input_schema=SCHEMA, status=AIModel.Status.ACTIVE)
+            input_schema=SCHEMA, status=AIModel.Status.APPROVED)
+        self.model.status = AIModel.Status.ACTIVE
+        self.model.save(update_fields=['status'])
         self.handler = _Handler(self.model)
 
     def test_complete_valid_input_is_accepted(self):
@@ -113,7 +115,9 @@ class InputRefusalTests(TestCase):
         model = AIModel.objects.create(
             data_scientist=self.user, name='T2', description='d',
             input_schema={'smoker': {'label': 'Smoker', 'min': 0, 'max': 1}},
-            status=AIModel.Status.ACTIVE)
+            status=AIModel.Status.APPROVED)
+        model.status = AIModel.Status.ACTIVE
+        model.save(update_fields=['status'])
         df = _Handler(model)._build_tabular_df({'smoker': '0'})
         self.assertEqual(df.iloc[0]['smoker'], 0.0)
 

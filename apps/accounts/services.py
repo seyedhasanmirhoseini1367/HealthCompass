@@ -5,6 +5,37 @@ from django.db import transaction
 logger = logging.getLogger(__name__)
 
 
+def erase_uploaded_file(storage, name: str, *, label: str) -> bool:
+    """
+    Remove one uploaded file from storage. The single authoritative erasure.
+
+    Every path that destroys a row owning a file calls this, so there is one
+    place that decides what "the file is gone" means and one place that reports
+    when it is not.
+
+    Idempotent by design: deleting a file that is already absent is a success,
+    not an error. Django's FileSystemStorage.delete() swallows FileNotFoundError
+    itself, and the explicit check here makes the intent legible and covers
+    backends that do not. That property is what allows more than one path to
+    cover the same file — a record deleted as part of a user erasure is reached
+    by both the cascade and the purge, and the second call is a no-op rather
+    than a spurious failure.
+
+    Returns True when the file is gone afterwards. Never raises: erasure runs
+    after the database work has committed, so raising here would fail an
+    operation that has already succeeded.
+    """
+    if not name:
+        return True
+    try:
+        if storage.exists(name):
+            storage.delete(name)
+        return True
+    except Exception as exc:
+        logger.error('Erasure: could not delete %s (%s): %s', name, label, exc)
+        return False
+
+
 def purge_user_data(user) -> None:
     """
     Right-to-erasure: delete all PHI for the user, including physical files.
@@ -64,14 +95,16 @@ def purge_user_data(user) -> None:
     # bytes were already gone irreversibly. Doing it after the commit means the
     # worst case is an orphaned file, which is recoverable, rather than a record
     # pointing at nothing, which is not.
+    # Through the shared primitive, so the rule for "the file is gone" is the
+    # same one the record-deletion path uses. MedicalRecord files are also
+    # reached by the post_delete receiver as the user cascade commits; that
+    # overlap is harmless because erase_uploaded_file is idempotent, and it is
+    # kept deliberately so this function still erases everything it collected
+    # even if a signal is ever disconnected.
     failed = 0
     for label, field_file in targets:
-        try:
-            field_file.delete(save=False)
-        except Exception as exc:
+        if not erase_uploaded_file(field_file.storage, field_file.name, label=label):
             failed += 1
-            logger.error('Erasure: could not delete %s for user %s: %s',
-                         label, user_pk, exc)
 
     if failed:
         # A silently skipped file is an unfulfilled erasure request, so this is

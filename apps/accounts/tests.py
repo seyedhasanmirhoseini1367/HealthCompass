@@ -37,42 +37,46 @@ class PurgeUserDataTest(TestCase):
         purge_user_data(self.user)
         self.assertFalse(User.objects.filter(pk=pk).exists())
 
-    def test_profile_picture_file_delete_called(self):
-        """purge_user_data calls .delete(save=False) on a non-empty profile picture."""
+    def test_profile_picture_file_is_erased(self):
+        """
+        Asserts the outcome, not the mechanism.
+
+        This used to assert `.delete(save=False)` was called on the FieldFile.
+        Erasure now goes through the shared `erase_uploaded_file`, so pinning
+        the old call made the test fail while the file was still being removed —
+        it was measuring how, not whether.
+        """
+        from django.core.files.base import ContentFile
+
         from apps.accounts.services import purge_user_data
 
-        mock_pic = MagicMock()
-        # FieldFile is truthy when it has a name; make the mock behave the same.
-        mock_pic.__bool__ = MagicMock(return_value=True)
+        self.user.profile_picture.save(
+            'pic.png', ContentFile(b'\x89PNG\r\n\x1a\n'), save=True)
+        storage, name = self.user.profile_picture.storage, self.user.profile_picture.name
+        self.assertTrue(storage.exists(name))
 
-        with patch.object(User, 'profile_picture', new_callable=lambda: property(
-            lambda s: mock_pic, lambda s, v: None
-        )):
+        with self.captureOnCommitCallbacks(execute=True):
             purge_user_data(self.user)
 
-        mock_pic.delete.assert_called_once_with(save=False)
+        self.assertFalse(storage.exists(name))
 
-    def test_record_file_delete_called(self):
-        """purge_user_data calls .delete(save=False) on each MedicalRecord file."""
+    def test_record_file_is_erased(self):
+        """Same: the file is gone afterwards, however that is achieved."""
+        from django.core.files.base import ContentFile
+
         from apps.accounts.services import purge_user_data
         from apps.medical_records.models import MedicalRecord
 
         record = MedicalRecord.objects.create(
-            patient=self.user, title='Scan', record_type='imaging'
-        )
-        mock_file = MagicMock()
-        mock_file.__bool__ = MagicMock(return_value=True)
+            patient=self.user, title='Scan', record_type='imaging')
+        record.file.save('scan.pdf', ContentFile(b'%PDF-1.4 x'), save=True)
+        storage, name = record.file.storage, record.file.name
+        self.assertTrue(storage.exists(name))
 
-        with patch.object(type(record), 'file',
-                          new_callable=lambda: property(
-                              lambda s: mock_file, lambda s, v: None
-                          )):
-            # Patch the queryset to return our modified record
-            with patch.object(self.user.medical_records, 'select_related',
-                               return_value=MagicMock(all=MagicMock(return_value=[record]))):
-                purge_user_data(self.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            purge_user_data(self.user)
 
-        mock_file.delete.assert_called_once_with(save=False)
+        self.assertFalse(storage.exists(name))
 
     def test_chat_sessions_removed_by_cascade(self):
         from apps.accounts.services import purge_user_data
