@@ -118,10 +118,31 @@ class ChatTemplateHasNoInnerHtmlSinkTests(SimpleTestCase):
                          f'renderSources must not interpolate into innerHTML: {offenders}')
 
     def test_general_source_urls_are_protocol_checked(self):
-        """A javascript: or data: URL must never become a clickable href."""
+        """
+        A javascript: or data: URL must never become a clickable href.
+
+        The check moved out of this function into the shared `safeUrl`, which
+        the markdown link renderer uses too — one implementation, so the two
+        cannot drift into disagreeing about what is safe. This asserts the
+        property in its two halves rather than its old location: renderSources
+        delegates, and the thing it delegates to restricts the protocol.
+        """
         body = self._function_body('renderSources')
-        self.assertIn("parsed.protocol === 'http:'", body)
-        self.assertIn("parsed.protocol === 'https:'", body)
+        self.assertIn('safeUrl(s.source_url)', body,
+                      'renderSources no longer validates the URL at all')
+
+        checker = self._function_body('safeUrl')
+        self.assertIn("parsed.protocol !== 'http:'", checker)
+        self.assertIn("parsed.protocol !== 'https:'", checker)
+
+    def test_only_one_url_validation_rule_exists(self):
+        """
+        Two copies of this rule is how one of them ends up out of date. The
+        markdown renderer, the source chips and the consent button all ask the
+        same function.
+        """
+        self.assertEqual(self.source.count('new URL('), 1,
+                         'a second URL-validation rule has appeared')
 
     def test_escape_html_still_guards_the_markdown_path(self):
         """The original protection must not be lost while fixing the new one."""
