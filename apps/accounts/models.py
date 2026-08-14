@@ -177,6 +177,76 @@ class DoctorAccessLog(models.Model):
         return f'{who} accessed {self.patient} [{self.resource}] @ {self.accessed_at}'
 
 
+class AdminAuditEvent(models.Model):
+    """
+    What an administrator did to the system, as opposed to who read a patient.
+
+    `DoctorAccessLog` answers "who saw my records" for a patient. Nothing
+    answered "who approved this account", "who activated this model", or "who
+    tried to grant themselves superuser" — and those are the actions that change
+    what the system will permit next.
+
+    Django's own `LogEntry` covers part of this: it records add, change and
+    delete performed through the admin's change form. It does not cover custom
+    actions, which is where approval and activation live, because those use
+    `queryset.update()`; it never records a refusal; and its `user` field is
+    CASCADE, so deleting an administrator erases their entire admin history —
+    the opposite of what an audit trail is for.
+
+    This table covers what LogEntry cannot. It is not a replacement for it and
+    not a general event bus: rows are appended by a handful of named call sites
+    and never updated or deleted by application code.
+
+    Deliberately NOT here: clinical values, file names, free text from patient
+    records. `metadata` accepts scalars only.
+    """
+    class Action(models.TextChoices):
+        USER_APPROVED    = 'user_approved',    'User approved'
+        USER_REJECTED    = 'user_rejected',    'User rejected and deleted'
+        MODEL_APPROVED   = 'model_approved',   'AI model approved'
+        MODEL_ACTIVATED  = 'model_activated',  'AI model activated'
+        MODEL_REJECTED   = 'model_rejected',   'AI model rejected'
+        ESCALATION_DENIED = 'escalation_denied', 'Authority change refused'
+
+    actor        = models.ForeignKey(
+                     'accounts.CustomUser', on_delete=models.SET_NULL, null=True,
+                     related_name='admin_audit_events',
+                     help_text='The administrator who acted.')
+    # Same reasoning as DoctorAccessLog.actor_label: SET_NULL keeps the row when
+    # an account is deleted, but a row saying only that *someone* granted
+    # themselves authority is not accountability. Written once, never updated.
+    actor_label  = models.CharField(max_length=200, blank=True, default='')
+    action       = models.CharField(max_length=32, choices=Action.choices, db_index=True)
+    # Target as strings rather than a GenericForeignKey: the target may be
+    # deleted by the very action being recorded (a rejected user), and a
+    # dangling generic relation would resolve to nothing. Strings survive it.
+    target_type  = models.CharField(max_length=64, blank=True, default='')
+    target_id    = models.CharField(max_length=64, blank=True, default='')
+    target_label = models.CharField(
+                     max_length=200, blank=True, default='',
+                     help_text='Human-readable identifier of the target at the time '
+                               'of the action. Never clinical content.')
+    # Which authority the actor relied on. With one administrator today this is
+    # nearly always "superuser"; it is recorded now so the trail stays readable
+    # if that ever stops being true.
+    authority    = models.CharField(max_length=64, blank=True, default='')
+    success      = models.BooleanField(default=True,
+                     help_text='False for refused attempts, which are the ones '
+                               'worth reading.')
+    metadata     = models.JSONField(default=dict, blank=True,
+                     help_text='Scalars only — counts, identifiers, reasons.')
+    created_at   = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['action', '-created_at'])]
+
+    def __str__(self):
+        outcome = '' if self.success else ' [REFUSED]'
+        who = self.actor_label or 'unknown actor'
+        return f'{who} {self.get_action_display()}{outcome} @ {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class ConsentPurpose(models.TextChoices):
     """
     Separate purposes, deliberately not a single "I agree".

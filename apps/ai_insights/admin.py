@@ -36,11 +36,19 @@ class AIModelAdmin(admin.ModelAdmin):
 
     @admin.action(description='✅ Approve selected models')
     def approve_models(self, request, queryset):
+        from apps.accounts.audit import record as record_admin_action
+        from apps.accounts.models import AdminAuditEvent
+
+        eligible = list(queryset.filter(status='pending'))
         count = queryset.filter(status='pending').update(
             status='approved',
             reviewed_by=request.user,
             reviewed_at=timezone.now(),
         )
+        for model in eligible:
+            record_admin_action(AdminAuditEvent.Action.MODEL_APPROVED,
+                                actor=request.user, target=model,
+                                target_label=model.slug)
         self.message_user(request, f'{count} model(s) approved.')
 
     @admin.action(description='🟢 Set selected models to Active')
@@ -56,11 +64,21 @@ class AIModelAdmin(admin.ModelAdmin):
         eligible = queryset.filter(status='approved')
         skipped = queryset.exclude(status='approved').count()
 
+        from apps.accounts.audit import record as record_admin_action
+        from apps.accounts.models import AdminAuditEvent
+
+        activated = list(eligible)
         count = eligible.update(
             status='active',
             reviewed_by=request.user,
             reviewed_at=timezone.now(),
         )
+        # Activation is what makes a model patient-facing, so it is the single
+        # most consequential administrative action in this system.
+        for model in activated:
+            record_admin_action(AdminAuditEvent.Action.MODEL_ACTIVATED,
+                                actor=request.user, target=model,
+                                target_label=model.slug)
         self.message_user(request, f'{count} model(s) activated.')
         if skipped:
             self.message_user(
@@ -72,7 +90,15 @@ class AIModelAdmin(admin.ModelAdmin):
 
     @admin.action(description='❌ Reject selected models')
     def reject_models(self, request, queryset):
+        from apps.accounts.audit import record as record_admin_action
+        from apps.accounts.models import AdminAuditEvent
+
+        rejected = list(queryset)
         count = queryset.update(status='rejected')
+        for model in rejected:
+            record_admin_action(AdminAuditEvent.Action.MODEL_REJECTED,
+                                actor=request.user, target=model,
+                                target_label=model.slug)
         self.message_user(request, f'{count} model(s) rejected.')
 
 

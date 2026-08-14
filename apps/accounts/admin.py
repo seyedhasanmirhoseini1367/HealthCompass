@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import (CustomUser, PatientProfile, DoctorProfile,
+from .models import (AdminAuditEvent, CustomUser, DoctorAccessLog,
+                     PatientProfile, DoctorProfile,
                      DataScientistProfile, HospitalAdminProfile,
                      PatientDoctorRelationship)
 
@@ -121,6 +122,16 @@ class CustomUserAdmin(UserAdmin):
         if changed == ['role'] and obj.pk != request.user.pk:
             return
 
+        # A refused escalation is the single most important thing in this table:
+        # nothing else records an attempt, because nothing was written.
+        from .audit import record as record_admin_action
+        from .models import AdminAuditEvent
+        record_admin_action(
+            AdminAuditEvent.Action.ESCALATION_DENIED,
+            actor=request.user, target=obj, target_label=obj.username,
+            success=False, fields=','.join(changed),
+            self_target=(obj.pk == request.user.pk))
+
         raise PermissionDenied(
             f'Refusing to change {", ".join(changed)} through the user admin. '
             f'System authority is granted from the shell, and no account may '
@@ -129,20 +140,87 @@ class CustomUserAdmin(UserAdmin):
 
     @admin.action(description='✅ Approve selected users')
     def approve_users(self, request, queryset):
-        updated = queryset.filter(is_approved=False)
+        from .audit import record as record_admin_action
+        from .models import AdminAuditEvent
+
+        updated = list(queryset.filter(is_approved=False))
         for user in updated:
             _send_approval_email(user, approved=True)
         count = queryset.update(is_approved=True)
+
+        # Recorded per user rather than as one summary row: "who approved this
+        # account" is the question a trail has to answer, and a count cannot.
+        for user in updated:
+            record_admin_action(
+                AdminAuditEvent.Action.USER_APPROVED,
+                actor=request.user, target=user,
+                target_label=user.username, role=user.role)
         self.message_user(request, f'{count} user(s) approved and notified by email.')
 
     @admin.action(description='❌ Reject & delete selected users')
     def reject_users(self, request, queryset):
+        from .audit import record as record_admin_action
+        from .models import AdminAuditEvent
+
         count = 0
         for user in queryset:
             _send_approval_email(user, approved=False)
+            # Recorded BEFORE the delete: afterwards there is no row to name,
+            # and this action destroys the account it is describing.
+            record_admin_action(
+                AdminAuditEvent.Action.USER_REJECTED,
+                actor=request.user, target=user,
+                target_label=user.username, role=user.role)
             user.delete()
             count += 1
         self.message_user(request, f'{count} user(s) rejected, notified, and removed.')
+
+
+class _ReadOnlyAdmin(admin.ModelAdmin):
+    """
+    A record of what happened, not a place to change it.
+
+    An audit trail an administrator can edit is not evidence. Add, change and
+    delete are refused at the ModelAdmin level, so the rows are visible and
+    inert — including to the account that wrote them.
+
+    This is not tamper-proofing: a superuser with shell access can still reach
+    the ORM. It removes the ability to erase evidence through the interface
+    people actually use, which is the realistic threat, and states plainly that
+    the stronger guarantee is not being claimed.
+    """
+    def has_add_permission(self, request):                       return False
+    def has_change_permission(self, request, obj=None):          return False
+    def has_delete_permission(self, request, obj=None):          return False
+
+
+@admin.register(AdminAuditEvent)
+class AdminAuditEventAdmin(_ReadOnlyAdmin):
+    """
+    Who did what to the system, when, under which authority, and whether it
+    succeeded. Refusals are here too — they are the rows worth reading.
+    """
+    list_display  = ('created_at', 'actor_label', 'action', 'target_type',
+                     'target_label', 'authority', 'success')
+    list_filter   = ('action', 'success', 'authority')
+    search_fields = ('actor_label', 'target_label', 'target_id')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(DoctorAccessLog)
+class DoctorAccessLogAdmin(_ReadOnlyAdmin):
+    """
+    The clinical access trail. It was written by four call sites and read by
+    nobody: patients could see their own slice through the data export, and no
+    compliance review was possible without shell access.
+
+    Deliberately shows WHO accessed WHICH resource and when — never the content
+    of the resource, so reviewing the trail is not itself a way to read records.
+    """
+    list_display  = ('accessed_at', 'actor_label', 'actor', 'patient', 'resource')
+    list_filter   = ('accessed_at',)
+    search_fields = ('actor_label', 'resource')
+    date_hierarchy = 'accessed_at'
 
 
 @admin.register(PatientProfile)
