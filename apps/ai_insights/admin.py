@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
+
+from apps.accounts.admin_phi import PhiAccessLoggedAdmin
 from .models import AIModel, ModelPrediction, HealthAlert
 
 
@@ -103,7 +105,7 @@ class AIModelAdmin(admin.ModelAdmin):
 
 
 @admin.register(HealthAlert)
-class HealthAlertAdmin(admin.ModelAdmin):
+class HealthAlertAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
     list_display  = ('title', 'patient', 'severity', 'is_read', 'created_at')
     list_filter   = ('severity', 'is_read')
     search_fields = ('title', 'patient__username')
@@ -115,7 +117,7 @@ class HealthAlertAdmin(admin.ModelAdmin):
 
 
 @admin.register(ModelPrediction)
-class ModelPredictionAdmin(admin.ModelAdmin):
+class ModelPredictionAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
     list_display = ('model', 'patient', 'risk_score', 'created_at')
     list_filter  = ('model__category',)
     readonly_fields = ('input_data', 'result')

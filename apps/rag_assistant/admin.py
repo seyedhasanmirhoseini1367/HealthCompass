@@ -1,9 +1,17 @@
 from django.contrib import admin
+
+from apps.accounts.admin_phi import PhiAccessLoggedAdmin
 from .models import ChatSession, QueryLog, MedicalDocument, MedicalChunk
 
 
 @admin.register(QueryLog)
-class QueryLogAdmin(admin.ModelAdmin):
+class QueryLogAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
+    def phi_subject(self, obj):
+        # A query log has no patient of its own; it belongs to the session's.
+        # Reading one exposes the patient's question and the assistant's answer
+        # about their records, which is as clinical as the record itself.
+        return getattr(obj.session, 'patient', None) if obj.session_id else None
+
     list_display  = ('created_at', 'short_query', 'llm_provider',
                      'retrieved_chunks_count', 'safety_routed', 'triggered_rules')
     list_filter   = ('safety_routed', 'llm_provider')
@@ -18,20 +26,20 @@ class QueryLogAdmin(admin.ModelAdmin):
 
 
 @admin.register(ChatSession)
-class ChatSessionAdmin(admin.ModelAdmin):
+class ChatSessionAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
     list_display  = ('title', 'patient', 'created_at', 'updated_at')
     search_fields = ('title', 'patient__username')
 
 
 @admin.register(MedicalDocument)
-class MedicalDocumentAdmin(admin.ModelAdmin):
+class MedicalDocumentAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
     list_display  = ('title', 'document_type', 'patient', 'created_at')
     list_filter   = ('document_type',)
     search_fields = ('title', 'patient__username')
 
 
 @admin.register(MedicalChunk)
-class MedicalChunkAdmin(admin.ModelAdmin):
+class MedicalChunkAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
     list_display = ('document', 'chunk_index', 'patient', 'has_embedding')
     list_filter  = ('document__document_type',)
 
