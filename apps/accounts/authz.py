@@ -42,6 +42,147 @@ def can_view_population_analytics(user) -> bool:
     )
 
 
+#: Scopes a patient can share. Named after the resources this application
+#: already has, so the vocabulary on the sharing screen matches the vocabulary
+#: everywhere else.
+SHARE_SCOPES = ('records', 'alerts', 'appointments')
+
+
+def sharing_grant(recipient, patient, scope: str):
+    """
+    The effective grant letting *recipient* see *patient*'s *scope*, or None.
+
+    One query, one place. Every view, endpoint and template asks this rather
+    than filtering SharingGrant themselves, because a status-and-expiry filter
+    repeated at five call sites is four chances to forget the expiry half.
+
+    Administrative authority is deliberately absent from this function. An
+    administrator holds no grant, so they get None here — being staff is not a
+    way to become someone's family.
+    """
+    from apps.accounts.models import SharingGrant
+
+    if recipient is None or patient is None:
+        return None
+    if not getattr(recipient, 'is_authenticated', False):
+        return None
+    if recipient.pk == patient.pk:
+        return None
+    if scope not in SHARE_SCOPES:
+        return None
+
+    grant = (SharingGrant.objects
+             .filter(recipient=recipient, patient=patient,
+                     status=SharingGrant.Status.ACTIVE)
+             .first())
+    if grant is None or not grant.allows(scope):
+        return None
+    return grant
+
+
+def shared_with(recipient, scope: str):
+    """Every patient whose *scope* this recipient may currently see."""
+    from apps.accounts.models import SharingGrant
+
+    if not getattr(recipient, 'is_authenticated', False):
+        return []
+    grants = (SharingGrant.objects
+              .filter(recipient=recipient, status=SharingGrant.Status.ACTIVE,
+                      **{f'can_view_{scope}': True})
+              .select_related('patient'))
+    return [g.patient for g in grants if g.allows(scope)]
+
+
+def can_view_shared_records(recipient, patient) -> bool:
+    """
+    Whether *recipient* may read *patient*'s records through a family share.
+
+    Separate from `doctor_has_active_link` on purpose. A clinician's access
+    needs an ACTIVE hospital-created link AND the patient's DATA_SHARING
+    consent; a family share is the patient handing a specific person a specific
+    key. Collapsing them would let a share satisfy a clinical rule it was never
+    checked against, or make family access require a consent written about
+    clinicians.
+
+    Both are consulted by `can_access_media`, and neither widens the other.
+    """
+    return sharing_grant(recipient, patient, 'records') is not None
+
+
+def can_revoke_grant(user, grant) -> bool:
+    """
+    Who may end a share.
+
+    The patient, always — it is their data and their decision.
+
+    An administrator, deliberately: a recipient can be abusive, and the subject
+    may be the last person able to act. This is asymmetric on purpose. Revoking
+    removes access and can be justified for someone else's safety; creating it
+    cannot, so `can_create_grant` has no administrative branch at all.
+    """
+    if grant is None or not getattr(user, 'is_authenticated', False):
+        return False
+    if grant.patient_id == user.pk:
+        return True
+    return bool(user.is_staff or user.is_superuser)
+
+
+def can_create_grant(user, patient) -> bool:
+    """
+    Only the patient, for their own data. No administrative branch exists.
+
+    An administrator creating a share on someone's behalf is impersonating
+    consent, and there is no operational need that outweighs that: if a patient
+    wants to share, they can.
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return user.pk == getattr(patient, 'pk', None)
+
+
+def can_inspect_grant_metadata(user) -> bool:
+    """
+    Read WHO shared with WHOM, and when — never the records behind it.
+
+    Compliance needs to answer "who has access to this patient's data" without
+    that question becoming a way to read the data. `can_view_shared_records`
+    has no administrative branch, so holding this changes nothing about what an
+    administrator can actually see.
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return bool(user.is_staff or user.is_superuser)
+
+
+def can_correct_clinical_value(user) -> bool:
+    """
+    Who may append a correction to an extracted lab value.
+
+    Platform administration, and only that. The reasoning is not that
+    administrators are clinically qualified — they are not, and a correction is
+    explicitly not a clinical judgement. It is an assertion that the extraction
+    misread the source document, which is a data-integrity question about this
+    system's own parsing.
+
+    Deliberately NOT the patient, and not their doctor:
+
+      * the patient owns the data but not its evidential integrity. A subject
+        able to rewrite their own lab history destroys the value of the record
+        for everyone who relies on it, including themselves.
+      * a doctor's authority here is to READ a linked patient's records under
+        consent. Writing to them is a different power, and consent to be read is
+        not consent to be edited.
+
+    This keeps administrative authority separate from clinical-data ownership:
+    the administrator can fix what the parser got wrong and still cannot decide
+    anything clinical, because a correction records what the document said, not
+    what it means.
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return bool(user.is_staff or user.is_superuser)
+
+
 def resolve_media_owner(relative_path: str):
     """
     Return (owner, resource_label) for a stored media path.
@@ -165,6 +306,14 @@ def can_access_media(user, relative_path: str) -> bool:
     is_phi = not resource.startswith('ai_model:')
 
     if doctor_has_active_link(user, owner):
+        log_phi_access(user, owner, f'media:{resource}')
+        return True
+
+    # A family share, which is a different authority from a clinical link and
+    # is checked separately so neither can widen the other. Logged the same way:
+    # the patient's access trail must show every person who opened their file,
+    # not only the clinicians.
+    if is_phi and can_view_shared_records(user, owner):
         log_phi_access(user, owner, f'media:{resource}')
         return True
 

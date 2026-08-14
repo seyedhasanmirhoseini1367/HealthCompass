@@ -16,6 +16,11 @@ urlpatterns = [
     path("export/",                  views.data_export,            name="data_export"),
     # Patient control over who may read their records (NEW-05).
     path("my-doctors/",                    views.my_doctors,            name="my_doctors"),
+    path("my-shares/",                     views.my_shares,             name="my_shares"),
+    path("my-shares/create/",              views.create_share,          name="create_share"),
+    path("my-shares/<int:pk>/revoke/",     views.revoke_share,          name="revoke_share"),
+    path("shared/<int:pk>/",               views.shared_patient,        name="shared_patient"),
+    path("shared/<int:pk>/record/<uuid:record_pk>/", views.shared_record, name="shared_record"),
     path("my-doctors/<int:pk>/approve/",   views.approve_doctor_access, name="approve_doctor_access"),
     path("my-doctors/<int:pk>/revoke/",    views.revoke_doctor_access,  name="revoke_doctor_access"),
     path("emergency-card/",          views.emergency_card,         name="emergency_card"),

@@ -6,6 +6,8 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordResetView
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
@@ -16,7 +18,7 @@ from django.views.decorators.http import require_POST
 from allauth.socialaccount.views import SignupView as BaseSocialSignupView
 from django_ratelimit.decorators import ratelimit
 
-from .models import (PatientProfile, DoctorProfile, DataScientistProfile,
+from .models import (CustomUser, PatientProfile, DoctorProfile, DataScientistProfile,
                      HospitalAdminProfile, EmergencyCardView,
                      PatientDoctorRelationship, DoctorAccessLog)
 from .forms import (RegisterForm, LoginForm, ProfileForm, PasswordChangeForm,
@@ -611,3 +613,218 @@ def revoke_doctor_access(request, pk):
 
     messages.success(request, 'Access revoked. That doctor can no longer view your records.')
     return redirect('accounts:my_doctors')
+
+
+# ─── Family / shared access ──────────────────────────────────────────────────
+#
+# The patient is the only authority here. Every view below scopes to
+# request.user as the grantor, so there is no identifier a caller could
+# substitute to act on someone else's data — the same shape as the export and
+# consent views.
+
+@login_required
+def my_shares(request):
+    """Who this patient shares with, and who shares with them."""
+    from .authz import SHARE_SCOPES
+    from .models import SharingGrant
+
+    granted = (SharingGrant.objects
+               .filter(patient=request.user)
+               .select_related('recipient')
+               .order_by('-created_at'))
+    received = (SharingGrant.objects
+                .filter(recipient=request.user, status=SharingGrant.Status.ACTIVE)
+                .select_related('patient')
+                .order_by('-created_at'))
+
+    return render(request, 'accounts/my_shares.html', {
+        'granted':  granted,
+        # Only grants that actually give something: showing an expired one under
+        # "shared with me" would promise access the patient no longer has.
+        'received': [g for g in received if g.is_effective],
+        'scopes':   SHARE_SCOPES,
+        'Status':   SharingGrant.Status,
+    })
+
+
+@login_required
+@require_POST
+def create_share(request):
+    """
+    Share part of your record with someone.
+
+    POST only, and the grantor is always request.user: `can_create_grant` has
+    no administrative branch, so there is no path by which anyone creates a
+    share on another person's behalf.
+    """
+    from .authz import can_create_grant
+    from .models import SharingGrant
+
+    identifier = (request.POST.get('recipient') or '').strip().lower()
+    if not identifier:
+        messages.error(request, 'Enter the username or email of the person to share with.')
+        return redirect('accounts:my_shares')
+
+    recipient = (CustomUser.objects
+                 .filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
+                 .first())
+    if recipient is None:
+        # Deliberately the same message whether or not the account exists: this
+        # form would otherwise confirm which email addresses are registered.
+        messages.error(request, 'No account matches that username or email.')
+        return redirect('accounts:my_shares')
+
+    if recipient.pk == request.user.pk:
+        messages.error(request, 'You already have access to your own records.')
+        return redirect('accounts:my_shares')
+
+    if not can_create_grant(request.user, request.user):
+        raise PermissionDenied
+
+    scopes = request.POST.getlist('scopes')
+    if not scopes:
+        messages.error(request, 'Choose at least one thing to share.')
+        return redirect('accounts:my_shares')
+
+    grant, created = SharingGrant.objects.get_or_create(
+        patient=request.user, recipient=recipient,
+        defaults={'can_view_records': 'records' in scopes,
+                  'can_view_alerts': 'alerts' in scopes,
+                  'can_view_appointments': 'appointments' in scopes})
+
+    if not created:
+        # Re-sharing with someone already listed updates the scopes rather than
+        # failing on the uniqueness constraint, and un-revokes if they had been
+        # cut off — an explicit act by the patient either way.
+        grant.can_view_records = 'records' in scopes
+        grant.can_view_alerts = 'alerts' in scopes
+        grant.can_view_appointments = 'appointments' in scopes
+        grant.status = SharingGrant.Status.ACTIVE
+        grant.revoked_at = None
+        grant.revoked_by = None
+        grant.revoke_reason = ''
+        grant.save()
+
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=request.user,
+        resource=f'share_granted:{recipient.pk}')
+    messages.success(
+        request,
+        f'{recipient.get_full_name() or recipient.username} can now see '
+        f'{", ".join(scopes)}. You can stop this at any time.')
+    return redirect('accounts:my_shares')
+
+
+@login_required
+@require_POST
+def revoke_share(request, pk):
+    """Stop sharing. Takes effect on the next request the recipient makes."""
+    from .authz import can_revoke_grant
+    from .models import SharingGrant
+
+    grant = get_object_or_404(SharingGrant, pk=pk)
+    if not can_revoke_grant(request.user, grant):
+        raise PermissionDenied
+
+    grant.revoke(by=request.user, reason=request.POST.get('reason', ''))
+
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=grant.patient,
+        resource=f'share_revoked:{grant.recipient_id}')
+    messages.success(request, 'Sharing stopped.')
+    return redirect('accounts:my_shares')
+
+
+@login_required
+def shared_patient(request, pk):
+    """
+    What a recipient may actually see of someone who shared with them.
+
+    Every section is gated on its own scope, evaluated here rather than in the
+    template: hiding a block in HTML is not authorization, and a template that
+    decides what to fetch would put the rule in two places.
+
+    Until this view existed the scopes were unreachable — a grant said "Records"
+    on the patient's sharing page while no path served them a record. Failing
+    closed is not the same as being correct: the patient was told access existed
+    that did not.
+    """
+    from .authz import sharing_grant
+    from apps.ai_insights.models import HealthAlert
+    from apps.appointments.models import Appointment
+    from apps.medical_records.models import MedicalRecord
+
+    subject = get_object_or_404(CustomUser, pk=pk)
+
+    # One lookup for the pair, then each scope is read off it. A grant that
+    # gives nothing is indistinguishable from no grant at all.
+    grant = None
+    for scope in ('records', 'alerts', 'appointments'):
+        grant = sharing_grant(request.user, subject, scope)
+        if grant is not None:
+            break
+    if grant is None:
+        raise Http404
+
+    records = alerts = appointments = None
+
+    if grant.allows('records'):
+        qs = MedicalRecord.objects.filter(patient=subject)
+        # A frozen share shows the record as it stood, not as it grows. NULL
+        # means the share follows the record forward, which is the common case.
+        if grant.data_cutoff is not None:
+            qs = qs.filter(uploaded_at__lt=grant.data_cutoff)
+        records = qs.order_by('-record_date', '-uploaded_at')[:100]
+
+    if grant.allows('alerts'):
+        # Severity and title only — the alert says something is wrong without
+        # disclosing the values behind it, which is the whole point of alerts
+        # being a scope separate from records.
+        alerts = (HealthAlert.objects.filter(patient=subject)
+                  .order_by('-created_at')[:20])
+
+    if grant.allows('appointments'):
+        appointments = (Appointment.objects
+                        .filter(patient=subject, is_cancelled=False)
+                        .order_by('appointment_datetime')[:20])
+
+    # Reading someone else's record is an access event, recorded in THEIR trail
+    # exactly as a clinician's read is. A patient asking "who has seen my data"
+    # must see family members too, not only doctors.
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=subject, resource='shared:patient_overview')
+
+    return render(request, 'accounts/shared_patient.html', {
+        'subject':      subject,
+        'grant':        grant,
+        'records':      records,
+        'alerts':       alerts,
+        'appointments': appointments,
+    })
+
+
+@login_required
+def shared_record(request, pk, record_pk):
+    """One shared record. Scope re-checked here, never inherited from the list."""
+    from .authz import sharing_grant
+    from apps.medical_records.models import MedicalRecord
+
+    subject = get_object_or_404(CustomUser, pk=pk)
+    grant = sharing_grant(request.user, subject, 'records')
+    if grant is None:
+        raise Http404
+
+    record = get_object_or_404(MedicalRecord, pk=record_pk, patient=subject)
+    if grant.data_cutoff is not None and record.uploaded_at >= grant.data_cutoff:
+        raise Http404
+
+    DoctorAccessLog.objects.create(
+        actor=request.user, patient=subject, resource=f'shared:record:{record.pk}')
+
+    return render(request, 'accounts/shared_record.html', {
+        'subject': subject,
+        'record':  record,
+        # effective() so a corrected value is what the family member sees, the
+        # same reading the patient and their clinicians see.
+        'lab_values': [(lv, lv.effective()) for lv in record.lab_values.all()],
+    })

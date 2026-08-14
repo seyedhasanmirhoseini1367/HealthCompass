@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import (AdminAuditEvent, CustomUser, DoctorAccessLog,
+from .models import (AdminAuditEvent, CustomUser, DoctorAccessLog, SharingGrant,
                      PatientProfile, DoctorProfile,
                      DataScientistProfile, HospitalAdminProfile,
                      PatientDoctorRelationship)
@@ -221,6 +221,52 @@ class DoctorAccessLogAdmin(_ReadOnlyAdmin):
     list_filter   = ('accessed_at',)
     search_fields = ('actor_label', 'resource')
     date_hierarchy = 'accessed_at'
+
+
+@admin.register(SharingGrant)
+class SharingGrantAdmin(_ReadOnlyAdmin):
+    """
+    Compliance metadata: who shares with whom, and when. Never the records.
+
+    Read-only plus one action. An administrator can see that a share exists and
+    end an abusive one; they cannot create a share, and `can_view_shared_records`
+    has no administrative branch, so nothing here gives them the clinical data
+    behind it.
+
+    Asymmetric deliberately: revoking removes access and can protect someone who
+    may be unable to act for themselves, while granting on a patient's behalf is
+    impersonating consent.
+    """
+    list_display  = ('created_at', 'patient', 'recipient', 'status',
+                     'can_view_records', 'can_view_alerts', 'can_view_appointments',
+                     'expires_at', 'revoked_at')
+    list_filter   = ('status', 'can_view_records', 'can_view_alerts')
+    search_fields = ('patient__username', 'recipient__username')
+    date_hierarchy = 'created_at'
+    actions = ['revoke_grants']
+
+    @admin.action(description='Stop the selected shares')
+    def revoke_grants(self, request, queryset):
+        from .audit import record as record_admin_action
+        from .authz import can_revoke_grant
+        from .models import AdminAuditEvent
+
+        stopped = 0
+        for grant in queryset.filter(status=SharingGrant.Status.ACTIVE):
+            if not can_revoke_grant(request.user, grant):
+                record_admin_action(AdminAuditEvent.Action.SHARE_DENIED,
+                                    actor=request.user, target=grant, success=False)
+                continue
+            grant.revoke(by=request.user, reason='revoked by administrator')
+            stopped += 1
+            # Identifiers only: who shared with whom is metadata, and the
+            # records behind the grant are not named here at all.
+            record_admin_action(
+                AdminAuditEvent.Action.SHARE_REVOKED, actor=request.user,
+                target=grant, patient_id=grant.patient_id,
+                recipient_id=grant.recipient_id)
+
+        self.message_user(request, f'{stopped} share(s) stopped.')
 
 
 @admin.register(PatientProfile)

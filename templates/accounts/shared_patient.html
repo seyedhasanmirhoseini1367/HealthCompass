@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}{{ subject.get_full_name|default:subject.username }} — Shared with you{% endblock %}
+{% block extra_css %}
+<style>
+.sp-page { max-width:820px; margin:0 auto; }
+.sp-head { background:linear-gradient(135deg,#0ea5e9,#6366f1); color:white; border-radius:14px;
+           padding:1.1rem 1.25rem; margin-bottom:1.2rem; }
+.sp-head h1 { font-size:1.1rem; font-weight:800; margin:0 0 .2rem; }
+.sp-head p { font-size:.82rem; opacity:.9; margin:0; }
+.sp-section { font-size:.95rem; font-weight:800; color:var(--text); margin:1.6rem 0 .6rem; }
+.sp-card { background:white; border:1.5px solid var(--border); border-radius:12px;
+           padding:.85rem 1rem; margin-bottom:.6rem; }
+.sp-title { font-size:.9rem; font-weight:700; color:#1e293b; margin:0 0 .15rem; }
+.sp-meta { font-size:.74rem; color:#94a3b8; }
+.sp-sev { display:inline-block; padding:.12rem .5rem; border-radius:5px; font-size:.66rem;
+          font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+.sp-sev.critical { background:#fee2e2; color:#b91c1c; }
+.sp-sev.warning  { background:#fef3c7; color:#92400e; }
+.sp-sev.info     { background:#dbeafe; color:#1d4ed8; }
+.sp-empty { font-size:.83rem; color:#94a3b8; padding:.6rem 0; }
+.sp-note { font-size:.78rem; color:#64748b; background:#f8fafc; border-radius:9px;
+           padding:.7rem .9rem; margin:1.2rem 0; line-height:1.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sp-page">
+  <div class="sp-head">
+    <h1>{{ subject.get_full_name|default:subject.username }}</h1>
+    <p>Shared with you since {{ grant.created_at|date:"j M Y" }}{% if grant.expires_at %} · access ends {{ grant.expires_at|date:"j M Y" }}{% endif %}</p>
+  </div>
+
+  {% comment %}
+    Each section renders only when its scope allows it. The view decides; this
+    template is told, so a change here cannot widen access.
+  {% endcomment %}
+
+  {% if records is not None %}
+    <div class="sp-section">Medical records</div>
+    {% for record in records %}
+      <div class="sp-card">
+        <p class="sp-title">
+          <a href="{% url 'accounts:shared_record' subject.pk record.pk %}">{{ record.title }}</a>
+        </p>
+        <p class="sp-meta">{{ record.get_record_type_display }} · {{ record.record_date|default:record.uploaded_at|date:"j M Y" }}</p>
+      </div>
+    {% empty %}
+      <p class="sp-empty">No records to show.</p>
+    {% endfor %}
+  {% endif %}
+
+  {% if alerts is not None %}
+    <div class="sp-section">Health alerts</div>
+    {% for alert in alerts %}
+      <div class="sp-card">
+        <p class="sp-title">
+          <span class="sp-sev {{ alert.severity }}">{{ alert.severity }}</span>
+          {{ alert.title }}
+        </p>
+        <p class="sp-meta">{{ alert.created_at|date:"j M Y, H:i" }}</p>
+      </div>
+    {% empty %}
+      <p class="sp-empty">No alerts.</p>
+    {% endfor %}
+    {% if records is None %}
+      <p class="sp-note">
+        You can see that an alert exists and how serious it is.
+        {{ subject.get_full_name|default:subject.username }} has not shared the
+        underlying results with you.
+      </p>
+    {% endif %}
+  {% endif %}
+
+  {% if appointments is not None %}
+    <div class="sp-section">Appointments</div>
+    {% for appointment in appointments %}
+      <div class="sp-card">
+        <p class="sp-title">{{ appointment.title }}</p>
+        <p class="sp-meta">
+          {{ appointment.appointment_datetime|date:"j M Y, H:i" }}
+          {% if appointment.location %} · {{ appointment.location }}{% endif %}
+        </p>
+      </div>
+    {% empty %}
+      <p class="sp-empty">No upcoming appointments.</p>
+    {% endfor %}
+  {% endif %}
+
+  <p class="sp-note">
+    You are seeing this because {{ subject.get_full_name|default:subject.username }}
+    chose to share it. They can stop at any time, and every time you open their
+    information it is recorded in their access history.
+  </p>
+</div>
+{% endblock %}
