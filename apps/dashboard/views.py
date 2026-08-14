@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 
+from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -11,6 +12,7 @@ from django.utils import timezone
 from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import HealthAlert
 from apps.notifications.models import Notification
+from apps.accounts.authz import doctor_has_active_link
 from apps.accounts.models import CustomUser, PatientDoctorRelationship, DoctorAccessLog
 from apps.accounts.safe_json import script_safe_json
 
@@ -93,14 +95,21 @@ def patient_records(request, patient_pk):
         messages.error(request, 'Access denied.')
         return redirect('dashboard:home')
 
-    # Verify the doctor-patient relationship
+    # Verify the doctor-patient relationship.
+    #
+    # Through authz.doctor_has_active_link rather than a local queryset: the
+    # rule is an ACTIVE link AND the patient's DATA_SHARING consent, and this
+    # view used to test only the first half. serve_media already asks the shared
+    # predicate, so a local copy here meant revoking DATA_SHARING closed the
+    # file download and left this page open.
     patient = get_object_or_404(CustomUser, pk=patient_pk, role='patient')
-    relationship = get_object_or_404(
-        PatientDoctorRelationship,
-        doctor=request.user,
-        patient=patient,
+    if not doctor_has_active_link(request.user, patient):
+        raise Http404
+
+    relationship = PatientDoctorRelationship.objects.filter(
+        doctor=request.user, patient=patient,
         status=PatientDoctorRelationship.Status.ACTIVE,
-    )
+    ).first()
 
     DoctorAccessLog.objects.create(
         actor=request.user,
@@ -127,13 +136,9 @@ def doctor_record_detail(request, record_pk):
 
     record = get_object_or_404(MedicalRecord, pk=record_pk)
 
-    # Ensure this doctor is linked to this patient
-    get_object_or_404(
-        PatientDoctorRelationship,
-        doctor=request.user,
-        patient=record.patient,
-        status=PatientDoctorRelationship.Status.ACTIVE,
-    )
+    # ACTIVE link AND DATA_SHARING consent — see patient_records above.
+    if not doctor_has_active_link(request.user, record.patient):
+        raise Http404
 
     DoctorAccessLog.objects.create(
         actor=request.user,

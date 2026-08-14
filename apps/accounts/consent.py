@@ -68,6 +68,27 @@ def has_consent(user, purpose: str) -> bool:
     ).exists()
 
 
+def was_revoked(user, purpose: str) -> bool:
+    """
+    True when *user* has at some point actively withdrawn *purpose* and has not
+    granted it again since.
+
+    Distinct from `not has_consent(...)`, which is also true for someone who has
+    simply never been asked. The difference matters wherever a decision is being
+    made on the user's behalf: "never decided" may be resolved by the action the
+    user is currently taking, but "explicitly withdrawn" may not be overridden by
+    a side effect of some unrelated action.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    if has_consent(user, purpose):
+        return False
+
+    return Consent.objects.filter(
+        user=user, purpose=purpose, revoked_at__isnull=False,
+    ).exists()
+
+
 def require_consent(user, purpose: str) -> None:
     """Raise ConsentRequired unless *user* has granted *purpose*."""
     if not has_consent(user, purpose):

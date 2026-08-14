@@ -50,6 +50,14 @@ class _Fixture(TestCase):
         self.record = MedicalRecord.objects.create(
             patient=self.patient, title='Panel', record_type='lab_result')
 
+        # Access needs an ACTIVE link AND the patient's DATA_SHARING consent.
+        # These tests vary the link status, so the consent is granted here to
+        # keep that the only moving part. The consent half is exercised on its
+        # own in test_data_sharing_consent.py.
+        from apps.accounts.consent import grant_consent
+        from apps.accounts.models import ConsentPurpose
+        grant_consent(self.patient, ConsentPurpose.DATA_SHARING)
+
     def _link(self, status=Status.PENDING):
         return PatientDoctorRelationship.objects.create(
             patient=self.patient, doctor=self.doctor,

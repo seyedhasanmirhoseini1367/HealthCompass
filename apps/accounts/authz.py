@@ -79,17 +79,40 @@ def resolve_media_owner(relative_path: str):
 
 
 def doctor_has_active_link(doctor, patient) -> bool:
-    """True when an ACTIVE (patient-approved) relationship exists."""
-    from apps.accounts.models import PatientDoctorRelationship
+    """
+    True when an ACTIVE (patient-approved) relationship exists AND the patient
+    still consents to sharing records with clinicians.
+
+    Two independent conditions, deliberately both required:
+
+      * the per-doctor relationship, which the patient approves individually;
+      * ConsentPurpose.DATA_SHARING, which is the patient's blanket permission
+        for this category of processing and acts as a master switch over every
+        link at once.
+
+    DATA_SHARING was defined and described but checked nowhere, so a patient
+    could revoke "Sharing my records with linked clinicians" on the consent page
+    and every linked doctor carried on reading. A consent control that changes
+    nothing is worse than an absent one: it tells the data subject they have
+    exercised a right they have not.
+
+    The check lives here, beside the relationship test, so the web views and the
+    media path cannot answer this question differently.
+    """
+    from apps.accounts.consent import has_consent
+    from apps.accounts.models import ConsentPurpose, PatientDoctorRelationship
 
     if doctor is None or patient is None or doctor.pk == patient.pk:
         return False
     if not getattr(doctor, 'is_doctor', False):
         return False
-    return PatientDoctorRelationship.objects.filter(
+    if not PatientDoctorRelationship.objects.filter(
         doctor=doctor, patient=patient,
         status=PatientDoctorRelationship.Status.ACTIVE,
-    ).exists()
+    ).exists():
+        return False
+
+    return has_consent(patient, ConsentPurpose.DATA_SHARING)
 
 
 def log_phi_access(actor, patient, resource: str) -> None:

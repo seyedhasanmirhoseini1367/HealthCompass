@@ -277,7 +277,10 @@ class PatientDoctorRelationship(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=Status.choices,
                     default=Status.PENDING, db_index=True,
-                    help_text='Only "active" grants the doctor access to records.')
+                    help_text='"active" is necessary but NOT sufficient: the patient '
+                              'must also hold the DATA_SHARING consent, which is a '
+                              'master switch over every link. Ask '
+                              'authz.doctor_has_active_link, never this field alone.')
     decided_at = models.DateTimeField(null=True, blank=True,
                     help_text='When the patient approved or revoked this link.')
 

@@ -140,6 +140,14 @@ class DoctorAccessAuthorizationTests(TestCase):
             patient=self.patient, doctor=self.linked_doctor,
             status=PatientDoctorRelationship.Status.ACTIVE,
         )
+        # An ACTIVE link is necessary but not sufficient — the patient must also
+        # hold DATA_SHARING consent. These tests are about the link, so the
+        # consent is granted here; it has its own tests in
+        # test_data_sharing_consent.py.
+        from apps.accounts.consent import grant_consent
+        from apps.accounts.models import ConsentPurpose
+        grant_consent(self.patient, ConsentPurpose.DATA_SHARING)
+
         self.record = MedicalRecord.objects.create(
             patient=self.patient, title='Confidential Diagnosis',
             record_type='diagnosis', raw_text='Stage II carcinoma',

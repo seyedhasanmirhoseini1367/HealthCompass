@@ -537,9 +537,43 @@ def approve_doctor_access(request, pk):
                                 'here. Ask your clinic to send a new request.')
         return redirect('accounts:my_doctors')
 
+    # Refuse while clinician sharing is switched off.
+    #
+    # DATA_SHARING is a master switch: turning it off closes every link at once
+    # without touching their status. Granting it as a side effect of approving
+    # ONE doctor would silently restore every other doctor the patient had
+    # deliberately cut off — one affirmative act about one person reopening
+    # three they never mentioned.
+    #
+    # Only an explicit withdrawal blocks here. A patient approving their first
+    # doctor has never been asked about DATA_SHARING, and that decision is
+    # exactly what this action expresses, so it is granted below as before.
+    from .consent import was_revoked
+    from .models import ConsentPurpose
+    if was_revoked(request.user, ConsentPurpose.DATA_SHARING):
+        messages.error(
+            request,
+            'Sharing with clinicians is currently switched off, so this request '
+            'cannot be approved. Turn "Sharing my records with linked clinicians" '
+            'back on in Privacy & Consent first — note that doing so restores '
+            'access for every clinician whose link is still active.')
+        return redirect('accounts:consent')
+
     link.status = PatientDoctorRelationship.Status.ACTIVE
     link.decided_at = timezone.now()
     link.save(update_fields=['status', 'decided_at'])
+
+    # Approving a link is an affirmative decision to share records with a
+    # clinician, so it records the DATA_SHARING consent that authz now requires.
+    # Without this the patient would approve a doctor and the doctor would still
+    # be refused, with nothing on either screen explaining why.
+    #
+    # It is a master switch, not a per-doctor flag: revoking DATA_SHARING on the
+    # consent page closes every link at once, and approving a second doctor
+    # while it is already granted is idempotent.
+    from .consent import grant_consent
+    from .models import ConsentPurpose
+    grant_consent(request.user, ConsentPurpose.DATA_SHARING)
 
     # The access log is the record patients can later ask to see; a grant is as
     # much a part of that history as a read.

@@ -63,6 +63,13 @@ class MediaAccessTests(TestCase):
         self.path = self.record.file.name
 
     def _link(self, status):
+        # Access needs an ACTIVE link AND the patient's DATA_SHARING consent.
+        # These tests vary the status, so consent is granted alongside to keep
+        # that the only moving part; the consent half has its own file.
+        from apps.accounts.consent import grant_consent
+        from apps.accounts.models import ConsentPurpose
+        grant_consent(self.patient, ConsentPurpose.DATA_SHARING)
+
         return PatientDoctorRelationship.objects.create(
             patient=self.patient, doctor=self.doctor, status=status)
 

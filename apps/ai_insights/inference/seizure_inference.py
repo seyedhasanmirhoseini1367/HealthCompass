@@ -8,7 +8,14 @@ from pathlib import Path
 from scipy.signal import butter, filtfilt, stft as scipy_stft
 from sklearn.preprocessing import StandardScaler
 
-_MODELS_DIR = Path(__file__).parent / "model_weights"
+# apps/ai_insights/model_weights/, not apps/ai_insights/inference/model_weights/.
+#
+# This file lives in inference/, so `parent` resolved one level too deep to a
+# directory that has never existed. Every variant therefore raised
+# FileNotFoundError from _get_session, and because predict() catches per-model
+# exceptions and only raises when ALL THREE fail, the failure surfaced as
+# "All models failed: ONNX model not found: ..." rather than as a missing path.
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "model_weights"
 
 ONNX_FILES = {
     "cnn_transformer": "cnn_transformer.onnx",
