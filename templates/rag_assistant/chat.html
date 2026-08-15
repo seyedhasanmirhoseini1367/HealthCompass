@@ -483,6 +483,9 @@ async function sendMessage() {
         } else if (payload.type === 'chart') {
           renderChart(assistantWrap, payload.chart);
 
+        } else if (payload.type === 'chart_unavailable') {
+          renderChartUnavailable(assistantWrap, payload.reason);
+
         } else if (payload.type === 'meta') {
           renderModeBadge(assistantWrap, payload.mode || 'personal');
           if (payload.mode === 'consent_required') {
@@ -657,6 +660,28 @@ function renderConsentAction(wrap, url) {
   row.appendChild(link);
   const sourcesRow = wrap.querySelector('.sources-row');
   if (sourcesRow) wrap.insertBefore(row, sourcesRow); else wrap.appendChild(row);
+}
+
+
+// Why no chart, when one was asked for.
+//
+// Nothing used to be rendered in this case while the system prompt separately
+// told the model to say "Here is your chart:" — so the patient was promised a
+// chart, shown nothing, and left to guess which half had broken.
+//
+// textContent rather than innerHTML for the same reason renderChart uses it:
+// the reason can name a biomarker that came from an uploaded document, and
+// there is no escaping anywhere in that chain.
+function renderChartUnavailable(wrap, reason) {
+  if (!reason) return;
+  const note = document.createElement('div');
+  note.className = 'chart-card';
+  note.style.color = '#475569';
+  note.style.fontSize = '.82rem';
+  note.style.lineHeight = '1.5';
+  note.textContent = reason;
+  wrap.appendChild(note);
+  scrollToBottom();
 }
 
 function renderChart(wrap, data) {

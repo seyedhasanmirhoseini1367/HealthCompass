@@ -137,6 +137,54 @@ def _build_routing_graph() -> StateGraph:
 health_graph_routing = _build_routing_graph().compile()
 
 
+#: Shown when building the chart raised rather than simply finding no data.
+_CHART_ERROR = ('A chart could not be drawn just now because of a problem on '
+                'our side. Your answer above is unaffected.')
+
+
+def _chart_unavailable_reason(traj_svc, patient, query: str) -> str:
+    """
+    Why no chart, in terms the patient can act on.
+
+    The distinction that matters is between "we hold nothing measured for this"
+    and "we hold one reading, and a single point is not a trend". Both produce
+    an empty chart, and only the second is worth waiting for another test.
+
+    Deliberately says nothing clinical — it describes what the application has,
+    not what it means.
+    """
+    from apps.medical_records.models import ParsedLabValue
+
+    biomarker = traj_svc.detect_biomarker(query)
+    label = (biomarker or '').replace('_', ' ') or 'that measurement'
+
+    if not ParsedLabValue.objects.filter(patient=patient).exists():
+        return ('No chart yet — none of your uploaded documents have produced '
+                'structured measurements to plot. Charts are drawn from lab '
+                'values the app could read as numbers with dates.')
+
+    if biomarker:
+        # Straight from the shared vocabulary, which is what the trajectory
+        # loader matches on. Asking a different source here would let the
+        # explanation disagree with the thing it is explaining.
+        from apps.rag_assistant.services.biomarkers import BIOMARKERS
+
+        aliases = BIOMARKERS.get(biomarker, ())
+        readings = ParsedLabValue.objects.filter(patient=patient)
+        matching = [r for r in readings
+                    if any(a.lower() in (r.parameter_name or '').lower()
+                           for a in aliases)]
+        if not matching:
+            return (f'No chart for {label} — the app has structured lab values '
+                    f'for you, but none it recognised as {label}.')
+        if len(matching) < 2:
+            return (f'No chart for {label} yet — a trend needs at least two '
+                    f'readings and the app has one.')
+
+    return ('No chart yet — there are not enough structured readings of that '
+            'measurement to plot a trend.')
+
+
 # ── stream_graph — graph-path SSE generator ────────────────────────────────────
 
 def stream_graph(
@@ -309,12 +357,25 @@ def stream_graph(
 
         traj_svc = TrajectoryService()
         if display_mode == 'trajectory' or traj_svc.is_chart_request(query):
+            # A chart was asked for, so the patient gets an answer either way.
+            #
+            # Previously this emitted nothing when no chart could be built, and
+            # the system prompt separately told the model to say "Here is your
+            # chart:" whenever one was requested — so a patient with no
+            # structured measurements was promised a chart, shown nothing, and
+            # left to wonder which part had broken. The prompt no longer
+            # announces charts; this says what happened instead.
             try:
                 chart_data = traj_svc.get_chart_data(patient, query)
-                if chart_data:
-                    yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
             except Exception as _chart_err:
                 logger.warning('stream_graph chart_data failed: %s', _chart_err)
+                yield f'data: {json.dumps({"type": "chart_unavailable", "reason": _CHART_ERROR})}\n\n'
+            else:
+                if chart_data:
+                    yield f'data: {json.dumps({"type": "chart", "chart": chart_data})}\n\n'
+                else:
+                    reason = _chart_unavailable_reason(traj_svc, patient, query)
+                    yield f'data: {json.dumps({"type": "chart_unavailable", "reason": reason})}\n\n'
 
         yield 'data: {"type": "done"}\n\n'
 
