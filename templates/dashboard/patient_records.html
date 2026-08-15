@@ -40,6 +40,15 @@
 </div>
 {% endif %}
 
+{% if has_any %}
+{% comment %}
+  The same partial the patient sees. A clinician reading a different summary
+  from the one their patient is reading is how a consultation goes wrong.
+{% endcomment %}
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:.875rem">Medications &amp; Conditions</h2>
+{% include 'medical_records/_clinical_summary.html' %}
+{% endif %}
+
 <h2 style="font-size:1rem;font-weight:700;margin-bottom:.875rem">Medical Records ({{ records|length }})</h2>
 
 {% if records %}

@@ -5,7 +5,7 @@ from .auth import (
 from .records import (
     records_list, record_detail, record_delete, record_upload,
     upload_pdf_api, upload_text_api, upload_kanta_api,
-    upload_wearable_api, scan_ocr_api,
+    upload_wearable_api, scan_ocr_api, clinical_summary_api,
 )
 from .analytics import dashboard_summary, analytics, population_insights
 from .alerts import (
@@ -29,7 +29,7 @@ __all__ = [
     'profile_update', 'profile_picture_upload', 'change_password', 'emergency_card',
     'records_list', 'record_detail', 'record_delete', 'record_upload',
     'upload_pdf_api', 'upload_text_api', 'upload_kanta_api',
-    'upload_wearable_api', 'scan_ocr_api',
+    'upload_wearable_api', 'scan_ocr_api', 'clinical_summary_api',
     'dashboard_summary', 'analytics', 'population_insights',
     'alerts_list', 'alert_mark_read', 'notifications_list', 'notification_mark_read',
     'my_predictions', 'prediction_detail_api',

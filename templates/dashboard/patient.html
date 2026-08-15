@@ -28,8 +28,31 @@
 <div class="stat-grid">
   <div class="stat-card"><div class="num">{{ total_records }}</div><div class="lbl">Records</div></div>
   <div class="stat-card"><div class="num" style="color:var(--danger)">{{ unread_alerts }}</div><div class="lbl">Alerts</div></div>
+  <a href="{% url 'medical_records:health_summary' %}" class="stat-card" style="text-decoration:none;display:block">
+    <div class="num">{{ current_medication_count }}</div><div class="lbl">Medications</div>
+  </a>
+  <a href="{% url 'medical_records:health_summary' %}" class="stat-card" style="text-decoration:none;display:block">
+    <div class="num">{{ current_condition_count }}</div><div class="lbl">Conditions</div>
+  </a>
   <div class="stat-card"><div class="num">{{ total_predictions }}</div><div class="lbl">AI Runs</div></div>
 </div>
+
+{% if clinical_conflict_count %}
+{% comment %}
+  Surfaced on the landing page rather than only on the summary. Two documents
+  disagreeing about whether a drug was stopped is the most actionable thing this
+  application can tell someone, and it is invisible unless they go looking.
+{% endcomment %}
+<a href="{% url 'medical_records:health_summary' %}"
+   style="display:block;text-decoration:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:.9rem 1.1rem;margin-bottom:1.5rem">
+  <span style="font-weight:700;font-size:.9rem;color:#92400e">⚠️ Your documents disagree</span>
+  <span style="font-size:.85rem;color:#78350f;display:block;margin-top:.2rem">
+    {{ clinical_conflict_count }} entr{{ clinical_conflict_count|pluralize:"y,ies" }}
+    on the same date say different things. Nothing has been chosen for you —
+    review the sources.
+  </span>
+</a>
+{% endif %}
 
 <div class="grid-2">
   <div class="card">

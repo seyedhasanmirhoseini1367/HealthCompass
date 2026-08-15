@@ -348,6 +348,81 @@ def _create_alert(record: MedicalRecord, abnormal_count: int) -> None:
                  abnormal_count=abnormal_count, error_type=type(exc).__name__)
 
 
+
+def _save_clinical_state(record, structured: dict) -> int:
+    """
+    Persist the medications and conditions the parser extracted.
+
+    These were parsed into `parsed_data` and then discarded: a repo-wide search
+    found zero consumers, so a discharge summary listing six drugs produced six
+    entries nobody could query and the assistant could not answer "what am I
+    taking". This is where that data starts existing.
+
+    Every statement is written against the record that asserted it, never merged
+    into a running total. Two documents disagreeing is a fact about the record
+    set, and `clinical_state` reports it rather than picking a winner.
+
+    Failure here must not lose the record: the document and its lab values are
+    the primary artifact, and a malformed medications block is a parsing problem,
+    not a reason to reject an upload.
+    """
+    from .models import ConditionStatement, MedicationStatement
+
+    created = 0
+
+    for entry in structured.get('medications') or []:
+        if not isinstance(entry, dict):
+            continue
+        name = (entry.get('name') or '').strip()
+        if not name:
+            continue          # a medication with no name asserts nothing
+        try:
+            MedicationStatement.objects.create(
+                record=record, patient=record.patient, name=name[:200],
+                dose=(entry.get('dose') or '')[:100],
+                frequency=(entry.get('frequency') or '')[:100],
+                route=(entry.get('route') or '')[:50],
+                status=(MedicationStatement.Status.DISCONTINUED
+                        if str(entry.get('status', '')).lower().startswith(('disc', 'stop'))
+                        else MedicationStatement.Status.ACTIVE),
+            )
+            created += 1
+        except Exception as exc:
+            # Type, not message. A database error can carry the offending value
+            # back in its text, and that value is a drug name — logs are read by
+            # people who have no business seeing one patient's prescription.
+            logger.warning('Could not store a medication from record %s (%s)',
+                           record.pk, type(exc).__name__)
+
+    for entry in structured.get('diagnoses') or []:
+        if not isinstance(entry, dict):
+            continue
+        description = (entry.get('description') or '').strip()
+        code = (entry.get('code') or '').strip()
+        # A code with no wording is still a diagnosis. The extraction schema is
+        # {"code": "", "description": ""} and the model fills whichever it can,
+        # so requiring the description dropped "E11" — a real assertion, lost
+        # silently, which is the failure mode this whole feature exists to end.
+        if not description and not code:
+            continue
+        try:
+            ConditionStatement.objects.create(
+                record=record, patient=record.patient,
+                code=code[:32],
+                description=description[:300],
+                status=(ConditionStatement.Status.RESOLVED
+                        if str(entry.get('status', '')).lower().startswith('resolv')
+                        else ConditionStatement.Status.ACTIVE),
+            )
+            created += 1
+        except Exception as exc:
+            # Type, not message — a diagnosis is the most sensitive field here.
+            logger.warning('Could not store a condition from record %s (%s)',
+                           record.pk, type(exc).__name__)
+
+    return created
+
+
 def _save_lab_value(record, lv: dict, *, measured_at=None) -> bool:
     """
     Create one ParsedLabValue row. Returns True if is_abnormal.
@@ -441,6 +516,7 @@ class MedicalRecordService:
                 1 for lv in structured.get('lab_values', [])
                 if _save_lab_value(record, lv)
             )
+            _save_clinical_state(record, structured)
             if flagged:
                 record.is_flagged = True
                 record.save(update_fields=['is_flagged'])
@@ -502,6 +578,7 @@ class MedicalRecordService:
                 1 for lv in structured.get('lab_values', [])
                 if _save_lab_value(record, lv)
             )
+            _save_clinical_state(record, structured)
             if flagged:
                 record.is_flagged = True
                 record.save(update_fields=['is_flagged'])
@@ -605,6 +682,9 @@ class MedicalRecordService:
                         if _save_lab_value(record, lv, measured_at=measured_at):
                             flagged += 1
                         lab_values_created += 1
+
+                # Kanta documents carry medications and diagnoses too.
+                _save_clinical_state(record, doc)
 
                 if flagged:
                     record.is_flagged = True

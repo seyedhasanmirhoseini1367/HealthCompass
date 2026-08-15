@@ -752,6 +752,7 @@ def shared_patient(request, pk):
     from .authz import sharing_grant
     from apps.ai_insights.models import HealthAlert
     from apps.appointments.models import Appointment
+    from apps.medical_records.clinical_state import clinical_summary
     from apps.medical_records.models import MedicalRecord
 
     subject = get_object_or_404(CustomUser, pk=pk)
@@ -768,6 +769,8 @@ def shared_patient(request, pk):
 
     records = alerts = appointments = None
 
+    summary = None
+
     if grant.allows('records'):
         qs = MedicalRecord.objects.filter(patient=subject)
         # A frozen share shows the record as it stood, not as it grows. NULL
@@ -775,6 +778,15 @@ def shared_patient(request, pk):
         if grant.data_cutoff is not None:
             qs = qs.filter(uploaded_at__lt=grant.data_cutoff)
         records = qs.order_by('-record_date', '-uploaded_at')[:100]
+
+        # Medications and conditions are part of the records scope, not a fourth
+        # thing: they are derived entirely from the documents that scope covers.
+        #
+        # The cutoff is passed through rather than assumed. Derived state leaks
+        # its sources — resolving "current medications" over every record would
+        # tell a frozen recipient what changed after the freeze, which is the
+        # disclosure the cutoff exists to prevent.
+        summary = clinical_summary(subject, data_cutoff=grant.data_cutoff)
 
     if grant.allows('alerts'):
         # Severity and title only — the alert says something is wrong without
@@ -794,13 +806,19 @@ def shared_patient(request, pk):
     DoctorAccessLog.objects.create(
         actor=request.user, patient=subject, resource='shared:patient_overview')
 
-    return render(request, 'accounts/shared_patient.html', {
+    context = {
         'subject':      subject,
         'grant':        grant,
         'records':      records,
         'alerts':       alerts,
         'appointments': appointments,
-    })
+        'summary':      summary,
+    }
+    # Flattened for the shared partial, which takes the same names on every page
+    # so that one template cannot render differently for different readers.
+    if summary is not None:
+        context.update(summary)
+    return render(request, 'accounts/shared_patient.html', context)
 
 
 @login_required
@@ -827,4 +845,8 @@ def shared_record(request, pk, record_pk):
         # effective() so a corrected value is what the family member sees, the
         # same reading the patient and their clinicians see.
         'lab_values': [(lv, lv.effective()) for lv in record.lab_values.all()],
+        # What this document asserted, not the resolved state — the record is
+        # already inside the cutoff, so no further filtering applies here.
+        'medications': record.medicationstatement_set.all(),
+        'conditions':  record.conditionstatement_set.all(),
     })

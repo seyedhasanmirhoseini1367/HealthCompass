@@ -35,6 +35,20 @@
     template is told, so a change here cannot widen access.
   {% endcomment %}
 
+  {% if summary is not None %}
+    {% comment %}
+      Part of the records scope, and gated on it in the view — these are derived
+      from the shared documents, not a separate disclosure. The same partial the
+      patient sees, with the grant's cutoff already applied to the data.
+    {% endcomment %}
+    <div class="sp-section">Medications &amp; conditions</div>
+    {% if has_any %}
+      {% include 'medical_records/_clinical_summary.html' %}
+    {% else %}
+      <p class="sp-empty">No medications or conditions are recorded.</p>
+    {% endif %}
+  {% endif %}
+
   {% if records is not None %}
     <div class="sp-section">Medical records</div>
     {% for record in records %}

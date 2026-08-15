@@ -31,6 +31,19 @@ def home(request):
         ctx['unread_alerts']      = data['unread_alerts']
         ctx['recent_predictions'] = data['recent_predictions']
         ctx['total_predictions']  = data['total_predictions']
+
+        # What they are taking and what they have, on the page they land on.
+        # The counts only — the dashboard is a summary, and the full lists with
+        # their sources live one click away. A conflict is surfaced here rather
+        # than buried, because "two of your documents disagree about a
+        # medication" is the item on this page most worth acting on.
+        from apps.medical_records.clinical_state import clinical_summary
+
+        summary = clinical_summary(user)
+        ctx['current_medication_count'] = len(summary['current_medications'])
+        ctx['current_condition_count']  = len(summary['current_conditions'])
+        ctx['clinical_conflict_count']  = (len(summary['conflicted_medications'])
+                                           + len(summary['conflicted_conditions']))
         template = 'dashboard/patient.html'
 
     elif user.is_doctor:
@@ -120,12 +133,20 @@ def patient_records(request, patient_pk):
     records = MedicalRecord.objects.filter(patient=patient).order_by('-uploaded_at')
     alerts = HealthAlert.objects.filter(patient=patient).order_by('-created_at')[:5]
 
-    return render(request, 'dashboard/patient_records.html', {
+    # No cutoff: a clinical link is not a frozen share, and it is already gated
+    # on the same predicate as every record on this page. The clinician sees the
+    # resolved state the patient sees — including the conflicts, which are the
+    # part a clinician is actually able to settle.
+    from apps.medical_records.clinical_state import clinical_summary
+
+    context = {
         'patient': patient,
         'records': records,
         'alerts': alerts,
         'relationship': relationship,
-    })
+    }
+    context.update(clinical_summary(patient))
+    return render(request, 'dashboard/patient_records.html', context)
 
 
 @login_required

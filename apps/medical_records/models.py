@@ -279,3 +279,90 @@ class WearableDataPoint(models.Model):
 
     def __str__(self):
         return f'{self.get_metric_display()}: {self.value} {self.unit} @ {self.recorded_at}'
+
+
+class _Statement(models.Model):
+    """
+    Shared shape for "a document asserted something about this patient".
+
+    Medications and conditions are not values to be averaged; they are claims
+    made by a source document at a point in time, and they change. The same
+    principles the lab values follow apply here: the assertion is immutable
+    evidence of what a document said, a later document supersedes it rather
+    than overwriting it, and the current state is resolved rather than stored.
+
+    Storing "is the patient on metformin" as a mutable flag would lose when it
+    started, when it stopped, and which document said so — which is most of what
+    makes the answer trustworthy.
+    """
+    patient    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # The document that asserted it. Provenance, exactly as ParsedLabValue.record.
+    record     = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE)
+    # When the assertion was true according to the document, NOT when it was
+    # ingested. A discharge summary uploaded today can describe last year.
+    asserted_on = models.DateField(
+        null=True, blank=True,
+        help_text='The document date this assertion belongs to. NULL when the '
+                  'document carried no date; such statements cannot be ordered '
+                  'and are reported as undated rather than assumed recent.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        # Newest assertion first. The tiebreak is the auto-increment id, which
+        # is monotonic — a UUID would make "most recent" a coin toss between two
+        # statements carrying the same date.
+        ordering = ['-asserted_on', '-id']
+
+    def save(self, *args, **kwargs):
+        if self.record_id and self.patient_id != self.record.patient_id:
+            self.patient_id = self.record.patient_id
+        if self.asserted_on is None and self.record_id:
+            self.asserted_on = self.record.record_date
+        super().save(*args, **kwargs)
+
+
+class MedicationStatement(_Statement):
+    """One document's claim about one medication."""
+    class Status(models.TextChoices):
+        ACTIVE       = 'active',       'Being taken'
+        DISCONTINUED = 'discontinued', 'Stopped'
+
+    name      = models.CharField(max_length=200)
+    dose      = models.CharField(max_length=100, blank=True, default='')
+    frequency = models.CharField(max_length=100, blank=True, default='')
+    route     = models.CharField(max_length=50, blank=True, default='')
+    status    = models.CharField(max_length=16, choices=Status.choices,
+                                 default=Status.ACTIVE)
+
+    class Meta(_Statement.Meta):
+        abstract = False
+        indexes = [models.Index(fields=['patient', 'name', '-asserted_on'])]
+
+    def __str__(self):
+        return f'{self.name} [{self.status}] @ {self.asserted_on or "undated"}'
+
+
+class ConditionStatement(_Statement):
+    """One document's claim about one diagnosis."""
+    class Status(models.TextChoices):
+        ACTIVE   = 'active',   'Active'
+        RESOLVED = 'resolved', 'Resolved'
+
+    code        = models.CharField(max_length=32, blank=True, default='',
+                                   help_text='ICD or local code when the document gave one.')
+    # Blank because extraction returns {"code": "", "description": ""} and fills
+    # whichever it can: a bare ICD code is a real diagnosis, and requiring the
+    # wording meant discarding it. At least one of the two is present — enforced
+    # at ingestion, where a statement with neither asserts nothing.
+    description = models.CharField(max_length=300, blank=True, default='')
+    status      = models.CharField(max_length=16, choices=Status.choices,
+                                   default=Status.ACTIVE)
+
+    class Meta(_Statement.Meta):
+        abstract = False
+        indexes = [models.Index(fields=['patient', 'description', '-asserted_on'])]
+
+    def __str__(self):
+        label = self.description or self.code or 'unnamed condition'
+        return f'{label} [{self.status}] @ {self.asserted_on or "undated"}'

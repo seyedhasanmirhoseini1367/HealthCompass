@@ -111,10 +111,36 @@ class WearableDataPointSerializer(serializers.ModelSerializer):
         fields = ['metric', 'metric_display', 'value', 'unit', 'recorded_at']
 
 
+class MedicationStatementSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        from apps.medical_records.models import MedicationStatement
+        model  = MedicationStatement
+        fields = ['name', 'dose', 'frequency', 'route',
+                  'status', 'status_display', 'asserted_on']
+
+
+class ConditionStatementSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        from apps.medical_records.models import ConditionStatement
+        model  = ConditionStatement
+        fields = ['code', 'description', 'status', 'status_display', 'asserted_on']
+
+
 class MedicalRecordDetailSerializer(serializers.ModelSerializer):
     record_type_display = serializers.CharField(source='get_record_type_display', read_only=True)
     lab_values          = ParsedLabValueSerializer(many=True, read_only=True)
     wearable_points     = WearableDataPointSerializer(many=True, read_only=True)
+    # What this document asserted, alongside its lab values. Not the resolved
+    # state: a client showing these as "current medications" would be reading a
+    # superseded document as though it were today's answer.
+    medications = MedicationStatementSerializer(
+        source='medicationstatement_set', many=True, read_only=True)
+    conditions  = ConditionStatementSerializer(
+        source='conditionstatement_set', many=True, read_only=True)
 
     class Meta:
         model  = MedicalRecord
@@ -122,6 +148,7 @@ class MedicalRecordDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'record_type', 'record_type_display',
             'record_date', 'uploaded_at', 'is_flagged', 'notes',
             'parsed_data', 'raw_text', 'lab_values', 'wearable_points',
+            'medications', 'conditions',
         ]
         read_only_fields = ['uploaded_at', 'is_flagged']
 
