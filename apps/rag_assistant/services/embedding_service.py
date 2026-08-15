@@ -31,6 +31,15 @@ _EMBED_DIM   = 3072  # default gemini-embedding-001 output dimension
 _BATCH_LIMIT = 100   # Gemini batch API max items per request
 
 
+class OutboundEmbeddingBlocked(RuntimeError):
+    """
+    The call was refused before leaving the process, not attempted and failed.
+
+    Distinct from a provider error so that "we chose not to send this" is never
+    read as "the provider is down" — the two call for opposite responses.
+    """
+
+
 # ── Embedding provenance & compatibility ──────────────────────────────────────
 #
 # A stored vector is only meaningful against a query vector from the *same*
@@ -265,6 +274,21 @@ class EmbeddingService:
             try:
                 embeddings = self.embed_batch([c.content for c in batch],
                                               task_type='RETRIEVAL_DOCUMENT')
+            except OutboundEmbeddingBlocked as exc:
+                # Not an incident. Nobody attempted anything and nothing broke —
+                # this deployment is configured not to send text to the provider,
+                # exactly as the consent refusal above is configured. Alerting on
+                # it would train operators to ignore EMBEDDING_FAILED, which is
+                # the event that does mean something.
+                #
+                # Still not silent: the status and the reason go on the row, so
+                # these chunks are findable as unretrievable rather than looking
+                # merely unprocessed.
+                logger.info(
+                    'embed_chunks: not embedding %d chunk(s) — outbound embedding disabled',
+                    len(batch))
+                self._mark(batch, status=StatusEnum(batch[0]).FAILED, error=str(exc)[:300])
+                continue
             except Exception as exc:
                 logger.error(
                     'embed_chunks: embedding failed for %d chunk(s): %s', len(batch), exc)
@@ -447,6 +471,16 @@ class EmbeddingService:
     # ── Internal ───────────────────────────────────────────────────────────────
 
     def _call_api(self, texts: List[str], task_type: str) -> np.ndarray:
+        # The one place text leaves this process for the embedding provider, and
+        # therefore the one place the door can be shut. Under the test runner it
+        # is shut by default: the inline auto-indexer would otherwise embed every
+        # fixture record against the real API key. See RAG_ALLOW_EXTERNAL_EMBEDDING.
+        if not getattr(settings, 'RAG_ALLOW_EXTERNAL_EMBEDDING', True):
+            raise OutboundEmbeddingBlocked(
+                'Outbound embedding is disabled (RAG_ALLOW_EXTERNAL_EMBEDDING=False). '
+                'Patch EmbeddingService._call_api or embed_batch in tests that need vectors.'
+            )
+
         api_key = getattr(settings, 'GEMINI_API_KEY', '')
         if not api_key:
             raise RuntimeError('GEMINI_API_KEY is not configured — cannot embed texts')

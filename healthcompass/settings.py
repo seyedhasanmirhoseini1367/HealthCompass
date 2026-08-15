@@ -498,6 +498,26 @@ DATE_FORMAT_PREFERENCE = config('DATE_FORMAT_PREFERENCE', default='eu')
 import sys as _sys
 RAG_AUTO_INDEX_SYNC = 'test' in _sys.argv
 
+# ── The test suite must not call the embedding provider ───────────────────────
+#
+# RAG_AUTO_INDEX_SYNC above makes the post_save auto-indexer run inline, so
+# every test that creates a MedicalRecord — hundreds of them, most having
+# nothing to do with retrieval — sent that record's text to Google using the
+# developer's real API key.
+#
+# Two consequences, both real, both observed. It spent the shared free-tier
+# embedding quota until production requests were refused with 429; and it sent
+# test-fixture text to a third party from a suite nobody thinks of as making
+# network calls.
+#
+# Every test that genuinely exercises embedding already patches `_call_api` or
+# `embed_batch`, so nothing depends on the outbound call. It is refused at that
+# one choke point instead; a test that truly needs the provider can override
+# this setting deliberately, which is the point — reaching an external service
+# should be something a test asks for, not something it does by accident.
+RAG_ALLOW_EXTERNAL_EMBEDDING = config(
+    'RAG_ALLOW_EXTERNAL_EMBEDDING', default='test' not in _sys.argv, cast=bool)
+
 # ── Test uploads go to a throwaway directory ──────────────────────────────────
 #
 # The suite writes real files: every test that saves a MedicalRecord, a
