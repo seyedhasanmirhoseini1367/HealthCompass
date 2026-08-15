@@ -82,6 +82,39 @@ apps/
   are excluded from trajectory/threshold comparison. Also `reference_range`,
   `is_abnormal`, `is_critical`, `measured_at`.
 - **`WearableDataPoint`** — `metric`, `value`, `unit`, `recorded_at`.
+- **`LabValueCorrection`** — append-only supersession of a `ParsedLabValue`.
+  Auto-increment PK (deliberately **not** UUID: it is the chronological tiebreak,
+  and a random UUID4 would decide the effective clinical value by chance).
+  `ParsedLabValue.effective()` returns the latest correction or the original;
+  the original row is never modified.
+- **`MedicationStatement`** / **`ConditionStatement`** — one row per *claim a
+  document made*, sharing the abstract `_Statement` base
+  (`patient`, `record`, `asserted_on`, auto-increment PK, `ordering =
+  ['-asserted_on', '-id']`). `asserted_on` is the document's date, not the
+  ingestion date, and is NULL when the document carried none.
+
+  These are **not** current state. Nothing stores "the patient is on metformin";
+  `apps/medical_records/clinical_state.py` resolves it per query:
+
+  - a later document supersedes an earlier one rather than overwriting it;
+  - a statement with no date never supersedes a dated one;
+  - two documents carrying the **same** date and disagreeing are reported as
+    conflicted and excluded from both `current` and `discontinued` — answering
+    either way would pick a side;
+  - matching is casefold + whitespace only. Deliberately not a drug vocabulary:
+    deciding that "Metformin" and "Metformin HCl 500mg" are one medication is a
+    clinical judgement, and getting it wrong merges two prescriptions or splits
+    one history.
+
+  `clinical_summary(patient, data_cutoff=None)` is the single entry point used by
+  the patient's page, a family recipient's page and a clinician's page, so the
+  three cannot disagree about what "current" means. `data_cutoff` is passed
+  through for frozen shares: derived state leaks its sources, and resolving over
+  every record would tell a frozen recipient what changed after the freeze.
+
+  Populated by `_save_clinical_state()` at the three ingestion sites. Before it
+  existed, parsers extracted `medications` and `diagnoses` into `parsed_data` and
+  a repo-wide search found **zero** consumers.
 
 ### 4.3 RAG store — `apps/rag_assistant/models.py`
 
@@ -288,6 +321,25 @@ no significance judgements. Values whose unit the normaliser could not resolve
 (`unit_known=False`) are treated as incomparable and never reported as a
 conflict. The notice states the disagreement and its sources and stops — nothing
 in the data says which record is right.
+
+#### Known divergence: the assistant does not read `clinical_state`
+
+`medications_node` answers "am I still taking X?" by retrieving text chunks and
+letting the model read them. `clinical_state` answers the same question from the
+structured statements. **These are two independent answers to one question, and
+nothing currently reconciles them.**
+
+They can disagree. The summary page can report a medication as conflicted while
+the assistant, reading the same two documents as prose, states one of them
+confidently. The retrieval path also has no equivalent of the "undated statements
+never supersede dated ones" rule.
+
+This is recorded rather than patched because closing it changes what the
+assistant says about medication, which needs its own evaluation run rather than
+being folded into the feature that revealed it. Until then the structured
+summary — which cites the document behind every entry and refuses to resolve a
+same-date disagreement — is the authoritative surface, and the assistant's
+medication answers carry the usual citations for the reader to check.
 
 ### Chunk provenance
 
@@ -861,6 +913,8 @@ materialised**, so a compression bomb is rejected rather than decompressed.
 | Upload validation | Magic-byte + extension check — `apps/medical_records/services.py:27-60` |
 | Media authorization | Authenticated + per-object ownership + path-traversal guard — `healthcompass/urls.py:17-58` |
 | Doctor access audit | `DoctorAccessLog` |
+| Admin PHI reads | `PhiAccessLoggedAdmin` writes the patient's own access trail when a staff member opens their row. Changelists are not logged (paging is not an access event) and self-reads are not logged. |
+| Admin PHI writes | `NonEditablePhiAdmin` on `MedicalRecord`, `QueryLog`, `ChatSession`, `MedicalDocument`, `MedicalChunk`: no add, no change, **deletion allowed**. Modification makes a record assert something its source never said; deletion removes the assertion and claims nothing. Erasure has to remain possible, and post_delete takes the file with the row. `ParsedLabValue` stays editable-by-append via `LabValueCorrection`. |
 | Emergency-card audit | `EmergencyCardView` with hashed IP; patient can revoke token or disable card |
 | PHI retention | `QUERYLOG_RETENTION_DAYS` (default 90) + `purge_old_query_logs` command |
 | Account deletion | `purge_user_data()` behind password re-confirmation — `apps/accounts/views.py:290-301` |
@@ -930,8 +984,25 @@ consumes untrusted chunk text, carries its own boundary system message.
 - ~1,950 lines of Django tests, concentrated in `rag_assistant` (797),
   `ai_insights` (524) and `medical_records` (446). `api` and `notifications`
   are effectively untested (3 lines each).
+  *(That count predates the authorization, consent, sharing, correction and
+  clinical-state suites added since; the suite is now well over a thousand tests
+  and `api` is no longer untested.)*
 - `RAG_AUTO_INDEX_SYNC` forces synchronous indexing under `manage.py test`
-  for determinism (`settings.py:356-357`).
+  for determinism.
+- **`RAG_ALLOW_EXTERNAL_EMBEDDING` is False under `manage.py test`.** Because
+  auto-indexing runs inline, every test that created a `MedicalRecord` — most of
+  them, having nothing to do with retrieval — embedded its text through the real
+  Gemini API on the developer's key. That spent the shared free-tier quota until
+  **production requests were refused with 429**, and sent fixture text to a third
+  party from a suite nobody thinks of as making network calls.
+
+  `EmbeddingService._call_api` now refuses before anything leaves the process,
+  raising `OutboundEmbeddingBlocked`. `embed_chunks` treats that separately from
+  a provider failure: the chunks are marked FAILED with the reason on the row,
+  but no `EMBEDDING_FAILED` alert is emitted, because a configured refusal is not
+  an incident and alerting on it would train operators to ignore the event that
+  is. Every test that genuinely exercises embedding patches `_call_api` or
+  `embed_batch`, so nothing depended on the outbound call.
 - `evaluation/` holds a RAG quality harness with committed results
   (`rag_quality_results.json`, `results.json`) and generated charts.
 
