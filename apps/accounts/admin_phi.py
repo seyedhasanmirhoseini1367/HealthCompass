@@ -69,3 +69,44 @@ class PhiAccessLoggedAdmin:
             # case, and this guards the lookup itself.
             logger.error('Could not record admin PHI read of %s %s: %s',
                          self.model.__name__, object_id, exc)
+
+
+class NonEditablePhiAdmin(PhiAccessLoggedAdmin):
+    """
+    Visible, auditable, deletable — but never rewritten.
+
+    Applied where clinical data has no legitimate hand-editing path:
+
+      * MedicalRecord — the document as ingested. Its metadata can be fixed by
+        deleting and re-uploading, which the patient can do themselves; its
+        raw_text and parsed_data feed retrieval, so editing them would silently
+        change what the assistant answers with no provenance at all.
+      * ChatSession / QueryLog — a transcript. Editing a record of what was said
+        is not correction, it is falsification, and retention is handled by
+        purge_old_query_logs rather than by hand.
+      * MedicalDocument / MedicalChunk — derived retrieval artifacts. They are
+        rebuilt by indexing, never authored.
+
+    Why deletion stays
+    ------------------
+    This class first blocked deletion too, and that was wrong. Deletion is not
+    the same act as modification: rewriting a record makes it assert something
+    its source never said, while deleting it removes the assertion entirely and
+    claims nothing. Erasure is also a right the controller has to be able to
+    exercise on a subject's behalf, and the admin is the only place a single
+    record belonging to the wrong account can be removed.
+
+    It is safe here for a specific reason: `medical_records.signals` erases the
+    underlying file on post_delete via transaction.on_commit, so an admin delete
+    — including a bulk `delete_selected`, which never calls Model.delete() —
+    takes the bytes with it. Blocking deletion did not make anything safer; it
+    removed the one erasure path those guarantees were built for.
+
+    ParsedLabValue is the case that needed an alternative rather than a
+    prohibition, and it has one: corrections are appended with provenance.
+
+    Addition is blocked everywhere: creating clinical data by hand in the admin
+    fabricates a document that no source produced.
+    """
+    def has_add_permission(self, request):              return False
+    def has_change_permission(self, request, obj=None): return False

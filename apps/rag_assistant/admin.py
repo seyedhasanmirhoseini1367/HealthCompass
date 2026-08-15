@@ -1,11 +1,11 @@
 from django.contrib import admin
 
-from apps.accounts.admin_phi import PhiAccessLoggedAdmin
+from apps.accounts.admin_phi import PhiAccessLoggedAdmin, NonEditablePhiAdmin
 from .models import ChatSession, QueryLog, MedicalDocument, MedicalChunk
 
 
 @admin.register(QueryLog)
-class QueryLogAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
+class QueryLogAdmin(NonEditablePhiAdmin, admin.ModelAdmin):
     def phi_subject(self, obj):
         # A query log has no patient of its own; it belongs to the session's.
         # Reading one exposes the patient's question and the assistant's answer
@@ -26,20 +26,20 @@ class QueryLogAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
 
 
 @admin.register(ChatSession)
-class ChatSessionAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
+class ChatSessionAdmin(NonEditablePhiAdmin, admin.ModelAdmin):
     list_display  = ('title', 'patient', 'created_at', 'updated_at')
     search_fields = ('title', 'patient__username')
 
 
 @admin.register(MedicalDocument)
-class MedicalDocumentAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
+class MedicalDocumentAdmin(NonEditablePhiAdmin, admin.ModelAdmin):
     list_display  = ('title', 'document_type', 'patient', 'created_at')
     list_filter   = ('document_type',)
     search_fields = ('title', 'patient__username')
 
 
 @admin.register(MedicalChunk)
-class MedicalChunkAdmin(PhiAccessLoggedAdmin, admin.ModelAdmin):
+class MedicalChunkAdmin(NonEditablePhiAdmin, admin.ModelAdmin):
     list_display = ('document', 'chunk_index', 'patient', 'has_embedding')
     list_filter  = ('document__document_type',)
 
