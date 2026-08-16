@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('care', '0001_initial'),
+        ('care', '0005_care_monitoring'),
         ('notifications', '0003_notification_notificatio_user_id_427e4b_idx_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

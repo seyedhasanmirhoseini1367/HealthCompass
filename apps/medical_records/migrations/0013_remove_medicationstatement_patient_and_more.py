@@ -22,7 +22,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('care', '0002_remove_caretask_medication_statement'),
+        ('care', '0006_remove_caretask_medication_statement'),
         ('medical_records', '0012_index_claim_token'),
     ]
 
