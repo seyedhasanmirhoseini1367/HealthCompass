@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block title %}My care — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.cr-wrap{max-width:720px;margin:0 auto}
+.cr-h{font-size:1.2rem;font-weight:800;color:var(--text);margin:0 0 .25rem}
+.cr-sub{font-size:.85rem;color:#94a3b8;margin-bottom:1.3rem}
+.cr-card{background:white;border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.7rem}
+.cr-task{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.cr-label{font-weight:700;font-size:.95rem;color:var(--text)}
+.cr-when{font-size:.8rem;color:#94a3b8}
+.cr-actions{display:flex;gap:.45rem;flex-wrap:wrap}
+.cr-btn{border:1.5px solid var(--border);background:white;border-radius:10px;padding:.45rem .9rem;font-size:.85rem;font-weight:600;cursor:pointer;color:var(--text)}
+.cr-btn.done{background:#059669;border-color:#059669;color:white}
+.cr-btn:hover{filter:brightness(.97)}
+.cr-state{font-size:.78rem;font-weight:700;padding:.2rem .6rem;border-radius:6px}
+.cr-state.confirmed{background:#d1fae5;color:#065f46}
+.cr-state.skipped{background:#e0e7ff;color:#3730a3}
+.cr-state.missed{background:#fee2e2;color:#991b1b}
+.cr-state.unconfirmed{background:#f1f5f9;color:#475569}
+.cr-note{font-size:.8rem;color:#64748b;background:#f8fafc;border-radius:9px;padding:.7rem .9rem;line-height:1.55;margin-top:1.1rem}
+.cr-say textarea{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:.7rem;font-size:.9rem;font-family:inherit;resize:vertical;min-height:80px}
+.cr-past{font-size:.85rem;color:#475569;padding:.45rem 0;border-bottom:1px solid #f1f5f9}
+.cr-past:last-child{border-bottom:none}
+</style>
+{% endblock %}
+{% block content %}
+<div class="cr-wrap">
+  <h1 class="cr-h">My care</h1>
+  <p class="cr-sub">Today's reminders, and anything you want to tell us.</p>
+
+  {% for occ in occurrences %}
+  <div class="cr-card">
+    <div class="cr-task">
+      <div>
+        <div class="cr-label">{{ occ.task.label }}</div>
+        <div class="cr-when">{{ occ.due_at|date:"D j M, H:i" }}</div>
+      </div>
+
+      {% if occ.state == states.PENDING or occ.state == states.UNCONFIRMED %}
+      {% comment %}
+        Three answers, not one. A single "Done" button teaches the system
+        nothing about the times it was not done, and then the only thing left
+        to reason about is silence.
+      {% endcomment %}
+      <div class="cr-actions">
+        {% for value, label in answers %}
+        <form method="post" action="{% url 'care:respond' occ.pk %}" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="state" value="{{ value }}">
+          <button class="cr-btn {% if value == 'confirmed' %}done{% endif %}" type="submit">{{ label }}</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <span class="cr-state {{ occ.state }}">{{ occ.get_state_display }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="cr-card">
+    <p style="font-size:.88rem;color:#64748b;margin:0">
+      Nothing scheduled right now.
+    </p>
+  </div>
+  {% endfor %}
+
+  <div class="cr-card">
+    <div class="cr-label" style="margin-bottom:.5rem">Your reminders</div>
+    {% for task in tasks %}
+    <div class="cr-task" style="padding:.35rem 0">
+      <div>
+        <span style="font-weight:600">{{ task.label }}</span>
+        <span class="cr-when">· {{ task.times_of_day|join:", " }}</span>
+      </div>
+      <form method="post" action="{% url 'care:stop_task' task.pk %}">
+        {% csrf_token %}
+        <button class="cr-btn" type="submit">Stop</button>
+      </form>
+    </div>
+    {% empty %}
+    <p style="font-size:.88rem;color:#64748b;margin:0 0 .6rem;line-height:1.55">
+      No reminders yet. Add one and it will appear above at the times you choose.
+    </p>
+    {% endfor %}
+
+    <form method="post" action="{% url 'care:add_task' %}" style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      {% csrf_token %}
+      <input name="label" placeholder="What to take, e.g. morning tablet"
+             style="flex:2 1 200px;border:1.5px solid var(--border);border-radius:10px;padding:.55rem .7rem;font-size:.9rem">
+      <input name="times" placeholder="08:00, 20:00"
+             style="flex:1 1 120px;border:1.5px solid var(--border);border-radius:10px;padding:.55rem .7rem;font-size:.9rem">
+      <button class="cr-btn done" type="submit">Add</button>
+    </form>
+    <p style="font-size:.78rem;color:#94a3b8;margin:.5rem 0 0">
+      {% comment %}
+        Said plainly: this is a reminder the patient set, not a prescription.
+        Nothing here is derived from a document, and nothing a document says
+        creates one of these.
+      {% endcomment %}
+      These are your own reminders. They are not a prescription, and they are
+      separate from what your documents say.
+    </p>
+  </div>
+
+  <div class="cr-card cr-say">
+    <div class="cr-label" style="margin-bottom:.5rem">How are you feeling?</div>
+    <form method="post" action="{% url 'care:report' %}">
+      {% csrf_token %}
+      <textarea name="text" placeholder="For example: I felt dizzy this morning."></textarea>
+      <button class="cr-btn done" type="submit" style="margin-top:.6rem">Send</button>
+    </form>
+    <p style="font-size:.78rem;color:#94a3b8;margin:.6rem 0 0">
+      {% comment %}
+        Said before they type, not after. Someone deciding whether to mention
+        something needs to know who will see it.
+      {% endcomment %}
+      Saved in your own words. The people you share with are told that you
+      reported something — they read it in the app, not in the notification.
+    </p>
+  </div>
+
+  {% if reports %}
+  <div class="cr-card">
+    <div class="cr-label" style="margin-bottom:.4rem">What you've told us</div>
+    {% for r in reports %}
+    <div class="cr-past">
+      {{ r.text }}
+      <span style="color:#94a3b8">· {{ r.effective_at|date:"j M, H:i" }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="cr-note">
+    If you don't answer a reminder, we record that we didn't hear back — not
+    that you missed it. Only you can say what actually happened.
+  </p>
+</div>
+{% endblock %}

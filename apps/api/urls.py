@@ -25,7 +25,6 @@ urlpatterns = [
     path('records/upload/scan/',      views.scan_ocr_api,        name='scan_ocr'),
     path('records/',                 views.records_list,    name='records_list'),
     # Before the <str:pk> route, which would otherwise swallow the literal.
-    path('records/summary/',         views.clinical_summary_api, name='clinical_summary'),
     path('records/<str:pk>/',        views.record_detail,   name='record_detail'),
     path('records/<str:pk>/delete/', views.record_delete,   name='record_delete'),
 

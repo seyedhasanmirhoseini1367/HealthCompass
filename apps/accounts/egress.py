@@ -173,6 +173,45 @@ class ExternalProcessingGuard:
         raise ConsentRequired(point.purpose, _denial_message(point))
 
 
+# ── Which providers may receive PHI at all ────────────────────────────────────
+#
+# Consent is granted per PURPOSE ("sending my health data to external AI
+# providers"), not per company. The generation fallback chain is Groq → Gemini →
+# Anthropic → OpenAI, so that single consent authorised four organisations, and
+# which one actually received a patient's records depended on nothing more than
+# which API key happened to be configured and which provider answered first.
+#
+# A patient agreeing to "external AI processing" has not agreed to an arbitrary
+# set of vendors chosen at runtime. This is the server-side half of the answer:
+# an allowlist the deployment controls, enforced inside the fallback loop so a
+# provider that is not on it is skipped rather than tried.
+#
+# The default is every provider the code already used, so this changes no
+# behaviour on its own. What it changes is that the set is now stated, and
+# restricting it is a configuration change rather than a code change.
+DEFAULT_PHI_LLM_PROVIDERS = ('groq', 'gemini', 'anthropic', 'openai')
+
+
+def phi_llm_providers() -> frozenset:
+    """The providers this deployment permits to receive patient data."""
+    configured = getattr(settings, 'PHI_LLM_PROVIDERS', None)
+    if configured is None:
+        configured = DEFAULT_PHI_LLM_PROVIDERS
+    return frozenset(str(p).strip().lower() for p in configured if str(p).strip())
+
+
+def phi_provider_allowed(provider: str) -> bool:
+    """
+    Whether *provider* may be handed patient data.
+
+    Asked inside the fallback loop rather than once before it: a chain that
+    checked only its first choice would fall through to an unvetted provider the
+    moment the permitted one was slow or down, which is exactly when nobody is
+    watching.
+    """
+    return (provider or '').strip().lower() in phi_llm_providers()
+
+
 def _denial_message(point: EgressPoint) -> str:
     return (
         f'This step sends your health data to {point.provider} for processing, '

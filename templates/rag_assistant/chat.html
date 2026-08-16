@@ -135,6 +135,12 @@ footer{display:none!important}
 /* Chat header sub-elements */
 .chat-bot-icon  { font-size:1.5rem;flex-shrink:0 }
 .chat-header-info { flex:1;min-width:0 }
+.subject-picker{display:flex;align-items:center;gap:.4rem;margin-right:.6rem}
+.subject-picker label{font-size:.72rem;color:rgba(255,255,255,.85);white-space:nowrap}
+.subject-picker select{border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);
+  color:#fff;border-radius:8px;padding:.28rem .5rem;font-size:.8rem;font-weight:600;max-width:150px}
+.subject-picker select option{color:#1e293b}
+.subject-picker select:focus-visible{outline:2px solid #fff;outline-offset:1px}
 /* Records banner link */
 .link-amber { color:#92400e;font-weight:700;margin-left:.3rem }
 /* Empty state */
@@ -212,6 +218,25 @@ footer{display:none!important}
         <h1>AI Health Assistant</h1>
         <p>Ask about your records, lab results, medications, and health topics</p>
       </div>
+      {% comment %}
+        Whose records the question is answered from.
+
+        Rendered only when the person actually has someone to choose between —
+        a select with one option is a control that teaches nothing and takes
+        space. Every option here came from accounts.authz, and the choice is
+        re-checked server-side on each question; this is a convenience, never
+        the authorization.
+      {% endcomment %}
+      {% if subject_choices|length > 1 %}
+      <div class="subject-picker">
+        <label for="subjectSelect">Answer about</label>
+        <select id="subjectSelect" aria-label="Whose records to answer from">
+          {% for choice in subject_choices %}
+          <option value="{{ choice.value }}">{{ choice.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <button id="drawerBtn" onclick="openMobileDrawer()" class="drawer-btn d-none">
         <i class="fas fa-history"></i> Chats
       </button>
@@ -292,6 +317,8 @@ footer{display:none!important}
 <script>
 const SESSION_ID = "{{ session.pk }}";
 const STREAM_URL = "{% url 'rag_assistant:stream_message' %}";
+// Non-streaming endpoint, used for "Everyone" — see the send handler.
+const ASK_URL    = "{% url 'rag_assistant:send_message' %}";
 const CSRF = "{{ csrf_token }}";
 
 // ── LINK SAFETY ─ BEGIN (extracted verbatim by test_chat_link_safety.py) ─────
@@ -437,11 +464,40 @@ async function sendMessage() {
 
   let firstToken = true;
 
+  // Whose records to answer from. The server re-checks this on every request;
+  // sending it here only saves the user re-stating it.
+  const picker  = document.getElementById('subjectSelect');
+  const subject = picker ? picker.value : 'self';
+
   try {
+    // "Everyone" produces one labelled answer per person, which is not a
+    // shape a single token stream can carry — so it takes the non-streaming
+    // endpoint instead of silently streaming just one of them.
+    if (subject === 'all') {
+      const r = await fetch(ASK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ message: msg, session_id: SESSION_ID, subject: subject }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      typing.style.display = 'none';
+      if (firstToken) { area.appendChild(assistantWrap); firstToken = false; }
+      rawBuf.push(data.response || '');
+      contentDiv.innerHTML = renderMarkdown(rawBuf.join(''));
+      if (data.sources) renderSources(assistantWrap, data.sources);
+      // Same bookkeeping the stream's 'done' event does, so the copy button
+      // works identically on a multi-person answer.
+      assistantWrap.querySelector('.bubble-assistant')
+                   .setAttribute('data-raw', rawBuf.join(''));
+      scrollToBottom();
+      return;
+    }
+
     const resp = await fetch(STREAM_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-      body: JSON.stringify({ message: msg, session_id: SESSION_ID }),
+      body: JSON.stringify({ message: msg, session_id: SESSION_ID, subject: subject }),
     });
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

@@ -93,32 +93,7 @@ def record_detail(request, pk):
         'record':          record,
         'lab_values':      record.lab_values.all(),
         'wearable_points': record.wearable_points.all()[:200],
-        # What THIS document asserted, not the resolved state. A discharge
-        # summary listing a drug is not a claim that the patient is on it today,
-        # and showing it next to the record as though it were would put a
-        # superseded medication in front of someone as current.
-        'medications':     record.medicationstatement_set.all(),
-        'conditions':      record.conditionstatement_set.all(),
     })
-
-
-# ─── Medications & Conditions ─────────────────────────────────────────────────
-
-@login_required
-def health_summary(request):
-    """
-    What the patient is on and what they have, resolved across every document.
-
-    Their own data, so no predicate stands between them and it — the whole
-    authorization question here is that `request.user` is the only patient this
-    can be called for. Recipients and clinicians reach the same summary through
-    their own gated views.
-    """
-    from .clinical_state import clinical_summary
-
-    context = {'subject': request.user, 'is_own': True}
-    context.update(clinical_summary(request.user))
-    return render(request, 'medical_records/health_summary.html', context)
 
 
 # ─── Delete Record ────────────────────────────────────────────────────────────

@@ -14,7 +14,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from apps.appointments.models import Appointment
         from apps.notifications.models import Notification
-        from apps.notifications.firebase import send_push
 
         now    = timezone.now()
         window = timedelta(minutes=8)
@@ -62,6 +61,14 @@ class Command(BaseCommand):
                 if appt.location:
                     body += f' at {appt.location}'
 
+                # Creating the Notification is what sends the push: a post_save
+                # receiver in notifications.apps does it.
+                #
+                # This used to ALSO call send_push() here, so every reminder
+                # arrived on the patient's phone twice — once from the receiver
+                # and once from this line. Two buzzes for one appointment is the
+                # small end of alert fatigue, and it is the end that teaches
+                # people to ignore the notification.
                 Notification.objects.create(
                     user=appt.patient,
                     type='system',
@@ -70,12 +77,22 @@ class Command(BaseCommand):
                     link='/appointments/',
                 )
 
-                try:
-                    send_push(appt.patient, title, body,
-                              data={'type': 'appointment', 'id': str(appt.id)})
-                except Exception:
-                    logger.exception('send_push failed for appointment %s', appt.id)
-
                 sent += 1
 
-        self.stdout.write(self.style.SUCCESS(f'Sent {sent} appointment reminder(s).'))
+        # Respects the verbosity it was given, and says nothing when there was
+        # nothing to say.
+        #
+        # This ran unconditionally. The scheduler in appointments/apps.py calls
+        # it every ten minutes with verbosity=0 — explicitly asking for silence
+        # — and `self.stdout.write` does not consult verbosity, so it printed
+        # "Sent 0 appointment reminder(s)." forever, in the dev console and in
+        # production logs alike. A line that appears 144 times a day and means
+        # "nothing happened" is how the line that means something gets missed.
+        verbosity = int(options.get('verbosity', 1))
+        if sent:
+            self.stdout.write(self.style.SUCCESS(
+                f'Sent {sent} appointment reminder(s).'))
+        elif verbosity >= 2:
+            # Only when someone asked for detail, e.g. running it by hand to
+            # check it is alive.
+            self.stdout.write('No appointment reminders were due.')

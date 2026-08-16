@@ -12,3 +12,8 @@ class MedicalRecordsConfig(AppConfig):
         # caller, because the paths it exists for — admin bulk delete and user
         # cascade — have no caller to do the importing.
         from . import signals  # noqa: F401
+
+        # Refuses to let production start with medical files on ephemeral local
+        # disk. Imported here so the check registers itself whatever entry
+        # point is used — runserver, gunicorn, or a management command.
+        from . import checks  # noqa: F401

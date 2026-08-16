@@ -39,29 +39,6 @@
   <p style="font-size:.85rem;color:#94a3b8">No individual results are attached to this record.</p>
   {% endif %}
 
-  {% if medications or conditions %}
-  <p style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:1.4rem 0 .4rem">
-    Stated in this document
-  </p>
-  <ul style="font-size:.84rem;padding-left:1.2rem;margin:0;color:var(--text)">
-    {% for m in medications %}
-    <li style="padding:.15rem 0">
-      💊 {{ m.name }} {{ m.dose }}
-      <span style="color:#94a3b8">— {{ m.get_status_display|lower }}</span>
-    </li>
-    {% endfor %}
-    {% for c in conditions %}
-    <li style="padding:.15rem 0">
-      🏥 {{ c.description|default:c.code }}
-      <span style="color:#94a3b8">— {{ c.get_status_display|lower }}</span>
-    </li>
-    {% endfor %}
-  </ul>
-  <p style="font-size:.76rem;color:#94a3b8;margin-top:.5rem">
-    {# The same caution the patient's own record page carries. #}
-    What this document says. A later document may have changed it.
-  </p>
-  {% endif %}
 
   <p style="font-size:.78rem;color:#64748b;background:#f8fafc;border-radius:9px;padding:.7rem .9rem;margin-top:1.4rem;line-height:1.5">
     Shared with you by {{ subject.get_full_name|default:subject.username }}. Opening it is recorded in their access history.

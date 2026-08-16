@@ -1,119 +1,230 @@
 {% extends 'base.html' %}
-{% block title %}My Dashboard — HealthCompass{% endblock %}
+{% block title %}Dashboard — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
-/* .dash-header replaced by global .page-hero */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
-.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
-.stat-card .num{font-size:1.8rem;font-weight:800;color:var(--primary-dk)}
-.stat-card .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
-.section-h{font-size:1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
-.section-h i{color:var(--primary)}
-.item-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-radius:10px;background:#f8fafc;margin-bottom:.5rem;font-size:.875rem}
-.item-row:last-child{margin-bottom:0}
-.empty-msg{color:var(--muted);font-size:.85rem;text-align:center;padding:2rem}
-.alert-critical{border-left:4px solid var(--danger);background:#fff5f5}
-.alert-warning{border-left:4px solid var(--warning);background:#fffbf0}
-.alert-info{border-left:4px solid var(--primary);background:#f0f9ff}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
-@media(max-width:768px){.grid-2{grid-template-columns:1fr}}
+/*
+  Deliberately few things, deliberately large.
+
+  The previous version led with five counters — records, alerts, medications,
+  conditions, AI runs. A count answers "how many rows exist", which is not a
+  question anyone opens a health app to ask. This leads with what needs doing
+  and says nothing at all when nothing does.
+
+  Type is 1rem+ in the body and colour is never the only carrier of meaning:
+  every state has a word next to its dot, because a red dot alone is unreadable
+  to a colour-blind reader and ambiguous to everyone else.
+*/
+.db-wrap{max-width:840px;margin:0 auto}
+.db-greet{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
+.db-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
+
+.db-attention{background:#fffbeb;border:1.5px solid #fcd34d;border-radius:16px;padding:1.1rem 1.25rem;margin-bottom:1.6rem}
+.db-attention.urgent{background:#fef2f2;border-color:#fca5a5}
+.db-attention h2{font-size:1.05rem;font-weight:800;color:#92400e;margin:0 0 .8rem}
+.db-attention.urgent h2{color:#991b1b}
+.db-att-item{display:block;text-decoration:none;padding:.7rem 0;border-top:1px solid #fde68a}
+.db-attention.urgent .db-att-item{border-top-color:#fecaca}
+.db-att-item:first-of-type{border-top:none}
+.db-att-title{font-weight:700;font-size:1rem;color:#78350f}
+.db-attention.urgent .db-att-title{color:#7f1d1d}
+.db-att-detail{font-size:.9rem;color:#92400e;line-height:1.55;margin-top:.15rem}
+.db-att-cta{display:inline-block;margin-top:.5rem;font-size:.88rem;font-weight:700;color:#92400e;text-decoration:underline}
+
+.db-calm{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:16px;padding:1.1rem 1.25rem;margin-bottom:1.6rem}
+.db-calm p{margin:0;font-size:1rem;font-weight:600;color:#065f46}
+
+.db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:1.6rem}
+.db-card{display:block;text-decoration:none;background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem}
+.db-card:hover{border-color:#cbd5e1}
+.db-card-h{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.5rem}
+.db-card-t{font-size:1rem;font-weight:700;color:var(--text)}
+.db-state{font-size:.78rem;font-weight:700;white-space:nowrap}
+.db-state.ok{color:#059669}.db-state.warn{color:#b45309}.db-state.urgent{color:#b91c1c}
+.db-state.info{color:#0369a1}.db-state.muted{color:#94a3b8}
+.db-card-s{font-size:.92rem;color:#475569;line-height:1.5}
+.db-line{font-size:.9rem;color:#475569;padding:.35rem 0;line-height:1.5}
+.db-line b{color:var(--text)}
+
+.db-sec-h{font-size:1.05rem;font-weight:800;color:var(--text);margin:0 0 .7rem}
+.db-person{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;text-decoration:none}
+.db-person:hover{border-color:#cbd5e1}
+.db-person-n{font-size:1rem;font-weight:700;color:var(--text)}
+.db-person-d{font-size:.86rem;color:#64748b;margin-top:.1rem}
+
+.db-quiet{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:1.6rem}
+.db-quiet-t{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:.6rem}
+.db-quiet a{color:var(--primary);text-decoration:none}
+.db-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+@media(max-width:640px){.db-grid{grid-template-columns:1fr}.db-greet{font-size:1.2rem}}
 </style>
 {% endblock %}
 {% block content %}
-<div class="page-hero">
-  <h1>👋 Hello, {{ user.get_full_name|default:user.username }}</h1>
-  <p>Here is your health overview</p>
-</div>
+<div class="db-wrap">
 
-<div class="stat-grid">
-  <div class="stat-card"><div class="num">{{ total_records }}</div><div class="lbl">Records</div></div>
-  <div class="stat-card"><div class="num" style="color:var(--danger)">{{ unread_alerts }}</div><div class="lbl">Alerts</div></div>
-  <a href="{% url 'medical_records:health_summary' %}" class="stat-card" style="text-decoration:none;display:block">
-    <div class="num">{{ current_medication_count }}</div><div class="lbl">Medications</div>
-  </a>
-  <a href="{% url 'medical_records:health_summary' %}" class="stat-card" style="text-decoration:none;display:block">
-    <div class="num">{{ current_condition_count }}</div><div class="lbl">Conditions</div>
-  </a>
-  <div class="stat-card"><div class="num">{{ total_predictions }}</div><div class="lbl">AI Runs</div></div>
-</div>
+  <h1 class="db-greet">{{ greeting }}, {{ user.first_name|default:user.get_full_name|default:user.username }}</h1>
+  <p class="db-sub">Your health &amp; care overview.</p>
 
-{% if clinical_conflict_count %}
-{% comment %}
-  Surfaced on the landing page rather than only on the summary. Two documents
-  disagreeing about whether a drug was stopped is the most actionable thing this
-  application can tell someone, and it is invisible unless they go looking.
-{% endcomment %}
-<a href="{% url 'medical_records:health_summary' %}"
-   style="display:block;text-decoration:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:.9rem 1.1rem;margin-bottom:1.5rem">
-  <span style="font-weight:700;font-size:.9rem;color:#92400e">⚠️ Your documents disagree</span>
-  <span style="font-size:.85rem;color:#78350f;display:block;margin-top:.2rem">
-    {{ clinical_conflict_count }} entr{{ clinical_conflict_count|pluralize:"y,ies" }}
-    on the same date say different things. Nothing has been chosen for you —
-    review the sources.
-  </span>
-</a>
-{% endif %}
+  {% comment %}
+    ── Today ───────────────────────────────────────────────────────────────
+    Each card is a summary that links to the page that owns the subject. The
+    dashboard never reproduces those pages; it says whether they are worth
+    opening.
+  {% endcomment %}
+  <h2 class="db-sec-h">Today</h2>
+  <div class="db-grid">
+    {% with med=sections.medications appt=sections.appointments care=sections.care %}
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-header"><i class="fas fa-exclamation-triangle"></i> Health Alerts</div>
-    <div class="card-body">
-      {% if alerts %}
-        {% for alert in alerts %}
-        <div class="item-row alert-{{ alert.severity }}">
-          <span>{{ alert.title }}</span>
-          <span class="badge badge-{{ alert.severity }}">{{ alert.get_severity_display }}</span>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty-state"><span class="es-icon">✅</span><span class="es-title" style="color:var(--success)">All clear!</span><span class="es-desc">No health alerts right now.</span></div>
-      {% endif %}
-    </div>
+    <a class="db-card" href="{{ med.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">💊 {{ med.title }}</span>
+        {% comment %}
+          The chip is suppressed when the card already explains itself. It read
+          "Nothing recorded yet" directly above a summary saying "No medication
+          reminders set up." — the same fact twice, in a smaller font.
+        {% endcomment %}
+        {% if med.state != 'no_data' or not med.summary %}
+        <span class="db-state {{ med.style.tone }}">{{ med.style.label }}</span>
+        {% endif %}
+      </div>
+      {% if med.summary %}<div class="db-card-s">{{ med.summary }}</div>{% endif %}
+      {% for item in med.items %}{% if not item.is_actionable and item.state != 'ok' %}
+      <div class="db-line"><b>{{ item.title }}</b>{% if item.detail %} — {{ item.detail }}{% endif %}</div>
+      {% endif %}{% endfor %}
+    </a>
+
+    <a class="db-card" href="{{ appt.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">📅 Next appointment</span>
+        {% if appt.state != 'no_data' or not appt.summary %}
+        <span class="db-state {{ appt.style.tone }}">{{ appt.style.label }}</span>
+        {% endif %}
+      </div>
+      {% for item in appt.items %}
+      <div class="db-card-s"><b>{{ item.title }}</b></div>
+      <div class="db-line">{{ item.detail }}</div>
+      {% empty %}
+      <div class="db-card-s">{{ appt.summary }}</div>
+      {% endfor %}
+    </a>
+
+    <a class="db-card" href="{{ care.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">🫀 {{ care.title }}</span>
+        {% if care.state != 'no_data' or not care.summary %}
+        <span class="db-state {{ care.style.tone }}">{{ care.style.label }}</span>
+        {% endif %}
+      </div>
+      {% if care.summary %}<div class="db-card-s">{{ care.summary }}</div>{% endif %}
+      {% for item in care.items %}{% if not item.is_actionable and item.state != 'ok' %}
+      <div class="db-line"><b>{{ item.title }}</b></div>
+      {% endif %}{% endfor %}
+    </a>
+
+    {% endwith %}
   </div>
 
-  <div class="card">
-    <div class="card-header"><i class="fas fa-file-medical"></i> Recent Records</div>
-    <div class="card-body">
-      {% if records %}
-        {% for r in records %}
-        <div class="item-row">
-          <span>{{ r.title }}</span>
-          <span class="badge badge-info">{{ r.get_record_type_display }}</span>
-        </div>
-        {% endfor %}
-        <div style="text-align:right;margin-top:.75rem"><a href="/records/" class="btn btn-outline" style="font-size:.8rem">View All</a></div>
-      {% else %}
-        <div class="empty-state"><span class="es-icon">📁</span><span class="es-title">No records yet</span><span class="es-desc">Upload labs, prescriptions, or wearable data to get started.</span><a href="/records/" class="btn btn-primary" style="font-size:.8rem">Upload Records</a></div>
-      {% endif %}
+  {% comment %}
+    ── What needs you ──────────────────────────────────────────────────────
+    Shown ONLY when something genuinely does. An always-present "attention"
+    box that usually says "nothing" trains people to skip it, and then it is
+    not there when it matters.
+  {% endcomment %}
+  {% if attention %}
+  <div class="db-attention {% if overall == 'urgent' %}urgent{% endif %}">
+    <h2>{% if overall == 'urgent' %}Needs attention now{% else %}Needs your attention{% endif %}</h2>
+    {% for section, item in attention %}
+    <a class="db-att-item" href="{{ item.href|default:section.href }}">
+      <span class="db-att-title">{{ item.style.dot }} {{ item.title }}</span>
+      {% if item.detail %}<span class="db-att-detail">{{ item.detail }}</span>{% endif %}
+      {% if item.action %}<span class="db-att-cta">{{ item.action.0 }} →</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% elif show_reassurance and fully_checked %}
+  <div class="db-calm">
+    <p>✅ Nothing needs your attention right now.</p>
+  </div>
+  {% elif show_reassurance and has_any_data %}
+  {% comment %}
+    Qualified on purpose. Saying "all clear" to someone with no medication
+    reminders set up is reassurance about a thing nobody checked, and the
+    honest version is more useful anyway: it says what would make the page
+    work.
+  {% endcomment %}
+  <div class="db-calm" style="background:#f8fafc;border-color:var(--border)">
+    <p style="color:#334155">Nothing needs your attention in what is set up so far.</p>
+    <div style="margin-top:.6rem;display:flex;gap:.6rem;flex-wrap:wrap">
+      {% for gap in setup_gaps %}
+      <a href="{{ gap.href }}" style="font-size:.88rem;font-weight:600;color:var(--primary);text-decoration:none">
+        {{ gap.label }} →
+      </a>
+      {% endfor %}
     </div>
   </div>
-</div>
+  {% endif %}
 
-<div class="card" style="margin-top:1.5rem">
-  <div class="card-header"><i class="fas fa-brain"></i> Recent AI Predictions <a href="{% url 'ai_insights:my_predictions' %}" style="float:right;font-size:.78rem;font-weight:400;color:var(--primary)">View all</a></div>
-  <div class="card-body">
-    {% if recent_predictions %}
-      {% for p in recent_predictions %}
-      <div class="item-row">
-        <span>{{ p.model.name }}</span>
-        <span style="display:flex;align-items:center;gap:.5rem">
-          {% if p.risk_score is not None %}
-          <span class="badge {% if p.risk_score > 0.7 %}badge-critical{% elif p.risk_score > 0.4 %}badge-warning{% else %}badge-info{% endif %}">{% if p.risk_score > 0.7 %}High{% elif p.risk_score > 0.4 %}Medium{% else %}Low{% endif %} risk</span>
-          {% endif %}
-          <a href="{% url 'ai_insights:prediction_detail' p.pk %}" style="font-size:.78rem;color:var(--primary)">Details</a>
-        </span>
+  {% comment %}
+    ── Watching over ───────────────────────────────────────────────────────
+    Only rendered when this person actually cares for someone. Names and
+    attention state only — what is wrong lives on their page, behind the
+    scopes they chose to grant.
+  {% endcomment %}
+  {% if is_caregiver %}
+  <h2 class="db-sec-h">{{ watching.title }}</h2>
+  {% for item in watching.items %}
+  <a class="db-person" href="{{ item.href }}">
+    <span>
+      <span class="db-person-n">{{ item.title }}</span>
+      <span class="db-person-d">{{ item.detail }}</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:.7rem">
+      <span class="db-state {{ item.style.tone }}">{{ item.style.dot }} {{ item.style.label }}</span>
+      <span style="font-size:.85rem;font-weight:700;color:var(--primary);white-space:nowrap">View →</span>
+    </span>
+  </a>
+  {% endfor %}
+  <p style="font-size:.85rem;color:#64748b;margin:.3rem 0 1.6rem">
+    <a href="{% url 'care:my_care' %}" style="color:var(--primary);text-decoration:none">
+      Open Companions →
+    </a>
+  </p>
+  {% endif %}
+
+  {% comment %}
+    ── Quieter context ─────────────────────────────────────────────────────
+    Below the fold on purpose. Recent records and AI runs are worth having and
+    are not what the page is for.
+  {% endcomment %}
+  <div class="db-quiet">
+    <div class="db-quiet-t">Recent health activity</div>
+    {% comment %}
+      What was measured and when, one row per kind of measurement. A wearable
+      import writes hundreds of heart-rate points; the useful line is "heart
+      rate — today", not two hundred of them.
+    {% endcomment %}
+    {% for m in measurements %}
+    <div class="db-line" style="display:flex;justify-content:space-between;gap:1rem">
+      <a href="{{ m.href }}">{{ m.label }}</a>
+      <span style="color:#94a3b8;white-space:nowrap">{{ m.ago }}</span>
+    </div>
+    {% endfor %}
+
+    {% if not measurements %}
+      {% for r in records|slice:':3' %}
+      <div class="db-line"><a href="{% url 'medical_records:detail' r.pk %}">{{ r.title }}</a>
+        <span style="color:#94a3b8">· {{ r.get_record_type_display }}</span></div>
+      {% empty %}
+      <div class="db-card-s">
+        Nothing measured yet. Uploading a lab result or wearable export is what
+        makes the rest of this page useful.
       </div>
       {% endfor %}
-    {% else %}
-      <div class="empty-state"><span class="es-icon">🧠</span><span class="es-title">No predictions yet</span><span class="es-desc">Run an AI model to see your risk scores here.</span><a href="{% url 'ai_insights:list' %}" class="btn btn-primary" style="font-size:.8rem">Browse AI Models</a></div>
     {% endif %}
+    <div class="db-actions">
+      <a href="/records/" class="btn btn-primary" style="font-size:.85rem">Upload a record</a>
+      <a href="/assistant/" class="btn btn-outline" style="font-size:.85rem">Ask the assistant</a>
+    </div>
   </div>
-</div>
 
-<div style="margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap">
-  <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
-  <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI Assistant</a>
-  <a href="{% url 'ai_insights:patient_analytics' %}" class="btn btn-outline" style="background:linear-gradient(135deg,#6366f1,#0ea5e9);color:white;border:none"><i class="fas fa-chart-line"></i> My Analytics</a>
-  <a href="/insights/" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Run AI Models</a>
 </div>
 {% endblock %}

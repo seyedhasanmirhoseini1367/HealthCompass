@@ -1,21 +1,30 @@
 """
-Ensure the Google SocialApp in the database matches the env var credentials.
+Ensure the Google SocialApp in the database matches the configured credentials.
 Run on every startup so Railway env vars are always authoritative.
 Exits with code 1 if credentials are missing (fails the deploy).
 """
-import os
 import sys
-from django.core.management.base import BaseCommand
+
+from decouple import config
 from django.conf import settings
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = 'Create or update the Google SocialApp entry from environment variables'
+    help = 'Create or update the Google SocialApp entry from the configured credentials'
 
     def handle(self, *args, **options):
-        # Read directly from os.environ — most reliable in Railway/Docker contexts
-        client_id = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
-        secret    = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+        # Through decouple, like every other credential in this project.
+        #
+        # This used to read os.environ directly, which works on Railway — env
+        # vars are real there — and cannot work locally, because a .env file is
+        # read by decouple and never exported to the process environment. So
+        # local Google login was unfixable by running this command: it always
+        # exited 1 saying the variable was unset, while the value sat in .env.
+        #
+        # decouple checks os.environ first, so Railway behaviour is unchanged.
+        client_id = config('GOOGLE_CLIENT_ID', default='').strip()
+        secret    = config('GOOGLE_CLIENT_SECRET', default='').strip()
 
         # Fall back to SOCIALACCOUNT_PROVIDERS in settings
         if not client_id:
@@ -27,7 +36,7 @@ class Command(BaseCommand):
         if not client_id:
             self.stderr.write(self.style.ERROR(
                 'GOOGLE_CLIENT_ID is not set — Google OAuth will not work. '
-                'Add it as an environment variable in Railway.'
+                'Set it in the environment (Railway) or in .env (local).'
             ))
             sys.exit(1)
 
@@ -37,7 +46,14 @@ class Command(BaseCommand):
             from allauth.socialaccount.models import SocialApp
             from django.contrib.sites.models import Site
 
-            domain = os.environ.get('SITE_DOMAIN', '') or getattr(settings, 'SITE_DOMAIN', 'healthcompass.hasanai.net')
+            # A local server is not healthcompass.hasanai.net. Site.domain is
+            # what allauth builds callback URLs from in some flows, so leaving
+            # the production hostname on a dev database sends the browser to
+            # production mid-login.
+            fallback = ('127.0.0.1:8000' if settings.DEBUG
+                        else 'healthcompass.hasanai.net')
+            domain = (config('SITE_DOMAIN', default='').strip()
+                      or getattr(settings, 'SITE_DOMAIN', '') or fallback)
             site, site_created = Site.objects.update_or_create(
                 id=settings.SITE_ID,
                 defaults={'domain': domain, 'name': 'HealthCompass'},

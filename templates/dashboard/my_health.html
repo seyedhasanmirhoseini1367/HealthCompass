@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}My Health — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.hb-wrap{max-width:860px;margin:0 auto}
+.hb-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
+.hb-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
+.hb-sec{font-size:1.05rem;font-weight:800;color:var(--text);margin:1.8rem 0 .7rem}
+.hb-sec:first-of-type{margin-top:0}
+.hb-card{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:.7rem}
+.hb-row{display:flex;justify-content:space-between;gap:1rem;font-size:.92rem;color:#475569;padding:.4rem 0;border-bottom:1px solid #f1f5f9}
+.hb-row:last-child{border-bottom:none}
+.hb-row b{color:var(--text);font-weight:600}
+.hb-empty{font-size:.92rem;color:#64748b;line-height:1.6;margin:0}
+.hb-link{color:var(--primary);text-decoration:none;font-weight:600;font-size:.88rem}
+.hb-pill{font-size:.75rem;font-weight:700;padding:.15rem .55rem;border-radius:6px}
+.hb-pill.critical{background:#fee2e2;color:#991b1b}
+.hb-pill.warning{background:#fef3c7;color:#92400e}
+.hb-pill.info{background:#dbeafe;color:#1d4ed8}
+.hb-warn{background:#fffbeb;border-color:#fcd34d}
+</style>
+{% endblock %}
+{% block content %}
+<div class="hb-wrap">
+  <h1 class="hb-h1">My Health</h1>
+  <p class="hb-sub">What your records say about you right now.</p>
+
+  {% comment %}
+    Medications & conditions was removed at the owner's request. It derived a
+    current medication/condition list from uploaded documents, but the documents
+    that would populate it all predate the feature, so it only ever showed its
+    own empty state. The records themselves are untouched and remain in Records.
+  {% endcomment %}
+
+  {% comment %}
+    ── My reminders ── (moved here from Companions: a dose you take is a fact about you, not about the person you look after)──────────────────────────────────────────────────────
+  {% endcomment %}
+  <h2 class="hb-sec">My reminders</h2>
+  <div class="hb-card">
+    {% for occ in occurrences %}
+    <div class="cr-task">
+      <div>
+        <div class="cr-label">{{ occ.task.label }}</div>
+        <div class="cr-when">{{ occ.due_at|date:"D j M, H:i" }}</div>
+      </div>
+      {% if occ.state == states.PENDING or occ.state == states.UNCONFIRMED %}
+      <div class="cr-actions">
+        {% for value, label in answers %}
+        <form method="post" action="{% url 'care:respond' occ.pk %}" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="state" value="{{ value }}">
+          <button class="cr-btn {% if value == 'confirmed' %}done{% endif %}" type="submit">{{ label }}</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <span class="cr-state {{ occ.state }}">{{ occ.get_state_display }}</span>
+      {% endif %}
+    </div>
+    {% empty %}
+    <p class="hb-empty" style="margin-bottom:.6rem">Nothing scheduled right now.</p>
+    {% endfor %}
+  </div>
+
+  <div class="hb-card">
+    <div class="cr-label" style="margin-bottom:.5rem">Set up a reminder</div>
+    {% for task in tasks %}
+    <div class="cr-task">
+      <div>
+        <span style="font-weight:600">{{ task.label }}</span>
+        <span class="cr-when">· {{ task.times_of_day|join:", " }}</span>
+      </div>
+      <form method="post" action="{% url 'care:stop_task' task.pk %}">
+        {% csrf_token %}
+        <button class="cr-btn" type="submit">Stop</button>
+      </form>
+    </div>
+    {% endfor %}
+    <form method="post" action="{% url 'care:add_task' %}" style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      {% csrf_token %}
+      <label for="task-label" class="sr-only" style="position:absolute;left:-9999px">What to take</label>
+      <input id="task-label" name="label" placeholder="What to take, e.g. morning tablet"
+             style="flex:2 1 200px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
+      <label for="task-times" class="sr-only" style="position:absolute;left:-9999px">Times of day</label>
+      <input id="task-times" name="times" placeholder="08:00, 20:00"
+             style="flex:1 1 120px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
+      <button class="cr-btn done" type="submit">Add</button>
+    </form>
+    <p style="font-size:.8rem;color:#94a3b8;margin:.6rem 0 0;line-height:1.5">
+      {% comment %}
+        Said plainly: a reminder is something the patient set, not something a
+        document prescribed. The two are separate objects in this system and
+        must stay separate in the reader's mind too.
+      {% endcomment %}
+      Your own reminders. They are not a prescription, and they are separate
+      from what your documents say.
+    </p>
+  </div>
+
+  {% comment %}
+    ── How I am ────────────────────────────────────────────────────────────
+  {% endcomment %}
+  <h2 class="hb-sec">How are you feeling?</h2>
+  <div class="hb-card cr-say">
+    <form method="post" action="{% url 'care:report' %}">
+      {% csrf_token %}
+      <label for="report-text" style="position:absolute;left:-9999px">What you want to tell us</label>
+      <textarea id="report-text" name="text" placeholder="For example: I felt dizzy this morning."></textarea>
+      <button class="cr-btn done" type="submit" style="margin-top:.6rem">Send</button>
+    </form>
+    <p style="font-size:.8rem;color:#94a3b8;margin:.6rem 0 0;line-height:1.5">
+      Saved in your own words. The people you share with are told that you
+      reported something — they read it in the app, not in the notification.
+    </p>
+  </div>
+
+  <p class="hb-empty" style="margin-top:1.4rem">
+    If you don't answer a reminder, we record that we didn't hear back — not
+    that you missed it. Only you can say what actually happened.
+  </p>
+
+  <h2 class="hb-sec">Health alerts</h2>
+  <div class="hb-card">
+    {% for alert in alerts %}
+    <div class="hb-row">
+      <b>{{ alert.title }}</b>
+      <span class="hb-pill {{ alert.severity }}">{{ alert.get_severity_display }}</span>
+    </div>
+    {% empty %}
+    <p class="hb-empty">
+      {% comment %}
+        Not "you are healthy". No alert means no rule has fired, which is a
+        fact about the rules and not about the person.
+      {% endcomment %}
+      No alerts have been raised on your records.
+    </p>
+    {% endfor %}
+  </div>
+
+  <h2 class="hb-sec">Recent measurements</h2>
+  <div class="hb-card">
+    {% for m in measurements %}
+    <div class="hb-row"><b>{{ m.label }}</b><span>{{ m.ago }}</span></div>
+    {% empty %}
+    <p class="hb-empty">
+      Nothing measured yet. Upload a wearable export or a lab result and it
+      will appear here.
+    </p>
+    {% endfor %}
+  </div>
+
+  <h2 class="hb-sec">Records &amp; insights</h2>
+  <div class="hb-card">
+    <div class="hb-row"><b>Documents</b>
+      <span>{{ record_count }} on file · <a class="hb-link" href="/records/">Open Records →</a></span></div>
+    {% for p in predictions %}
+    <div class="hb-row"><b>{{ p.model.name }}</b>
+      <span><a class="hb-link" href="{% url 'ai_insights:prediction_detail' p.pk %}">Result →</a></span></div>
+    {% empty %}
+    <div class="hb-row"><b>AI models</b>
+      <span><a class="hb-link" href="/insights/">Browse models →</a></span></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

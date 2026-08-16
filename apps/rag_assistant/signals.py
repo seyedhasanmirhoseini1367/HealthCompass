@@ -49,21 +49,59 @@ def _get_executor() -> ThreadPoolExecutor:
 
 
 def _index_in_background(record_pk: str):
-    try:
-        from apps.medical_records.models import MedicalRecord
-        from apps.rag_assistant.services.rag_service import RAGService
+    """
+    Index one record, claiming it first so two workers cannot both do it.
 
+    The claim is the important part. Previously this ran unconditionally and
+    stamped `indexed_at` on any positive chunk count, which meant:
+
+      * two workers could index the same record and both declare success;
+      * a record whose embeddings were REFUSED (no consent) or FAILED (provider
+        down) was still recorded as indexed, because chunks are created before
+        they are embedded and the count was read as the outcome.
+
+    Now the record is claimed, indexed, and then marked according to what
+    actually happened to its chunks. `indexed_at` is set in exactly one place —
+    MedicalRecord.mark_indexed — and only from the INDEXING state.
+    """
+    from apps.medical_records.models import MedicalRecord
+    from apps.rag_assistant.services.rag_service import RAGService
+
+    record = None
+    try:
         record = MedicalRecord.objects.get(pk=record_pk)
-        svc    = RAGService()
-        n      = svc.index_record(record)
-        # Stamp only on success: the column is what a sweep uses to find records
-        # whose indexing never ran or never finished.
-        from django.utils import timezone as _tz
-        MedicalRecord.objects.filter(pk=record_pk).update(indexed_at=_tz.now())
-        logger.info('Auto-indexed record %s → %d chunks', record_pk, n)
+
+        if not record.claim_for_indexing():
+            # Somebody else holds it, or it is already indexed. Losing the race
+            # is the normal outcome of two workers seeing the same save, not an
+            # error worth reporting.
+            logger.debug('Record %s is already claimed or indexed; skipping',
+                         record_pk)
+            return
+
+        n = RAGService().index_record(record)
+        outcome = RAGService().indexing_outcome(record)
+
+        if outcome == MedicalRecord.IndexStatus.INDEXED:
+            record.mark_indexed()
+            logger.info('Auto-indexed record %s → %d chunks', record_pk, n)
+        elif outcome == MedicalRecord.IndexStatus.BLOCKED:
+            record.mark_index_blocked('external processing not permitted')
+            logger.info('Record %s not indexed — external processing not '
+                        'permitted', record_pk)
+        else:
+            record.mark_index_failed('one or more chunks have no embedding')
+            # Patient-impacting: the record is in their list and the assistant
+            # cannot find it.
+            from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+            ops_emit(OpsEvent.INDEXING_FAILED, record_id=record_pk,
+                     error_type='EmbeddingIncomplete')
+
     except Exception as exc:
         logger.error('Auto-index failed for record %s: %s', record_pk, exc)
-        # Without this the record silently never becomes searchable.
+        if record is not None:
+            # Type only — a provider error can quote the document it was given.
+            record.mark_index_failed(type(exc).__name__)
         from healthcompass.observability import Event as OpsEvent, emit as ops_emit
         ops_emit(OpsEvent.INDEXING_FAILED, record_id=record_pk,
                  error_type=type(exc).__name__)
@@ -85,6 +123,16 @@ def on_medical_record_save(sender, instance, created, **kwargs):
         return
 
     pk_str = str(instance.pk)
+
+    # The content changed, so whatever is indexed is now out of date. Marking it
+    # stale is what makes the record claimable again — without this an edited
+    # record would sit at INDEXED, the claim would be refused, and the new
+    # content would never be indexed at all.
+    #
+    # Deliberately does not disturb a record being indexed right now: that run
+    # is either already working from the new content or will be superseded by
+    # the save that follows it.
+    instance.mark_index_stale()
 
     from django.conf import settings
     if getattr(settings, 'RAG_AUTO_INDEX_SYNC', False):

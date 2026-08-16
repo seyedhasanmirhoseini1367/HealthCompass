@@ -886,20 +886,36 @@ document.addEventListener('keydown', function(e) {
 });
 
 /* ── Panel navigation ────────────────────────────────────────────────────── */
+/*
+ * Visibility is toggled through `d-none`, never through inline display.
+ *
+ * These three elements are hidden in the markup with `class="d-none"`, and
+ * `.d-none` is `display:none !important`. An inline `style.display` cannot beat
+ * `!important`, so setting one here was a no-op: picking an option swapped the
+ * title but left every panel hidden, and the back arrow never appeared. The
+ * modal looked like it had lost its contents.
+ *
+ * Each class carries its own display (`.modal-options` flex, `.modal-back`
+ * inline-flex, `.upload-panel` block), so removing the class restores the right
+ * one without this function needing to know which.
+ */
 function showOptions() {
-  document.querySelectorAll('.upload-panel').forEach(function(p){ p.style.display='none'; });
-  document.getElementById('panel-options').style.display = 'flex';
-  document.getElementById('modalBack').style.display     = 'none';
+  document.querySelectorAll('.upload-panel').forEach(function(p){ p.classList.add('d-none'); });
+  document.getElementById('panel-options').classList.remove('d-none');
+  document.getElementById('modalBack').classList.add('d-none');
   document.getElementById('modalTitle').innerHTML =
     '<i class="fas fa-plus-circle text-primary"></i> Add Record';
   document.getElementById('modalBox').classList.remove('wide');
 }
 function showPanel(name) {
-  document.getElementById('panel-options').style.display = 'none';
-  document.querySelectorAll('.upload-panel').forEach(function(p){ p.style.display='none'; });
-  document.getElementById('panel-' + name).style.display = 'block';
-  document.getElementById('modalBack').style.display     = 'inline-flex';
-  document.getElementById('modalTitle').innerHTML        = PANEL_TITLES[name] || name;
+  var panel = document.getElementById('panel-' + name);
+  if (!panel) { return; }   // an unknown name must not blank the modal
+
+  document.getElementById('panel-options').classList.add('d-none');
+  document.querySelectorAll('.upload-panel').forEach(function(p){ p.classList.add('d-none'); });
+  panel.classList.remove('d-none');
+  document.getElementById('modalBack').classList.remove('d-none');
+  document.getElementById('modalTitle').innerHTML = PANEL_TITLES[name] || name;
   document.getElementById('modalBox').classList.add('wide');
 }
 
@@ -988,16 +1004,19 @@ document.getElementById('modal-scan-input').addEventListener('change', function(
   if (!file) return;
   modalScanBlob = file;
   document.getElementById('modal-scan-preview').src = URL.createObjectURL(file);
-  document.getElementById('scan-capture-wrap').style.display = 'none';
-  document.getElementById('scan-preview-wrap').style.display = 'block';
+  // Same `d-none` rule as the panels: the preview is hidden by an !important
+  // class, so an inline display could never reveal it — you took a photo and
+  // the modal showed you nothing.
+  document.getElementById('scan-capture-wrap').classList.add('d-none');
+  document.getElementById('scan-preview-wrap').classList.remove('d-none');
   setScanStatus('');
 });
 
 function resetScanCapture() {
   modalScanBlob = null;
   document.getElementById('modal-scan-input').value = '';
-  document.getElementById('scan-capture-wrap').style.display = 'block';
-  document.getElementById('scan-preview-wrap').style.display = 'none';
+  document.getElementById('scan-capture-wrap').classList.remove('d-none');
+  document.getElementById('scan-preview-wrap').classList.add('d-none');
   document.getElementById('modal-scan-text').value = '';
   setScanStatus('');
 }

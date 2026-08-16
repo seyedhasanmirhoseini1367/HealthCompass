@@ -38,13 +38,27 @@ class ConsentPageReachabilityTests(TestCase):
         self.assertContains(response, f'href="{url}"',
                             msg_prefix='no link to Privacy & Consent in the chrome')
 
-    def test_the_link_is_in_the_mobile_menu_too(self):
-        """Phone users navigate through a different menu; one link is not enough."""
-        url = reverse('accounts:consent')
+    def test_a_phone_user_can_still_reach_it(self):
+        """
+        Phone users navigate through a different menu, and must still get there.
+
+        This used to count the link twice in the page — a proxy for "it is in
+        both menus" that stopped being true when navigation was consolidated to
+        six entries and the mobile menu stopped listing every capability.
+
+        The proxy was wrong; the guarantee was not. So the path is walked
+        instead: the mobile menu offers Settings, and Settings offers consent.
+        That is a stronger assertion than counting occurrences — it fails if
+        either half of the route breaks, including if the Settings page stops
+        linking consent.
+        """
         body = self.client.get('/dashboard/').content.decode()
-        self.assertGreaterEqual(
-            body.count(f'href="{url}"'), 2,
-            'the consent link is in only one of the two navigation menus')
+        mobile = body[body.index('id="mobileMenu"'):body.index('</nav>')]
+        self.assertIn('href="/dashboard/settings/"', mobile,
+                      'the phone menu has no route towards consent')
+
+        settings_page = self.client.get('/dashboard/settings/')
+        self.assertContains(settings_page, reverse('accounts:consent'))
 
     def test_anonymous_visitors_are_not_offered_it(self):
         """There is no consent to manage without an account."""

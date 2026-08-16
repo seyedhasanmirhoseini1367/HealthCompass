@@ -48,8 +48,76 @@ class MedicalRecord(models.Model):
     # makes those records findable so a sweep can reindex them.
     indexed_at = models.DateTimeField(
         null=True, blank=True, db_index=True,
-        help_text='Set when RAG indexing last succeeded. NULL means this record '
-                  'is not searchable by the assistant.')
+        help_text='Set when RAG indexing last SUCCEEDED, and only then. NULL '
+                  'means this record is not searchable by the assistant.')
+
+    # ── Indexing state ───────────────────────────────────────────────────────
+    #
+    # indexed_at alone could not answer "is this record searchable?".
+    #
+    # `index_record()` returns the number of chunks it created, and the caller
+    # stamped indexed_at on any positive count — but chunks are created before
+    # they are embedded, and embedding can be refused (the patient has not
+    # consented to external processing) or fail (the provider is down). Both
+    # produced chunks, so both produced a timestamp saying "indexed" for a
+    # record with no vectors at all, which is a record the assistant cannot
+    # find. The stamp said the opposite of the truth in exactly the cases that
+    # matter.
+    #
+    # There was also no claim. Two workers could index the same record
+    # concurrently and both stamp it, and a third could see a fresh timestamp
+    # while indexing was still running.
+    #
+    # So the state is explicit, and every transition is a compare-and-set
+    # against the current value — see claim_for_indexing() below.
+
+    class IndexStatus(models.TextChoices):
+        PENDING  = 'pending',  'Waiting to be indexed'
+        INDEXING = 'indexing', 'Being indexed now'
+        INDEXED  = 'indexed',  'Searchable'
+        FAILED   = 'failed',   'Indexing failed'
+        BLOCKED  = 'blocked',  'Not permitted to index'
+
+    #: States a worker may claim from.
+    #:
+    #: BLOCKED is claimable although it is not in the state diagram: it means
+    #: the patient had not consented to external processing at the time, and
+    #: consent can be granted later. Leaving those records unclaimable would
+    #: make the block permanent, so granting consent would silently never make
+    #: old records searchable.
+    CLAIMABLE_INDEX_STATES = (IndexStatus.PENDING, IndexStatus.FAILED,
+                              IndexStatus.BLOCKED)
+
+    index_status = models.CharField(
+        max_length=16, choices=IndexStatus.choices,
+        default=IndexStatus.PENDING, db_index=True,
+        help_text='Where this record is in the indexing lifecycle. Only '
+                  '"indexed" means the assistant can find it.')
+    index_started_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When the current or last indexing attempt was claimed. Used '
+                  'to find work abandoned by a worker that died mid-run.')
+    index_error = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text='Why the last attempt did not succeed. Error TYPE and a short '
+                  'reason only — never provider output, which can quote the '
+                  'document it was given.')
+    index_attempts = models.PositiveIntegerField(
+        default=0,
+        help_text='How many times indexing has been claimed for this record.')
+
+    #: Identity of the current claim, not just the fact that one exists.
+    #:
+    #: Guarding transitions on `index_status == INDEXING` alone is not enough,
+    #: because two different runs occupy that same value. A worker that stalled,
+    #: had its record re-claimed by someone else, and then finally returned
+    #: would find the status it expected and happily overwrite the newer run's
+    #: result. Matching the token as well means a transition applies only to the
+    #: attempt that actually started it.
+    index_claim = models.UUIDField(
+        null=True, blank=True,
+        help_text='Token identifying the current indexing attempt. Only the '
+                  'holder may record its outcome.')
 
     # Identity of the ingested artifact, for idempotent upload.
     #
@@ -89,6 +157,119 @@ class MedicalRecord(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.get_record_type_display()}) - {self.patient.username}'
+
+    # ── Indexing transitions ─────────────────────────────────────────────────
+    #
+    # Every one of these is a single UPDATE whose WHERE clause names the state
+    # it expects to find. The database decides who wins, so two workers racing
+    # for the same record cannot both proceed, and a late worker cannot
+    # overwrite the result of the one that actually finished.
+    #
+    # They return bool rather than raising: losing a race is a normal outcome
+    # for a background job, not an error, and the caller's correct response is
+    # to stop rather than to handle an exception.
+
+    def claim_for_indexing(self) -> bool:
+        """
+        Take ownership of indexing this record. True only for the winner.
+
+        PENDING | FAILED | BLOCKED → INDEXING, atomically. A record already
+        INDEXING belongs to somebody else; one already INDEXED needs no work
+        until something marks it stale.
+        """
+        import uuid as _uuid
+
+        from django.db.models import F
+        from django.utils import timezone as _tz
+
+        token = _uuid.uuid4()
+        claimed = type(self).objects.filter(
+            pk=self.pk, index_status__in=self.CLAIMABLE_INDEX_STATES,
+        ).update(
+            index_status=self.IndexStatus.INDEXING,
+            index_started_at=_tz.now(),
+            index_attempts=F('index_attempts') + 1,
+            index_error='',
+            index_claim=token,
+        )
+        if claimed:
+            self.refresh_from_db(
+                fields=['index_status', 'index_started_at', 'index_attempts',
+                        'index_error', 'index_claim'])
+        return bool(claimed)
+
+    def mark_indexed(self) -> bool:
+        """
+        INDEXING → INDEXED. The only place indexed_at is ever set.
+
+        Guarded on INDEXING so a worker that lost the race, or one whose claim
+        was reclaimed after it stalled, cannot declare success over whatever
+        the current holder is doing.
+        """
+        from django.utils import timezone as _tz
+
+        return bool(type(self).objects.filter(
+            pk=self.pk, index_status=self.IndexStatus.INDEXING,
+            index_claim=self.index_claim,
+        ).update(index_status=self.IndexStatus.INDEXED,
+                 indexed_at=_tz.now(), index_error='', index_claim=None))
+
+    def mark_index_failed(self, reason: str) -> bool:
+        """
+        INDEXING → FAILED. indexed_at is deliberately left alone.
+
+        A record that was searchable yesterday and failed to re-index today is
+        still searchable from the older index, and clearing the timestamp would
+        claim otherwise.
+        """
+        return bool(type(self).objects.filter(
+            pk=self.pk, index_status=self.IndexStatus.INDEXING,
+            index_claim=self.index_claim,
+        ).update(index_status=self.IndexStatus.FAILED,
+                 index_error=(reason or '')[:300], index_claim=None))
+
+    def mark_index_blocked(self, reason: str) -> bool:
+        """
+        INDEXING | PENDING → BLOCKED. Refused, not broken.
+
+        Distinct from FAILED because the responses differ: a failure should be
+        retried, while a block will keep being refused until the patient
+        changes their mind, and retrying it just spends quota to be told no.
+        """
+        from django.db.models import Q
+
+        # From PENDING no claim is needed — that is the path taken before any
+        # attempt starts. From INDEXING the token is required, for the same
+        # reason the other transitions require it.
+        return bool(type(self).objects.filter(
+            Q(index_status=self.IndexStatus.PENDING)
+            | Q(index_status=self.IndexStatus.INDEXING,
+                index_claim=self.index_claim),
+            pk=self.pk,
+        ).update(index_status=self.IndexStatus.BLOCKED,
+                 index_error=(reason or '')[:300], index_claim=None))
+
+    def mark_index_stale(self) -> bool:
+        """
+        Anything except INDEXING → PENDING, because the content changed.
+
+        Not applied to a record being indexed right now: that run is already
+        working from the new content or will be superseded by the next save,
+        and stealing its state mid-flight would let it finish and mark a
+        version that no longer exists as current.
+        """
+        return bool(type(self).objects.exclude(
+            index_status=self.IndexStatus.INDEXING,
+        ).filter(pk=self.pk).update(index_status=self.IndexStatus.PENDING))
+
+    @property
+    def is_searchable(self) -> bool:
+        """
+        Whether the assistant can actually find this record.
+
+        The question `indexed_at` was being asked and could not answer.
+        """
+        return self.index_status == self.IndexStatus.INDEXED
 
 
 class ParsedLabValue(models.Model):
@@ -281,88 +462,3 @@ class WearableDataPoint(models.Model):
         return f'{self.get_metric_display()}: {self.value} {self.unit} @ {self.recorded_at}'
 
 
-class _Statement(models.Model):
-    """
-    Shared shape for "a document asserted something about this patient".
-
-    Medications and conditions are not values to be averaged; they are claims
-    made by a source document at a point in time, and they change. The same
-    principles the lab values follow apply here: the assertion is immutable
-    evidence of what a document said, a later document supersedes it rather
-    than overwriting it, and the current state is resolved rather than stored.
-
-    Storing "is the patient on metformin" as a mutable flag would lose when it
-    started, when it stopped, and which document said so — which is most of what
-    makes the answer trustworthy.
-    """
-    patient    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    # The document that asserted it. Provenance, exactly as ParsedLabValue.record.
-    record     = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE)
-    # When the assertion was true according to the document, NOT when it was
-    # ingested. A discharge summary uploaded today can describe last year.
-    asserted_on = models.DateField(
-        null=True, blank=True,
-        help_text='The document date this assertion belongs to. NULL when the '
-                  'document carried no date; such statements cannot be ordered '
-                  'and are reported as undated rather than assumed recent.')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        abstract = True
-        # Newest assertion first. The tiebreak is the auto-increment id, which
-        # is monotonic — a UUID would make "most recent" a coin toss between two
-        # statements carrying the same date.
-        ordering = ['-asserted_on', '-id']
-
-    def save(self, *args, **kwargs):
-        if self.record_id and self.patient_id != self.record.patient_id:
-            self.patient_id = self.record.patient_id
-        if self.asserted_on is None and self.record_id:
-            self.asserted_on = self.record.record_date
-        super().save(*args, **kwargs)
-
-
-class MedicationStatement(_Statement):
-    """One document's claim about one medication."""
-    class Status(models.TextChoices):
-        ACTIVE       = 'active',       'Being taken'
-        DISCONTINUED = 'discontinued', 'Stopped'
-
-    name      = models.CharField(max_length=200)
-    dose      = models.CharField(max_length=100, blank=True, default='')
-    frequency = models.CharField(max_length=100, blank=True, default='')
-    route     = models.CharField(max_length=50, blank=True, default='')
-    status    = models.CharField(max_length=16, choices=Status.choices,
-                                 default=Status.ACTIVE)
-
-    class Meta(_Statement.Meta):
-        abstract = False
-        indexes = [models.Index(fields=['patient', 'name', '-asserted_on'])]
-
-    def __str__(self):
-        return f'{self.name} [{self.status}] @ {self.asserted_on or "undated"}'
-
-
-class ConditionStatement(_Statement):
-    """One document's claim about one diagnosis."""
-    class Status(models.TextChoices):
-        ACTIVE   = 'active',   'Active'
-        RESOLVED = 'resolved', 'Resolved'
-
-    code        = models.CharField(max_length=32, blank=True, default='',
-                                   help_text='ICD or local code when the document gave one.')
-    # Blank because extraction returns {"code": "", "description": ""} and fills
-    # whichever it can: a bare ICD code is a real diagnosis, and requiring the
-    # wording meant discarding it. At least one of the two is present — enforced
-    # at ingestion, where a statement with neither asserts nothing.
-    description = models.CharField(max_length=300, blank=True, default='')
-    status      = models.CharField(max_length=16, choices=Status.choices,
-                                   default=Status.ACTIVE)
-
-    class Meta(_Statement.Meta):
-        abstract = False
-        indexes = [models.Index(fields=['patient', 'description', '-asserted_on'])]
-
-    def __str__(self):
-        label = self.description or self.code or 'unnamed condition'
-        return f'{label} [{self.status}] @ {self.asserted_on or "undated"}'

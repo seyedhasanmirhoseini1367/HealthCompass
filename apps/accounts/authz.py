@@ -109,6 +109,63 @@ def can_view_shared_records(recipient, patient) -> bool:
     return sharing_grant(recipient, patient, 'records') is not None
 
 
+def can_ask_assistant_about(asker, subject) -> bool:
+    """
+    Whether *asker* may put a question to the assistant about *subject*.
+
+    Deliberately stricter than reading the person's care page, and for a reason
+    that is about egress rather than access: answering sends the subject's
+    record excerpts to an external LLM. Two conditions, both about the subject
+    and neither about the asker:
+
+      * the RECORDS scope, not `alerts`. "Tell me if something is wrong" is a
+        promise about notifications; it is not permission to read someone's file
+        aloud to a language model.
+      * the subject's own EXTERNAL_LLM consent. The data being transmitted is
+        theirs, so the agreement that matters is theirs — a caregiver cannot
+        consent on their behalf by consenting for themselves.
+
+    Asking about yourself needs no grant, but still needs your own consent; the
+    caller reaches that through the ordinary pipeline gate.
+
+    This predicate is what replaced the structural guarantee that the assistant
+    only ever answered about `request.user`. That guarantee was pinned by a
+    source-level test, whose own docstring said the right response to wanting
+    this feature was to add a predicate at the choke point rather than delete
+    the test. This is that predicate.
+    """
+    from apps.accounts.consent import has_consent
+    from apps.accounts.models import ConsentPurpose
+
+    if not getattr(asker, 'is_authenticated', False) or subject is None:
+        return False
+
+    if asker.pk == subject.pk:
+        return True
+
+    if sharing_grant(asker, subject, 'records') is None:
+        return False
+
+    return has_consent(subject, ConsentPurpose.EXTERNAL_LLM)
+
+
+def assistant_subjects(asker) -> list:
+    """
+    Everyone this person may currently ask the assistant about, themselves first.
+
+    Built from the predicate above rather than from a queryset, so the list a
+    user is offered and the check performed when they choose cannot disagree.
+    """
+    if not getattr(asker, 'is_authenticated', False):
+        return []
+
+    subjects = [asker]
+    for patient in shared_with(asker, 'records'):
+        if patient.pk != asker.pk and can_ask_assistant_about(asker, patient):
+            subjects.append(patient)
+    return subjects
+
+
 def can_revoke_grant(user, grant) -> bool:
     """
     Who may end a share.

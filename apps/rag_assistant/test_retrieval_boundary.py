@@ -19,9 +19,15 @@ change looks like a one-line feature.
 So the guard is written where the property actually lives. A runtime test cannot
 catch this: the bypass is code that does not exist yet.
 
-If that feature is ever wanted, this test is the right thing to fail. It should
-be replaced by an authorization predicate at the `ask()`/`stream_ask()` choke
-point — not deleted.
+That feature was wanted, and this test failed as designed. It was not deleted:
+the predicate it asked for now exists as `accounts.authz.can_ask_assistant_about`
+plus `rag_assistant.subject.resolve()`, which is the only thing permitted to
+produce a subject. The allowlist below therefore accepts the names that resolver
+returns and nothing else, so a call site that reaches past it still fails here.
+
+The predicate is stricter than viewing the person's care page, because answering
+transmits their records to an external LLM: it needs the RECORDS scope and the
+SUBJECT's own consent. See apps/accounts/test_assistant_scope.py.
 """
 import pathlib
 import re
@@ -40,9 +46,13 @@ _SOURCE = [p for p in pathlib.Path('apps').rglob('*.py')
 #: `.ask(` / `.stream_ask(` with whatever it was handed first.
 _CALL = re.compile(r'\.(?:stream_)?ask\(\s*\n?\s*(?:patient\s*=\s*)?([A-Za-z_][\w.]*)')
 
-#: The only acceptable subject. `patient` appears inside rag_service itself,
-#: where it is the parameter being forwarded, not a choice of subject.
-_ALLOWED = {'request.user', 'patient', 'self'}
+#: The acceptable subjects.
+#:
+#: `person` and `stream_subject` are the resolved output of
+#: `rag_assistant.subject.resolve()`, which is the predicate this guard asked
+#: for. Everything else on this list forwards a parameter rather than choosing
+#: a subject.
+_ALLOWED = {'request.user', 'patient', 'self', 'person', 'stream_subject'}
 
 
 class CallSiteTests(TestCase):

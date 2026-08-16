@@ -453,12 +453,22 @@ def generate(
         chunks, context_override, query_mode, general_chunks or []
     )
 
+    from apps.accounts.egress import phi_provider_allowed
+
     for caller, name in [
         (_call_groq,      'groq'),
         (_call_gemini,    'gemini'),
         (_call_anthropic, 'anthropic'),
         (_call_openai,    'openai'),
     ]:
+        # Asked per provider, inside the loop. A chain that vetted only its
+        # first choice would fall through to an unvetted vendor the moment the
+        # permitted one was slow or down.
+        if not phi_provider_allowed(name):
+            logger.info('Provider %s is not permitted to receive patient data; '
+                        'skipping', name)
+            continue
+
         # Each _call_* already returns None on its own errors, but the point of a
         # fallback chain is that ONE provider failing must never end the request.
         # Anything that escapes a provider — an SDK bug, an import error, a
@@ -609,13 +619,19 @@ def generate_streaming(
             yielded = True
             yield token
 
-    for _stream_fn, key_attr in [
-        (_stream_groq,      'GROQ_API_KEY'),
-        (_stream_gemini,    'GEMINI_API_KEY'),
-        (_stream_anthropic, 'ANTHROPIC_API_KEY'),
-        (_stream_openai,    'OPENAI_API_KEY'),
+    from apps.accounts.egress import phi_provider_allowed
+
+    for _stream_fn, key_attr, name in [
+        (_stream_groq,      'GROQ_API_KEY',      'groq'),
+        (_stream_gemini,    'GEMINI_API_KEY',    'gemini'),
+        (_stream_anthropic, 'ANTHROPIC_API_KEY', 'anthropic'),
+        (_stream_openai,    'OPENAI_API_KEY',    'openai'),
     ]:
         if not getattr(settings, key_attr, ''):
+            continue
+        if not phi_provider_allowed(name):
+            logger.info('Provider %s is not permitted to receive patient data; '
+                        'skipping', name)
             continue
         yield from _track(_stream_fn(context, query, history, sys_prompt=sys_prompt))
         if yielded:
@@ -628,15 +644,21 @@ def generate_streaming(
 # ── Provider detection (for logging streaming calls) ───────────────────────────
 
 def active_stream_provider() -> str:
-    """Return which provider would be used for a streaming call right now."""
-    if getattr(settings, 'GROQ_API_KEY', ''):
-        return 'groq'
-    if getattr(settings, 'GEMINI_API_KEY', ''):
-        return 'gemini'
-    if getattr(settings, 'ANTHROPIC_API_KEY', ''):
-        return 'anthropic'
-    if getattr(settings, 'OPENAI_API_KEY', ''):
-        return 'openai'
+    """
+    Which provider a streaming call would use right now.
+
+    Applies the same allowlist as the loop it describes. Reporting a provider
+    the chain would skip would put a vendor name in QueryLog that never saw the
+    data — which is worse than no name at all, because it would be believed.
+    """
+    from apps.accounts.egress import phi_provider_allowed
+
+    for key_attr, name in (('GROQ_API_KEY', 'groq'),
+                           ('GEMINI_API_KEY', 'gemini'),
+                           ('ANTHROPIC_API_KEY', 'anthropic'),
+                           ('OPENAI_API_KEY', 'openai')):
+        if getattr(settings, key_attr, '') and phi_provider_allowed(name):
+            return name
     return 'fallback'
 
 

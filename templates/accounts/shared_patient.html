@@ -35,18 +35,60 @@
     template is told, so a change here cannot widen access.
   {% endcomment %}
 
-  {% if summary is not None %}
-    {% comment %}
-      Part of the records scope, and gated on it in the view — these are derived
-      from the shared documents, not a separate disclosure. The same partial the
-      patient sees, with the grant's cutoff already applied to the data.
-    {% endcomment %}
-    <div class="sp-section">Medications &amp; conditions</div>
-    {% if has_any %}
-      {% include 'medical_records/_clinical_summary.html' %}
+  {% comment %}
+    Care status first: it is the only section that answers "do they need me
+    right now". Records and appointments are reference material by comparison.
+  {% endcomment %}
+  {% if has_care_scope %}
+    <div class="sp-section">Does anything need attention?</div>
+    {% if care_signals %}
+      {% for item in care_signals %}
+      <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:.9rem 1.1rem;margin-bottom:.6rem">
+        <p style="font-weight:700;font-size:.92rem;color:#92400e;margin:0">{{ item.headline }}</p>
+        {% if item.is_their_words %}
+        <p style="font-size:.88rem;color:#78350f;margin:.35rem 0 0;line-height:1.55">“{{ item.detail }}”</p>
+        <p style="font-size:.75rem;color:#a16207;margin:.25rem 0 0">
+          Their own words, {{ item.signal.window_start|date:"j M, H:i" }}
+        </p>
+        {% else %}
+        <p style="font-size:.88rem;color:#78350f;margin:.35rem 0 0;line-height:1.55">{{ item.detail }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
     {% else %}
-      <p class="sp-empty">No medications or conditions are recorded.</p>
+      <div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:.95rem 1.1rem">
+        <p style="font-size:.92rem;color:#065f46;margin:0;font-weight:600">
+          Nothing needs your attention right now.
+        </p>
+      </div>
     {% endif %}
+
+    {% if care_activity.any %}
+    <div class="sp-card" style="margin-top:.6rem">
+      <p class="sp-meta" style="text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem">Last 7 days</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:.7rem;text-align:center">
+        <div><div style="font-size:1.25rem;font-weight:800;color:#059669">{{ care_activity.confirmed }}</div>
+             <div style="font-size:.7rem;color:#94a3b8">Confirmed</div></div>
+        <div><div style="font-size:1.25rem;font-weight:800;color:#64748b">{{ care_activity.unconfirmed }}</div>
+             <div style="font-size:.7rem;color:#94a3b8">No answer</div></div>
+        <div><div style="font-size:1.25rem;font-weight:800;color:#b91c1c">{{ care_activity.missed }}</div>
+             <div style="font-size:.7rem;color:#94a3b8">Said missed</div></div>
+        <div><div style="font-size:1.25rem;font-weight:800;color:#4338ca">{{ care_activity.skipped }}</div>
+             <div style="font-size:.7rem;color:#94a3b8">Said skipped</div></div>
+      </div>
+      <p style="font-size:.78rem;color:#64748b;margin:.8rem 0 0;line-height:1.5">
+        {% comment %}
+          Said next to the number a caregiver is most likely to misread. These
+          are four separate counts on purpose — never one adherence figure.
+        {% endcomment %}
+        “No answer” means the app did not hear back. It does not mean a task was
+        missed — only they can tell you that.
+      </p>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {% if summary is not None %}
   {% endif %}
 
   {% if records is not None %}

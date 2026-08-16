@@ -24,24 +24,11 @@
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
         {% if user.is_authenticated %}
-        <li><a href="/insights/">AI &amp; Analytics</a></li>
-        <li><a href="/assistant/">AI Assistant</a></li>
-        <li><a href="/records/">My Records</a></li>
         <li><a href="/dashboard/">Dashboard</a></li>
-        <!-- More ▾ dropdown -->
-        <li class="nav-more-wrap">
-            <button class="nav-more-btn" id="moreBtn" onclick="toggleMoreMenu(event)"
-                    aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu">
-                More <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
-            </button>
-            <div class="nav-more-menu" id="moreMenu">
-                <a href="/records/summary/" class="nav-more-item"><i class="fas fa-pills" style="color:#8b5cf6"></i> Medications &amp; Conditions</a>
-                <a href="/appointments/" class="nav-more-item"><i class="fas fa-calendar-check" style="color:#0ea5e9"></i> Appointments</a>
-                <div class="nav-more-divider"></div>
-                <a href="/insights/icu/" class="nav-more-item"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i> ICU Monitor</a>
-                <a href="/accounts/emergency-card/" class="nav-more-item"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
-            </div>
-        </li>
+        <li><a href="/dashboard/health/">My Health</a></li>
+        <li><a href="/care/">Care</a></li>
+        <li><a href="/records/">Records</a></li>
+        <li><a href="/assistant/">Assistant</a></li>
         {% else %}
         <li><a href="/insights/">AI &amp; Analytics</a></li>
         <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
@@ -66,11 +53,14 @@
             <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}</span>
             <i class="fas fa-chevron-down" style="font-size:.65rem;color:var(--muted)"></i>
         </div>
+        {% comment %}
+          Account-level things only. Dashboard is the first item in the sidebar,
+          and Edit Profile / Change Password both live on the Profile page this
+          menu opens — a menu that repeats what is one click behind it makes the
+          list longer without making anything reachable.
+        {% endcomment %}
         <div id="userMenu" style="display:none;position:absolute;top:56px;right:1.5rem;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:190px;z-index:200;overflow:hidden">
-            <a href="/dashboard/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-bottom:1px solid var(--border)"><i class="fas fa-tachometer-alt" style="color:var(--primary);width:16px"></i> Dashboard</a>
             <a href="/accounts/profile/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user" style="color:var(--primary);width:16px"></i> My Profile</a>
-            <a href="/accounts/profile/edit/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-edit" style="color:var(--primary);width:16px"></i> Edit Profile</a>
-            <a href="/accounts/password/change/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-lock" style="color:var(--primary);width:16px"></i> Change Password</a>
             <a href="/accounts/consent/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-top:1px solid var(--border)"><i class="fas fa-shield-halved" style="color:var(--primary);width:16px"></i> Privacy &amp; Consent</a>
             <a href="/accounts/my-shares/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user-group" style="color:var(--primary);width:16px"></i> Sharing</a>
             <a href="/accounts/emergency-card/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-id-card-clip" style="color:#ef4444;width:16px"></i> Emergency Card</a>
@@ -86,20 +76,25 @@
     <div id="mobileMenu" class="mobile-menu">
       <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
       {% if user.is_authenticated %}
-      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
+      {% comment %}
+        Same order and same labels as the sidebar. The Dashboard sub-items are
+        listed inline rather than behind a disclosure: a phone menu is already
+        a temporary overlay the user opened on purpose, so hiding items behind
+        a second tap inside it buys nothing and costs a tap.
+      {% endcomment %}
+      <a href="/" class="mm-link"><i class="fas fa-house"></i> Home</a>
       <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
-      <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> My Records</a>
-      <a href="/records/summary/" class="mm-link"><i class="fas fa-pills"></i> Medications &amp; Conditions</a>
-      <a href="/dashboard/" class="mm-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
+      <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> Records</a>
+      <a href="/dashboard/" class="mm-link"><i class="fas fa-house-medical"></i> Dashboard</a>
+      <div class="mm-divider"></div>
+      <span class="mm-section-label">Under Dashboard</span>
+      <a href="/dashboard/health/" class="mm-link"><i class="fas fa-heart-pulse"></i> My Health</a>
+      <a href="/care/" class="mm-link"><i class="fas fa-hand-holding-heart"></i> Companions</a>
       <a href="/appointments/" class="mm-link"><i class="fas fa-calendar-check"></i> Appointments</a>
       <div class="mm-divider"></div>
-      <span class="mm-section-label">Clinical</span>
-      <a href="/insights/icu/" class="mm-link"><i class="fas fa-hospital-user" style="color:var(--primary)"></i> ICU Monitor</a>
+      <a href="/dashboard/settings/" class="mm-link"><i class="fas fa-gear"></i> Settings</a>
       <div class="mm-divider"></div>
-      <a href="/accounts/profile/" class="mm-link"><i class="fas fa-user" style="color:var(--muted)"></i> My Profile</a>
-      <a href="/accounts/consent/" class="mm-link"><i class="fas fa-shield-halved" style="color:var(--primary)"></i> Privacy &amp; Consent</a>
-      <a href="/accounts/my-shares/" class="mm-link"><i class="fas fa-user-group" style="color:var(--primary)"></i> Sharing</a>
-      <a href="/accounts/emergency-card/" class="mm-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i> Emergency Card</a>
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
       <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
@@ -122,18 +117,42 @@
     </button>
   </div>
   <nav class="sb-nav">
-    <span class="sb-label">Main</span>
-    <a href="/insights/" class="sb-link"><i class="fas fa-brain"></i><span class="sb-txt">AI &amp; Analytics</span></a>
+    {% comment %}
+      Six destinations, in the order the product is actually used, with the
+      lower-frequency surfaces folded under Dashboard.
+
+      Dashboard is BOTH a link and a group. Clicking the label opens the page —
+      it is still the answer to "what needs my attention" and losing that would
+      be a real regression — while the chevron expands the surfaces that live
+      underneath it. A parent item that only toggles is a menu pretending to be
+      a destination, and the user then has no way to reach the overview at all.
+    {% endcomment %}
+    <a href="/" class="sb-link"><i class="fas fa-house"></i><span class="sb-txt">Home</span></a>
     <a href="/assistant/" class="sb-link"><i class="fas fa-robot"></i><span class="sb-txt">AI Assistant</span></a>
-    <a href="/records/" class="sb-link"><i class="fas fa-file-medical"></i><span class="sb-txt">My Records</span></a>
-    <a href="/records/summary/" class="sb-link"><i class="fas fa-pills"></i><span class="sb-txt">Medications</span></a>
-    <a href="/notifications/" class="sb-link"><i class="fas fa-bell"></i><span class="sb-txt">Notifications</span>{% if unread_notifications_count %}<span class="sb-badge">{{ unread_notifications_count }}</span>{% endif %}</a>
-    <a href="/appointments/" class="sb-link"><i class="fas fa-calendar-check"></i><span class="sb-txt">Appointments</span></a>
-    <a href="/dashboard/" class="sb-link"><i class="fas fa-tachometer-alt"></i><span class="sb-txt">Dashboard</span></a>
-    <div class="sb-divider"></div>
-    <span class="sb-label">Clinical</span>
-    <a href="/insights/icu/" class="sb-link"><i class="fas fa-hospital-user" style="color:#0ea5e9"></i><span class="sb-txt">ICU Monitor</span></a>
-    <a href="/accounts/emergency-card/" class="sb-link"><i class="fas fa-id-card-clip" style="color:#ef4444"></i><span class="sb-txt">Emergency Card</span></a>
+    <a href="/insights/" class="sb-link"><i class="fas fa-brain"></i><span class="sb-txt">AI &amp; Analytics</span></a>
+    <a href="/records/" class="sb-link"><i class="fas fa-file-medical"></i><span class="sb-txt">Records</span></a>
+
+    <div class="sb-group">
+      <a href="/dashboard/" class="sb-link sb-parent"><i class="fas fa-house-medical"></i><span class="sb-txt">Dashboard</span></a>
+      <button type="button" class="sb-caret" id="dashCaret"
+              onclick="toggleDashGroup(event)"
+              aria-expanded="false" aria-controls="dashSub"
+              aria-label="Show more under Dashboard">
+        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="sb-sub" id="dashSub" hidden>
+      <a href="/dashboard/health/" class="sb-link sb-sublink"><i class="fas fa-heart-pulse"></i><span class="sb-txt">My Health</span></a>
+      <a href="/care/" class="sb-link sb-sublink"><i class="fas fa-hand-holding-heart"></i><span class="sb-txt">Companions</span></a>
+      <a href="/appointments/" class="sb-link sb-sublink"><i class="fas fa-calendar-check"></i><span class="sb-txt">Appointments</span></a>
+    </div>
+
+    <a href="/dashboard/settings/" class="sb-link"><i class="fas fa-gear"></i><span class="sb-txt">Settings</span></a>
+    {% comment %}
+      No Notifications row: the bell with its unread badge sits in the top bar
+      on every page and every viewport, so a second entry here would be the
+      same destination twice in one screen.
+    {% endcomment %}
   </nav>
 </aside>
 {% endif %}
@@ -213,6 +232,45 @@ document.getElementById('deleteModal').addEventListener('click', function(e) {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeDeleteModal();
 });
+
+
+// Dashboard sub-group: the chevron expands, the label still navigates.
+//
+// Kept separate from the link deliberately. A parent item that only toggles
+// leaves no way to reach the page itself, and Dashboard is the overview — the
+// one screen that answers "does anything need me right now".
+//
+// The open/closed choice persists like the sidebar collapse does, because a
+// group that springs shut on every page load is a group nobody uses twice.
+function toggleDashGroup(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const sub   = document.getElementById('dashSub');
+  const caret = document.getElementById('dashCaret');
+  if (!sub || !caret) return;
+  const open = sub.hasAttribute('hidden');
+  if (open) { sub.removeAttribute('hidden'); } else { sub.setAttribute('hidden', ''); }
+  caret.setAttribute('aria-expanded', open ? 'true' : 'false');
+  caret.setAttribute('aria-label', open ? 'Hide more under Dashboard' : 'Show more under Dashboard');
+  caret.classList.toggle('open', open);
+  localStorage.setItem('hc_dash', open ? '1' : '0');
+}
+
+(function(){
+  const sub   = document.getElementById('dashSub');
+  const caret = document.getElementById('dashCaret');
+  if (!sub || !caret) return;
+  // Open by default when the user is already on one of the pages inside it,
+  // so the group shows where they are rather than hiding it.
+  const path = location.pathname;
+  const inside = ['/dashboard/health/', '/care/', '/appointments/']
+                 .some(function (h) { return path.startsWith(h); });
+  if (localStorage.getItem('hc_dash') === '1' || inside) {
+    sub.removeAttribute('hidden');
+    caret.setAttribute('aria-expanded', 'true');
+    caret.classList.add('open');
+  }
+})();
 
 function toggleSidebar() {
   const sb  = document.getElementById('appSidebar');

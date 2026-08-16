@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Settings — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.st-wrap{max-width:720px;margin:0 auto}
+.st-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
+.st-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
+.st-sec{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:1.6rem 0 .6rem}
+.st-item{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;
+         border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;
+         text-decoration:none}
+.st-item:hover{border-color:#cbd5e1}
+.st-name{font-size:.98rem;font-weight:700;color:var(--text)}
+.st-desc{font-size:.85rem;color:#64748b;margin-top:.15rem;line-height:1.5}
+.st-meta{font-size:.82rem;color:#94a3b8;white-space:nowrap}
+</style>
+{% endblock %}
+{% block content %}
+<div class="st-wrap">
+  <h1 class="st-h1">Settings</h1>
+  <p class="st-sub">Your account, and who can see your health information.</p>
+
+  {% comment %}
+    Privacy and sharing come first, above profile details. These are the
+    controls with the largest consequences in this product — who can see a
+    patient's health data — and until now they were reachable only from a
+    dropdown menu.
+  {% endcomment %}
+  <div class="st-sec">Privacy &amp; sharing</div>
+
+  <a class="st-item" href="{% url 'accounts:my_shares' %}">
+    <span>
+      <span class="st-name">Who can see my health</span>
+      <span class="st-desc">People you have shared with, what they can see, and how to stop.</span>
+    </span>
+    <span class="st-meta">
+      {% if active_share_count %}{{ active_share_count }} active{% else %}None{% endif %}
+    </span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:consent' %}">
+    <span>
+      <span class="st-name">Privacy &amp; consent</span>
+      <span class="st-desc">What this app may do with your data, including sending it to AI providers.</span>
+    </span>
+    <span class="st-meta">Manage →</span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:emergency_card' %}">
+    <span>
+      <span class="st-name">Emergency card</span>
+      <span class="st-desc">A page anyone holding the link can read in an emergency.</span>
+    </span>
+    <span class="st-meta">{% if emergency_enabled %}On{% else %}Off{% endif %}</span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:my_doctors' %}">
+    <span>
+      <span class="st-name">My clinicians</span>
+      <span class="st-desc">Doctors linked to your record, and their access.</span>
+    </span>
+    <span class="st-meta">Manage →</span>
+  </a>
+
+  <div class="st-sec">Account</div>
+
+  <a class="st-item" href="{% url 'accounts:profile' %}">
+    <span>
+      <span class="st-name">Profile</span>
+      <span class="st-desc">Your name, date of birth and contact details.</span>
+    </span>
+    <span class="st-meta">Open →</span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:change_password' %}">
+    <span>
+      <span class="st-name">Password</span>
+      <span class="st-desc">Change the password you sign in with.</span>
+    </span>
+    <span class="st-meta">Change →</span>
+  </a>
+
+  <div class="st-sec">Your data</div>
+
+  <a class="st-item" href="{% url 'accounts:data_export' %}">
+    <span>
+      <span class="st-name">Download my data</span>
+      <span class="st-desc">Everything HealthCompass holds about you, as a file.</span>
+    </span>
+    <span class="st-meta">Export →</span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:delete_account' %}">
+    <span>
+      <span class="st-name" style="color:#b91c1c">Delete my account</span>
+      <span class="st-desc">Removes your records and files. This cannot be undone.</span>
+    </span>
+    <span class="st-meta">→</span>
+  </a>
+</div>
+{% endblock %}

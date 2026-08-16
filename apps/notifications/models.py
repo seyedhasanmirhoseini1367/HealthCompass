@@ -43,3 +43,10 @@ class Notification(models.Model):
 
     def __str__(self):
         return f'{self.title} → {self.user.username}'
+
+
+# The event/delivery split lives in events.py, imported here so Django's app
+# registry finds the models. Kept in a separate module because it is a different
+# concern from the in-app Notification row above: Notification is what one
+# channel produces, NotificationEvent is what happened.
+from .events import NotificationDelivery, NotificationEvent  # noqa: E402,F401

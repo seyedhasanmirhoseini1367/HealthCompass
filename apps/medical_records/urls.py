@@ -6,7 +6,6 @@ app_name = 'medical_records'
 urlpatterns = [
     path('', views.record_list, name='list'),
     # Before the <uuid:pk> route: a literal segment must not be a candidate pk.
-    path('summary/', views.health_summary, name='health_summary'),
     path('<uuid:pk>/', views.record_detail, name='detail'),
     path('<uuid:pk>/delete/', views.record_delete, name='delete'),
     path('upload/kanta/', views.upload_kanta, name='upload_kanta'),

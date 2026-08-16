@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}People I'm watching over — HealthCompass{% endblock %}
+{% block content %}
+<div style="max-width:720px;margin:0 auto">
+  <h1 style="font-size:1.2rem;font-weight:800;color:var(--text);margin:0 0 .25rem">
+    People I'm watching over
+  </h1>
+  <p style="font-size:.85rem;color:#94a3b8;margin-bottom:1.3rem">
+    Everyone who has chosen to share their care status with you.
+  </p>
+
+  {% for row in rows %}
+  <a href="{% url 'care:watch_detail' row.subject.pk %}"
+     style="display:flex;align-items:center;justify-content:space-between;gap:1rem;
+            background:white;border:1px solid var(--border);border-radius:14px;
+            padding:1rem 1.1rem;margin-bottom:.7rem;text-decoration:none">
+    <span style="font-weight:700;font-size:.95rem;color:var(--text)">
+      {{ row.subject.get_full_name|default:row.subject.first_name|default:"Family member" }}
+    </span>
+    {% if row.open_signals %}
+    <span style="background:#fef3c7;color:#92400e;font-size:.78rem;font-weight:700;
+                 padding:.25rem .7rem;border-radius:7px">
+      {{ row.open_signals }} need{{ row.open_signals|pluralize:"s," }} attention
+    </span>
+    {% else %}
+    <span style="color:#059669;font-size:.82rem;font-weight:600">Nothing to do</span>
+    {% endif %}
+  </a>
+  {% empty %}
+  <div style="background:white;border:1px solid var(--border);border-radius:14px;padding:1.25rem">
+    <p style="font-size:.88rem;color:#64748b;margin:0;line-height:1.6">
+      Nobody has shared their care status with you yet. Sharing is started by
+      the person being cared for, from their own account — it cannot be
+      requested from this side.
+    </p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

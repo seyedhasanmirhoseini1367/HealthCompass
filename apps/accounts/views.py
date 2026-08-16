@@ -752,7 +752,6 @@ def shared_patient(request, pk):
     from .authz import sharing_grant
     from apps.ai_insights.models import HealthAlert
     from apps.appointments.models import Appointment
-    from apps.medical_records.clinical_state import clinical_summary
     from apps.medical_records.models import MedicalRecord
 
     subject = get_object_or_404(CustomUser, pk=pk)
@@ -769,8 +768,6 @@ def shared_patient(request, pk):
 
     records = alerts = appointments = None
 
-    summary = None
-
     if grant.allows('records'):
         qs = MedicalRecord.objects.filter(patient=subject)
         # A frozen share shows the record as it stood, not as it grows. NULL
@@ -779,14 +776,8 @@ def shared_patient(request, pk):
             qs = qs.filter(uploaded_at__lt=grant.data_cutoff)
         records = qs.order_by('-record_date', '-uploaded_at')[:100]
 
-        # Medications and conditions are part of the records scope, not a fourth
-        # thing: they are derived entirely from the documents that scope covers.
-        #
-        # The cutoff is passed through rather than assumed. Derived state leaks
-        # its sources — resolving "current medications" over every record would
-        # tell a frozen recipient what changed after the freeze, which is the
-        # disclosure the cutoff exists to prevent.
-        summary = clinical_summary(subject, data_cutoff=grant.data_cutoff)
+    care_signals = None
+    care_activity = None
 
     if grant.allows('alerts'):
         # Severity and title only — the alert says something is wrong without
@@ -794,6 +785,21 @@ def shared_patient(request, pk):
         # being a scope separate from records.
         alerts = (HealthAlert.objects.filter(patient=subject)
                   .order_by('-created_at')[:20])
+
+        # Care monitoring belongs to the SAME scope, and is shown here rather
+        # than on a second page. There used to be two caregiver pages about one
+        # person — this one for records/alerts/appointments, /care/watching/<pk>/
+        # for care signals — reached from different places, with the scope rule
+        # implemented twice. Two pages about one person is how the two answers
+        # start disagreeing.
+        from apps.care.models import MonitoringSignal
+
+        care_signals = list(
+            MonitoringSignal.objects
+            .filter(patient=subject, resolved_at__isnull=True)
+            .prefetch_related('occurrences', 'reports')
+            .order_by('-created_at')[:20])
+        care_activity = _care_activity(subject)
 
     if grant.allows('appointments'):
         appointments = (Appointment.objects
@@ -812,13 +818,69 @@ def shared_patient(request, pk):
         'records':      records,
         'alerts':       alerts,
         'appointments': appointments,
-        'summary':      summary,
+        'care_signals': [_present_signal(s) for s in (care_signals or [])],
+        'has_care_scope': care_signals is not None,
+        'care_activity': care_activity,
     }
-    # Flattened for the shared partial, which takes the same names on every page
-    # so that one template cannot render differently for different readers.
-    if summary is not None:
-        context.update(summary)
     return render(request, 'accounts/shared_patient.html', context)
+
+
+def _care_activity(subject):
+    """
+    A week of care answers, counted.
+
+    The four states are shown separately and never summed into an adherence
+    figure. "Unconfirmed" is the app not hearing back; "missed" is the person
+    saying they missed it. Averaging those into one percentage would turn our
+    ignorance into their behaviour.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone as _tz
+
+    from apps.care.models import TaskOccurrence
+
+    since = _tz.now() - timedelta(days=7)
+    occurrences = TaskOccurrence.objects.filter(patient=subject, due_at__gte=since)
+    counts = {
+        'confirmed':   occurrences.filter(state=TaskOccurrence.State.CONFIRMED).count(),
+        'unconfirmed': occurrences.filter(state=TaskOccurrence.State.UNCONFIRMED).count(),
+        'missed':      occurrences.filter(state=TaskOccurrence.State.MISSED).count(),
+        'skipped':     occurrences.filter(state=TaskOccurrence.State.SKIPPED).count(),
+    }
+    counts['any'] = any(counts.values())
+    return counts
+
+
+def _present_signal(signal):
+    """
+    What a caregiver reads about one care signal.
+
+    Says what was observed and stops there. "Not confirmed 3 times" is a fact
+    about this application's records; "not taking her medication" would be a
+    claim about a person that the evidence — silence — cannot support.
+    """
+    from apps.care.models import MonitoringSignal
+
+    if signal.kind == MonitoringSignal.Kind.REPEATED_UNCONFIRMED:
+        count = signal.occurrences.count()
+        first = signal.occurrences.first()
+        label = first.task.label if first else 'a care task'
+        return {
+            'signal':   signal,
+            'headline': f'{count} unanswered reminder{"" if count == 1 else "s"}',
+            'detail':   f'“{label}” was not confirmed {count} time'
+                        f'{"" if count == 1 else "s"} in a row. That means no one '
+                        f'answered — not that it was missed.',
+        }
+    if signal.kind == MonitoringSignal.Kind.REPORTED_MISSED:
+        return {'signal': signal, 'headline': 'Reported a missed task',
+                'detail': 'They told the app they missed a scheduled task.'}
+    if signal.kind == MonitoringSignal.Kind.REPORTED_SYMPTOM:
+        entry = signal.reports.first()
+        return {'signal': signal, 'headline': 'Reported how they are feeling',
+                'detail': entry.text if entry else '', 'is_their_words': True}
+    return {'signal': signal, 'headline': 'Needs attention', 'detail': ''}
 
 
 @login_required
@@ -845,8 +907,4 @@ def shared_record(request, pk, record_pk):
         # effective() so a corrected value is what the family member sees, the
         # same reading the patient and their clinicians see.
         'lab_values': [(lv, lv.effective()) for lv in record.lab_values.all()],
-        # What this document asserted, not the resolved state — the record is
-        # already inside the cutoff, so no further filtering applies here.
-        'medications': record.medicationstatement_set.all(),
-        'conditions':  record.conditionstatement_set.all(),
     })

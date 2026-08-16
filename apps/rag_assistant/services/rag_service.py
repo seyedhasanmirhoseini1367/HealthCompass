@@ -45,6 +45,40 @@ class RAGService:
         logger.info('Indexed record %s → %d chunks', record.pk, len(chunks))
         return len(chunks)
 
+    def indexing_outcome(self, record) -> str:
+        """
+        What actually became of this record's chunks — the truth `index_record`
+        could not tell.
+
+        `index_record` returns how many chunks it CREATED, and chunks are
+        created before they are embedded. Embedding can then be refused
+        (external processing not permitted) or fail (provider down), and both
+        leave a positive count behind. Reading that count as success is how a
+        record with no vectors at all came to be stamped as indexed.
+
+        So the answer comes from the chunks themselves. Blocked outranks failed:
+        if any chunk was refused, the honest description of the record is
+        "not permitted", and retrying it would only spend quota being told no
+        again.
+        """
+        from apps.medical_records.models import MedicalRecord
+        from apps.rag_assistant.models import MedicalChunk
+
+        statuses = set(
+            MedicalChunk.objects
+            .filter(document__record=record)
+            .values_list('embedding_status', flat=True))
+
+        if not statuses:
+            # Nothing to embed — a record with no extractable text. Processing
+            # completed and produced nothing, which is a success, not a failure.
+            return MedicalRecord.IndexStatus.INDEXED
+        if MedicalChunk.EmbeddingStatus.BLOCKED in statuses:
+            return MedicalRecord.IndexStatus.BLOCKED
+        if statuses - {MedicalChunk.EmbeddingStatus.EMBEDDED}:
+            return MedicalRecord.IndexStatus.FAILED
+        return MedicalRecord.IndexStatus.INDEXED
+
     def index_all_records(self, patient) -> int:
         from apps.medical_records.models import MedicalRecord
         total = 0

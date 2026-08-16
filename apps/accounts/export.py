@@ -209,23 +209,10 @@ def _medical_records(user):
             'raw_text':      rec.raw_text,
             'parsed_data':   rec.parsed_data,
             'attached_file': _archive_path_for(rec) if rec.file else None,
-            # Medications and conditions asserted by this document. Included
-            # per record rather than as a resolved list: the export is what the
-            # documents said, and the current state is derived from it.
-            'medications': [{
-                'name':        m.name,
-                'dose':        m.dose,
-                'frequency':   m.frequency,
-                'route':       m.route,
-                'status':      m.status,
-                'asserted_on': _dt(m.asserted_on),
-            } for m in rec.medicationstatement_set.all()],
-            'conditions': [{
-                'code':        c.code,
-                'description': c.description,
-                'status':      c.status,
-                'asserted_on': _dt(c.asserted_on),
-            } for c in rec.conditionstatement_set.all()],
+            # Medications and conditions were exported here as separate lists,
+            # extracted per document. That feature was removed; whatever the
+            # parser found still ships inside `parsed_data` above, so nothing
+            # the patient is entitled to has left the archive.
             'lab_values': [{
                 'parameter_name':  lv.parameter_name,
                 'value':           lv.value,

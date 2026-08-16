@@ -136,6 +136,23 @@ footer strong{color:white}
 .sb-link.active{background:#e0f2fe;color:var(--primary-dk);font-weight:700}
 .sb-link i{width:18px;text-align:center;flex-shrink:0;font-size:.9rem}
 .sb-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Dashboard group: a link and a disclosure control sharing one row.
+   The label navigates; only the chevron toggles. A parent that merely toggles
+   leaves no way to open the overview itself. */
+.sb-group{display:flex;align-items:center}
+.sb-group .sb-parent{flex:1;min-width:0}
+.sb-caret{background:none;border:none;cursor:pointer;padding:.45rem .55rem;color:#94a3b8;display:flex;align-items:center;border-radius:8px}
+.sb-caret:hover{color:var(--primary-dk);background:var(--bg)}
+.sb-caret:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sb-caret i{font-size:.75rem;transition:transform .15s ease}
+.sb-caret.open i{transform:rotate(180deg)}
+.sb-sub{display:flex;flex-direction:column}
+/* Must out-specify .sb-sub above. An author rule with display:flex beats the
+   browser's [hidden]{display:none}, so the panel could never close and the
+   chevron toggled an attribute nothing responded to. */
+.sb-sub[hidden]{display:none}
+.sb-sublink{padding-left:2rem;font-size:.8rem}
+.app-sidebar.collapsed .sb-sub,.app-sidebar.collapsed .sb-caret{display:none}
 .sb-badge{margin-left:auto;background:#ef4444;color:white;font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:20px;flex-shrink:0}
 .sb-divider{height:1px;background:var(--border);margin:.4rem .4rem}
 .app-sidebar.collapsed .sb-label,.app-sidebar.collapsed .sb-txt,.app-sidebar.collapsed .sb-badge{display:none}

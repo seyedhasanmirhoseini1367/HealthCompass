@@ -23,27 +23,25 @@ def home(request):
     ctx = {}
 
     if user.is_patient:
+        # One builder for the whole page. The view neither queries nor decides
+        # what anything means — `overview` owns both, so the web page and any
+        # future API answer the same question the same way.
+        #
+        # Caregiver content is part of the SAME dashboard rather than a separate
+        # one: "caregiver" is not a role in this system, it is a SharingGrant
+        # relationship, and most people who have one are also patients. Giving
+        # them two dashboards would mean choosing which of their two reasons for
+        # opening the app mattered more.
+        from apps.dashboard.overview import build_dashboard
         from apps.dashboard.services import get_patient_dashboard_data
+
+        ctx.update(build_dashboard(user))
+
+        # Still needed for the "recent activity" strip at the foot of the page.
         data = get_patient_dashboard_data(user)
         ctx['records']            = data['recent_records']
-        ctx['alerts']             = data['recent_alerts']
         ctx['total_records']      = data['total_records']
-        ctx['unread_alerts']      = data['unread_alerts']
         ctx['recent_predictions'] = data['recent_predictions']
-        ctx['total_predictions']  = data['total_predictions']
-
-        # What they are taking and what they have, on the page they land on.
-        # The counts only — the dashboard is a summary, and the full lists with
-        # their sources live one click away. A conflict is surfaced here rather
-        # than buried, because "two of your documents disagree about a
-        # medication" is the item on this page most worth acting on.
-        from apps.medical_records.clinical_state import clinical_summary
-
-        summary = clinical_summary(user)
-        ctx['current_medication_count'] = len(summary['current_medications'])
-        ctx['current_condition_count']  = len(summary['current_conditions'])
-        ctx['clinical_conflict_count']  = (len(summary['conflicted_medications'])
-                                           + len(summary['conflicted_conditions']))
         template = 'dashboard/patient.html'
 
     elif user.is_doctor:
@@ -133,19 +131,12 @@ def patient_records(request, patient_pk):
     records = MedicalRecord.objects.filter(patient=patient).order_by('-uploaded_at')
     alerts = HealthAlert.objects.filter(patient=patient).order_by('-created_at')[:5]
 
-    # No cutoff: a clinical link is not a frozen share, and it is already gated
-    # on the same predicate as every record on this page. The clinician sees the
-    # resolved state the patient sees — including the conflicts, which are the
-    # part a clinician is actually able to settle.
-    from apps.medical_records.clinical_state import clinical_summary
-
     context = {
         'patient': patient,
         'records': records,
         'alerts': alerts,
         'relationship': relationship,
     }
-    context.update(clinical_summary(patient))
     return render(request, 'dashboard/patient_records.html', context)
 
 

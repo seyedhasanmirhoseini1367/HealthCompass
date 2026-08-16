@@ -100,46 +100,6 @@
 </div>
 {% endif %}
 
-<!-- Medications & Conditions asserted by THIS document -->
-{% if medications or conditions %}
-<div class="section-card">
-  <div class="section-h">💊 Medications &amp; conditions in this document</div>
-  <p style="font-size:.8rem;color:var(--muted);margin:-.5rem 0 .9rem;line-height:1.5">
-    {% comment %}
-      Said explicitly, because the natural reading of a drug name on a screen is
-      "you are taking this". This document may have been superseded by a later
-      one; the resolved answer lives on the summary page and nowhere else.
-    {% endcomment %}
-    What this document states. A later document may have changed it — see
-    <a href="{% url 'medical_records:health_summary' %}">medications &amp; conditions</a>
-    for the current picture.
-  </p>
-  <table class="lab-table">
-    <thead>
-      <tr><th>Item</th><th>Detail</th><th>Status</th></tr>
-    </thead>
-    <tbody>
-      {% for m in medications %}
-      <tr>
-        <td style="font-weight:600">💊 {{ m.name }}</td>
-        <td style="color:var(--muted)">
-          {{ m.dose }} {{ m.frequency }} {{ m.route }}
-        </td>
-        <td>{{ m.get_status_display }}</td>
-      </tr>
-      {% endfor %}
-      {% for c in conditions %}
-      <tr>
-        <td style="font-weight:600">🏥 {{ c.description|default:c.code }}</td>
-        <td style="color:var(--muted)">{{ c.code }}</td>
-        <td>{{ c.get_status_display }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
 <!-- Wearable Data Summary -->
 {% if wearable_points %}
 <div class="section-card">

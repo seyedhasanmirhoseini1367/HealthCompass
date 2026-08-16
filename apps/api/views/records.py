@@ -42,57 +42,6 @@ def record_detail(request, pk):
     return Response(MedicalRecordDetailSerializer(record).data)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def clinical_summary_api(request):
-    """
-    Medications and conditions, resolved across the caller's own documents.
-
-    The subject is always `request.user`, exactly as on the web page — there is
-    no patient parameter here to get wrong. Conflicts are returned as their own
-    list rather than folded into `current`: a client that only renders `current`
-    then shows a shorter, confident list instead of a disputed one, and the
-    disagreement is the part a clinician needs.
-    """
-    from apps.medical_records.clinical_state import clinical_summary
-
-    from ..serializers import (ConditionStatementSerializer,
-                               MedicationStatementSerializer)
-
-    summary = clinical_summary(request.user)
-
-    def medications(key):
-        return MedicationStatementSerializer(
-            [r.statement for r in summary[key]], many=True).data
-
-    def conditions(key):
-        return ConditionStatementSerializer(
-            [r.statement for r in summary[key]], many=True).data
-
-    def disputed(key, serializer):
-        # Every side of the disagreement, with the document that made it, so a
-        # client can show what is actually in conflict rather than a bare flag.
-        return [{
-            'statements': serializer([s for s in r.conflicting], many=True).data,
-            'sources': [s.record.title for s in r.conflicting],
-        } for r in summary[key]]
-
-    return Response({
-        'current_medications':      medications('current_medications'),
-        'discontinued_medications': medications('discontinued_medications'),
-        'conflicted_medications':   disputed('conflicted_medications',
-                                             MedicationStatementSerializer),
-        'current_conditions':       conditions('current_conditions'),
-        'resolved_conditions':      conditions('resolved_conditions'),
-        'conflicted_conditions':    disputed('conflicted_conditions',
-                                             ConditionStatementSerializer),
-        # Said in the payload, not only in the UI: a client rendering this owes
-        # the reader the same caveat the web page carries.
-        'caveat': ('Derived from uploaded documents. Anything started or '
-                   'changed since the most recent document is not reflected.'),
-    })
-
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def record_delete(request, pk):

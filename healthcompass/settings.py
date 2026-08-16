@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.dashboard',
     'apps.notifications',
     'apps.appointments',
+    'apps.care',
     # Mobile API
     'apps.api',
     'rest_framework',
@@ -132,6 +133,19 @@ MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
 #   STORAGE_BUCKET_NAME   — e.g. healthcompass-media
 #   STORAGE_ACCESS_KEY    — S3-compatible access key
 #   STORAGE_SECRET_KEY    — S3-compatible secret key
+# Deliberately acknowledging that uploads are lost on every deploy. Without
+# this, a production start with no object storage is a hard system-check error
+# — see apps/medical_records/checks.py for why that is not a warning.
+#
+# Always true under the test runner. Django sets DEBUG=False for tests, so the
+# check would otherwise read the suite as a production deployment and abort
+# every run — and it would be wrong on the merits too: test media goes to a
+# throwaway temp directory on purpose, so "this storage is ephemeral" is a
+# statement of intent there rather than a defect.
+import sys as _sys_storage
+ALLOW_EPHEMERAL_MEDIA = ('test' in _sys_storage.argv
+                         or config('ALLOW_EPHEMERAL_MEDIA', default=False, cast=bool))
+
 _OBJECT_STORAGE_URL = config('OBJECT_STORAGE_URL', default='')
 if _OBJECT_STORAGE_URL:
     INSTALLED_APPS += ['storages']
@@ -169,6 +183,20 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # ── AI APIs ────────────────────────────────────────────────────────────────────
+# ── Which LLM vendors may receive patient data ────────────────────────────────
+#
+# Consent is granted per purpose — "sending my health data to external AI
+# providers" — not per company, while the generation fallback chain spans four
+# organisations. Whichever key was configured and answered first got the
+# records, which is a vendor decision made at runtime rather than by policy.
+#
+# This is the server-side allowlist, enforced inside the fallback loop (see
+# apps/accounts/egress.py). The default is every provider the code already
+# used, so it changes nothing on its own; narrowing it is now a configuration
+# change instead of a code change.
+PHI_LLM_PROVIDERS = config(
+    'PHI_LLM_PROVIDERS', default='groq,gemini,anthropic,openai', cast=Csv())
+
 GROQ_API_KEY      = config('GROQ_API_KEY',      default='')
 GEMINI_API_KEY    = config('GEMINI_API_KEY',    default='')
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
@@ -251,7 +279,13 @@ USE_X_FORWARDED_HOST    = True
 
 # ── Google OAuth (allauth) ─────────────────────────────────────────────────────
 SITE_ID = 1
-SITE_DOMAIN = config('SITE_DOMAIN', default='healthcompass.hasanai.net')
+# The default follows DEBUG. Hardcoding the production host meant a local
+# database ended up with Site.domain = healthcompass.hasanai.net, which is the
+# host Django uses to build absolute URLs when no request is in hand — password
+# reset links and OAuth callbacks generated on a dev machine pointed at
+# production. An explicit SITE_DOMAIN still wins in both environments.
+SITE_DOMAIN = config('SITE_DOMAIN',
+                     default='127.0.0.1:8000' if DEBUG else 'healthcompass.hasanai.net')
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'

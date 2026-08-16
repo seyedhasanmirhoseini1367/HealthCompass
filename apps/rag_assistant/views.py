@@ -56,7 +56,12 @@ def chat_view(request):
         for m in chat_messages
     ]
 
+    from apps.rag_assistant.subject import choices_for
+
     return render(request, 'rag_assistant/chat.html', {
+        # Built from the same predicate the request path enforces, so nothing
+        # can be offered that the check would then refuse.
+        'subject_choices':  choices_for(request.user),
         'session':          session,
         'chat_messages':    chat_messages,
         'sessions':         sessions,
@@ -123,10 +128,44 @@ def send_message(request):
     history = list(session.messages.values('query', 'response').order_by('-created_at')[:3])
     history.reverse()
 
-    # Call RAG service
-    response_text, sources, provider, chunks_count, safety_routed, triggered_rules = RAGService().ask(
-        request.user, query, history
-    )
+    # Whose records is this about?
+    #
+    # The value comes from the client and is untrusted; `resolve` checks it
+    # against accounts.authz and refuses indistinguishably from "no such
+    # person", so this cannot be used to probe which user ids exist.
+    from apps.rag_assistant import subject as subject_mod
+
+    try:
+        subjects = subject_mod.resolve(request.user, body.get('subject'))
+    except subject_mod.SubjectNotPermitted:
+        return JsonResponse({'error': 'Not available.'}, status=404)
+
+    # Answered per person, never merged. One prompt holding three people's
+    # records produces answers nobody can attribute.
+    answers = []
+    sources, provider, chunks_count = [], '', 0
+    safety_routed, triggered_rules = False, []
+    for person in subjects:
+        subject_mod.record_access(request.user, person, query)
+        text, srcs, prov, n, routed, rules = RAGService().ask(
+            person, query, history)
+        answers.append((subject_mod.label_for(request.user, person), text))
+        sources.extend(srcs)
+        provider = provider or prov
+        chunks_count += n
+        safety_routed = safety_routed or routed
+        triggered_rules.extend(rules)
+
+    if len(answers) == 1:
+        response_text = answers[0][1]
+    else:
+        # Labelled, so no sentence is left ambiguous about whose data it used.
+        # This is why "Everyone" is not one merged prompt: three people's
+        # records in a single context produce a medication list nobody can
+        # attribute, and attributing a drug to the wrong person is a clinical
+        # error, not a formatting one.
+        parts = [f'**{name}**\n\n{text}' for name, text in answers]
+        response_text = '\n\n'.join(parts)
 
     # Auto-title the session on first message
     if session.messages.count() == 0:
@@ -243,6 +282,20 @@ def stream_message(request):
     history = list(session.messages.values('query', 'response').order_by('-created_at')[:3])
     history.reverse()
 
+    from apps.rag_assistant import subject as subject_mod
+
+    try:
+        subjects = subject_mod.resolve(request.user, body.get('subject'))
+    except subject_mod.SubjectNotPermitted:
+        return JsonResponse({'error': 'Not available.'}, status=404)
+
+    # Streaming answers one subject. "Everyone" is a multi-answer shape that
+    # does not fit a single token stream, so the selector's All option uses the
+    # non-streaming path; here it degrades to the asker rather than silently
+    # streaming somebody else's records.
+    stream_subject = subjects[0] if len(subjects) == 1 else request.user
+    subject_mod.record_access(request.user, stream_subject, query)
+
     def _event_stream():
         collected_tokens          = []
         collected_sources         = []
@@ -255,7 +308,7 @@ def stream_message(request):
 
         try:
             for event_str in RAGService().stream_ask(
-                patient  = request.user,
+                patient  = stream_subject,
                 query    = query,
                 history  = history,
             ):
