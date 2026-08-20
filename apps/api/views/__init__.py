@@ -23,6 +23,11 @@ from .icu import icu_dashboard_api, seizure_realtime_analyze
 from .consent import (consent_list, consent_grant, consent_revoke,
                       consent_history_view)
 from .export import export_status, export_download
+from .sharing import (sharing_companions, create_share, revoke_share,
+                      shared_patient_detail)
+from .care import (care_tasks_list_create, care_task_stop,
+                   care_occurrences_list, occurrence_respond,
+                   patient_reports_list_create)
 
 __all__ = [
     'login', 'register', 'forgot_password', 'me', 'register_fcm_token',
@@ -39,4 +44,7 @@ __all__ = [
     'icu_dashboard_api', 'seizure_realtime_analyze',
     'consent_list', 'consent_grant', 'consent_revoke', 'consent_history_view',
     'export_status', 'export_download',
+    'sharing_companions', 'create_share', 'revoke_share', 'shared_patient_detail',
+    'care_tasks_list_create', 'care_task_stop', 'care_occurrences_list',
+    'occurrence_respond', 'patient_reports_list_create',
 ]

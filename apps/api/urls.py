@@ -83,4 +83,17 @@ urlpatterns = [
 
     # Seizure Realtime
     path('seizure-realtime/analyze/',     views.seizure_realtime_analyze, name='seizure_realtime_analyze'),
+
+    # Sharing / companions
+    path('sharing/companions/',            views.sharing_companions,     name='sharing_companions'),
+    path('sharing/companions/create/',     views.create_share,           name='create_share'),
+    path('sharing/companions/<int:pk>/revoke/', views.revoke_share,      name='revoke_share'),
+    path('sharing/companions/<int:pk>/',   views.shared_patient_detail,  name='shared_patient_detail'),
+
+    # Care monitoring
+    path('care/tasks/',                  views.care_tasks_list_create, name='care_tasks'),
+    path('care/tasks/<uuid:pk>/stop/',   views.care_task_stop,         name='care_task_stop'),
+    path('care/occurrences/',            views.care_occurrences_list,  name='care_occurrences'),
+    path('care/occurrences/<uuid:pk>/respond/', views.occurrence_respond, name='occurrence_respond'),
+    path('care/reports/',                views.patient_reports_list_create, name='care_reports'),
 ]

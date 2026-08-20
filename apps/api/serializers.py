@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from apps.accounts.models import CustomUser
+from apps.accounts.models import CustomUser, SharingGrant
 from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import AIModel, ModelPrediction, HealthAlert
 from apps.notifications.models import Notification
 from apps.appointments.models import Appointment
+from apps.care.models import CareTask, MonitoringSignal, PatientReport, TaskOccurrence
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -190,3 +191,61 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'is_completed', 'is_cancelled', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
+
+
+class SharingGrantSerializer(serializers.ModelSerializer):
+    """
+    Read-only: writes always go through the dedicated create/revoke actions
+    (apps.api.views.sharing), never through this serializer's .save(), so the
+    business rules in accounts.authz cannot be bypassed by posting a grant
+    directly.
+    """
+    patient      = UserSerializer(read_only=True)
+    recipient    = UserSerializer(read_only=True)
+    is_effective = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model  = SharingGrant
+        fields = ['id', 'patient', 'recipient', 'can_view_records', 'can_view_alerts',
+                  'can_view_appointments', 'status', 'is_effective', 'created_at',
+                  'expires_at', 'data_cutoff', 'revoked_at', 'revoke_reason']
+        read_only_fields = fields
+
+
+class CareTaskSerializer(serializers.ModelSerializer):
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+
+    class Meta:
+        model  = CareTask
+        fields = ['id', 'kind', 'kind_display', 'label', 'times_of_day',
+                  'grace_minutes', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'is_active', 'created_at', 'updated_at']
+
+
+class TaskOccurrenceSerializer(serializers.ModelSerializer):
+    task_label = serializers.CharField(source='task.label', read_only=True)
+    task_kind  = serializers.CharField(source='task.kind', read_only=True)
+
+    class Meta:
+        model  = TaskOccurrence
+        fields = ['id', 'task', 'task_label', 'task_kind', 'due_at', 'state',
+                  'responded_at', 'response_input', 'created_at']
+        read_only_fields = fields
+
+
+class PatientReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = PatientReport
+        fields = ['id', 'kind', 'input_method', 'text', 'occurred_at', 'created_at']
+        read_only_fields = ['id', 'input_method', 'created_at']
+
+
+class MonitoringSignalSerializer(serializers.ModelSerializer):
+    kind_display     = serializers.CharField(source='get_kind_display', read_only=True)
+    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
+
+    class Meta:
+        model  = MonitoringSignal
+        fields = ['id', 'kind', 'kind_display', 'severity', 'severity_display',
+                  'window_start', 'window_end', 'created_at', 'resolved_at']
+        read_only_fields = fields
