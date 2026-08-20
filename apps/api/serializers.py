@@ -241,11 +241,55 @@ class PatientReportSerializer(serializers.ModelSerializer):
 
 
 class MonitoringSignalSerializer(serializers.ModelSerializer):
+    """
+    headline/detail mirror accounts.views._present_signal exactly (same four
+    branches, same wording) so a caregiver reads the same sentence on mobile
+    and web. Kept as a local copy rather than importing that view-private
+    function into the API layer.
+    """
     kind_display     = serializers.CharField(source='get_kind_display', read_only=True)
     severity_display = serializers.CharField(source='get_severity_display', read_only=True)
+    headline         = serializers.SerializerMethodField()
+    detail           = serializers.SerializerMethodField()
+
+    def get_headline(self, obj):
+        return _present_signal(obj)['headline']
+
+    def get_detail(self, obj):
+        return _present_signal(obj)['detail']
 
     class Meta:
         model  = MonitoringSignal
         fields = ['id', 'kind', 'kind_display', 'severity', 'severity_display',
-                  'window_start', 'window_end', 'created_at', 'resolved_at']
+                  'window_start', 'window_end', 'created_at', 'resolved_at',
+                  'headline', 'detail']
         read_only_fields = fields
+
+
+def _present_signal(signal):
+    """
+    What a caregiver reads about one care signal.
+
+    Mirrors accounts.views._present_signal exactly: says what was observed
+    and stops there. "Not confirmed 3 times" is a fact about this
+    application's records; "not taking her medication" would be a claim
+    about a person that the evidence — silence — cannot support.
+    """
+    if signal.kind == MonitoringSignal.Kind.REPEATED_UNCONFIRMED:
+        count = signal.occurrences.count()
+        first = signal.occurrences.first()
+        label = first.task.label if first else 'a care task'
+        return {
+            'headline': f'{count} unanswered reminder{"" if count == 1 else "s"}',
+            'detail':   f'“{label}” was not confirmed {count} time'
+                        f'{"" if count == 1 else "s"} in a row. That means no one '
+                        f'answered — not that it was missed.',
+        }
+    if signal.kind == MonitoringSignal.Kind.REPORTED_MISSED:
+        return {'headline': 'Reported a missed task',
+                'detail': 'They told the app they missed a scheduled task.'}
+    if signal.kind == MonitoringSignal.Kind.REPORTED_SYMPTOM:
+        entry = signal.reports.first()
+        return {'headline': 'Reported how they are feeling',
+                'detail': entry.text if entry else ''}
+    return {'headline': 'Needs attention', 'detail': ''}

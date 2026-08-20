@@ -8,8 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..serializers import (AppointmentSerializer, HealthAlertSerializer,
-                           MedicalRecordSerializer, SharingGrantSerializer,
-                           UserSerializer)
+                           MedicalRecordSerializer, MonitoringSignalSerializer,
+                           SharingGrantSerializer, UserSerializer)
 from healthcompass.errors import client_error
 
 _log = logging.getLogger(__name__)
@@ -168,6 +168,7 @@ def shared_patient_detail(request, pk):
             return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         records = alerts = appointments = None
+        care_signals = care_activity = None
 
         if grant.allows('records'):
             qs = MedicalRecord.objects.filter(patient=subject)
@@ -182,6 +183,17 @@ def shared_patient_detail(request, pk):
                 HealthAlert.objects.filter(patient=subject).order_by('-created_at')[:20],
                 many=True).data
 
+            # Care monitoring belongs to the SAME scope, shown alongside alerts
+            # exactly as accounts.views.shared_patient does.
+            from apps.care.models import MonitoringSignal
+
+            signals_qs = (MonitoringSignal.objects
+                          .filter(patient=subject, resolved_at__isnull=True)
+                          .prefetch_related('occurrences', 'reports')
+                          .order_by('-created_at')[:20])
+            care_signals = MonitoringSignalSerializer(signals_qs, many=True).data
+            care_activity = _care_activity(subject)
+
         if grant.allows('appointments'):
             appointments = AppointmentSerializer(
                 Appointment.objects.filter(patient=subject, is_cancelled=False)
@@ -193,12 +205,40 @@ def shared_patient_detail(request, pk):
             actor=request.user, patient=subject, resource='shared:patient_overview')
 
         return Response({
-            'subject':      UserSerializer(subject).data,
-            'is_effective': grant.is_effective,
-            'records':      records,
-            'alerts':       alerts,
-            'appointments': appointments,
+            'subject':       UserSerializer(subject).data,
+            'is_effective':  grant.is_effective,
+            'records':       records,
+            'alerts':        alerts,
+            'appointments':  appointments,
+            'care_signals':  care_signals,
+            'care_activity': care_activity,
         })
     except Exception as exc:
         _log.exception('shared_patient_detail error: %s', exc)
         return Response(client_error(exc, context='sharing'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _care_activity(subject):
+    """
+    A week of care answers, counted.
+
+    Mirrors accounts.views._care_activity exactly. The four states are shown
+    separately and never summed into an adherence figure: 'unconfirmed' is
+    the app not hearing back, 'missed' is the person saying they missed it,
+    and averaging those into one percentage would turn our ignorance into
+    their behaviour.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.care.models import TaskOccurrence
+
+    since = timezone.now() - timedelta(days=7)
+    occurrences = TaskOccurrence.objects.filter(patient=subject, due_at__gte=since)
+    return {
+        'confirmed':   occurrences.filter(state=TaskOccurrence.State.CONFIRMED).count(),
+        'unconfirmed': occurrences.filter(state=TaskOccurrence.State.UNCONFIRMED).count(),
+        'missed':      occurrences.filter(state=TaskOccurrence.State.MISSED).count(),
+        'skipped':     occurrences.filter(state=TaskOccurrence.State.SKIPPED).count(),
+    }
