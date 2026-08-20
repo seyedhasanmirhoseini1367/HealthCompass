@@ -56,6 +56,10 @@ SAMPLE_ARGS = {
     'run_model':               ['some-model'],
     'appointment_detail':      ['00000000-0000-0000-0000-000000000001'],
     'assistant_session_detail': ['session-1'],
+    'revoke_share':            ['1'],
+    'shared_patient_detail':   ['1'],
+    'care_task_stop':          ['00000000-0000-0000-0000-000000000001'],
+    'occurrence_respond':      ['00000000-0000-0000-0000-000000000001'],
 }
 
 
@@ -238,6 +242,74 @@ class PatientIsolationTests(_PatientFixture):
         note.refresh_from_db()
         self.assertFalse(note.is_read)
 
+    def test_shared_patient_detail_requires_a_grant(self):
+        """No SharingGrant between these two users at all: a 404, not a 403 —
+        the endpoint must not confirm the subject id exists to a caller with
+        zero access."""
+        response = self.client.get(
+            reverse('api:shared_patient_detail', args=[self.owner.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_another_patients_share_cannot_be_revoked(self):
+        from apps.accounts.models import SharingGrant
+
+        third_party = User.objects.create_user(
+            'api_share_recipient', email='api_share_recipient@test.invalid',
+            password='pw', role='patient')
+        grant = SharingGrant.objects.create(
+            patient=self.owner, recipient=third_party, can_view_records=True)
+
+        response = self.client.post(
+            reverse('api:revoke_share', args=[grant.pk]))
+        self.assertIn(response.status_code, (403, 404))
+
+        grant.refresh_from_db()
+        self.assertEqual(grant.status, SharingGrant.Status.ACTIVE)
+
+    def test_another_patients_care_task_cannot_be_stopped(self):
+        from apps.care.models import CareTask
+
+        task = CareTask.objects.create(
+            patient=self.owner, label='Owner medication', times_of_day=['08:00'])
+
+        response = self.client.post(
+            reverse('api:care_task_stop', args=[task.pk]))
+        self.assertIn(response.status_code, (403, 404))
+
+        task.refresh_from_db()
+        self.assertTrue(task.is_active)
+
+    def test_another_patients_occurrence_cannot_be_responded_to(self):
+        from apps.care.models import CareTask, TaskOccurrence
+
+        task = CareTask.objects.create(
+            patient=self.owner, label='Owner medication', times_of_day=['08:00'])
+        occurrence = TaskOccurrence.objects.create(
+            task=task, patient=self.owner, due_at=timezone.now())
+
+        response = self.client.post(
+            reverse('api:occurrence_respond', args=[occurrence.pk]),
+            {'state': 'confirmed'}, format='json')
+        self.assertIn(response.status_code, (403, 404))
+
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.state, TaskOccurrence.State.PENDING)
+
+    def test_the_care_tasks_list_shows_only_your_own(self):
+        from apps.care.models import CareTask
+
+        CareTask.objects.create(
+            patient=self.owner, label='Owner medication', times_of_day=['08:00'])
+        CareTask.objects.create(
+            patient=self.intruder, label='Mine', times_of_day=['09:00'])
+
+        response = self.client.get(reverse('api:care_tasks'))
+        self.assertEqual(response.status_code, 200)
+
+        body = response.content.decode()
+        self.assertIn('Mine', body)
+        self.assertNotIn('Owner medication', body)
+
 
 class ReadEndpointTests(TestCase):
     """Property 3 — the endpoints a mobile session opens with actually work."""
@@ -253,7 +325,9 @@ class ReadEndpointTests(TestCase):
         for name in ('me', 'records_list', 'dashboard', 'analytics', 'alerts_list',
                      'my_predictions', 'notifications', 'ai_models',
                      'appointments', 'assistant_sessions', 'consent_list',
-                     'consent_history', 'export_status'):
+                     'consent_history', 'export_status',
+                     'sharing_companions', 'care_tasks', 'care_occurrences',
+                     'care_reports'):
             with self.subTest(endpoint=name):
                 cache.clear()
                 response = self.client.get(reverse(f'api:{name}'))
@@ -292,7 +366,8 @@ class WriteEndpointTests(TestCase):
 
     def test_state_changing_endpoints_reject_get(self):
         for name in ('consent_grant', 'consent_revoke', 'change_password',
-                     'record_upload', 'upload_text', 'assistant_ask'):
+                     'record_upload', 'upload_text', 'assistant_ask',
+                     'create_share'):
             with self.subTest(endpoint=name):
                 cache.clear()
                 response = self.client.get(reverse(f'api:{name}'))
@@ -342,3 +417,68 @@ class WriteEndpointTests(TestCase):
             format='json')
 
         self.assertEqual(MedicalRecord.objects.filter(patient=victim).count(), 0)
+
+    def test_a_share_can_be_created_and_revoked(self):
+        from apps.accounts.models import SharingGrant
+
+        recipient = User.objects.create_user(
+            'api_recipient', email='api_recipient@test.invalid', password='pw', role='patient')
+
+        created = self.client.post(
+            reverse('api:create_share'),
+            {'identifier': 'api_recipient', 'scopes': ['records', 'alerts']},
+            format='json')
+        self.assertEqual(created.status_code, 201, created.content)
+
+        grant = SharingGrant.objects.get(patient=self.patient, recipient=recipient)
+        self.assertTrue(grant.can_view_records)
+        self.assertTrue(grant.can_view_alerts)
+
+        revoked = self.client.post(reverse('api:revoke_share', args=[grant.pk]))
+        self.assertEqual(revoked.status_code, 204)
+        grant.refresh_from_db()
+        self.assertEqual(grant.status, SharingGrant.Status.REVOKED)
+
+    def test_a_share_cannot_be_created_with_yourself(self):
+        response = self.client.post(
+            reverse('api:create_share'),
+            {'identifier': 'api_writer', 'scopes': ['records']}, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_care_task_can_be_created_and_stopped(self):
+        from apps.care.models import CareTask, TaskOccurrence
+
+        created = self.client.post(
+            reverse('api:care_tasks'),
+            {'label': 'Evening pill', 'times_of_day': ['20:00']}, format='json')
+        self.assertEqual(created.status_code, 201, created.content)
+
+        task = CareTask.objects.get(patient=self.patient, label='Evening pill')
+        # Materialised immediately, same as the web add_task view — a patient
+        # who just set up a reminder should see it without waiting for cron.
+        self.assertTrue(TaskOccurrence.objects.filter(task=task).exists())
+
+        stopped = self.client.post(reverse('api:care_task_stop', args=[task.pk]))
+        self.assertEqual(stopped.status_code, 204)
+        task.refresh_from_db()
+        self.assertFalse(task.is_active)
+
+    def test_an_occurrence_can_only_be_resolved_to_a_human_state(self):
+        from apps.care.models import CareTask, TaskOccurrence
+
+        task = CareTask.objects.create(
+            patient=self.patient, label='Morning pill', times_of_day=['08:00'])
+        occurrence = TaskOccurrence.objects.create(
+            task=task, patient=self.patient, due_at=timezone.now())
+
+        response = self.client.post(
+            reverse('api:occurrence_respond', args=[occurrence.pk]),
+            {'state': 'unconfirmed'}, format='json')
+        self.assertEqual(response.status_code, 400)
+
+        response = self.client.post(
+            reverse('api:occurrence_respond', args=[occurrence.pk]),
+            {'state': 'confirmed'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.state, TaskOccurrence.State.CONFIRMED)

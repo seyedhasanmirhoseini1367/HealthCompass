@@ -121,10 +121,14 @@ def occurrence_respond(request, pk):
     Ownership is the filter, not a check after the fact — an occurrence
     belonging to someone else is not found rather than found-and-refused.
     """
-    try:
-        from apps.care.models import PatientReport, TaskOccurrence
+    from apps.care.models import PatientReport, TaskOccurrence
 
-        occurrence = get_object_or_404(TaskOccurrence, pk=pk, patient=request.user)
+    # Outside the try/except below: Http404 is itself an Exception subclass,
+    # and a bare `except Exception` around it would turn a 404 into a 500 —
+    # the exact bug this file's own test suite (test_endpoints.py) catches.
+    occurrence = get_object_or_404(TaskOccurrence, pk=pk, patient=request.user)
+
+    try:
         state = (request.data.get('state') or '').strip()
 
         try:
