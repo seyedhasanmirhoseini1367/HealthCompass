@@ -424,3 +424,107 @@ class SignalTests(_Care):
             self.assertTrue(
                 value.startswith(('repeated_', 'reported_')),
                 f'{value} reads like a clinical claim rather than an observation')
+
+
+class FrequentTaskStreakTests(_Care):
+    """
+    A task due several times a day must not silence its own alarm.
+
+    `_trailing_unconfirmed_streak` took the twenty most recent occurrences and
+    then skipped the in-grace ones inside the loop. A task due four times a day
+    fills those twenty rows with five days of still-in-grace occurrences, every
+    one of them skipped — leaving an empty streak. An empty streak makes
+    `evaluate_task` call `_resolve_open`, which closes the caregiver's signal on
+    a task that is in fact being ignored.
+
+    That is the worst shape a bug can have in this product: it does not fail
+    loudly, it produces a false all-clear, and it does so precisely for the
+    patients with the most frequent medication schedules.
+    """
+
+    def _frequent_task(self):
+        return self._task(label='Four times a day',
+                          times=['08:00', '12:00', '18:00', '22:00'])
+
+    def test_in_grace_occurrences_do_not_hide_an_unanswered_streak(self):
+        """ACCEPTANCE — 20 in-grace rows must not bury the evidence behind them."""
+        from apps.care.signals_rules import _trailing_unconfirmed_streak
+
+        task = self._frequent_task()
+        # The unanswered ones happened first, so they sit behind a wall of
+        # newer occurrences that are still inside their grace window.
+        for i in range(3):
+            self._occurrence(task=task,
+                             due=self.anchor - timedelta(days=6, hours=i),
+                             state=TaskOccurrence.State.UNCONFIRMED)
+        for i in range(24):
+            self._occurrence(task=task, due=self.anchor - timedelta(minutes=i + 1))
+
+        streak = _trailing_unconfirmed_streak(task)
+
+        self.assertEqual(len(streak), 3,
+                         'in-grace occurrences hid the unanswered ones behind them')
+
+    def test_a_frequent_task_still_raises_for_the_caregiver(self):
+        """The consequence: the signal is raised rather than silently resolved."""
+        from apps.care.signals_rules import evaluate_task
+
+        task = self._frequent_task()
+        for i in range(3):
+            self._occurrence(task=task,
+                             due=self.anchor - timedelta(days=6, hours=i),
+                             state=TaskOccurrence.State.UNCONFIRMED)
+        for i in range(24):
+            self._occurrence(task=task, due=self.anchor - timedelta(minutes=i + 1))
+
+        raised = evaluate_task(task)
+
+        self.assertEqual(len(raised), 1)
+        self.assertEqual(raised[0].kind, MonitoringSignal.Kind.REPEATED_UNCONFIRMED)
+
+    def test_an_open_signal_is_not_resolved_while_the_task_is_ignored(self):
+        """
+        The dangerous half. Resolving means telling a caregiver the worry is
+        over, and it must never happen because the query ran out of room.
+        """
+        from apps.care.signals_rules import evaluate_task
+
+        task = self._frequent_task()
+        for i in range(3):
+            self._occurrence(task=task,
+                             due=self.anchor - timedelta(days=6, hours=i),
+                             state=TaskOccurrence.State.UNCONFIRMED)
+        signal = MonitoringSignal.objects.create(
+            patient=self.patient,
+            kind=MonitoringSignal.Kind.REPEATED_UNCONFIRMED,
+            window_start=self.anchor - timedelta(days=6),
+            window_end=self.anchor - timedelta(days=6),
+            subject_key=f'task:{task.pk}', rule='unconfirmed_streak')
+        for i in range(24):
+            self._occurrence(task=task, due=self.anchor - timedelta(minutes=i + 1))
+
+        evaluate_task(task)
+        signal.refresh_from_db()
+
+        self.assertIsNone(signal.resolved_at,
+                          'the caregiver was told the worry was over')
+
+    def test_a_genuine_confirmation_still_breaks_the_streak(self):
+        """
+        The fix must not make the streak unbreakable. An answered occurrence
+        still ends it, which is what stops one bad week following someone
+        forever.
+        """
+        from apps.care.signals_rules import _trailing_unconfirmed_streak
+
+        task = self._frequent_task()
+        self._occurrence(task=task, due=self.anchor - timedelta(days=6),
+                         state=TaskOccurrence.State.UNCONFIRMED)
+        self._occurrence(task=task, due=self.anchor - timedelta(days=5),
+                         state=TaskOccurrence.State.CONFIRMED)
+        self._occurrence(task=task, due=self.anchor - timedelta(days=4),
+                         state=TaskOccurrence.State.UNCONFIRMED)
+
+        streak = _trailing_unconfirmed_streak(task)
+
+        self.assertEqual(len(streak), 1)

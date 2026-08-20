@@ -39,9 +39,10 @@ class NotificationEvent(models.Model):
     this?" is answerable, and so that a notification whose evidence has been
     erased cannot keep justifying itself.
 
-    It deliberately does NOT carry a rendered message. What a caregiver may see
-    depends on what the patient shared with THAT caregiver, so the text is built
-    per recipient, after the authorization check, and never before.
+    It deliberately does NOT carry a rendered message. Text is built after the
+    authorization check and never before, so wording a recipient is not entitled
+    to is never constructed — a string that exists is a string that can be
+    logged, cached, or attached to an exception.
     """
 
     class Kind(models.TextChoices):
@@ -75,6 +76,17 @@ class NotificationEvent(models.Model):
     #: still the current one. Shown as "3 times", never as three notifications.
     occurrence_count = models.PositiveIntegerField(default=1)
 
+    #: When this event stopped being the current one for its dedupe_key.
+    #:
+    #: NULL means live, and the partial unique constraint below allows exactly
+    #: one live event per (subject, dedupe_key). This column exists because the
+    #: aggregation window is *rolling* — "raised within the last N hours" — and a
+    #: rolling window cannot be a database constraint: a partial index predicate
+    #: must be immutable, and `now()` is not. Materialising "live" as a column
+    #: turns a time comparison the database cannot enforce into an equality it
+    #: can.
+    superseded_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,6 +95,25 @@ class NotificationEvent(models.Model):
         indexes = [
             models.Index(fields=['subject', '-created_at']),
             models.Index(fields=['dedupe_key', '-created_at']),
+        ]
+        constraints = [
+            # The dedupe check in `dispatch.event_for_signal` is filter-then-
+            # create, which two concurrent care cycles both pass. That produced
+            # two events, and two events produce two rounds of delivery to the
+            # same caregiver — the alert fatigue the whole dedupe layer exists
+            # to prevent, reachable through a cron retry.
+            #
+            # The application still does the window check; this constraint is
+            # what makes the check true under concurrency rather than merely
+            # usually true.
+            # Blank keys are excluded deliberately. `dedupe_key` defaults to ''
+            # for events that do not aggregate — an appointment reminder is a
+            # separate thing each time — and without this exclusion every one of
+            # them would collide with the last on (subject, '').
+            models.UniqueConstraint(
+                fields=['subject', 'dedupe_key'],
+                condition=models.Q(superseded_at__isnull=True) & ~models.Q(dedupe_key=''),
+                name='one_live_event_per_subject_and_key'),
         ]
 
     def __str__(self):

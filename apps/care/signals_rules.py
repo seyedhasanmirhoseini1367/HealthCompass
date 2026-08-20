@@ -56,19 +56,34 @@ def _trailing_unconfirmed_streak(task):
 
     Walks backwards from the newest and stops at the first answered one, so a
     single confirmation genuinely breaks the streak rather than being averaged
-    away. Occurrences still inside their grace window are skipped rather than
-    counted: they are not yet evidence of anything, and counting them would
-    raise a signal before the patient has had a chance to respond.
+    away. Occurrences still inside their grace window are not evidence of
+    anything — the patient has not had their chance to respond yet — so they are
+    excluded rather than counted.
+
+    Excluded in the QUERY, which is the fix for a real false-negative. The
+    exclusion used to be a `continue` inside the loop, over a `[:20]` slice taken
+    first. A task due four times a day fills those twenty rows with five days of
+    still-in-grace occurrences, every one of them skipped, leaving an empty
+    streak — and an empty streak makes `evaluate_task` call `_resolve_open` and
+    close the signal on a task that is in fact being ignored. A caregiver would
+    have seen a worry disappear at the exact moment it was becoming true.
+
+    Filtering in the database means in-grace rows never consume the budget, so
+    the limit below counts only occurrences that can actually contribute.
     """
     from .models import TaskOccurrence
+
+    # Generous relative to any threshold a policy can set: the loop stops at the
+    # first answered occurrence anyway, so this only bounds the query, and the
+    # count it bounds is now entirely made of rows that carry evidence.
+    limit = max(20, policy().unconfirmed_streak_for_caregiver * 5)
 
     streak = []
     recent = (task.occurrences
               .filter(due_at__lte=timezone.now())
-              .order_by('-due_at')[:20])
+              .exclude(state=TaskOccurrence.State.PENDING)
+              .order_by('-due_at')[:limit])
     for occurrence in recent:
-        if occurrence.state == TaskOccurrence.State.PENDING:
-            continue
         if occurrence.state != TaskOccurrence.State.UNCONFIRMED:
             break
         streak.append(occurrence)
