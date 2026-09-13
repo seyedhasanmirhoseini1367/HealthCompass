@@ -12,7 +12,10 @@ ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
     default='127.0.0.1,localhost',
     cast=Csv()
-) + ['healthcompass-ibco.onrender.com']
+) + [
+    'healthcompass-ibco.onrender.com',
+    'healthcompass.hasanai.net',
+]
 
 # Trust Railway's HTTPS proxy and the subdomain
 CSRF_TRUSTED_ORIGINS = config(
