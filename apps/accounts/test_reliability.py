@@ -282,8 +282,14 @@ class BackgroundIndexingTests(TransactionTestCase):
         from apps.medical_records.models import MedicalRecord
         from apps.rag_assistant.signals import _index_in_background
 
+        # The create() below would also queue a background index of the same
+        # record (TransactionTestCase fires on_commit at once). That pool thread
+        # then raced this test's direct call to write index_status on the same
+        # row, and SQLite intermittently failed one with "database table is
+        # locked". Only the direct call is under test, so keep the pool out.
         with patch('apps.rag_assistant.services.rag_service.RAGService.index_record',
-                   side_effect=RuntimeError('embedding provider down')):
+                   side_effect=RuntimeError('embedding provider down')), \
+             patch('apps.rag_assistant.signals._get_executor'):
             record = MedicalRecord.objects.create(
                 patient=self.user, title='Still saved', record_type='other',
             )
