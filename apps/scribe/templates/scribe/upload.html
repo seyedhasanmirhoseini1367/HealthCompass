@@ -1,0 +1,37 @@
+{% extends 'scribe/_base.html' %}
+{% block title %}Upload recording — AI scribe{% endblock %}
+{% block scribe_content %}
+<h1 class="sc-h">Upload a consultation recording</h1>
+<p class="sc-sub">
+  The audio is transcribed on this server. The transcript is then sent to an external
+  AI provider to draft the note. Only upload recordings you have permission to process,
+  preferably simulated or de-identified consultations.
+</p>
+
+{% if not has_consent %}
+<div class="sc-error" style="margin-bottom:1rem">
+  Drafting the note requires your consent to send health data to external AI providers.
+  <a href="{% url 'accounts:consent' %}">Open Privacy &amp; Consent settings</a>.
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="sc-card" id="scUploadForm">
+  {% csrf_token %}
+  <label for="{{ form.audio.id_for_label }}" style="font-weight:700">{{ form.audio.label }}</label>
+  <div style="margin:.5rem 0">{{ form.audio }}</div>
+  <div class="sc-muted">{{ form.audio.help_text }}</div>
+  {% if form.audio.errors %}<div class="sc-error" style="margin-top:.6rem">{{ form.audio.errors|join:" " }}</div>{% endif %}
+  <div style="margin-top:1rem">
+    <button type="submit" class="sc-btn primary" {% if not has_consent %}disabled{% endif %}>Upload and process</button>
+    <a class="sc-btn" href="{% url 'scribe:list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('scUploadForm').addEventListener('submit', function (e) {
+  var btn = this.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+});
+</script>
+{% endblock %}

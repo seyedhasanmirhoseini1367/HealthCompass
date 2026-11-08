@@ -1,0 +1,30 @@
+{% extends 'scribe/_base.html' %}
+{% block title %}AI scribe — HealthCompass{% endblock %}
+{% block scribe_content %}
+<div class="sc-row" style="margin-bottom:1rem">
+  <div>
+    <h1 class="sc-h">AI scribe</h1>
+    <p class="sc-sub" style="margin:0">Upload a consultation recording to get a transcript and a draft SOAP note.</p>
+  </div>
+  <a class="sc-btn primary" href="{% url 'scribe:upload' %}">Upload recording</a>
+</div>
+
+{% for e in encounters %}
+<div class="sc-card sc-row">
+  <div>
+    <a href="{% url 'scribe:detail' e.pk %}" style="font-weight:700;color:var(--text)">{{ e.original_filename|default:"Recording" }}</a>
+    <div class="sc-muted">{{ e.created_at|date:"D j M Y, H:i" }}</div>
+  </div>
+  <div class="sc-row" style="gap:.6rem">
+    <span class="sc-status {{ e.status }}">{{ e.get_status_display }}</span>
+    <form method="post" action="{% url 'scribe:delete' e.pk %}"
+          onsubmit="return confirm('Delete this encounter and its audio file?');">
+      {% csrf_token %}
+      <button type="submit" class="sc-btn danger">Delete</button>
+    </form>
+  </div>
+</div>
+{% empty %}
+<div class="sc-card sc-muted">No encounters yet.</div>
+{% endfor %}
+{% endblock %}

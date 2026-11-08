@@ -1,0 +1,148 @@
+{% extends 'scribe/_base.html' %}
+{% block title %}Encounter — AI scribe{% endblock %}
+{% block scribe_css %}
+<style>
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
+@media (max-width:860px){.sc-grid{grid-template-columns:1fr}}
+.sc-transcript{max-height:70vh;overflow-y:auto}
+.sc-seg{display:flex;gap:.6rem;padding:.3rem .4rem;border-radius:6px;font-size:.88rem;line-height:1.5}
+.sc-seg .ts{color:#94a3b8;font-variant-numeric:tabular-nums;flex:0 0 auto;font-size:.78rem;padding-top:.1rem}
+.sc-seg .ix{color:#cbd5e1;font-size:.7rem;flex:0 0 1.8rem;text-align:right;padding-top:.15rem}
+.sc-seg.hl{background:#fef08a}
+.sc-sec h2{font-size:.95rem;font-weight:800;margin:.2rem 0 .4rem;color:#0f766e;text-transform:uppercase;letter-spacing:.03em}
+.sc-sec ul{list-style:none;margin:0 0 .9rem;padding:0}
+.sc-item{border:1px solid var(--border);border-radius:9px;padding:.5rem .7rem;margin-bottom:.4rem;cursor:pointer;font-size:.9rem}
+.sc-item:hover{border-color:#0f766e}
+.sc-item.active{border-color:#0f766e;background:#f0fdfa}
+.sc-item .src{font-size:.72rem;color:#94a3b8;margin-top:.2rem}
+.sc-item .src.none{color:#b45309}
+.sc-ev{margin-top:.4rem;padding-left:.6rem;border-left:3px solid #e2e8f0;font-size:.78rem;color:#475569}
+.sc-ev div{margin-bottom:.3rem}
+.sc-empty{font-size:.82rem;color:#94a3b8;font-style:italic;margin:0 0 .9rem}
+</style>
+{% endblock %}
+{% block scribe_content %}
+<div class="sc-row" style="margin-bottom:1rem">
+  <div>
+    <h1 class="sc-h">{{ encounter.original_filename|default:"Recording" }}</h1>
+    <div class="sc-muted">
+      Uploaded {{ encounter.created_at|date:"D j M Y, H:i" }}
+      {% if transcript.language %}· language: {{ transcript.language }}{% endif %}
+      {% if note.provider %}· note by: {{ note.provider }}{% endif %}
+    </div>
+  </div>
+  <div class="sc-row" style="gap:.6rem">
+    <span class="sc-status {{ encounter.status }}" id="scStatus">{{ encounter.get_status_display }}</span>
+    <a class="sc-btn" href="{% url 'scribe:list' %}">All encounters</a>
+    <form method="post" action="{% url 'scribe:delete' encounter.pk %}"
+          onsubmit="return confirm('Delete this encounter and its audio file?');">
+      {% csrf_token %}
+      <button type="submit" class="sc-btn danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+{% if encounter.status == 'failed' %}
+<div class="sc-error" style="margin-bottom:1rem">{{ encounter.error_message|default:"Processing failed." }}</div>
+{% elif encounter.is_in_progress %}
+<div class="sc-card sc-muted" id="scProgress">
+  Processing… this page refreshes automatically. Transcription runs on the server's CPU
+  and can take roughly as long as the recording itself.
+</div>
+{% endif %}
+
+{% if transcript %}
+<div class="sc-grid">
+  <div class="sc-card sc-transcript" id="scTranscript">
+    <h2 style="font-size:.95rem;font-weight:800;margin:0 0 .5rem">Transcript</h2>
+    {% for s in segments %}
+    <div class="sc-seg" id="seg-{{ s.index }}"><span class="ix">{{ s.index }}</span><span class="ts">{{ s.ts }}</span><span>{{ s.text }}</span></div>
+    {% endfor %}
+  </div>
+
+  <div class="sc-card">
+    {% if note %}
+    <p class="sc-muted" style="margin-top:0">Draft note — click an item to highlight the transcript lines it was taken from. Always check it against the transcript.</p>
+    {% for sec in sections %}
+    <div class="sc-sec">
+      <h2>{{ sec.label }}</h2>
+      {% if sec.items %}
+      <ul>
+        {% for item in sec.items %}
+        <li class="sc-item" data-segs="{{ item.segments_csv }}" tabindex="0">
+          {{ item.text }}
+          {% if item.segments %}
+          <div class="src">Source segments: {{ item.segments|join:", " }}</div>
+          {% else %}
+          <div class="src none">⚠ No transcript segment cited — verify manually.</div>
+          {% endif %}
+          {% if sec.show_evidence %}
+          <div class="sc-ev">
+            {% for ev in item.evidence %}
+            <div>
+              <strong>{{ ev.source_name|default:"Source" }}</strong>{% if ev.title %}: {{ ev.title }}{% endif %}
+              {% if ev.source_url %}<a href="{{ ev.source_url }}" target="_blank" rel="noopener noreferrer">link</a>{% endif %}
+              <div class="sc-muted">{{ ev.snippet }}</div>
+            </div>
+            {% empty %}
+            <div class="sc-muted">No matching guideline excerpts.</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="sc-empty">Nothing in the transcript supports this section.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="sc-muted">The note will appear here once it has been generated.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  // Highlight the transcript segments behind a note item.
+  function select(item) {
+    document.querySelectorAll('.sc-seg.hl').forEach(function (el) { el.classList.remove('hl'); });
+    document.querySelectorAll('.sc-item.active').forEach(function (el) { el.classList.remove('active'); });
+    item.classList.add('active');
+    var first = null;
+    (item.dataset.segs || '').split(',').forEach(function (i) {
+      var seg = i && document.getElementById('seg-' + i);
+      if (seg) { seg.classList.add('hl'); first = first || seg; }
+    });
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  document.querySelectorAll('.sc-item').forEach(function (item) {
+    item.addEventListener('click', function (e) {
+      if (e.target.tagName !== 'A') select(item);
+    });
+    item.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(item); }
+    });
+  });
+
+  {% if encounter.is_in_progress %}
+  // Poll until processing finishes, then reload to render the result server-side.
+  var statusEl = document.getElementById('scStatus');
+  var timer = setInterval(function () {
+    fetch('{% url "scribe:status" encounter.pk %}', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        statusEl.textContent = data.status_display;
+        statusEl.className = 'sc-status ' + data.status;
+        if (!data.in_progress) { clearInterval(timer); window.location.reload(); }
+      })
+      .catch(function () {});
+  }, 4000);
+  {% endif %}
+})();
+</script>
+{% endblock %}

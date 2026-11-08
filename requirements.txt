@@ -87,3 +87,10 @@ gunicorn==26.0.0
 psycopg2-binary==2.9.12
 whitenoise==6.12.0
 dj-database-url==3.1.2
+
+# Experimental AI scribe (apps/scribe) — local speech-to-text on CPU.
+# Pulls in ctranslate2 (inference engine) and av (bundled FFmpeg, so mp3/m4a
+# decode without a system ffmpeg). Reuses onnxruntime above for voice-activity
+# detection. The Whisper "small" weights (~480 MB) are downloaded from Hugging
+# Face on first use, not at install time; the model needs ~1 GB RAM when loaded.
+faster-whisper==1.2.1

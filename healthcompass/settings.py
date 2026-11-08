@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.appointments',
     'apps.care',
+    'apps.scribe',  # experimental AI scribe demo — see apps/scribe/README.md
     # Mobile API
     'apps.api',
     'rest_framework',

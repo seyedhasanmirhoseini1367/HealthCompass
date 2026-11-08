@@ -171,6 +171,7 @@ urlpatterns = [
     path('notifications/', include('apps.notifications.urls')),
     path('appointments/', include('apps.appointments.urls')),
     path('care/', include('apps.care.urls')),
+    path('scribe/', include('apps.scribe.urls')),
     path('api/v1/', include('apps.api.urls')),
     path('icu/', RedirectView.as_view(url='/insights/icu/', permanent=True)),
     re_path(r'^media/(?P<path>.+)$', serve_media),
