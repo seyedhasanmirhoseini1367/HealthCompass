@@ -9,5 +9,6 @@ urlpatterns = [
     path('upload/',              views.encounter_upload, name='upload'),
     path('<int:pk>/',            views.encounter_detail, name='detail'),
     path('<int:pk>/status/',     views.encounter_status, name='status'),
+    path('<int:pk>/retry/',      views.encounter_retry,  name='retry'),
     path('<int:pk>/delete/',     views.encounter_delete, name='delete'),
 ]

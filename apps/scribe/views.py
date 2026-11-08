@@ -9,7 +9,12 @@ from .forms import EncounterUploadForm
 from .models import Encounter
 from .services.evidence import EVIDENCE_SECTIONS
 from .services.note_generation import SECTIONS, format_timestamp
+from .services import pipeline
 from .services.pipeline import mark_if_stale, start_pipeline
+
+# Upload and retry share one budget: both start a CPU-heavy transcription.
+PROCESS_RATE = '10/h'
+PROCESS_GROUP = 'scribe-process'
 
 SECTION_LABELS = {'subjective': 'Subjective', 'objective': 'Objective',
                   'assessment': 'Assessment', 'plan': 'Plan'}
@@ -36,7 +41,7 @@ def encounter_list(request):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-@ratelimit(key='user', rate='10/h', method='POST', block=False)
+@ratelimit(key='user', rate=PROCESS_RATE, group=PROCESS_GROUP, method='POST', block=False)
 def encounter_upload(request):
     has_consent = _has_llm_consent(request.user)
     form = EncounterUploadForm(request.POST or None, request.FILES or None)
@@ -102,6 +107,22 @@ def encounter_status(request, pk):
         'error': encounter.error_message,
         'in_progress': encounter.is_in_progress,
     })
+
+
+@login_required
+@require_POST
+@ratelimit(key='user', rate=PROCESS_RATE, group=PROCESS_GROUP, method='POST', block=False)
+def encounter_retry(request, pk):
+    encounter = mark_if_stale(_own_encounter(request, pk))
+    if encounter.status != Encounter.Status.FAILED:
+        messages.info(request, 'Only a failed encounter can be retried.')
+    elif getattr(request, 'limited', False):
+        messages.error(request, 'Processing limit reached (10 per hour). Try again later.')
+    elif not _has_llm_consent(request.user):
+        messages.error(request, 'Grant the "external AI providers" consent first.')
+    else:
+        pipeline.retry(encounter)
+    return redirect('scribe:detail', pk=encounter.pk)
 
 
 @login_required

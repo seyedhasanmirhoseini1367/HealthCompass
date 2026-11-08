@@ -32,14 +32,18 @@ upload (mp3/wav/m4a, ≤25 MB)
 5. The user needs the **"Sending my health data to external AI providers"** consent (`/accounts/consent/`). The transcript is sent to an external LLM, so upload is refused without it.
 6. To get guideline evidence, the general knowledge base must be indexed, as it is for the assistant's general-question mode. Otherwise items show "No matching guideline excerpts".
 
-Optional settings. They are read with `getattr`, so none are required:
+Optional configuration. Each value is read from Django settings if defined there, otherwise from an environment variable (or `.env`), so on Render you set them under **Environment** without a code change:
 
-| Setting | Default | |
+| Variable | Default | |
 |---|---|---|
-| `SCRIBE_WHISPER_MODEL` | `small` | `tiny` / `base` are much faster for quick tests |
+| `SCRIBE_WHISPER_MODEL` | `small` | `tiny` (~75 MB weights, ~150 MB RAM) or `base` (~145 MB, ~250 MB RAM) for small hosts; `small` needs ~1 GB RAM |
 | `SCRIBE_WHISPER_THREADS` | `2` | CPU threads for CTranslate2 |
 | `SCRIBE_WHISPER_BEAM_SIZE` | `1` | Greedy decoding. Use 5 for slightly better accuracy at ~2–3× the CPU |
-| `SCRIBE_STALE_MINUTES` | `120` | In-progress jobs older than this are marked failed |
+| `SCRIBE_STALE_MINUTES` | `15` | A job with no heartbeat for this long is marked failed |
+
+### Running on a small host (e.g. Render 512 MB)
+
+If an upload stays on "Transcribing" and the site briefly returns 503, the process was killed for running out of memory while loading the model. Render shows this under the service's **Events**. Set `SCRIBE_WHISPER_MODEL=tiny`, redeploy, and press **Retry** on the failed encounter. Even `tiny` shares memory with every gunicorn worker, so on a 512 MB instance it is a best effort.
 
 ## Running it
 
@@ -80,7 +84,7 @@ Absolute scores are not comparable to published PriMock57 numbers. The reference
 ## Known limitations
 
 - **No diarization.** The LLM infers who is speaking from context. Short or ambiguous exchanges can be attributed to the wrong person.
-- **Background threads, not a queue.** A server restart kills in-flight jobs (they show as failed after `SCRIBE_STALE_MINUTES`). Each web worker process loads its own Whisper model (~1 GB RAM for `small`), so this needs a host with headroom. A 512 MB instance will not run it.
+- **Background threads, not a queue.** A server restart kills in-flight jobs. Transcription writes a heartbeat every 30 s, so a killed job shows as failed after `SCRIBE_STALE_MINUTES` (15) and can be retried from its page. Each web worker process loads its own Whisper model (~1 GB RAM for `small`), so this needs a host with headroom. A 512 MB instance will not run it.
 - **Speed.** CPU transcription takes roughly 0.3–1× the recording length for `small` with int8, and jobs run one at a time per process.
 - **Output length.** Generation uses the shared `RAG_CONFIG['MAX_TOKENS']` (1200). A very long consultation can produce a truncated reply, which fails validation twice and then fails the encounter.
 - **Grounding is checked structurally, not semantically.** Segment indices are validated to exist, but nothing verifies that a segment really supports its item. Items with no valid citation are flagged in the UI.

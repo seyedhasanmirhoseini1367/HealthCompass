@@ -23,7 +23,11 @@ _transcribe_lock = threading.Lock()
 
 
 def _cfg(name, default):
-    return getattr(settings, name, default)
+    """Django setting if defined, else environment variable (or .env), else default."""
+    if hasattr(settings, name):
+        return getattr(settings, name)
+    from decouple import config
+    return config(name, default=default)
 
 
 def get_model():
@@ -46,13 +50,18 @@ def get_model():
     return _model
 
 
-def transcribe_audio(audio):
+def transcribe_audio(audio, on_progress=None):
     """
     Transcribe a file path (or a 16 kHz mono float32 numpy array).
+
+    *on_progress*, if given, is called after each decoded segment — the
+    pipeline uses it as a heartbeat so a job killed mid-way is detected quickly.
 
     Returns {"text", "segments": [{"start", "end", "text"}], "language", "duration"}.
     """
     model = get_model()
+    if on_progress:
+        on_progress()
     with _transcribe_lock:
         segments_iter, info = model.transcribe(
             audio,
@@ -65,6 +74,8 @@ def transcribe_audio(audio):
         # The iterator is lazy — decoding happens here, inside the lock.
         segments = []
         for seg in segments_iter:
+            if on_progress:
+                on_progress()
             text = (seg.text or '').strip()
             if text:
                 segments.append({'start': round(float(seg.start), 2),
@@ -106,13 +117,13 @@ def local_audio_path(field_file):
             os.remove(tmp_path)
 
 
-def transcribe(encounter):
+def transcribe(encounter, on_progress=None):
     """Transcribe an Encounter's audio and store the Transcript."""
     from apps.scribe.models import Transcript
 
     with local_audio_path(encounter.audio) as path:
         try:
-            result = transcribe_audio(path)
+            result = transcribe_audio(path, on_progress=on_progress)
         except ScribeError:
             raise
         except Exception as exc:

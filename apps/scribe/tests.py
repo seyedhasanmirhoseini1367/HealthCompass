@@ -130,7 +130,7 @@ class PipelineTests(TestCase):
     def _status(self):
         return Encounter.objects.get(pk=self.encounter.pk).status
 
-    def _fake_transcribe(self, path):
+    def _fake_transcribe(self, path, on_progress=None):
         self.seen.append(('transcribe', self._status()))
         return {'text': ' '.join(s['text'] for s in SEGMENTS), 'segments': SEGMENTS,
                 'language': 'en', 'duration': 19.0}
@@ -173,14 +173,14 @@ class PipelineTests(TestCase):
         self.assertFalse(Note.objects.filter(encounter=self.encounter).exists())
 
     def test_transcription_crash_marks_failed_with_safe_message(self):
-        def boom(path):
+        def boom(path, **kw):
             raise RuntimeError('decoder exploded at /secret/path')
         self._run(transcribe=boom)
         self.assertEqual(self.encounter.status, Encounter.Status.FAILED)
         self.assertNotIn('/secret/path', self.encounter.error_message)
 
     def test_no_speech_marks_failed(self):
-        self._run(transcribe=lambda p: {'text': '', 'segments': [], 'language': '', 'duration': 0})
+        self._run(transcribe=lambda p, **kw: {'text': '', 'segments': [], 'language': '', 'duration': 0})
         self.assertEqual(self.encounter.status, Encounter.Status.FAILED)
         self.assertIn('No speech', self.encounter.error_message)
 
@@ -305,3 +305,78 @@ class UploadTests(TestCase):
                 self.client.post(reverse('scribe:upload'), {'audio': f})
         self.assertFalse(Encounter.objects.exists())
         start.assert_not_called()
+
+
+# ── Recovery: heartbeat, stale detection, retry, model config ────────────────
+
+class RecoveryTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('sc_rec', email='rec@test.invalid', password='pw')
+        grant_consent(self.user, ConsentPurpose.EXTERNAL_LLM)
+        self.encounter = Encounter.objects.create(owner=self.user, audio=_wav())
+
+    def _age(self, minutes, status=Encounter.Status.TRANSCRIBING):
+        Encounter.objects.filter(pk=self.encounter.pk).update(
+            status=status, updated_at=timezone.now() - datetime.timedelta(minutes=minutes))
+        self.encounter.refresh_from_db()
+
+    def test_heartbeat_keeps_a_running_job_from_looking_stale(self):
+        self._age(60)
+        pipeline._heartbeat(self.encounter.pk)()
+        self.encounter.refresh_from_db()
+        pipeline.mark_if_stale(self.encounter)
+        self.assertEqual(self.encounter.status, Encounter.Status.TRANSCRIBING)
+
+    def test_heartbeat_is_throttled(self):
+        beat = pipeline._heartbeat(self.encounter.pk)
+        with mock.patch.object(Encounter.objects, 'filter', wraps=Encounter.objects.filter) as f:
+            for _ in range(50):
+                beat()
+        self.assertEqual(f.call_count, 1)
+
+    def test_a_job_killed_mid_way_fails_within_minutes_not_hours(self):
+        self._age(20)
+        pipeline.mark_if_stale(self.encounter)
+        self.assertEqual(self.encounter.status, Encounter.Status.FAILED)
+        self.assertIn('out of memory', self.encounter.error_message)
+
+    def test_a_recent_job_is_left_alone(self):
+        self._age(5)
+        pipeline.mark_if_stale(self.encounter)
+        self.assertEqual(self.encounter.status, Encounter.Status.TRANSCRIBING)
+
+    @mock.patch('apps.scribe.services.pipeline.start_pipeline')
+    def test_retry_resets_a_failed_encounter_and_restarts_it(self, start):
+        Transcript.objects.create(encounter=self.encounter, text='x', segments=SEGMENTS)
+        self._age(0, status=Encounter.Status.FAILED)
+        self.client.force_login(self.user)
+        resp = self.client.post(reverse('scribe:retry', args=[self.encounter.pk]))
+        self.assertRedirects(resp, reverse('scribe:detail', args=[self.encounter.pk]),
+                             fetch_redirect_response=False)
+        self.encounter.refresh_from_db()
+        self.assertEqual(self.encounter.status, Encounter.Status.UPLOADED)
+        self.assertFalse(Transcript.objects.filter(encounter=self.encounter).exists())
+        start.assert_called_once()
+
+    @mock.patch('apps.scribe.services.pipeline.start_pipeline')
+    def test_retry_refuses_an_encounter_that_is_not_failed(self, start):
+        self.client.force_login(self.user)
+        self.client.post(reverse('scribe:retry', args=[self.encounter.pk]))
+        start.assert_not_called()
+
+    @mock.patch('apps.scribe.services.pipeline.start_pipeline')
+    def test_retry_of_another_users_encounter_is_404(self, start):
+        self._age(0, status=Encounter.Status.FAILED)
+        other = User.objects.create_user('sc_rec2', email='rec2@test.invalid', password='pw')
+        self.client.force_login(other)
+        resp = self.client.post(reverse('scribe:retry', args=[self.encounter.pk]))
+        self.assertEqual(resp.status_code, 404)
+        start.assert_not_called()
+
+    def test_model_size_can_come_from_the_environment(self):
+        from apps.scribe.services.transcription import _cfg
+        with mock.patch.dict(os.environ, {'SCRIBE_WHISPER_MODEL': 'tiny'}):
+            self.assertEqual(_cfg('SCRIBE_WHISPER_MODEL', 'small'), 'tiny')
+        with self.settings(SCRIBE_WHISPER_MODEL='base'):
+            self.assertEqual(_cfg('SCRIBE_WHISPER_MODEL', 'small'), 'base')

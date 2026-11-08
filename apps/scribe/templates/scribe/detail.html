@@ -43,11 +43,18 @@
 </div>
 
 {% if encounter.status == 'failed' %}
-<div class="sc-error" style="margin-bottom:1rem">{{ encounter.error_message|default:"Processing failed." }}</div>
+<div class="sc-error sc-row" style="margin-bottom:1rem">
+  <span>{{ encounter.error_message|default:"Processing failed." }}</span>
+  <form method="post" action="{% url 'scribe:retry' encounter.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="sc-btn">Retry</button>
+  </form>
+</div>
 {% elif encounter.is_in_progress %}
 <div class="sc-card sc-muted" id="scProgress">
   Processing… this page refreshes automatically. Transcription runs on the server's CPU
-  and can take roughly as long as the recording itself.
+  and can take roughly as long as the recording itself. The first recording after a
+  server restart also waits for the speech model to download and load.
 </div>
 {% endif %}
 
