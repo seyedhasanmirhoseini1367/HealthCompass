@@ -36,13 +36,18 @@ jobs:
       SECRET_KEY: ci-secret-key-not-used-for-anything-real
       DEBUG: "False"
       ALLOWED_HOSTS: 127.0.0.1,localhost
+      # medical_records.E001 refuses DEBUG=False without durable object storage,
+      # so a deploy can never silently lose uploads. A CI runner is thrown away
+      # after every job, so ephemeral media is exactly right here — and without
+      # this opt-out the "Django system checks" step fails before the suite runs.
+      ALLOW_EPHEMERAL_MEDIA: "True"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Matches the development environment the pins were verified against.
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip

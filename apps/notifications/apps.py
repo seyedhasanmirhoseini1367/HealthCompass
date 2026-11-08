@@ -16,7 +16,15 @@ class NotificationsConfig(AppConfig):
 
         logger = logging.getLogger(__name__)
 
-        @receiver(post_save, sender=Notification, dispatch_uid='notifications.push_on_create')
+        # weak=False is load-bearing. This receiver is a local function, and
+        # signals hold receivers by weak reference by default: once ready()
+        # returned, nothing kept it alive, so it could be garbage-collected and
+        # silently disconnected. That happened with DEBUG=False — i.e. in
+        # production — where no push was ever sent for a directly written
+        # Notification (appointment reminders included). Caught by
+        # test_care_dispatch.NoDoublePushTests once CI ran with DEBUG=False.
+        @receiver(post_save, sender=Notification,
+                  dispatch_uid='notifications.push_on_create', weak=False)
         def push_on_notification(sender, instance, created, **kwargs):
             """
             Convenience push for code that writes a Notification directly.
