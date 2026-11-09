@@ -101,6 +101,21 @@ footer strong{color:white}
 .btn-outline{background:white;color:var(--primary-dk);border:1.5px solid var(--primary)}
 .btn-outline:hover{background:#e0f2fe;color:var(--primary-dk)}
 .btn-danger{background:var(--danger);color:white}
+.btn-danger:hover{background:#dc2626;color:white}
+.btn-secondary{background:var(--bg);color:var(--text);border:1.5px solid var(--border)}
+.btn-secondary:hover{background:#e2e8f0;color:var(--text)}
+.btn-ghost{background:transparent;color:var(--primary-dk)}
+.btn-ghost:hover{background:#e0f2fe}
+.btn-sm{padding:.35rem .8rem;font-size:.8rem;border-radius:8px}
+.btn-lg{padding:.75rem 1.6rem;font-size:1rem;border-radius:12px}
+.btn-block{width:100%;justify-content:center}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed;transform:none;pointer-events:none}
+/* Busy: set by static/js/ui.js while a form submits, so it cannot be sent twice. */
+.is-busy{position:relative;color:transparent!important;pointer-events:none}
+.is-busy>*{visibility:hidden}
+.is-busy::after{content:"";position:absolute;inset:0;margin:auto;width:1.05em;height:1.05em;border-radius:50%;border:2px solid;border-color:rgba(255,255,255,.95) rgba(255,255,255,.95) rgba(255,255,255,.95) transparent;animation:hc-spin .7s linear infinite}
+.btn-outline.is-busy::after,.btn-secondary.is-busy::after,.btn-ghost.is-busy::after,.is-busy:not(.btn)::after{border-color:var(--primary) var(--primary) var(--primary) transparent}
+@keyframes hc-spin{to{transform:rotate(360deg)}}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
 .card-header{padding:.6rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:.875rem;color:white;background:var(--gradient-brand)}
 .card-header i{color:white}
@@ -263,3 +278,28 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .tag-green   { background:#d1fae5;color:#065f46 }
 .tag-mint    { background:#f0fdf4;color:#16a34a }
 .tag-pink    { background:#fce7f3;color:#9d174d }
+
+
+/* -- Base form controls ---------------------------------------------------
+   :where() keeps specificity at zero, so any page that styles its own
+   inputs still wins. Only unstyled forms pick these up. */
+:where(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=hidden]):not([type=submit]):not([type=button]),select,textarea){font:inherit;font-size:.9rem;color:var(--text);background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:.5rem .8rem;transition:border-color .15s,box-shadow .15s;max-width:100%}
+:where(input,select,textarea):focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+:where(input,select,textarea):disabled{background:var(--bg);color:var(--muted);cursor:not-allowed}
+:where(input[type=checkbox],input[type=radio]){accent-color:var(--primary)}
+:where(.form-group){margin-bottom:1rem}
+:where(.form-group) :where(label){display:block;font-size:.82rem;font-weight:600;margin-bottom:.35rem;color:var(--text)}
+:where(.form-group) :where(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%}
+
+/* -- Phone safety ---------------------------------------------------------- */
+:where(main) :where(img,video,canvas,svg){max-width:100%}
+:where(main) :where(img,video){height:auto}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+
+/* -- Page-loading bar -------------------------------------------------------
+   Shown by static/js/ui.js after a short delay when a link or form starts
+   a navigation, so a slow server (or a cold start) is visibly working. */
+.hc-progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:2000;background:var(--gradient-brand);box-shadow:0 0 8px rgba(14,165,233,.5);opacity:0;transition:opacity .2s}
+.hc-progress.run{opacity:1;animation:hc-progress 8s cubic-bezier(.1,.7,.2,1) forwards}
+@keyframes hc-progress{from{width:0}20%{width:45%}60%{width:75%}to{width:92%}}
+@media (prefers-reduced-motion:reduce){.hc-progress.run{animation:none;width:70%}.is-busy::after{animation-duration:1.6s}}
