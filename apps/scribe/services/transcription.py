@@ -13,7 +13,7 @@ import threading
 
 from django.conf import settings
 
-from .errors import ScribeError
+from .errors import AUDIO_MISSING, ScribeError
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +120,9 @@ def local_audio_path(field_file):
 def transcribe(encounter, on_progress=None):
     """Transcribe an Encounter's audio and store the Transcript."""
     from apps.scribe.models import Transcript
+
+    if not encounter.audio_available:
+        raise ScribeError(AUDIO_MISSING)
 
     with local_audio_path(encounter.audio) as path:
         try:

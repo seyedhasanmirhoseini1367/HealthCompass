@@ -45,10 +45,15 @@
 {% if encounter.status == 'failed' %}
 <div class="sc-error sc-row" style="margin-bottom:1rem">
   <span>{{ encounter.error_message|default:"Processing failed." }}</span>
+  {% if can_retry %}
   <form method="post" action="{% url 'scribe:retry' encounter.pk %}">
     {% csrf_token %}
     <button type="submit" class="sc-btn">Retry</button>
   </form>
+  {% else %}
+  <span>The recording is no longer on the server, so this cannot be retried.
+    Delete it and <a href="{% url 'scribe:upload' %}">upload the recording again</a>.</span>
+  {% endif %}
 </div>
 {% elif encounter.is_in_progress %}
 <div class="sc-card sc-muted" id="scProgress">

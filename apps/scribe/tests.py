@@ -374,6 +374,40 @@ class RecoveryTests(TestCase):
         self.assertEqual(resp.status_code, 404)
         start.assert_not_called()
 
+    def _lose_audio(self):
+        # What a redeploy on an ephemeral disk does: the row survives, the file does not.
+        self.encounter.audio.storage.delete(self.encounter.audio.name)
+
+    @mock.patch('apps.scribe.services.pipeline.start_pipeline')
+    def test_retry_with_the_recording_gone_explains_instead_of_restarting(self, start):
+        self._age(0, status=Encounter.Status.FAILED)
+        self._lose_audio()
+        self.client.force_login(self.user)
+        self.client.post(reverse('scribe:retry', args=[self.encounter.pk]))
+        start.assert_not_called()
+        self.encounter.refresh_from_db()
+        self.assertEqual(self.encounter.status, Encounter.Status.FAILED)
+        self.assertIn('no longer on the server', self.encounter.error_message)
+
+    def test_detail_hides_retry_when_the_recording_is_gone(self):
+        self._age(0, status=Encounter.Status.FAILED)
+        self.client.force_login(self.user)
+        url = reverse('scribe:detail', args=[self.encounter.pk])
+        self.assertContains(self.client.get(url), reverse('scribe:retry', args=[self.encounter.pk]))
+        self._lose_audio()
+        resp = self.client.get(url)
+        self.assertNotContains(resp, reverse('scribe:retry', args=[self.encounter.pk]))
+        self.assertContains(resp, 'upload the recording again')
+
+    def test_pipeline_fails_clearly_when_the_recording_is_gone(self):
+        self._lose_audio()
+        with mock.patch('apps.scribe.services.transcription.transcribe_audio') as ta:
+            pipeline.run_pipeline(self.encounter.pk)
+        ta.assert_not_called()
+        self.encounter.refresh_from_db()
+        self.assertEqual(self.encounter.status, Encounter.Status.FAILED)
+        self.assertIn('no longer on the server', self.encounter.error_message)
+
     def test_model_size_can_come_from_the_environment(self):
         from apps.scribe.services.transcription import _cfg
         with mock.patch.dict(os.environ, {'SCRIBE_WHISPER_MODEL': 'tiny'}):

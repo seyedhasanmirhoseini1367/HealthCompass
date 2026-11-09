@@ -7,6 +7,7 @@ from django_ratelimit.decorators import ratelimit
 
 from .forms import EncounterUploadForm
 from .models import Encounter
+from .services.errors import AUDIO_MISSING
 from .services.evidence import EVIDENCE_SECTIONS
 from .services.note_generation import SECTIONS, format_timestamp
 from .services import pipeline
@@ -90,6 +91,7 @@ def encounter_detail(request, pk):
                 for i, s in enumerate(transcript.segments)] if transcript else []
     return render(request, 'scribe/detail.html', {
         'encounter': encounter,
+        'can_retry': encounter.status == Encounter.Status.FAILED and encounter.audio_available,
         'transcript': transcript,
         'segments': segments,
         'note': note,
@@ -120,6 +122,8 @@ def encounter_retry(request, pk):
         messages.error(request, 'Processing limit reached (10 per hour). Try again later.')
     elif not _has_llm_consent(request.user):
         messages.error(request, 'Grant the "external AI providers" consent first.')
+    elif not encounter.audio_available:
+        pipeline.fail(encounter, AUDIO_MISSING)
     else:
         pipeline.retry(encounter)
     return redirect('scribe:detail', pk=encounter.pk)

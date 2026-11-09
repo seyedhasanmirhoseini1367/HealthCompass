@@ -46,6 +46,20 @@ class Encounter(models.Model):
     def is_in_progress(self):
         return self.status in self.IN_PROGRESS
 
+    @property
+    def audio_available(self):
+        """
+        False when the recording is gone from storage. On a host with ephemeral
+        disk (e.g. Render without a persistent disk) every redeploy wipes
+        uploads while the database row survives.
+        """
+        if not self.audio:
+            return False
+        try:
+            return self.audio.storage.exists(self.audio.name)
+        except Exception:
+            return False
+
 
 class Transcript(models.Model):
     # One transcript per encounter; OneToOne is a unique FK.

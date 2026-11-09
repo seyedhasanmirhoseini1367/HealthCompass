@@ -117,10 +117,15 @@ def mark_if_stale(encounter):
     minutes = int(getattr(settings, 'SCRIBE_STALE_MINUTES', 15))
     if encounter.updated_at < timezone.now() - datetime.timedelta(minutes=minutes):
         _set_status(encounter, encounter.Status.FAILED,
-                    'Processing stopped without finishing — the server was most likely '
-                    'restarted, often because it ran out of memory loading the speech '
-                    'model. Try again, or use a smaller model (see the scribe README).')
+                    'Processing stopped without finishing — the server was restarted, '
+                    'either by a redeploy or because it ran out of memory loading the '
+                    'speech model. Try again, or use a smaller model (see the scribe README).')
     return encounter
+
+
+def fail(encounter, message):
+    """Mark an encounter failed with a message that is safe to show the user."""
+    _set_status(encounter, encounter.Status.FAILED, message)
 
 
 def retry(encounter):
