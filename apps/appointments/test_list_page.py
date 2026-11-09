@@ -32,7 +32,9 @@ class NextAppointmentTests(TestCase):
         body = r.content.decode()
         self.assertIn('Next appointment', body)
         self.assertIn('Later', body)
-        self.assertEqual(body.count('Cardiology'), 1)
+        # Shown once as a card title (the add-to-calendar menu repeats it in
+        # its label and links, which is not a duplicate card).
+        self.assertEqual(body.count('class="appt-title">Cardiology<'), 1)
 
     def test_a_single_appointment_shows_no_later_section(self):
         self._appt('Cardiology', 2)

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load appointment_tags %}
 {% block title %}My Appointments — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
@@ -18,6 +19,16 @@
 .appt-meta span{display:flex;align-items:center;gap:.25rem}
 .appt-actions{display:flex;gap:.4rem;align-items:center;flex-shrink:0}
 .past-card{opacity:.65}
+.view-switch{display:inline-flex;background:rgba(255,255,255,.18);border-radius:10px;padding:3px;gap:3px}
+.view-switch a{color:white;text-decoration:none;font-size:.82rem;font-weight:600;padding:.35rem .8rem;border-radius:8px}
+.view-switch a.on{background:white;color:var(--primary-dk)}
+.addcal{position:relative}
+.addcal summary{list-style:none;cursor:pointer}
+.addcal summary::-webkit-details-marker{display:none}
+.addcal-menu{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.12);padding:.35rem;min-width:200px;z-index:20}
+.addcal-menu a{display:flex;align-items:center;gap:.55rem;padding:.5rem .65rem;border-radius:7px;font-size:.85rem;color:var(--text);text-decoration:none}
+.addcal-menu a:hover{background:var(--bg)}
+.hero-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
 .next-card{background:white;border:1px solid #bae6fd;border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;box-shadow:0 4px 16px rgba(14,165,233,.10);position:relative;overflow:hidden}
 .next-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gradient-brand)}
 .next-card .appt-date{min-width:68px;padding:.65rem .5rem}
@@ -36,9 +47,15 @@
     <h1>📅 My Appointments</h1>
     <p>Schedule visits and get reminders right on time</p>
   </div>
-  <a href="{% url 'appointments:create' %}" class="btn btn-primary" style="background:white;color:var(--primary-dk);font-weight:700">
-    <i class="fas fa-plus"></i> New Appointment
-  </a>
+  <div class="hero-actions">
+    <nav class="view-switch" aria-label="View">
+      <a href="{% url 'appointments:list' %}" class="on" aria-current="page"><i class="fas fa-list"></i> List</a>
+      <a href="{% url 'appointments:month' %}"><i class="fas fa-calendar"></i> Calendar</a>
+    </nav>
+    <a href="{% url 'appointments:create' %}" class="btn btn-primary" style="background:white;color:var(--primary-dk);font-weight:700">
+      <i class="fas fa-plus"></i> New Appointment
+    </a>
+  </div>
 </div>
 
 <h2 class="section-h"><i class="fas fa-calendar-day"></i> Next appointment</h2>
@@ -64,6 +81,7 @@
     </div>
   </div>
   <div class="appt-actions">
+    {% include 'appointments/_addcal.html' with appt=next_appt %}
     <a href="{% url 'appointments:edit' next_appt.pk %}" class="btn btn-outline" style="padding:.35rem .75rem;font-size:.8rem">Edit</a>
     <a href="{% url 'appointments:delete' next_appt.pk %}" class="btn btn-danger" style="padding:.35rem .75rem;font-size:.8rem">Delete</a>
   </div>
@@ -98,6 +116,7 @@
       </div>
     </div>
     <div class="appt-actions">
+      {% include 'appointments/_addcal.html' %}
       <a href="{% url 'appointments:edit' appt.pk %}" class="btn btn-outline" style="padding:.35rem .75rem;font-size:.8rem">Edit</a>
       <a href="{% url 'appointments:delete' appt.pk %}" class="btn btn-danger" style="padding:.35rem .75rem;font-size:.8rem">Delete</a>
     </div>
