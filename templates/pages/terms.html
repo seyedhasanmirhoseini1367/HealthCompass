@@ -1,0 +1,35 @@
+{% extends 'pages/_legal.html' %}
+{% block title %}Terms of use — HealthCompass{% endblock %}
+{% block doc %}
+<h1>Terms of use</h1>
+<p class="lg-meta">The rules for using HealthCompass</p>
+
+<h2>The service</h2>
+<p>HealthCompass is a prototype for organising personal health information and exploring it with AI. It is provided as is, may change or be unavailable at times, and is not a medical service. See the <a href="{% url 'disclaimer' %}">medical disclaimer</a>.</p>
+
+<h2>Your account</h2>
+<ul>
+  <li>Give accurate details and keep your password private. You are responsible for what happens under your account.</li>
+  <li>Doctor, hospital and staff accounts are approved before they get access to other people's information.</li>
+  <li>Tell us if you think someone else has used your account.</li>
+</ul>
+
+<h2>What you upload</h2>
+<ul>
+  <li>Only upload information you are entitled to share. For someone else's data, you need their permission.</li>
+  <li>You keep ownership of what you upload. You let HealthCompass store and process it to run the features you use.</li>
+  <li>Keep your own copies of important documents. Download your data at any time from Settings.</li>
+</ul>
+
+<h2>Acceptable use</h2>
+<p>Do not try to access other people's data without permission, disrupt the service, probe it for weaknesses without agreement, or use it for anything unlawful.</p>
+
+<h2>Clinicians and staff</h2>
+<p>Professional users see patient information only as patients have allowed, and remain responsible for their own clinical judgement and professional obligations. AI output, including scribe notes, is a draft to be checked, never a final record.</p>
+
+<h2>Ending use</h2>
+<p>You can delete your account at any time. Accounts that misuse the service may be suspended.</p>
+
+<h2>Liability</h2>
+<p>To the extent the law allows, HealthCompass is not liable for decisions made on the basis of information in the service, or for loss caused by interruptions or errors.</p>
+{% endblock %}

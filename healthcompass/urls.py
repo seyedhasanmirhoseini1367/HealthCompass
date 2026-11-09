@@ -2,7 +2,7 @@ import logging
 
 from django.contrib import admin
 from django.urls import path, include, re_path
-from django.views.generic import RedirectView
+from django.views.generic import RedirectView, TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import FileResponse, Http404, JsonResponse
@@ -155,6 +155,14 @@ def _safe_file_response(path: Path):
     return response
 
 
+def _page(name):
+    """About and the legal pages: static templates, public, one shared layout."""
+    return TemplateView.as_view(
+        template_name=f'pages/{name}.html',
+        extra_context={'page': name,
+                       'contact_email': getattr(settings, 'CONTACT_EMAIL', '')})
+
+
 urlpatterns = [
     path('health/', health),
     path('health/ready/', readiness),
@@ -163,6 +171,10 @@ urlpatterns = [
     path('auth/3rdparty/signup/', AutoCompleteSocialSignup.as_view(), name='socialaccount_signup'),
     path('auth/', include('allauth.urls')),
     path('', home, name='home'),
+    path('about/', _page('about'), name='about'),
+    path('privacy/', _page('privacy'), name='privacy'),
+    path('terms/', _page('terms'), name='terms'),
+    path('disclaimer/', _page('disclaimer'), name='disclaimer'),
     path('accounts/', include('apps.accounts.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
     path('records/', include('apps.medical_records.urls')),

@@ -1,0 +1,27 @@
+{% extends 'pages/_legal.html' %}
+{% block title %}About — HealthCompass{% endblock %}
+{% block doc %}
+<h1>About HealthCompass</h1>
+<p class="lg-meta">Data · Insight · Care</p>
+
+<p>HealthCompass brings your medical records, reminders, appointments and the people who help you into one place, and lets you ask questions about your own health in plain language.</p>
+
+<h2>What it does</h2>
+<ul>
+  <li><strong>Records.</strong> Upload lab results and documents; they are read, organised and searchable.</li>
+  <li><strong>AI Assistant.</strong> Ask about your own records or general health topics. Answers cite where they came from.</li>
+  <li><strong>Reminders and appointments.</strong> Medication reminders you confirm, and visits with reminders before them.</li>
+  <li><strong>Companions.</strong> Share chosen parts of your health information with family or carers, and look after others.</li>
+  <li><strong>For clinicians and staff.</strong> Patient overviews for doctors, an experimental AI scribe, and analytics tools for the team.</li>
+</ul>
+
+<h2>Status</h2>
+<p>HealthCompass is a prototype under active development. Features change, and some are marked experimental. It is not a medical device; please read the <a href="{% url 'disclaimer' %}">medical disclaimer</a>.</p>
+
+<h2>Contact</h2>
+{% if contact_email %}
+<p>Questions, feedback or privacy requests: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+{% else %}
+<p>Signed-in users can manage their data from <a href="/dashboard/settings/">Settings</a>.</p>
+{% endif %}
+{% endblock %}

@@ -140,9 +140,20 @@
 </div>
 {% endif %}
 <main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
-<footer>
-    <p><strong>HealthCompass</strong> &nbsp;·&nbsp; AI-Powered Health Insights &nbsp;·&nbsp; MVP Prototype</p>
-    <p style="margin-top:.3rem;font-size:.75rem">Not a substitute for professional medical advice</p>
+<footer class="site-footer">
+    <div class="ft-inner">
+        <div class="ft-brand">
+            <strong>HealthCompass</strong>
+            <span>Your health records, reminders and care in one place.</span>
+        </div>
+        <nav class="ft-links" aria-label="Footer">
+            <a href="{% url 'about' %}">About</a>
+            <a href="{% url 'privacy' %}">Privacy</a>
+            <a href="{% url 'terms' %}">Terms</a>
+            <a href="{% url 'disclaimer' %}">Medical disclaimer</a>
+        </nav>
+    </div>
+    <p class="ft-note">&copy; {% now "Y" %} HealthCompass &nbsp;·&nbsp; Not a substitute for professional medical advice. In an emergency call 112.</p>
 </footer>
 {% block extra_js %}{% endblock %}
 

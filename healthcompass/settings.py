@@ -32,6 +32,8 @@ AUTHENTICATION_BACKENDS = [
 
 # Email address to notify when a new professional role registers
 ADMIN_NOTIFICATION_EMAIL = config('ADMIN_NOTIFICATION_EMAIL', default='')
+# Shown on About and Privacy when set. Empty hides the contact lines.
+CONTACT_EMAIL = config('CONTACT_EMAIL', default='')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
