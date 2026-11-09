@@ -23,26 +23,10 @@ def home(request):
     ctx = {}
 
     if user.is_patient:
-        # One builder for the whole page. The view neither queries nor decides
-        # what anything means — `overview` owns both, so the web page and any
-        # future API answer the same question the same way.
-        #
-        # Caregiver content is part of the SAME dashboard rather than a separate
-        # one: "caregiver" is not a role in this system, it is a SharingGrant
-        # relationship, and most people who have one are also patients. Giving
-        # them two dashboards would mean choosing which of their two reasons for
-        # opening the app mattered more.
-        from apps.dashboard.overview import build_dashboard
-        from apps.dashboard.services import get_patient_dashboard_data
-
-        ctx.update(build_dashboard(user))
-
-        # Still needed for the "recent activity" strip at the foot of the page.
-        data = get_patient_dashboard_data(user)
-        ctx['records']            = data['recent_records']
-        ctx['total_records']      = data['total_records']
-        ctx['recent_predictions'] = data['recent_predictions']
-        template = 'dashboard/patient.html'
+        # A patient's home is My Health, which now opens with what used to be
+        # this dashboard ("Today"). Kept as a redirect so old links and
+        # bookmarks to /dashboard/ still land somewhere sensible.
+        return redirect('dashboard:my_health')
 
     elif user.is_doctor:
         rels = PatientDoctorRelationship.objects.filter(

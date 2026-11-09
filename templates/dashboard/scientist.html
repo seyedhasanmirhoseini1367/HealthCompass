@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Scientist Dashboard — HealthCompass{% endblock %}
+{% block title %}Workspace — HealthCompass{% endblock %}
 {% block extra_css %}
 <style>
 /* .dash-header replaced by global .page-hero */
@@ -22,7 +22,7 @@
 {% block content %}
 <div class="page-hero">
   <h1>🔬 {{ user.get_full_name|default:user.username }}</h1>
-  <p>Your published AI models and usage statistics</p>
+  <p>Workspace · your published AI models and usage statistics</p>
 </div>
 
 <div class="stat-grid">

@@ -34,7 +34,7 @@ class ConsentPageReachabilityTests(TestCase):
     def test_a_signed_in_patient_is_given_a_link_to_it(self):
         """ACCEPTANCE. No template referenced the page at all."""
         url = reverse('accounts:consent')
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/', follow=True)
         self.assertContains(response, f'href="{url}"',
                             msg_prefix='no link to Privacy & Consent in the chrome')
 
@@ -52,7 +52,7 @@ class ConsentPageReachabilityTests(TestCase):
         either half of the route breaks, including if the Settings page stops
         linking consent.
         """
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/', follow=True).content.decode()
         mobile = body[body.index('id="mobileMenu"'):body.index('</nav>')]
         self.assertIn('href="/dashboard/settings/"', mobile,
                       'the phone menu has no route towards consent')

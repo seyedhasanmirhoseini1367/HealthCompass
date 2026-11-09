@@ -86,7 +86,7 @@ class EmptyStateTests(_Dash):
 
     def test_the_page_renders_for_an_empty_account(self):
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Nothing needs your attention right now')
@@ -110,7 +110,7 @@ class NoInventedNumbersTests(_Dash):
         """ACCEPTANCE — no defensible basis exists for one, so none is shown."""
         self._occurrence(TaskOccurrence.State.CONFIRMED)
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
 
         body = response.content.decode().lower()
         for term in ('health score', 'wellness score', 'risk index',
@@ -142,7 +142,7 @@ class SilenceWordingTests(_Dash):
     def test_the_rendered_page_never_says_the_patient_missed_a_dose(self):
         self._occurrence(TaskOccurrence.State.UNCONFIRMED)
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode().lower()
+        body = self.client.get('/dashboard/health/').content.decode().lower()
 
         self.assertNotIn('you missed', body)
         self.assertNotIn('did not take', body)
@@ -208,7 +208,7 @@ class StateSemanticsTests(_Dash):
 
         with patch('apps.dashboard.overview.recent_measurements',
                    side_effect=RuntimeError('boom')):
-            response = self.client.get('/dashboard/')
+            response = self.client.get('/dashboard/health/')
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Critical potassium')
@@ -244,7 +244,7 @@ class IsolationTests(_Dash):
                                    message='…')
 
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
 
         self.assertNotContains(response, 'Warfarin')
         self.assertNotContains(response, 'Their appointment')
@@ -253,7 +253,7 @@ class IsolationTests(_Dash):
     def test_the_dashboard_takes_no_patient_parameter(self):
         """ACCEPTANCE — there is no id in the request to substitute."""
         self.client.force_login(self.patient)
-        response = self.client.get(f'/dashboard/?patient={self.other.pk}')
+        response = self.client.get(f'/dashboard/health/?patient={self.other.pk}')
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Onni')
@@ -329,7 +329,7 @@ class CaregiverDashboardTests(_Dash):
         signal.occurrences.set([occurrence])
 
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
 
         self.assertContains(response, 'Onni')
         self.assertNotContains(response, DRUG)
@@ -362,70 +362,76 @@ class CaregiverDashboardTests(_Dash):
 
 
 class NavigationTests(_Dash):
-    """The dashboard must not become a second menu, but must be reachable."""
+    """
+    One menu per role, in the sidebar only. The patient Dashboard merged into
+    My Health, so a patient has one home page.
+    """
 
-    #: Top-level destinations. Everything else lives under Dashboard.
-    PRIMARY_NAV = ('/', '/assistant/', '/insights/', '/records/', '/dashboard/',
-                   '/dashboard/settings/')
+    #: A patient's menu, in order.
+    PATIENT_NAV = ('/dashboard/health/', '/records/', '/appointments/', '/care/',
+                   '/assistant/', '/insights/', '/dashboard/settings/')
 
-    #: Folded under Dashboard rather than removed.
-    GROUPED = ('/dashboard/health/', '/care/', '/appointments/')
+    def _sidebar(self, user, url='/dashboard/health/'):
+        self.client.force_login(user)
+        body = self.client.get(url, follow=True).content.decode()
+        return body[body.index('class="sb-nav"'):body.index('</aside>')]
 
-    def test_the_navigation_is_six_destinations(self):
-        """
-        ACCEPTANCE — the sidebar had twelve entries, four of which were
-        different views of "caring". The complexity moved inside a group; it
-        did not disappear, and neither did any capability.
-        """
-        self.client.force_login(self.patient)
+    def test_the_patient_menu_is_seven_destinations_in_order(self):
+        sidebar = self._sidebar(self.patient)
+        positions = [sidebar.index(f'href="{h}"') for h in self.PATIENT_NAV]
+        self.assertEqual(positions, sorted(positions), 'menu order changed')
+        self.assertEqual(sidebar.count('class="sb-link"'), len(self.PATIENT_NAV))
+
+    def test_a_patient_does_not_see_scribe_or_a_separate_dashboard(self):
+        sidebar = self._sidebar(self.patient)
+        self.assertNotIn('href="/scribe/"', sidebar)
+        self.assertNotIn('href="/dashboard/"', sidebar)
+
+    def test_a_doctors_menu_starts_with_my_patients_and_has_scribe(self):
+        doctor = User.objects.create_user('db_doc', email='db_doc@test.invalid',
+                                          password='pw', role='doctor')
+        sidebar = self._sidebar(doctor, '/dashboard/')
+        self.assertLess(sidebar.index('My Patients'), sidebar.index('href="/scribe/"'))
+        self.assertNotIn('href="/dashboard/health/"', sidebar)
+
+    def test_staff_see_workspace(self):
+        staff = User.objects.create_user('db_staff', email='db_staff@test.invalid',
+                                         password='pw', role='data_scientist')
+        sidebar = self._sidebar(staff, '/dashboard/')
+        self.assertIn('Workspace', sidebar)
+        self.assertNotIn('href="/scribe/"', sidebar)
+
+    def test_staff_show_their_job_title_next_to_the_role(self):
+        from apps.accounts.models import DataScientistProfile
+        staff = User.objects.create_user('db_staff2', email='db_staff2@test.invalid',
+                                         password='pw', role='data_scientist')
+        DataScientistProfile.objects.create(
+            user=staff, job_title=DataScientistProfile.JobTitle.DEVELOPER)
+        self.client.force_login(staff)
         body = self.client.get('/dashboard/').content.decode()
-        sidebar = body[body.index('class="sb-nav"'):body.index('</aside>')]
+        self.assertIn('>Staff<span class="role-job"> · Developer</span>', body)
+        self.assertNotIn('Data Scientist</span>', body)
 
-        for href in self.PRIMARY_NAV:
-            self.assertIn(f'href="{href}"', sidebar,
-                          f'{href} left the navigation')
-
-        # The grouped ones are present, but never as top-level rows.
-        for href in self.GROUPED:
-            self.assertIn(f'href="{href}"', sidebar,
-                          f'{href} is not reachable from the sidebar at all')
-            # class= follows href= in the anchor, so look forward from it.
-            at = sidebar.index(f'href="{href}"')
-            self.assertIn('sb-sublink', sidebar[at:at + 120],
-                          f'{href} is a top-level destination again')
-
-    def test_dashboard_is_still_a_destination_not_only_a_toggle(self):
-        """
-        ACCEPTANCE — a parent that merely expands leaves no way to open the
-        overview, which is the one screen answering "does anything need me".
-        """
+    def test_the_phone_menu_matches_the_sidebar(self):
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
-        sidebar = body[body.index('class="sb-nav"'):body.index('</aside>')]
+        body = self.client.get('/dashboard/health/').content.decode()
+        phone = body[body.index('id="mobileMenu"'):body.index('</nav>', body.index('id="mobileMenu"'))]
+        for href in self.PATIENT_NAV:
+            self.assertIn(f'href="{href}"', phone, f'{href} missing from the phone menu')
 
-        self.assertIn('href="/dashboard/" class="sb-link sb-parent"', sidebar)
-        self.assertIn('aria-expanded', sidebar)
-        self.assertIn('aria-controls="dashSub"', sidebar)
-
-    def test_the_group_is_collapsed_by_default(self):
+    def test_signed_in_users_have_no_second_menu_in_the_top_bar(self):
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/health/').content.decode()
+        self.assertNotIn('class="nav-links"', body)
 
-        self.assertIn('id="dashSub" hidden', body)
+    def test_the_old_dashboard_address_takes_a_patient_to_my_health(self):
+        self.client.force_login(self.patient)
+        self.assertRedirects(self.client.get('/dashboard/'), '/dashboard/health/')
 
-    def test_the_hidden_attribute_can_actually_hide_the_group(self):
-        """
-        ACCEPTANCE — it could not, and the panel was stuck open.
-
-        `.sb-sub{display:flex}` is an author rule and beats the browser's
-        `[hidden]{display:none}`, so toggling the attribute changed nothing on
-        screen. The stylesheet needs a rule that out-specifies it.
-        """
-        from django.contrib.staticfiles import finders
-
-        css = open(finders.find('css/main.css'), encoding='utf-8').read()
-        self.assertIn('.sb-sub[hidden]', css,
-                      'nothing in the stylesheet can hide the sub-group')
+    def test_the_site_root_takes_a_signed_in_user_to_their_home(self):
+        self.client.force_login(self.patient)
+        self.assertRedirects(self.client.get('/'), '/dashboard/health/',
+                             fetch_redirect_response=False)
 
     def test_notifications_is_not_duplicated_in_the_sidebar(self):
         """
@@ -433,23 +439,12 @@ class NavigationTests(_Dash):
         so a sidebar row would be the same destination twice on one screen.
         """
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/health/').content.decode()
         sidebar = body[body.index('class="sb-nav"'):body.index('</aside>')]
 
         self.assertNotIn('/notifications/', sidebar)
         # Still reachable — from the bell.
         self.assertIn('class="nav-notification"', body)
-
-    def test_the_toggle_is_reachable_without_a_mouse(self):
-        """A div with an onclick is invisible to keyboard and screen readers."""
-        self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
-        sidebar = body[body.index('class="sb-nav"'):body.index('</aside>')]
-
-        caret = sidebar[sidebar.index('id="dashCaret"') - 200:
-                        sidebar.index('id="dashCaret"') + 260]
-        self.assertIn('<button', caret)
-        self.assertIn('aria-label', caret)
 
     def test_every_retired_destination_is_still_reachable(self):
         """
@@ -498,7 +493,7 @@ class NavigationTests(_Dash):
         """
         self._grant(self.other, self.patient)
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/care/').content.decode()
         main = body[body.index('<main'):body.index('</main>')]
 
         self.assertIn('People I look after', main)
@@ -542,7 +537,7 @@ class NoDuplicationTests(_Dash):
     def test_the_person_appears_exactly_once_on_the_page(self):
         self._person_needing_attention()
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/health/').content.decode()
 
         self.assertEqual(body.count('>Onni<'), 1)
 
@@ -559,18 +554,23 @@ class NoDuplicationTests(_Dash):
         self._occurrence(TaskOccurrence.State.UNCONFIRMED, hours_ago=3)
 
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/health/').content.decode()
 
         self.assertLess(body.index('>Today<'), body.index('Needs your attention'))
         self.assertLess(body.index('Needs your attention'),
                         body.index('People I look after'))
 
-    def test_the_order_is_the_same_when_nobody_needs_help(self):
+    def test_people_who_are_fine_stay_on_companions(self):
+        """
+        My Health is about you. The people you look after appear there only
+        when one of them needs attention; otherwise they are on Companions.
+        """
         self._grant(self.other, self.patient)
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
 
-        self.assertLess(body.index('>Today<'), body.index('People I look after'))
+        health = self.client.get('/dashboard/health/').content.decode()
+        self.assertNotIn('>Onni<', health)
+        self.assertContains(self.client.get('/care/'), 'Onni')
 
     def test_the_count_reads_as_english(self):
         self._person_needing_attention()
@@ -597,7 +597,7 @@ class SetupGuidanceTests(_Dash):
         self.assertFalse(data['fully_checked'])
 
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
         self.assertContains(response, 'in what is set up so far')
         self.assertNotContains(response, 'Nothing needs your attention right now')
 
@@ -619,7 +619,7 @@ class SetupGuidanceTests(_Dash):
         self.assertTrue(data['fully_checked'])
 
         self.client.force_login(self.patient)
-        self.assertContains(self.client.get('/dashboard/'),
+        self.assertContains(self.client.get('/dashboard/health/'),
                             'Nothing needs your attention right now')
 
     def test_no_reassurance_while_someone_watched_needs_help(self):
@@ -641,7 +641,7 @@ class SetupGuidanceTests(_Dash):
         self.assertFalse(build_dashboard(self.patient)['show_reassurance'])
 
         self.client.force_login(self.patient)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
         self.assertNotContains(response, 'Nothing needs your attention')
         self.assertContains(response, '1 thing needs attention')
 
@@ -661,7 +661,7 @@ class SetupGuidanceTests(_Dash):
         list without making anything reachable.
         """
         self.client.force_login(self.patient)
-        body = self.client.get('/dashboard/').content.decode()
+        body = self.client.get('/dashboard/health/').content.decode()
         menu = body[body.index('id="userMenu"'):body.index('id="userMenu"') + 1800]
 
         for gone in ('/accounts/profile/edit/', '/accounts/password/change/'):

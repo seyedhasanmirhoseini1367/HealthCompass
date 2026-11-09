@@ -106,8 +106,9 @@ class DoctorProfileForm(forms.ModelForm):
 class DataScientistProfileForm(forms.ModelForm):
     class Meta:
         model   = DataScientistProfile
-        fields  = ['institution', 'research_area']
+        fields  = ['job_title', 'institution', 'research_area']
         widgets = {
+            'job_title':     forms.Select(attrs=_FC),
             'institution':   forms.TextInput(attrs=_FC),
             'research_area': forms.TextInput(attrs=_FC),
         }

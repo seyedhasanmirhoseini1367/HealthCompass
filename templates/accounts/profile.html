@@ -45,7 +45,7 @@
         {% elif user.is_data_scientist %}background:#ede9fe;color:#7c3aed
         {% elif user.is_hospital_admin %}background:#fef3c7;color:#b45309
         {% else %}background:#f1f5f9;color:var(--text){% endif %}">
-        {{ user.get_role_display }}
+        {{ user.get_role_display }}{% if user.is_data_scientist and profile.job_title %} · {{ profile.get_job_title_display }}{% endif %}
       </span>
     </div>
   </div>
@@ -75,7 +75,7 @@
   <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)">
     {% if user.is_patient %}🏥 Patient Details
     {% elif user.is_doctor %}👨‍⚕️ Doctor Details
-    {% elif user.is_data_scientist %}🔬 Researcher Details
+    {% elif user.is_data_scientist %}🔬 Staff Details
     {% elif user.is_hospital_admin %}🏨 Hospital Details
     {% endif %}
   </h3>
@@ -91,6 +91,7 @@
       <div class="info-item"><div class="label">Hospital</div><div class="value">{{ profile.hospital|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Department</div><div class="value">{{ profile.department|default:"—" }}</div></div>
     {% elif user.is_data_scientist %}
+      <div class="info-item"><div class="label">Job Title</div><div class="value">{{ profile.get_job_title_display|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Institution</div><div class="value">{{ profile.institution|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Research Area</div><div class="value">{{ profile.research_area|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Approval Status</div>
@@ -105,7 +106,7 @@
 {% endif %}
 
 <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
-  <a href="{% url 'dashboard:home' %}" class="btn" style="background:#f1f5f9;color:var(--text)">← Dashboard</a>
+  <a href="{% url 'dashboard:home' %}" class="btn" style="background:#f1f5f9;color:var(--text)">← Home</a>
   {% if user.is_patient %}
   <a href="{% url 'medical_records:list' %}" class="btn" style="background:var(--primary);color:white">My Records</a>
   {% endif %}

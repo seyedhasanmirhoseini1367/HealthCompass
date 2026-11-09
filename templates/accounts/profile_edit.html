@@ -144,8 +144,13 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
           </div>
 
           {% elif request.user.is_data_scientist %}
-          <div class="section-divider">Researcher Details</div>
+          <div class="section-divider">Staff Details</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="form-group" style="grid-column:1 / -1">
+              <label class="form-label" for="{{ profile_form.job_title.id_for_label }}">{{ profile_form.job_title.label }}</label>
+              {{ profile_form.job_title }}
+              {% if profile_form.job_title.errors %}<ul class="form-errors">{% for e in profile_form.job_title.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
             <div class="form-group">
               <label class="form-label">{{ profile_form.institution.label }}</label>
               {{ profile_form.institution }}

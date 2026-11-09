@@ -61,7 +61,25 @@ def my_health(request):
                            due_at__lte=now + timedelta(days=1))
                    .select_related('task').order_by('due_at'))
 
+    # Today: what used to be the patient Dashboard. Built by the same overview
+    # service, so its state rules (absence is never good news, no invented
+    # numbers) are unchanged. Patients only: other roles have their own home.
+    today = {}
+    if request.user.is_patient:
+        from apps.dashboard.overview import build_dashboard
+        today = build_dashboard(request.user)
+
+    # My Health is now a patient's home page, so one failing section must not
+    # take it down. The Today block already degrades per section; measurements
+    # get the same treatment here.
+    try:
+        measurements = recent_measurements(request.user, limit=6)
+    except Exception:
+        logger.exception('my_health: recent measurements failed')
+        measurements = []
+
     return render(request, 'dashboard/my_health.html', {
+        **today,
         'occurrences':   occurrences,
         'tasks':         CareTask.objects.filter(patient=request.user,
                                                  is_active=True),
@@ -72,7 +90,7 @@ def my_health(request):
         'reports':       PatientReport.objects.filter(patient=request.user)[:5],
         'alerts':        alerts,
         'unread_alerts': sum(1 for a in alerts if not a.is_read),
-        'measurements':  recent_measurements(request.user, limit=6),
+        'measurements':  measurements,
         'record_count':  MedicalRecord.objects.filter(patient=request.user).count(),
         'recent_records': MedicalRecord.objects.filter(patient=request.user)
                           .order_by('-uploaded_at')[:5],

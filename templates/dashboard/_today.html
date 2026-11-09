@@ -1,0 +1,125 @@
+{% comment %}
+  Today: the top of My Health for patients. This was the patient Dashboard; it
+  moved here so a patient has one home page instead of two that overlapped.
+
+  People you look after live on Companions. They appear here only when one of
+  them needs attention, names and state only: what is wrong stays on their
+  page, behind the scopes they granted.
+{% endcomment %}
+  {% comment %}
+    ── Today ───────────────────────────────────────────────────────────────
+    Each card is a summary that links to the page that owns the subject. The
+    dashboard never reproduces those pages; it says whether they are worth
+    opening.
+  {% endcomment %}
+  <h2 class="db-sec-h">Today</h2>
+  <div class="db-grid">
+    {% with med=sections.medications appt=sections.appointments care=sections.care %}
+
+    <a class="db-card" href="{{ med.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">💊 {{ med.title }}</span>
+        {% comment %}
+          The chip is suppressed when the card already explains itself. It read
+          "Nothing recorded yet" directly above a summary saying "No medication
+          reminders set up." — the same fact twice, in a smaller font.
+        {% endcomment %}
+        {% if med.state != 'no_data' or not med.summary %}
+        <span class="db-state {{ med.style.tone }}">{{ med.style.label }}</span>
+        {% endif %}
+      </div>
+      {% if med.summary %}<div class="db-card-s">{{ med.summary }}</div>{% endif %}
+      {% for item in med.items %}{% if not item.is_actionable and item.state != 'ok' %}
+      <div class="db-line"><b>{{ item.title }}</b>{% if item.detail %} — {{ item.detail }}{% endif %}</div>
+      {% endif %}{% endfor %}
+    </a>
+
+    <a class="db-card" href="{{ appt.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">📅 Next appointment</span>
+        {% if appt.state != 'no_data' or not appt.summary %}
+        <span class="db-state {{ appt.style.tone }}">{{ appt.style.label }}</span>
+        {% endif %}
+      </div>
+      {% for item in appt.items %}
+      <div class="db-card-s"><b>{{ item.title }}</b></div>
+      <div class="db-line">{{ item.detail }}</div>
+      {% empty %}
+      <div class="db-card-s">{{ appt.summary }}</div>
+      {% endfor %}
+    </a>
+
+    <a class="db-card" href="{{ care.href }}">
+      <div class="db-card-h">
+        <span class="db-card-t">🫀 {{ care.title }}</span>
+        {% if care.state != 'no_data' or not care.summary %}
+        <span class="db-state {{ care.style.tone }}">{{ care.style.label }}</span>
+        {% endif %}
+      </div>
+      {% if care.summary %}<div class="db-card-s">{{ care.summary }}</div>{% endif %}
+      {% for item in care.items %}{% if not item.is_actionable and item.state != 'ok' %}
+      <div class="db-line"><b>{{ item.title }}</b></div>
+      {% endif %}{% endfor %}
+    </a>
+
+    {% endwith %}
+  </div>
+
+  {% comment %}
+    ── What needs you ──────────────────────────────────────────────────────
+    Shown ONLY when something genuinely does. An always-present "attention"
+    box that usually says "nothing" trains people to skip it, and then it is
+    not there when it matters.
+  {% endcomment %}
+  {% if attention %}
+  <div class="db-attention {% if overall == 'urgent' %}urgent{% endif %}">
+    <h2>{% if overall == 'urgent' %}Needs attention now{% else %}Needs your attention{% endif %}</h2>
+    {% for section, item in attention %}
+    <a class="db-att-item" href="{{ item.href|default:section.href }}">
+      <span class="db-att-title">{{ item.style.dot }} {{ item.title }}</span>
+      {% if item.detail %}<span class="db-att-detail">{{ item.detail }}</span>{% endif %}
+      {% if item.action %}<span class="db-att-cta">{{ item.action.0 }} →</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% elif show_reassurance and fully_checked %}
+  <div class="db-calm">
+    <p>✅ Nothing needs your attention right now.</p>
+  </div>
+  {% elif show_reassurance and has_any_data %}
+  {% comment %}
+    Qualified on purpose. Saying "all clear" to someone with no medication
+    reminders set up is reassurance about a thing nobody checked, and the
+    honest version is more useful anyway: it says what would make the page
+    work.
+  {% endcomment %}
+  <div class="db-calm" style="background:#f8fafc;border-color:var(--border)">
+    <p style="color:#334155">Nothing needs your attention in what is set up so far.</p>
+    <div style="margin-top:.6rem;display:flex;gap:.6rem;flex-wrap:wrap">
+      {% for gap in setup_gaps %}
+      <a href="{{ gap.href }}" style="font-size:.88rem;font-weight:600;color:var(--primary);text-decoration:none">
+        {{ gap.label }} →
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if watching_urgent %}
+  <h2 class="db-sec-h">People I look after</h2>
+  {% for item in watching.items %}{% if item.state == 'attention' or item.state == 'urgent' %}
+  <a class="db-person" href="{{ item.href }}">
+    <span>
+      <span class="db-person-n">{{ item.title }}</span>
+      <span class="db-person-d">{{ item.detail }}</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:.7rem">
+      <span class="db-state {{ item.style.tone }}">{{ item.style.dot }} {{ item.style.label }}</span>
+      <span style="font-size:.85rem;font-weight:700;color:var(--primary);white-space:nowrap">View →</span>
+    </span>
+  </a>
+  {% endif %}{% endfor %}
+  <p style="font-size:.85rem;color:#64748b;margin:.3rem 0 1.6rem">
+    <a href="{% url 'care:my_care' %}" style="color:var(--primary);text-decoration:none">Everyone you look after is on Companions →</a>
+  </p>
+  {% endif %}

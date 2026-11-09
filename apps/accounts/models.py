@@ -8,7 +8,11 @@ class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         PATIENT        = 'patient',        'Patient'
         DOCTOR         = 'doctor',         'Doctor'
-        DATA_SCIENTIST = 'data_scientist', 'Data Scientist'
+        # Shown as "Staff": developers, data scientists, analysts and others who
+        # work on the platform. The stored value stays 'data_scientist' so no
+        # existing account, permission or approval changes. The person's actual
+        # job is DataScientistProfile.job_title.
+        DATA_SCIENTIST = 'data_scientist', 'Staff'
         HOSPITAL_ADMIN = 'hospital_admin', 'Hospital Admin'
         ADMIN          = 'admin',          'Admin'
 
@@ -22,7 +26,7 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=20, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     is_approved = models.BooleanField(default=True,
-        help_text='Patients are auto-approved. Doctors, Data Scientists, and Hospital Admins require admin approval.')
+        help_text='Patients are auto-approved. Doctors, Staff, and Hospital Admins require admin approval.')
 
     def save(self, *args, **kwargs):
         """
@@ -106,7 +110,22 @@ class DoctorProfile(models.Model):
 
 
 class DataScientistProfile(models.Model):
+    """Profile for the Staff role (stored role value: 'data_scientist')."""
+
+    class JobTitle(models.TextChoices):
+        DATA_SCIENTIST = 'data_scientist', 'Data Scientist'
+        DEVELOPER      = 'developer',      'Developer'
+        PROGRAMMER     = 'programmer',     'Programmer'
+        ANALYST        = 'analyst',        'Analyst'
+        DESIGNER       = 'designer',       'Designer'
+        RESEARCHER     = 'researcher',     'Researcher'
+        OTHER          = 'other',          'Other'
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='scientist_profile')
+    # Display only: shown next to "Staff" in the top bar. Never used for access.
+    # Existing profiles get the default, which is what they were before.
+    job_title = models.CharField(max_length=20, choices=JobTitle.choices,
+                                 default=JobTitle.DATA_SCIENTIST)
     institution = models.CharField(max_length=200, blank=True)
     research_area = models.CharField(max_length=200, blank=True)
     approved_by = models.ForeignKey(CustomUser, null=True, blank=True,

@@ -285,7 +285,7 @@ class DemoSeedTests(TestCase):
 
         data = build = None
         self.client.force_login(anna)
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/dashboard/health/')
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['attention'],

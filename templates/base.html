@@ -18,22 +18,19 @@
 </head>
 <body {% if user.is_authenticated %}class="auth-layout"{% endif %}>
 <nav class="navbar">
-    <a href="/" class="nav-brand"><img src="{% static 'healthcompass-horizontal.svg' %}" alt="HealthCompass" style="height:38px;width:auto"></a>
+    <a href="{% if user.is_authenticated %}{{ nav_home }}{% else %}/{% endif %}" class="nav-brand"><img src="{% static 'healthcompass-horizontal.svg' %}" alt="HealthCompass" style="height:38px;width:auto"></a>
 
-    <!-- Desktop nav links -->
+    {% comment %}
+      Signed-in users navigate with the sidebar only. A second menu up here
+      listed the same places in another order and under other names.
+    {% endcomment %}
+    {% if not user.is_authenticated %}
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
-        {% if user.is_authenticated %}
-        <li><a href="/dashboard/">Dashboard</a></li>
-        <li><a href="/dashboard/health/">My Health</a></li>
-        <li><a href="/care/">Care</a></li>
-        <li><a href="/records/">Records</a></li>
-        <li><a href="/assistant/">Assistant</a></li>
-        {% else %}
         <li><a href="/insights/">AI &amp; Analytics</a></li>
-        <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
-        {% endif %}
+        <li><a href="/#how-to-use">How it works</a></li>
     </ul>
+    {% endif %}
 
     <div class="nav-right">
         <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileMenu">&#9776;</button>
@@ -50,7 +47,7 @@
             <div class="nav-avatar">{{ user.username|first|upper }}</div>
             {% endif %}
             <span style="font-size:.85rem;font-weight:600">{{ user.username }}</span>
-            <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}</span>
+            <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}{% if user.is_data_scientist and user.scientist_profile.job_title %}<span class="role-job"> · {{ user.scientist_profile.get_job_title_display }}</span>{% endif %}</span>
             <i class="fas fa-chevron-down" style="font-size:.65rem;color:var(--muted)"></i>
         </div>
         {% comment %}
@@ -74,32 +71,19 @@
 
     <!-- Mobile menu -->
     <div id="mobileMenu" class="mobile-menu">
-      <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
       {% if user.is_authenticated %}
-      {% comment %}
-        Same order and same labels as the sidebar. The Dashboard sub-items are
-        listed inline rather than behind a disclosure: a phone menu is already
-        a temporary overlay the user opened on purpose, so hiding items behind
-        a second tap inside it buys nothing and costs a tap.
-      {% endcomment %}
-      <a href="/" class="mm-link"><i class="fas fa-house"></i> Home</a>
-      <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
-      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
-      <a href="/scribe/" class="mm-link"><i class="fas fa-microphone"></i> AI Scribe</a>
-      <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> Records</a>
-      <a href="/dashboard/" class="mm-link"><i class="fas fa-house-medical"></i> Dashboard</a>
-      <div class="mm-divider"></div>
-      <span class="mm-section-label">Under Dashboard</span>
-      <a href="/dashboard/health/" class="mm-link"><i class="fas fa-heart-pulse"></i> My Health</a>
-      <a href="/care/" class="mm-link"><i class="fas fa-hand-holding-heart"></i> Companions</a>
-      <a href="/appointments/" class="mm-link"><i class="fas fa-calendar-check"></i> Appointments</a>
-      <div class="mm-divider"></div>
-      <a href="/dashboard/settings/" class="mm-link"><i class="fas fa-gear"></i> Settings</a>
+      {# Same entries, order and labels as the sidebar: both come from nav_menu. #}
+      {% for item in nav_menu %}
+        {% if item == '---' %}<div class="mm-divider"></div>
+        {% elif item.href %}<a href="{{ item.href }}" class="mm-link"><i class="fas fa-{{ item.icon }}"></i> {{ item.label }}</a>
+        {% else %}<span class="mm-section-label">{{ item }}</span>{% endif %}
+      {% endfor %}
       <div class="mm-divider"></div>
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
-      <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
-      <a href="/accounts/login/?next=/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
+      <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
+      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
+      <a href="/#how-to-use" class="mm-link"><i class="fas fa-circle-question"></i> How it works</a>
       <div class="mm-divider"></div>
       <div style="display:flex;gap:.75rem;padding:.25rem 0">
         <a href="/accounts/login/" class="btn btn-outline" style="flex:1;justify-content:center">Log In</a>
@@ -119,42 +103,17 @@
   </div>
   <nav class="sb-nav">
     {% comment %}
-      Six destinations, in the order the product is actually used, with the
-      lower-frequency surfaces folded under Dashboard.
+      One menu per role, from apps/dashboard/navigation.py. Each role sees only
+      what it uses; the first entry is that role's home page.
 
-      Dashboard is BOTH a link and a group. Clicking the label opens the page —
-      it is still the answer to "what needs my attention" and losing that would
-      be a real regression — while the chevron expands the surfaces that live
-      underneath it. A parent item that only toggles is a menu pretending to be
-      a destination, and the user then has no way to reach the overview at all.
-    {% endcomment %}
-    <a href="/" class="sb-link"><i class="fas fa-house"></i><span class="sb-txt">Home</span></a>
-    <a href="/assistant/" class="sb-link"><i class="fas fa-robot"></i><span class="sb-txt">AI Assistant</span></a>
-    <a href="/insights/" class="sb-link"><i class="fas fa-brain"></i><span class="sb-txt">AI &amp; Analytics</span></a>
-    <a href="/scribe/" class="sb-link"><i class="fas fa-microphone"></i><span class="sb-txt">AI Scribe</span></a>
-    <a href="/records/" class="sb-link"><i class="fas fa-file-medical"></i><span class="sb-txt">Records</span></a>
-
-    <div class="sb-group">
-      <a href="/dashboard/" class="sb-link sb-parent"><i class="fas fa-house-medical"></i><span class="sb-txt">Dashboard</span></a>
-      <button type="button" class="sb-caret" id="dashCaret"
-              onclick="toggleDashGroup(event)"
-              aria-expanded="false" aria-controls="dashSub"
-              aria-label="Show more under Dashboard">
-        <i class="fas fa-chevron-down" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="sb-sub" id="dashSub" hidden>
-      <a href="/dashboard/health/" class="sb-link sb-sublink"><i class="fas fa-heart-pulse"></i><span class="sb-txt">My Health</span></a>
-      <a href="/care/" class="sb-link sb-sublink"><i class="fas fa-hand-holding-heart"></i><span class="sb-txt">Companions</span></a>
-      <a href="/appointments/" class="sb-link sb-sublink"><i class="fas fa-calendar-check"></i><span class="sb-txt">Appointments</span></a>
-    </div>
-
-    <a href="/dashboard/settings/" class="sb-link"><i class="fas fa-gear"></i><span class="sb-txt">Settings</span></a>
-    {% comment %}
       No Notifications row: the bell with its unread badge sits in the top bar
-      on every page and every viewport, so a second entry here would be the
-      same destination twice in one screen.
+      on every page and every viewport.
     {% endcomment %}
+    {% for item in nav_menu %}
+      {% if item == '---' %}<div class="sb-divider"></div>
+      {% elif item.href %}<a href="{{ item.href }}" class="sb-link"><i class="fas fa-{{ item.icon }}"></i><span class="sb-txt">{{ item.label }}</span></a>
+      {% else %}<span class="sb-label">{{ item }}</span>{% endif %}
+    {% endfor %}
   </nav>
 </aside>
 {% endif %}
@@ -236,44 +195,6 @@ document.addEventListener('keydown', function(e) {
 });
 
 
-// Dashboard sub-group: the chevron expands, the label still navigates.
-//
-// Kept separate from the link deliberately. A parent item that only toggles
-// leaves no way to reach the page itself, and Dashboard is the overview — the
-// one screen that answers "does anything need me right now".
-//
-// The open/closed choice persists like the sidebar collapse does, because a
-// group that springs shut on every page load is a group nobody uses twice.
-function toggleDashGroup(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  const sub   = document.getElementById('dashSub');
-  const caret = document.getElementById('dashCaret');
-  if (!sub || !caret) return;
-  const open = sub.hasAttribute('hidden');
-  if (open) { sub.removeAttribute('hidden'); } else { sub.setAttribute('hidden', ''); }
-  caret.setAttribute('aria-expanded', open ? 'true' : 'false');
-  caret.setAttribute('aria-label', open ? 'Hide more under Dashboard' : 'Show more under Dashboard');
-  caret.classList.toggle('open', open);
-  localStorage.setItem('hc_dash', open ? '1' : '0');
-}
-
-(function(){
-  const sub   = document.getElementById('dashSub');
-  const caret = document.getElementById('dashCaret');
-  if (!sub || !caret) return;
-  // Open by default when the user is already on one of the pages inside it,
-  // so the group shows where they are rather than hiding it.
-  const path = location.pathname;
-  const inside = ['/dashboard/health/', '/care/', '/appointments/']
-                 .some(function (h) { return path.startsWith(h); });
-  if (localStorage.getItem('hc_dash') === '1' || inside) {
-    sub.removeAttribute('hidden');
-    caret.setAttribute('aria-expanded', 'true');
-    caret.classList.add('open');
-  }
-})();
-
 function toggleSidebar() {
   const sb  = document.getElementById('appSidebar');
   const btn = document.getElementById('sbToggleBtn');
@@ -295,11 +216,15 @@ function toggleSidebar() {
     document.body.classList.add('sidebar-collapsed');
     if (btn) { btn.setAttribute('aria-expanded','false'); btn.setAttribute('aria-label','Expand sidebar'); }
   }
+  // Longest matching href wins, so /dashboard/settings/ highlights Settings
+  // and not the role's home at /dashboard/.
   const path = location.pathname;
+  let best = null;
   document.querySelectorAll('.sb-link').forEach(function(a) {
     const h = a.getAttribute('href');
-    if (h && h !== '/' && path.startsWith(h)) a.classList.add('active');
+    if (h && path.startsWith(h) && (!best || h.length > best.getAttribute('href').length)) best = a;
   });
+  if (best) best.classList.add('active');
 })();
 
 document.addEventListener('click', function(e) {

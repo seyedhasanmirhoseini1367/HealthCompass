@@ -51,6 +51,8 @@ a{color:inherit;text-decoration:none}
 .role-patient{background:#dbeafe;color:#1d4ed8}
 .role-doctor{background:#dcfce7;color:#15803d}
 .role-data_scientist{background:#ede9fe;color:#7c3aed}
+/* "Staff · Data Scientist": the job title is read as words, not as a shouted tag. */
+.role-job{text-transform:none;letter-spacing:0;font-weight:600;opacity:.85}
 .role-hospital_admin{background:#fef3c7;color:#92400e}
 .role-admin{background:#fee2e2;color:#b91c1c}
 .messages-wrap{padding:.75rem 1.5rem 0}
