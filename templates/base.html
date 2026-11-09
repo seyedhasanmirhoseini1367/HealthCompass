@@ -27,6 +27,7 @@
     {% if not user.is_authenticated %}
     <ul class="nav-links">
         <li><a href="/">Home</a></li>
+        <li><a href="/assistant/">AI Assistant</a></li>
         <li><a href="/insights/">AI &amp; Analytics</a></li>
         <li><a href="/#how-to-use">How it works</a></li>
     </ul>
@@ -82,6 +83,7 @@
       <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
       {% else %}
       <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
+      <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
       <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
       <a href="/#how-to-use" class="mm-link"><i class="fas fa-circle-question"></i> How it works</a>
       <div class="mm-divider"></div>
@@ -118,8 +120,24 @@
 </aside>
 {% endif %}
 
+{% comment %}
+  Flash messages float as toasts in the top-right corner instead of pushing
+  the page down. Success and info fade out on their own; warnings and errors
+  stay until closed, because they usually ask the reader to do something.
+{% endcomment %}
 {% if messages %}
-{% if messages %}<div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>{% endif %}
+<div class="toast-stack" id="toastStack">
+  {% for message in messages %}
+  <div class="toast toast-{{ message.tags|default:'info' }}"
+       role="{% if message.level >= 30 %}alert{% else %}status{% endif %}"
+       data-autohide="{% if message.level >= 30 %}0{% else %}1{% endif %}">
+    <span class="toast-icon" aria-hidden="true"><i class="fas {% if 'success' in message.tags %}fa-circle-check{% elif 'error' in message.tags %}fa-circle-exclamation{% elif 'warning' in message.tags %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}"></i></span>
+    <div class="toast-body">{{ message }}</div>
+    <button type="button" class="toast-close" aria-label="Dismiss"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+    <span class="toast-timer" aria-hidden="true"></span>
+  </div>
+  {% endfor %}
+</div>
 {% endif %}
 <main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
 <footer>
@@ -194,6 +212,33 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeDeleteModal();
 });
 
+
+// ── Toasts ──────────────────────────────────────────────────────────────────
+(function () {
+  const stack = document.getElementById('toastStack');
+  if (!stack) return;
+  const DURATION = 5000;
+  function dismiss(t) {
+    if (t.classList.contains('leaving')) return;
+    t.classList.add('leaving');
+    t.addEventListener('animationend', () => t.remove(), { once: true });
+    setTimeout(() => t.remove(), 400);  // in case animations are disabled
+  }
+  stack.querySelectorAll('.toast').forEach((t, i) => {
+    t.style.animationDelay = (i * 80) + 'ms';
+    t.querySelector('.toast-close').addEventListener('click', () => dismiss(t));
+    if (t.dataset.autohide !== '1') return;
+    let left = DURATION, started = null, timer = null;
+    const bar = t.querySelector('.toast-timer');
+    bar.style.animationDuration = DURATION + 'ms';
+    function run()   { started = Date.now(); timer = setTimeout(() => dismiss(t), left); t.classList.remove('paused'); }
+    function pause() { clearTimeout(timer); left -= Date.now() - started; t.classList.add('paused'); }
+    // Hovering or focusing keeps it on screen long enough to read.
+    t.addEventListener('mouseenter', pause); t.addEventListener('focusin', pause);
+    t.addEventListener('mouseleave', run);   t.addEventListener('focusout', run);
+    run();
+  });
+})();
 
 function toggleSidebar() {
   const sb  = document.getElementById('appSidebar');

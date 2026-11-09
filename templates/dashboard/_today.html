@@ -10,11 +10,12 @@
     ── Today ───────────────────────────────────────────────────────────────
     Each card is a summary that links to the page that owns the subject. The
     dashboard never reproduces those pages; it says whether they are worth
-    opening.
+    opening. Appointments are not here: the next one leads the Appointments
+    page instead, where it can be edited.
   {% endcomment %}
   <h2 class="db-sec-h">Today</h2>
   <div class="db-grid">
-    {% with med=sections.medications appt=sections.appointments care=sections.care %}
+    {% with med=sections.medications care=sections.care %}
 
     <a class="db-card" href="{{ med.href }}">
       <div class="db-card-h">
@@ -34,20 +35,6 @@
       {% endif %}{% endfor %}
     </a>
 
-    <a class="db-card" href="{{ appt.href }}">
-      <div class="db-card-h">
-        <span class="db-card-t">📅 Next appointment</span>
-        {% if appt.state != 'no_data' or not appt.summary %}
-        <span class="db-state {{ appt.style.tone }}">{{ appt.style.label }}</span>
-        {% endif %}
-      </div>
-      {% for item in appt.items %}
-      <div class="db-card-s"><b>{{ item.title }}</b></div>
-      <div class="db-line">{{ item.detail }}</div>
-      {% empty %}
-      <div class="db-card-s">{{ appt.summary }}</div>
-      {% endfor %}
-    </a>
 
     <a class="db-card" href="{{ care.href }}">
       <div class="db-card-h">

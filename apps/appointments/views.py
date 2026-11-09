@@ -17,8 +17,13 @@ def appointment_list(request):
         patient=request.user,
         appointment_datetime__lt=now,
     ).order_by('-appointment_datetime')[:20]
+    # The next appointment leads the page. It used to be a card on My Health,
+    # which could only link here; showing it where it can be edited saves a hop.
+    upcoming = list(upcoming.order_by('appointment_datetime'))
+    next_appt = upcoming[0] if upcoming else None
     return render(request, 'appointments/list.html', {
-        'upcoming': upcoming,
+        'next_appt': next_appt,
+        'upcoming': upcoming[1:],
         'past': past,
     })
 

@@ -26,7 +26,6 @@
       {% if appt %}Edit Appointment{% else %}Schedule Appointment{% endif %}
     </div>
     <div class="card-body">
-      {% if messages %}{% for msg in messages %}<div class="alert alert-{{ msg.tags }}">{{ msg }}</div>{% endfor %}{% endif %}
       <form method="post">
         {% csrf_token %}
         <div class="form-group">

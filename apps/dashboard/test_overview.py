@@ -503,9 +503,24 @@ class NavigationTests(_Dash):
     def test_each_dashboard_section_links_to_the_page_that_owns_it(self):
         data = build_dashboard(self.patient)
 
-        self.assertEqual(data['sections']['medications'].href, '/care/')
+        # Reminders and "How are you feeling?" are sections of My Health;
+        # /care/ is Companions and has neither.
+        self.assertEqual(data['sections']['medications'].href, '/dashboard/health/#reminders')
         self.assertEqual(data['sections']['appointments'].href, '/appointments/')
-        self.assertEqual(data['sections']['care'].href, '/care/')
+        self.assertEqual(data['sections']['care'].href, '/dashboard/health/#feeling')
+
+    def test_today_card_targets_exist_on_my_health(self):
+        self.client.force_login(self.patient)
+        body = self.client.get('/dashboard/health/').content.decode()
+        self.assertIn('id="reminders"', body)
+        self.assertIn('id="feeling"', body)
+        self.assertIn('href="/dashboard/health/#reminders"', body)
+        self.assertIn('href="/dashboard/health/#feeling"', body)
+
+    def test_next_appointment_is_not_on_my_health(self):
+        self.client.force_login(self.patient)
+        body = self.client.get('/dashboard/health/').content.decode()
+        self.assertNotIn('Next appointment', body)
 
 
 class NoDuplicationTests(_Dash):

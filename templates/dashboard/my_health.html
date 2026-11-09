@@ -48,6 +48,7 @@
 .db-calm{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:16px;padding:1.1rem 1.25rem;margin-bottom:1.6rem}
 .db-calm p{margin:0;font-size:1rem;font-weight:600;color:#065f46}
 
+.hb-sec[id]{scroll-margin-top:76px}
 .db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:1.6rem}
 .db-card{display:block;text-decoration:none;background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem}
 .db-card:hover{border-color:#cbd5e1}
@@ -90,7 +91,7 @@
   {% comment %}
     ── My reminders ── (moved here from Companions: a dose you take is a fact about you, not about the person you look after)──────────────────────────────────────────────────────
   {% endcomment %}
-  <h2 class="hb-sec">My reminders</h2>
+  <h2 class="hb-sec" id="reminders">My reminders</h2>
   <div class="hb-card">
     {% for occ in occurrences %}
     <div class="cr-task">
@@ -155,7 +156,7 @@
   {% comment %}
     ── How I am ────────────────────────────────────────────────────────────
   {% endcomment %}
-  <h2 class="hb-sec">How are you feeling?</h2>
+  <h2 class="hb-sec" id="feeling">How are you feeling?</h2>
   <div class="hb-card cr-say">
     <form method="post" action="{% url 'care:report' %}">
       {% csrf_token %}

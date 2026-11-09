@@ -18,6 +18,12 @@
 .appt-meta span{display:flex;align-items:center;gap:.25rem}
 .appt-actions{display:flex;gap:.4rem;align-items:center;flex-shrink:0}
 .past-card{opacity:.65}
+.next-card{background:white;border:1px solid #bae6fd;border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;box-shadow:0 4px 16px rgba(14,165,233,.10);position:relative;overflow:hidden}
+.next-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gradient-brand)}
+.next-card .appt-date{min-width:68px;padding:.65rem .5rem}
+.next-card .appt-date .day{font-size:1.9rem}
+.next-when{font-size:.8rem;font-weight:700;color:var(--primary-dk);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+.next-card .appt-title{font-size:1.1rem;white-space:normal}
 .reminder-chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.45rem}
 .chip{display:inline-flex;align-items:center;gap:.2rem;padding:.1rem .45rem;border-radius:20px;font-size:.68rem;font-weight:600;background:#dbeafe;color:#1d4ed8}
 .empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
@@ -35,14 +41,42 @@
   </a>
 </div>
 
-{% if messages %}
-  {% for msg in messages %}
-  <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
-  {% endfor %}
+<h2 class="section-h"><i class="fas fa-calendar-day"></i> Next appointment</h2>
+{% if next_appt %}
+<div class="next-card">
+  <div class="appt-date">
+    <div class="day">{{ next_appt.appointment_datetime|date:"d" }}</div>
+    <div class="mon">{{ next_appt.appointment_datetime|date:"M" }}</div>
+  </div>
+  <div class="appt-info">
+    <div class="next-when">In {{ next_appt.appointment_datetime|timeuntil }}</div>
+    <div class="appt-title">{{ next_appt.title }}</div>
+    <div class="appt-meta">
+      <span><i class="fas fa-clock"></i> {{ next_appt.appointment_datetime|date:"l j F, H:i" }}</span>
+      {% if next_appt.doctor_name %}<span><i class="fas fa-user-md"></i> {{ next_appt.doctor_name }}</span>{% endif %}
+      {% if next_appt.location %}<span><i class="fas fa-map-marker-alt"></i> {{ next_appt.location }}</span>{% endif %}
+    </div>
+    <div class="reminder-chips">
+      {% if next_appt.remind_24h %}<span class="chip"><i class="fas fa-bell"></i> 24h before</span>{% endif %}
+      {% if next_appt.remind_3h %}<span class="chip"><i class="fas fa-bell"></i> 3h before</span>{% endif %}
+      {% if next_appt.remind_2h %}<span class="chip"><i class="fas fa-bell"></i> 2h before</span>{% endif %}
+      {% if next_appt.remind_1h %}<span class="chip"><i class="fas fa-bell"></i> 1h before</span>{% endif %}
+    </div>
+  </div>
+  <div class="appt-actions">
+    <a href="{% url 'appointments:edit' next_appt.pk %}" class="btn btn-outline" style="padding:.35rem .75rem;font-size:.8rem">Edit</a>
+    <a href="{% url 'appointments:delete' next_appt.pk %}" class="btn btn-danger" style="padding:.35rem .75rem;font-size:.8rem">Delete</a>
+  </div>
+</div>
+{% else %}
+  <div class="empty-state">
+    <i class="fas fa-calendar-plus"></i>
+    <p>No upcoming appointments.<br><a href="{% url 'appointments:create' %}" style="color:var(--primary)">Schedule one now</a></p>
+  </div>
 {% endif %}
 
-<h2 class="section-h"><i class="fas fa-calendar-day"></i> Upcoming</h2>
 {% if upcoming %}
+<h2 class="section-h"><i class="fas fa-calendar-days"></i> Later</h2>
   {% for appt in upcoming %}
   <div class="appt-card{% if appt.is_cancelled %} past-card{% endif %}">
     <div class="appt-date">
@@ -69,11 +103,6 @@
     </div>
   </div>
   {% endfor %}
-{% else %}
-  <div class="empty-state">
-    <i class="fas fa-calendar-plus"></i>
-    <p>No upcoming appointments.<br><a href="{% url 'appointments:create' %}" style="color:var(--primary)">Schedule one now</a></p>
-  </div>
 {% endif %}
 
 {% if past %}

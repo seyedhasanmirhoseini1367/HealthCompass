@@ -55,7 +55,29 @@ a{color:inherit;text-decoration:none}
 .role-job{text-transform:none;letter-spacing:0;font-weight:600;opacity:.85}
 .role-hospital_admin{background:#fef3c7;color:#92400e}
 .role-admin{background:#fee2e2;color:#b91c1c}
-.messages-wrap{padding:.75rem 1.5rem 0}
+/* ── Toasts (flash messages) ───────────────────────────────────────────── */
+.toast-stack{position:fixed;top:72px;right:1.25rem;z-index:1000;display:flex;flex-direction:column;gap:.6rem;width:min(380px,calc(100vw - 2rem));pointer-events:none}
+.toast{--tone:var(--primary);position:relative;overflow:hidden;pointer-events:auto;display:flex;align-items:flex-start;gap:.75rem;padding:.85rem .85rem .95rem 1rem;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.12),0 2px 6px rgba(15,23,42,.06);font-size:.875rem;line-height:1.45;animation:toast-in .32s cubic-bezier(.2,.8,.2,1) both}
+.toast::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tone)}
+.toast-success{--tone:var(--success)}
+.toast-error,.toast-danger{--tone:var(--danger)}
+.toast-warning{--tone:var(--warning)}
+.toast-info,.toast-debug{--tone:var(--primary)}
+.toast-icon{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:var(--tone);background:color-mix(in srgb,var(--tone) 14%,transparent);font-size:.95rem}
+.toast-body{flex:1;padding-top:.2rem;font-weight:500}
+.toast-close{flex:none;border:0;background:none;color:var(--muted);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:.95rem;display:grid;place-items:center}
+.toast-close:hover,.toast-close:focus-visible{background:var(--bg);color:var(--text)}
+.toast-timer{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--tone);opacity:.35;transform-origin:left;transform:scaleX(0)}
+.toast[data-autohide="1"] .toast-timer{animation:toast-timer linear forwards}
+.toast.paused .toast-timer{animation-play-state:paused}
+.toast.leaving{animation:toast-out .25s ease-in forwards}
+@keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes toast-out{to{opacity:0;transform:translateX(24px)}}
+@keyframes toast-timer{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@media (max-width:600px){.toast-stack{top:68px;right:1rem;left:1rem;width:auto}
+  @keyframes toast-in{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+  @keyframes toast-out{to{opacity:0;transform:translateY(-12px)}}}
+@media (prefers-reduced-motion:reduce){.toast,.toast.leaving{animation:none}.toast[data-autohide="1"] .toast-timer{animation:none}}
 .alert{padding:.75rem 1.25rem;border-radius:10px;margin-bottom:.5rem;font-size:.875rem;display:flex;align-items:center;gap:.6rem}
 .alert-success{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
 .alert-error,.alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
