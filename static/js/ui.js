@@ -78,6 +78,66 @@
       wrap.appendChild(t);
     });
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wrapTables);
-  else wrapTables();
+  // -- Drag-and-drop file fields ------------------------------------------------
+  // Turns a plain <input type=file> into a drop area. The real input stays in
+  // the form (visually hidden, still focusable), so what is submitted does not
+  // change. Inputs that are hidden, opted out, or already inside a page's own
+  // drop area are left alone.
+  function humanSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return Math.round(n / 1024) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function enhanceFileInputs() {
+    document.querySelectorAll('main input[type=file]').forEach(function (input) {
+      if (input.hidden || input.dataset.noDropzone !== undefined || input.closest('.hc-drop, .drop-zone, .file-drop')) return;
+      if (getComputedStyle(input).display === 'none') return;
+      var drop = document.createElement('label');
+      drop.className = 'hc-drop';
+      if (input.id) drop.htmlFor = input.id;
+      var hint = input.accept ? input.accept.split(',').map(function (s) { return s.trim().replace(/^\./, '').toUpperCase(); })
+                                     .filter(function (s) { return s && s.indexOf('/') === -1; }).join(', ') : '';
+      drop.innerHTML =
+        '<i class="fas fa-cloud-arrow-up hc-drop-icon" aria-hidden="true"></i>' +
+        '<span class="hc-drop-main"><strong>Drag a file here</strong> or <u>browse</u></span>' +
+        (hint ? '<span class="hc-drop-hint"></span>' : '') +
+        '<span class="hc-drop-file" aria-live="polite"></span>';
+      if (hint) drop.querySelector('.hc-drop-hint').textContent = hint;
+      input.parentNode.insertBefore(drop, input);
+      drop.appendChild(input);
+      input.classList.add('hc-drop-input');
+
+      var fileLine = drop.querySelector('.hc-drop-file');
+      function show() {
+        var f = input.files;
+        if (!f || !f.length) { fileLine.textContent = ''; drop.classList.remove('has-file'); return; }
+        fileLine.textContent = f.length === 1 ? f[0].name + ' · ' + humanSize(f[0].size)
+                                              : f.length + ' files selected';
+        drop.classList.add('has-file');
+      }
+      input.addEventListener('change', show);
+      ['dragenter', 'dragover'].forEach(function (t) {
+        drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); });
+      });
+      ['dragleave', 'dragend', 'drop'].forEach(function (t) {
+        drop.addEventListener(t, function () { drop.classList.remove('over'); });
+      });
+      drop.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+        if (!input.multiple && files.length > 1) {
+          fileLine.textContent = 'Drop one file at a time.';
+          return;
+        }
+        input.files = files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      show();
+    });
+  }
+
+  function init() { wrapTables(); enhanceFileInputs(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

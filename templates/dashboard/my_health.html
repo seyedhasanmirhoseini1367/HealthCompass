@@ -49,6 +49,22 @@
 .db-calm p{margin:0;font-size:1rem;font-weight:600;color:#065f46}
 
 .hb-sec[id]{scroll-margin-top:76px}
+.ad-head{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;flex-wrap:wrap;margin-bottom:.8rem}
+.ad-sum{font-size:.85rem;color:#475569}
+.ad-bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px;align-items:end;height:96px}
+.ad-col{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.ad-stack{flex:1;width:100%;max-width:22px;display:flex;flex-direction:column-reverse;border-radius:5px;overflow:hidden;background:#f1f5f9}
+.ad-seg{display:block;width:100%}
+.ad-seg.confirmed,.ad-dot.confirmed{background:#22c55e}
+.ad-seg.skipped,.ad-dot.skipped{background:#f59e0b}
+.ad-seg.missed,.ad-dot.missed{background:#ef4444}
+.ad-seg.no_answer,.ad-dot.no_answer{background:#94a3b8}
+.ad-seg.waiting,.ad-dot.waiting{background:#bae6fd}
+.ad-day{font-size:.66rem;color:var(--muted);line-height:1}
+.ad-col.today .ad-day{color:var(--primary-dk);font-weight:800}
+.ad-legend{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.75rem;font-size:.75rem;color:#475569}
+.ad-legend span{display:inline-flex;align-items:center;gap:.35rem}
+.ad-dot{width:.6rem;height:.6rem;border-radius:3px;display:inline-block}
 .db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:1.6rem}
 .db-card{display:block;text-decoration:none;background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem}
 .db-card:hover{border-color:#cbd5e1}
@@ -92,6 +108,37 @@
     ── My reminders ── (moved here from Companions: a dose you take is a fact about you, not about the person you look after)──────────────────────────────────────────────────────
   {% endcomment %}
   <h2 class="hb-sec" id="reminders">My reminders</h2>
+  {% if adherence %}
+  {% comment %}
+    Two weeks at a glance. "No answer" is grey and never called missed: only
+    the patient can say a dose was missed (see apps/care/adherence.py).
+  {% endcomment %}
+  <div class="hb-card ad-card">
+    <div class="ad-head">
+      <span class="cr-label">Last {{ adherence.span }} days</span>
+      {% if adherence.percent is not None %}
+      <span class="ad-sum"><b>{{ adherence.confirmed }} of {{ adherence.answered_due }}</b> confirmed{% if adherence.no_answer %} · {{ adherence.no_answer }} with no answer{% endif %}</span>
+      {% endif %}
+    </div>
+    <div class="ad-bars" role="img" aria-label="Reminder answers over the last {{ adherence.span }} days: {{ adherence.confirmed }} of {{ adherence.answered_due }} confirmed{% if adherence.no_answer %}, {{ adherence.no_answer }} with no answer{% endif %}.">
+      {% for d in adherence.days %}
+      <div class="ad-col{% if d.is_today %} today{% endif %}" title="{{ d.label }}">
+        <div class="ad-stack">
+          {% for kind, n, pct in d.parts %}<span class="ad-seg {{ kind }}" style="height:{{ pct|floatformat:"1u" }}%"></span>{% endfor %}
+        </div>
+        <span class="ad-day">{{ d.date|date:"j" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="ad-legend" aria-hidden="true">
+      <span><i class="ad-dot confirmed"></i>Done</span>
+      <span><i class="ad-dot skipped"></i>Skipped</span>
+      <span><i class="ad-dot missed"></i>Missed (you said)</span>
+      <span><i class="ad-dot no_answer"></i>No answer</span>
+      <span><i class="ad-dot waiting"></i>Waiting</span>
+    </div>
+  </div>
+  {% endif %}
   <div class="hb-card">
     {% for occ in occurrences %}
     <div class="cr-task">

@@ -78,8 +78,16 @@ def my_health(request):
         logger.exception('my_health: recent measurements failed')
         measurements = []
 
+    try:
+        from apps.care.adherence import adherence
+        adherence_data = adherence(request.user)
+    except Exception:
+        logger.exception('my_health: adherence failed')
+        adherence_data = None
+
     return render(request, 'dashboard/my_health.html', {
         **today,
+        'adherence':     adherence_data,
         'occurrences':   occurrences,
         'tasks':         CareTask.objects.filter(patient=request.user,
                                                  is_active=True),
