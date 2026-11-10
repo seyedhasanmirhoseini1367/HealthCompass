@@ -89,5 +89,10 @@ jobs:
       - name: Check for missing migrations
         run: python manage.py makemigrations --check --dry-run
 
+      # Parallel: the suite took ~17 minutes serially, close to the job's
+      # timeout. tblib lets worker processes report a failing test's traceback
+      # (without it a failure surfaces as "cannot pickle 'traceback'").
       - name: Run test suite
-        run: python manage.py test apps --verbosity 2
+        run: |
+          pip install tblib==3.0.0
+          python manage.py test apps --parallel auto --verbosity 2

@@ -77,7 +77,14 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    # After AuthenticationMiddleware: needs request.user.
+    'apps.accounts.idle_session.IdleSessionMiddleware',
 ]
+
+# Signed out after this long without a request (see apps/accounts/idle_session.py).
+SESSION_COOKIE_AGE = config('SESSION_IDLE_MINUTES', default=120, cast=int) * 60
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 ROOT_URLCONF = 'healthcompass.urls'
 
