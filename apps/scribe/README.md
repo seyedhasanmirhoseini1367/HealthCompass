@@ -89,5 +89,6 @@ Absolute scores are not comparable to published PriMock57 numbers. The reference
 - **Output length.** Generation uses the shared `RAG_CONFIG['MAX_TOKENS']` (1200). A very long consultation can produce a truncated reply, which fails validation twice and then fails the encounter.
 - **Grounding is checked structurally, not semantically.** Segment indices are validated to exist, but nothing verifies that a segment really supports its item. Items with no valid citation are flagged in the UI.
 - **Evidence retrieval** loads the whole knowledge-base index and makes one embedding call per Assessment/Plan item. That is fine for a demo but slow for long notes.
-- **No editing, no export, no live recording, no audio playback.** The audio is not served back: `/media/` refuses files it cannot attribute to an owner.
+- **Editing and export are basic.** Items can be changed, removed or added (`/scribe/<id>/edit/`); changed items are flagged "edited" and added ones "added", and the model's reply stays in `raw_output`. Export is a print page (`/scribe/<id>/print/`) saved as PDF by the browser.
+- **No live recording, no audio playback.** The audio is not served back: `/media/` refuses files it cannot attribute to an owner.
 - **The egress point is not registered** in `apps/accounts/egress.py` yet. The consent check and the `PHI_LLM_PROVIDERS` allowlist are enforced directly in this app.

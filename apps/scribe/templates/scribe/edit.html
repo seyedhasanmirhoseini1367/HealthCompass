@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Edit note — Scribe — HealthCompass{% endblock %}
+{% block extra_css %}
+<style>
+.se-wrap{max-width:860px;margin:0 auto}
+.se-h{font-size:1.4rem;font-weight:800;margin:0 0 .25rem}
+.se-sub{color:var(--muted);font-size:.88rem;margin-bottom:1.25rem}
+.se-sec{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:1rem}
+.se-sec h2{font-size:1rem;font-weight:800;margin:0 0 .7rem}
+.se-item{display:grid;grid-template-columns:1fr auto;gap:.6rem;align-items:start;margin-bottom:.6rem}
+.se-item textarea,.se-new{width:100%;min-height:58px;resize:vertical}
+.se-meta{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+.se-del{display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:#b91c1c;white-space:nowrap;padding-top:.5rem}
+.se-new-l{display:block;font-size:.8rem;font-weight:600;color:#475569;margin:.6rem 0 .3rem}
+.se-bar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:1rem 0;display:flex;gap:.6rem;justify-content:flex-end}
+</style>
+{% endblock %}
+{% block content %}
+<div class="se-wrap">
+  <h1 class="se-h">Edit note</h1>
+  <p class="se-sub">{{ encounter.original_filename|default:"Recording" }} · Changed items stay linked to their transcript lines but are marked as edited. New items are marked as added by you. The model's original output is kept.</p>
+  <form method="post">
+    {% csrf_token %}
+    {% for sec in sections %}
+    <div class="se-sec">
+      <h2>{{ sec.label }}</h2>
+      {% for item in sec.items %}
+      <div class="se-item">
+        <div>
+          <textarea name="{{ sec.key }}-{{ forloop.counter0 }}-text" aria-label="{{ sec.label }} item {{ forloop.counter }}">{{ item.text }}</textarea>
+          <div class="se-meta">{% if item.added %}Added by clinician{% elif item.segments %}From segments {{ item.segments|join:", " }}{% if item.edited %} · edited{% endif %}{% else %}No cited segment{% endif %}</div>
+        </div>
+        <label class="se-del"><input type="checkbox" name="{{ sec.key }}-{{ forloop.counter0 }}-delete" value="1"> Remove</label>
+      </div>
+      {% empty %}
+      <p class="se-meta" style="margin:0 0 .4rem">No items.</p>
+      {% endfor %}
+      <label class="se-new-l" for="new-{{ sec.key }}">Add items (one per line)</label>
+      <textarea class="se-new" id="new-{{ sec.key }}" name="{{ sec.key }}-new" placeholder="New {{ sec.label|lower }} item"></textarea>
+    </div>
+    {% endfor %}
+    <div class="se-bar">
+      <a class="btn btn-secondary" href="{% url 'scribe:detail' encounter.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Save note</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -83,3 +83,6 @@ class Note(models.Model):
     raw_output = models.TextField(blank=True)
     provider   = models.CharField(max_length=32, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Set when a clinician saves changes. Items then carry "edited" or "added"
+    # flags in `soap`; `raw_output` still holds what the model produced.
+    edited_at  = models.DateTimeField(null=True, blank=True)

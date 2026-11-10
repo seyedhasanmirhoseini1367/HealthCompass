@@ -16,6 +16,7 @@
 .sc-item.active{border-color:#0f766e;background:#f0fdfa}
 .sc-item .src{font-size:.72rem;color:#94a3b8;margin-top:.2rem}
 .sc-item .src.none{color:#b45309}
+.sc-item .src.edited{color:#6d28d9}
 .sc-ev{margin-top:.4rem;padding-left:.6rem;border-left:3px solid #e2e8f0;font-size:.78rem;color:#475569}
 .sc-ev div{margin-bottom:.3rem}
 .sc-empty{font-size:.82rem;color:#94a3b8;font-style:italic;margin:0 0 .9rem}
@@ -29,10 +30,15 @@
       Uploaded {{ encounter.created_at|date:"D j M Y, H:i" }}
       {% if transcript.language %}· language: {{ transcript.language }}{% endif %}
       {% if note.provider %}· note by: {{ note.provider }}{% endif %}
+      {% if note.edited_at %}· edited {{ note.edited_at|date:"j M, H:i" }}{% endif %}
     </div>
   </div>
   <div class="sc-row" style="gap:.6rem">
     <span class="sc-status {{ encounter.status }}" id="scStatus">{{ encounter.get_status_display }}</span>
+    {% if note %}
+    <a class="sc-btn" href="{% url 'scribe:edit' encounter.pk %}"><i class="fas fa-pen"></i> Edit note</a>
+    <a class="sc-btn" href="{% url 'scribe:print' encounter.pk %}" target="_blank" rel="noopener"><i class="fas fa-print"></i> Print / PDF</a>
+    {% endif %}
     <a class="sc-btn" href="{% url 'scribe:list' %}">All encounters</a>
     <form method="post" action="{% url 'scribe:delete' encounter.pk %}"
           onsubmit="return confirm('Delete this encounter and its audio file?');">
@@ -83,8 +89,11 @@
         {% for item in sec.items %}
         <li class="sc-item" data-segs="{{ item.segments_csv }}" tabindex="0">
           {{ item.text }}
-          {% if item.segments %}
+          {% if item.added %}
+          <div class="src edited">✎ Added by clinician — not from the transcript.</div>
+          {% elif item.segments %}
           <div class="src">Source segments: {{ item.segments|join:", " }}</div>
+          {% if item.edited %}<div class="src edited">✎ Edited — check it still matches these segments.</div>{% endif %}
           {% else %}
           <div class="src none">⚠ No transcript segment cited — verify manually.</div>
           {% endif %}

@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
@@ -75,6 +76,8 @@ def _build_sections(note, n_segments):
                 'text': item['text'],
                 'segments': [i for i in item['source_segments'] if i < n_segments],
                 'segments_csv': ','.join(str(i) for i in item['source_segments'] if i < n_segments),
+                'edited': bool(item.get('edited')),
+                'added': bool(item.get('added')),
                 'evidence': ev[pos] if pos < len(ev) else [],
             } for pos, item in enumerate(items)],
         })
@@ -96,6 +99,48 @@ def encounter_detail(request, pk):
         'segments': segments,
         'note': note,
         'sections': _build_sections(note, len(segments)) if note else [],
+    })
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def encounter_edit(request, pk):
+    from .services.editing import apply_edits
+
+    encounter = _own_encounter(request, pk)
+    note = getattr(encounter, 'note', None)
+    if note is None:
+        messages.error(request, 'There is no note to edit yet.')
+        return redirect('scribe:detail', pk=pk)
+    if request.method == 'POST':
+        if apply_edits(note, request.POST):
+            messages.success(request, 'Note saved.')
+        else:
+            messages.info(request, 'No changes to save.')
+        return redirect('scribe:detail', pk=pk)
+    return render(request, 'scribe/edit.html', {
+        'encounter': encounter,
+        'note': note,
+        'sections': _build_sections(note, 10 ** 9),
+    })
+
+
+@login_required
+@require_GET
+def encounter_print(request, pk):
+    """A clean page for printing or the browser's "Save as PDF"."""
+    encounter = _own_encounter(request, pk)
+    note = getattr(encounter, 'note', None)
+    if note is None:
+        messages.error(request, 'There is no note to print yet.')
+        return redirect('scribe:detail', pk=pk)
+    transcript = getattr(encounter, 'transcript', None)
+    n = len(transcript.segments) if transcript else 0
+    return render(request, 'scribe/print.html', {
+        'encounter': encounter,
+        'note': note,
+        'sections': _build_sections(note, n),
+        'printed_at': timezone.now(),
     })
 
 
