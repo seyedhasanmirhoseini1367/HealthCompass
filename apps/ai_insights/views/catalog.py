@@ -22,7 +22,11 @@ from django.db.models import F
 def model_list(request):
     """Landing page — 3 navigation cards only."""
     total_models = AIModel.objects.filter(status='active').count()
-    return render(request, 'ai_insights/list.html', {'total_models': total_models})
+    from apps.accounts.authz import can_view_population_analytics
+    return render(request, 'ai_insights/list.html', {
+        'total_models': total_models,
+        'can_population': can_view_population_analytics(request.user),
+    })
 
 
 def models_view(request):
