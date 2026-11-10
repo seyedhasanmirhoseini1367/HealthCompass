@@ -260,10 +260,10 @@ footer{display:none!important}
           Ask about your latest lab results, what a medication does, or any general health question.
         </p>
         <div class="prompt-chips">
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">What do my latest lab results show?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">Do I have any abnormal values?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">What are my current medications?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">Explain my recent diagnosis</button>
+          {# Built from the user's own data: see apps/rag_assistant/suggestions.py #}
+          {% for q in suggestions %}
+          <button type="button" onclick="usePrompt(this.textContent)" class="chip-btn">{{ q }}</button>
+          {% endfor %}
         </div>
       </div>
       {% else %}

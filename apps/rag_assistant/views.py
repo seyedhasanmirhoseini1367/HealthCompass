@@ -57,6 +57,13 @@ def chat_view(request):
     ]
 
     from apps.rag_assistant.subject import choices_for
+    from apps.rag_assistant.suggestions import starter_questions
+
+    try:
+        suggestions = starter_questions(request.user) if not chat_messages else []
+    except Exception:
+        logger.exception('chat_view: starter questions failed')
+        suggestions = []
 
     return render(request, 'rag_assistant/chat.html', {
         # Built from the same predicate the request path enforces, so nothing
@@ -67,6 +74,7 @@ def chat_view(request):
         'sessions':         sessions,
         'has_records':      has_records,
         'history_data': history_data,
+        'suggestions':  suggestions,
     })
 
 
