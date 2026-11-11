@@ -317,6 +317,55 @@ class SharingGrant(models.Model):
         self.save(update_fields=['status', 'revoked_at', 'revoked_by', 'revoke_reason'])
 
 
+class ShareRequest(models.Model):
+    """
+    Someone asking a patient to share with them.
+
+    A request is never access. It is a separate row on purpose: SharingGrant's
+    invariant is that only the patient creates it, and that stays true — the
+    grant is still created by the patient, when they approve, choosing the
+    scopes themselves. The requester cannot pick what they get.
+
+    A declined request is not announced to the requester (no notification) so
+    saying no costs the patient nothing socially, and a recent decline blocks a
+    repeat request for DECLINE_COOLDOWN_DAYS so "no" cannot be worn down.
+    """
+    DECLINE_COOLDOWN_DAYS = 30
+    MAX_PENDING_SENT = 10
+
+    class Status(models.TextChoices):
+        PENDING   = 'pending',   'Pending'
+        APPROVED  = 'approved',  'Approved'
+        DECLINED  = 'declined',  'Declined'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    id        = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requester = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='share_requests_sent')
+    patient   = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='share_requests_received')
+    message   = models.CharField(max_length=300, blank=True, default='')
+    status    = models.CharField(max_length=10, choices=Status.choices,
+                  default=Status.PENDING, db_index=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            # At most one open request per pair.
+            models.UniqueConstraint(fields=['requester', 'patient'],
+                                    condition=models.Q(status='pending'),
+                                    name='one_pending_share_request_per_pair'),
+            models.CheckConstraint(check=~models.Q(requester=models.F('patient')),
+                                   name='share_request_not_self'),
+        ]
+        indexes = [models.Index(fields=['patient', 'status'])]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.requester.username} asks {self.patient.username} [{self.status}]'
+
+
 class AdminAuditEvent(models.Model):
     """
     What an administrator did to the system, as opposed to who read a patient.

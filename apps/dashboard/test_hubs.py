@@ -90,7 +90,7 @@ class SettingsHubTests(TestCase):
         self.client.force_login(self.patient)
         response = self.client.get('/dashboard/settings/')
 
-        for href in ('/accounts/my-shares/', '/accounts/consent/',
+        for href in ('/care/#sharing', '/accounts/consent/',
                      '/accounts/emergency-card/', '/accounts/export/'):
             self.assertContains(response, href)
 
@@ -130,8 +130,8 @@ class CareHubTests(TestCase):
         self.client.force_login(self.caregiver)
         response = self.client.get('/care/')
 
-        self.assertContains(response, 'Sharing always starts')
-        self.assertContains(response, 'requested from this side')
+        self.assertContains(response, 'Nobody shares their health information with you yet')
+        self.assertContains(response, 'Ask someone to share with me')
 
     def test_a_caregiver_sees_the_people_who_share_with_them(self):
         self._grant()

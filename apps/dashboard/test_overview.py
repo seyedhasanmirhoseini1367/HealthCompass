@@ -456,8 +456,9 @@ class NavigationTests(_Dash):
 
         hubs = {
             '/dashboard/health/': ['/records/', '/insights/'],
-            '/care/':             ['/accounts/my-shares/'],
-            '/dashboard/settings/': ['/accounts/my-shares/', '/accounts/consent/',
+            # Sharing itself is managed on /care/ (share form, stop, requests).
+            '/care/':             ['/accounts/my-shares/create/', '/accounts/share-requests/'],
+            '/dashboard/settings/': ['/care/#sharing', '/accounts/consent/',
                                      '/accounts/emergency-card/',
                                      '/accounts/export/'],
         }

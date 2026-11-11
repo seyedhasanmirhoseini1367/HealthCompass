@@ -1,5 +1,6 @@
 ﻿import hashlib
 import logging
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
@@ -622,29 +623,53 @@ def revoke_doctor_access(request, pk):
 # substitute to act on someone else's data — the same shape as the export and
 # consent views.
 
+# Sharing is managed on Companions (/care/), next to the people it concerns.
+# These views keep their URLs (old links, Settings, the privacy page) and send
+# the person back there.
+SHARING_PAGE = '/care/#sharing'
+
+
 @login_required
 def my_shares(request):
-    """Who this patient shares with, and who shares with them."""
-    from .authz import SHARE_SCOPES
+    """The old Sharing page. Everything it showed now lives on Companions."""
+    return redirect(SHARING_PAGE)
+
+
+def _apply_grant(patient, recipient, scopes):
+    """Create or update the patient's grant to *recipient* with exactly *scopes*."""
     from .models import SharingGrant
 
-    granted = (SharingGrant.objects
-               .filter(patient=request.user)
-               .select_related('recipient')
-               .order_by('-created_at'))
-    received = (SharingGrant.objects
-                .filter(recipient=request.user, status=SharingGrant.Status.ACTIVE)
-                .select_related('patient')
-                .order_by('-created_at'))
+    grant, created = SharingGrant.objects.get_or_create(
+        patient=patient, recipient=recipient,
+        defaults={'can_view_records': 'records' in scopes,
+                  'can_view_alerts': 'alerts' in scopes,
+                  'can_view_appointments': 'appointments' in scopes})
+    if not created:
+        # Re-sharing with someone already listed updates the scopes rather than
+        # failing on the uniqueness constraint, and un-revokes if they had been
+        # cut off — an explicit act by the patient either way.
+        grant.can_view_records = 'records' in scopes
+        grant.can_view_alerts = 'alerts' in scopes
+        grant.can_view_appointments = 'appointments' in scopes
+        grant.status = SharingGrant.Status.ACTIVE
+        grant.revoked_at = None
+        grant.revoked_by = None
+        grant.revoke_reason = ''
+        grant.save()
+    DoctorAccessLog.objects.create(
+        actor=patient, patient=patient, resource=f'share_granted:{recipient.pk}')
+    return grant
 
-    return render(request, 'accounts/my_shares.html', {
-        'granted':  granted,
-        # Only grants that actually give something: showing an expired one under
-        # "shared with me" would promise access the patient no longer has.
-        'received': [g for g in received if g.is_effective],
-        'scopes':   SHARE_SCOPES,
-        'Status':   SharingGrant.Status,
-    })
+
+def _clean_scopes(request):
+    from .authz import SHARE_SCOPES
+    return [x for x in request.POST.getlist('scopes') if x in SHARE_SCOPES]
+
+
+def _find_user(identifier):
+    return (CustomUser.objects
+            .filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
+            .first())
 
 
 @login_required
@@ -658,61 +683,43 @@ def create_share(request):
     share on another person's behalf.
     """
     from .authz import can_create_grant
-    from .models import SharingGrant
 
     identifier = (request.POST.get('recipient') or '').strip().lower()
     if not identifier:
         messages.error(request, 'Enter the username or email of the person to share with.')
-        return redirect('accounts:my_shares')
+        return redirect(SHARING_PAGE)
 
-    recipient = (CustomUser.objects
-                 .filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
-                 .first())
+    recipient = _find_user(identifier)
     if recipient is None:
         # Deliberately the same message whether or not the account exists: this
         # form would otherwise confirm which email addresses are registered.
         messages.error(request, 'No account matches that username or email.')
-        return redirect('accounts:my_shares')
+        return redirect(SHARING_PAGE)
 
     if recipient.pk == request.user.pk:
         messages.error(request, 'You already have access to your own records.')
-        return redirect('accounts:my_shares')
+        return redirect(SHARING_PAGE)
 
     if not can_create_grant(request.user, request.user):
         raise PermissionDenied
 
-    scopes = request.POST.getlist('scopes')
+    scopes = _clean_scopes(request)
     if not scopes:
         messages.error(request, 'Choose at least one thing to share.')
-        return redirect('accounts:my_shares')
+        return redirect(SHARING_PAGE)
 
-    grant, created = SharingGrant.objects.get_or_create(
-        patient=request.user, recipient=recipient,
-        defaults={'can_view_records': 'records' in scopes,
-                  'can_view_alerts': 'alerts' in scopes,
-                  'can_view_appointments': 'appointments' in scopes})
+    _apply_grant(request.user, recipient, scopes)
+    # Sharing directly also answers any open request from the same person.
+    from .models import ShareRequest
+    ShareRequest.objects.filter(
+        requester=recipient, patient=request.user, status=ShareRequest.Status.PENDING
+    ).update(status=ShareRequest.Status.APPROVED, responded_at=timezone.now())
 
-    if not created:
-        # Re-sharing with someone already listed updates the scopes rather than
-        # failing on the uniqueness constraint, and un-revokes if they had been
-        # cut off — an explicit act by the patient either way.
-        grant.can_view_records = 'records' in scopes
-        grant.can_view_alerts = 'alerts' in scopes
-        grant.can_view_appointments = 'appointments' in scopes
-        grant.status = SharingGrant.Status.ACTIVE
-        grant.revoked_at = None
-        grant.revoked_by = None
-        grant.revoke_reason = ''
-        grant.save()
-
-    DoctorAccessLog.objects.create(
-        actor=request.user, patient=request.user,
-        resource=f'share_granted:{recipient.pk}')
     messages.success(
         request,
         f'{recipient.get_full_name() or recipient.username} can now see '
         f'{", ".join(scopes)}. You can stop this at any time.')
-    return redirect('accounts:my_shares')
+    return redirect(SHARING_PAGE)
 
 
 @login_required
@@ -732,7 +739,126 @@ def revoke_share(request, pk):
         actor=request.user, patient=grant.patient,
         resource=f'share_revoked:{grant.recipient_id}')
     messages.success(request, 'Sharing stopped.')
-    return redirect('accounts:my_shares')
+    return redirect(SHARING_PAGE)
+
+
+# ── Asking someone to share ──────────────────────────────────────────────────
+
+def _name(user):
+    return user.get_full_name() or user.username
+
+
+@login_required
+@require_POST
+def request_share(request):
+    """
+    Ask someone to share with you. Creates a request, never access.
+
+    The patient decides on their own Companions page, picking the scopes.
+    """
+    from .models import SharingGrant, ShareRequest
+    from apps.notifications.models import Notification
+
+    identifier = (request.POST.get('patient') or '').strip().lower()
+    message = (request.POST.get('message') or '').strip()[:300]
+    if not identifier:
+        messages.error(request, 'Enter the username or email of the person you want to ask.')
+        return redirect(SHARING_PAGE)
+
+    patient = _find_user(identifier)
+    if patient is None:
+        messages.error(request, 'No account matches that username or email.')
+        return redirect(SHARING_PAGE)
+    if patient.pk == request.user.pk:
+        messages.error(request, 'You already have access to your own records.')
+        return redirect(SHARING_PAGE)
+
+    grant = SharingGrant.objects.filter(patient=patient, recipient=request.user).first()
+    if grant is not None and grant.is_effective:
+        messages.info(request, f'{_name(patient)} already shares with you. '
+                               'Only they can change what you see.')
+        return redirect(SHARING_PAGE)
+
+    mine = ShareRequest.objects.filter(requester=request.user)
+    if mine.filter(patient=patient, status=ShareRequest.Status.PENDING).exists():
+        messages.info(request, f'You have already asked {_name(patient)}. '
+                               'They will see it on their Companions page.')
+        return redirect(SHARING_PAGE)
+
+    cooldown = timezone.now() - timedelta(days=ShareRequest.DECLINE_COOLDOWN_DAYS)
+    if mine.filter(patient=patient, status=ShareRequest.Status.DECLINED,
+                   responded_at__gte=cooldown).exists():
+        messages.error(request, f'You asked {_name(patient)} recently. '
+                                'Please wait before asking again.')
+        return redirect(SHARING_PAGE)
+
+    if mine.filter(status=ShareRequest.Status.PENDING).count() >= ShareRequest.MAX_PENDING_SENT:
+        messages.error(request, 'You have too many requests waiting for an answer. '
+                                'Cancel one before sending another.')
+        return redirect(SHARING_PAGE)
+
+    ShareRequest.objects.create(requester=request.user, patient=patient, message=message)
+    Notification.objects.create(
+        user=patient, type=Notification.Type.SYSTEM,
+        title=f'{_name(request.user)} asked to see your health information',
+        message='Nothing is shared unless you approve. You choose what they can see.',
+        link=SHARING_PAGE)
+    messages.success(request, f'Request sent to {_name(patient)}. '
+                              'Nothing is shared unless they approve.')
+    return redirect(SHARING_PAGE)
+
+
+@login_required
+@require_POST
+def answer_share_request(request, pk):
+    """The patient approves (choosing what to share) or declines a request to them."""
+    from .models import ShareRequest
+    from apps.notifications.models import Notification
+
+    req = get_object_or_404(ShareRequest, pk=pk, patient=request.user,
+                            status=ShareRequest.Status.PENDING)
+    decision = request.POST.get('decision')
+
+    if decision == 'approve':
+        scopes = _clean_scopes(request)
+        if not scopes:
+            messages.error(request, 'Choose at least one thing to share, or decline.')
+            return redirect(SHARING_PAGE)
+        _apply_grant(request.user, req.requester, scopes)
+        req.status = ShareRequest.Status.APPROVED
+        req.responded_at = timezone.now()
+        req.save(update_fields=['status', 'responded_at'])
+        Notification.objects.create(
+            user=req.requester, type=Notification.Type.SYSTEM,
+            title=f'{_name(request.user)} is now sharing with you',
+            message=f'You can see their {", ".join(scopes)}.',
+            link=f'/care/person/{request.user.pk}/')
+        messages.success(request, f'{_name(req.requester)} can now see '
+                                  f'{", ".join(scopes)}. You can stop this at any time.')
+    elif decision == 'decline':
+        # No notification to the requester: saying no should cost nothing.
+        req.status = ShareRequest.Status.DECLINED
+        req.responded_at = timezone.now()
+        req.save(update_fields=['status', 'responded_at'])
+        messages.success(request, 'Request declined. Nothing was shared.')
+    else:
+        messages.error(request, 'Choose approve or decline.')
+    return redirect(SHARING_PAGE)
+
+
+@login_required
+@require_POST
+def cancel_share_request(request, pk):
+    """The requester withdraws a request they sent."""
+    from .models import ShareRequest
+
+    req = get_object_or_404(ShareRequest, pk=pk, requester=request.user,
+                            status=ShareRequest.Status.PENDING)
+    req.status = ShareRequest.Status.CANCELLED
+    req.responded_at = timezone.now()
+    req.save(update_fields=['status', 'responded_at'])
+    messages.success(request, 'Request cancelled.')
+    return redirect(SHARING_PAGE)
 
 
 @login_required

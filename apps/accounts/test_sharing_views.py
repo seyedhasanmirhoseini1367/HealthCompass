@@ -159,20 +159,27 @@ class RevokeTests(_Views):
 
 
 class ListingTests(_Views):
+    """Sharing is listed on Companions (/care/); the old page redirects there."""
+
+    def _care(self):
+        return self.client.get('/care/')
+
+    def test_the_old_page_redirects_to_companions(self):
+        response = self.client.get(reverse('accounts:my_shares'))
+        self.assertRedirects(response, '/care/#sharing', fetch_redirect_response=False)
 
     def test_the_page_shows_who_you_share_with(self):
         SharingGrant.objects.create(
             patient=self.patient, recipient=self.daughter, can_view_records=True)
 
-        body = self.client.get(reverse('accounts:my_shares')).content.decode()
-        self.assertIn('shv_daughter', body)
+        self.assertContains(self._care(), 'shv_daughter')
 
     def test_the_page_shows_who_shares_with_you(self):
         SharingGrant.objects.create(
             patient=self.daughter, recipient=self.patient, can_view_records=True)
 
-        body = self.client.get(reverse('accounts:my_shares')).content.decode()
-        self.assertIn('shv_daughter', body)
+        response = self._care()
+        self.assertEqual([r['subject'] for r in response.context['people']], [self.daughter])
 
     def test_an_expired_grant_is_not_listed_as_shared_with_you(self):
         """Listing it would promise access the patient no longer has."""
@@ -180,8 +187,7 @@ class ListingTests(_Views):
             patient=self.daughter, recipient=self.patient, can_view_records=True,
             expires_at=timezone.now() - timedelta(days=1))
 
-        response = self.client.get(reverse('accounts:my_shares'))
-        self.assertEqual(list(response.context['received']), [])
+        self.assertEqual(list(self._care().context['people']), [])
 
     def test_you_do_not_see_other_peoples_grants(self):
         stranger = User.objects.create_user(
@@ -189,9 +195,9 @@ class ListingTests(_Views):
         SharingGrant.objects.create(
             patient=stranger, recipient=self.daughter, can_view_records=True)
 
-        response = self.client.get(reverse('accounts:my_shares'))
+        response = self._care()
         self.assertEqual(list(response.context['granted']), [])
-        self.assertEqual(list(response.context['received']), [])
+        self.assertEqual(list(response.context['people']), [])
 
     def test_the_page_requires_login(self):
         self.client.logout()
