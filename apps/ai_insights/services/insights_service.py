@@ -72,7 +72,7 @@ def get_population_biomarker_stats(biomarker_names=None):
     from apps.medical_records.models import ParsedLabValue
 
     _cache_key = (
-        'ai_insights:pop_biomarker:'
+        'ai_insights:pop_biomarker:v2:'
         + (','.join(sorted(biomarker_names)) if biomarker_names else 'all')
     )
     cached = cache.get(_cache_key)
@@ -89,6 +89,9 @@ def get_population_biomarker_stats(biomarker_names=None):
         qs = qs.filter(parameter_name__in=biomarker_names)
 
     per_unit_monthly = defaultdict(lambda: defaultdict(list))
+    # Distinct patients behind each point, so a caller can withhold figures
+    # that describe too few people (see population_view).
+    per_unit_patients = defaultdict(lambda: defaultdict(set))
     for row in qs:
         current = row.effective()
         lv = {
@@ -106,15 +109,16 @@ def get_population_biomarker_stats(biomarker_names=None):
         month_key = date_val.strftime('%Y-%m')
         key       = (lv['parameter_name'], lv.get('unit') or '')
         per_unit_monthly[key][month_key].append(numeric)
+        per_unit_patients[key][month_key].add(row.record.patient_id)
 
     by_name = defaultdict(list)
     for (name, unit), months in per_unit_monthly.items():
         total = sum(len(vs) for vs in months.values())
-        by_name[name].append((unit, total, months))
+        by_name[name].append((unit, total, months, per_unit_patients[(name, unit)]))
 
     pop_trending, pop_latest, pop_avg, pop_unit = {}, {}, {}, {}
     for name, groups in by_name.items():
-        best_unit, _, best_months = max(groups, key=lambda x: x[1])
+        best_unit, _, best_months, best_patients = max(groups, key=lambda x: x[1])
         all_vals      = [v for vs in best_months.values() for v in vs]
         sorted_months = sorted(best_months.keys())
         series = [
@@ -122,6 +126,7 @@ def get_population_biomarker_stats(biomarker_names=None):
                 'date':  m,
                 'value': round(sum(best_months[m]) / len(best_months[m]), 2),
                 'count': len(best_months[m]),
+                'patients': len(best_patients[m]),
                 'unit':  best_unit,
             }
             for m in sorted_months if best_months[m]
@@ -131,7 +136,8 @@ def get_population_biomarker_stats(biomarker_names=None):
             pop_trending[name] = series
         if series:
             last = series[-1]
-            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count']}
+            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count'],
+                                'patients': last['patients']}
         if len(all_vals) >= 3:
             pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
 

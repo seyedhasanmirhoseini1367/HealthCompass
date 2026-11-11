@@ -94,10 +94,20 @@
 
 <div class="privacy-banner">
   <i class="fas fa-shield-alt"></i>
-  All data is fully anonymised — aggregated across patients, no individual is identifiable.
+  {% if limited %}
+  Aggregated across patients. Any figure based on fewer than {{ min_patients }} patients is hidden, so no individual can be identified.
+  {% else %}
+  Full view for research and administration. Small groups are not hidden here, so treat these figures as confidential.
+  {% endif %}
 </div>
 
-{% if not has_data %}
+{% if too_few %}
+<div style="background:white;border-radius:18px;border:1px solid var(--border);padding:3rem;text-align:center;color:var(--muted)">
+  <i class="fas fa-user-shield" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
+  <strong style="color:var(--text)">Not enough patients yet</strong>
+  <p style="font-size:.85rem;margin:.4rem 0 0">Population statistics appear once at least {{ min_patients }} patients have records, so that nobody's results can be worked out from them.</p>
+</div>
+{% elif not has_data %}
 <div style="background:white;border-radius:18px;border:1px solid var(--border);padding:3rem;text-align:center;color:var(--muted)">
   <i class="fas fa-users" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:.75rem"></i>
   <strong style="color:var(--text)">No population data yet</strong>
@@ -135,6 +145,7 @@
     </div>
   </div>
 
+  {% if not alerts_hidden %}
   <div class="sc-card" id="sc-alerts" style="--sc-accent:#f59e0b" onclick="toggleSection('alerts')">
     <div class="sc-card-top"><span class="sc-num" style="background:#f59e0b">3</span><span class="sc-icon">🔔</span><div class="sc-title">Alert Distribution</div></div>
     <div class="sc-desc">Breakdown of health alerts by severity across all patients — shows how common critical vs warning events are.</div>
@@ -143,6 +154,7 @@
       <span class="sc-tag" style="background:#fee2e2;color:#b91c1c">{{ total_alerts }} total</span>
     </div>
   </div>
+  {% endif %}
 
   <div class="sc-card" id="sc-records" style="--sc-accent:#10b981" onclick="toggleSection('records')">
     <div class="sc-card-top"><span class="sc-num" style="background:#10b981">4</span><span class="sc-icon">📁</span><div class="sc-title">Records by Type</div></div>
@@ -162,6 +174,7 @@
     </div>
   </div>
 
+  {% if not risk_hidden %}
   <div class="sc-card" id="sc-risk" style="--sc-accent:#ec4899" onclick="toggleSection('risk')">
     <div class="sc-card-top"><span class="sc-num" style="background:#ec4899">6</span><span class="sc-icon">🤖</span><div class="sc-title">AI Risk Distribution</div></div>
     <div class="sc-desc">Distribution of AI-predicted risk scores across all patients — low, moderate, and high risk breakdown.</div>
@@ -173,6 +186,7 @@
       <span class="sc-tag" style="background:#f1f5f9;color:#64748b">No data yet</span>{% endif %}
     </div>
   </div>
+  {% endif %}
 
 </div>
 
@@ -231,6 +245,7 @@
   </div>
 </div>
 
+{% if not alerts_hidden %}
 <!-- 3. Alert Distribution -->
 <div class="section-panel" id="sp-alerts">
   <div class="sp-header">
@@ -246,6 +261,8 @@
     <div class="alert-donut-wrap"><canvas id="alerts-chart"></canvas></div>
   </div>
 </div>
+
+{% endif %}
 
 <!-- 4. Records by Type -->
 <div class="section-panel" id="sp-records">
@@ -269,6 +286,7 @@
   </div>
 </div>
 
+{% if not risk_hidden %}
 <!-- 6. Risk Distribution -->
 <div class="section-panel" id="sp-risk">
   <div class="sp-header">
@@ -289,6 +307,7 @@
     {% endif %}
   </div>
 </div>
+{% endif %}
 
 {% endif %}{# has_data #}
 

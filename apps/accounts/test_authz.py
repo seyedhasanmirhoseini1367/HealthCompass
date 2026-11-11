@@ -228,10 +228,12 @@ class PopulationAnalyticsTests(TestCase):
         from django.contrib.auth.models import AnonymousUser
         self.assertFalse(can_view_population_analytics(AnonymousUser()))
 
-    def test_the_web_view_redirects_a_patient(self):
+    def test_the_web_view_gives_a_patient_the_limited_view(self):
+        # Open to patients, with small groups withheld (population_privacy.py).
         self.client.force_login(self.patient)
         response = self.client.get(reverse('ai_insights:population'))
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['limited'])
 
     def test_the_web_view_serves_a_data_scientist(self):
         self.client.force_login(self.scientist)
