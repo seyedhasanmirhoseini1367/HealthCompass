@@ -1,5 +1,6 @@
 import logging
 
+from ..pagination import paginated
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -36,8 +37,8 @@ def care_tasks_list_create(request):
         from apps.care.scheduling import generate_occurrences
 
         if request.method == 'GET':
-            qs = CareTask.objects.filter(patient=request.user, is_active=True)
-            return Response(CareTaskSerializer(qs, many=True).data)
+            qs = CareTask.objects.filter(patient=request.user, is_active=True).order_by('pk')
+            return paginated(request, qs, CareTaskSerializer)
 
         label = (request.data.get('label') or '').strip()
         if not label:
@@ -106,7 +107,7 @@ def care_occurrences_list(request):
                       due_at__gte=now - span, due_at__lte=now + span)
               .select_related('task')
               .order_by('-due_at'))
-        return Response(TaskOccurrenceSerializer(qs, many=True).data)
+        return paginated(request, qs, TaskOccurrenceSerializer)
     except Exception as exc:
         _log.exception('care_occurrences_list error: %s', exc)
         return Response(client_error(exc, context='care'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -156,8 +157,8 @@ def patient_reports_list_create(request):
         from apps.care.models import PatientReport
 
         if request.method == 'GET':
-            qs = PatientReport.objects.filter(patient=request.user)[:50]
-            return Response(PatientReportSerializer(qs, many=True).data)
+            qs = PatientReport.objects.filter(patient=request.user).order_by('-pk')
+            return paginated(request, qs, PatientReportSerializer)
 
         text = (request.data.get('text') or '').strip()
         if not text:

@@ -98,7 +98,7 @@
       var hint = input.accept ? input.accept.split(',').map(function (s) { return s.trim().replace(/^\./, '').toUpperCase(); })
                                      .filter(function (s) { return s && s.indexOf('/') === -1; }).join(', ') : '';
       drop.innerHTML =
-        '<i class="fas fa-cloud-arrow-up hc-drop-icon" aria-hidden="true"></i>' +
+        hcIcon('cloud-arrow-up', 'hc-drop-icon') +
         '<span class="hc-drop-main"><strong>Drag a file here</strong> or <u>browse</u></span>' +
         (hint ? '<span class="hc-drop-hint"></span>' : '') +
         '<span class="hc-drop-file" aria-live="polite"></span>';
@@ -141,3 +141,27 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
+/* -- Password fields: a show/hide toggle (audit polish) ---------------------- */
+(function () {
+  'use strict';
+  document.querySelectorAll('input[type="password"]').forEach(function (input) {
+    if (input.dataset.noToggle !== undefined || input.nextElementSibling && input.nextElementSibling.classList.contains('pw-toggle')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-toggle';
+    btn.textContent = 'Show';
+    btn.setAttribute('aria-label', 'Show password');
+    btn.setAttribute('aria-pressed', 'false');
+    if (input.id) btn.setAttribute('aria-controls', input.id);
+    btn.addEventListener('click', function () {
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Hide' : 'Show';
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    });
+    input.insertAdjacentElement('afterend', btn);
+  });
+})();
+

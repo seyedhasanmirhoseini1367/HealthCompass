@@ -10,6 +10,8 @@ Usage:
     python manage.py purge_old_query_logs --dry-run   # count without deleting
 """
 from django.core.management.base import BaseCommand
+
+from apps.ops.heartbeat import heartbeat
 from django.utils import timezone
 from django.conf import settings
 import datetime
@@ -28,6 +30,7 @@ class Command(BaseCommand):
             help='Print the count that would be deleted without deleting',
         )
 
+    @heartbeat('purge_old_query_logs')
     def handle(self, *args, **options):
         from apps.rag_assistant.models import QueryLog
 

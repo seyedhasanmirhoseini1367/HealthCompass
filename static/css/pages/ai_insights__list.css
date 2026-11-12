@@ -1,0 +1,20 @@
+/* Moved from templates/ai_insights/list.html */
+/* .page-hero styles are now global in base.html */
+
+.nav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem;max-width:960px;margin:0 auto}
+
+.nav-card{background:white;border-radius:20px;border:1.5px solid var(--border);padding:1.75rem 1.5rem 1.35rem;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:.7rem;text-decoration:none;color:inherit}
+.nav-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:20px 20px 0 0;background:var(--nc-accent,#6366f1);opacity:0;transition:opacity .2s}
+.nav-card:hover::before{opacity:1}
+.nav-card:hover{border-color:var(--nc-accent,#6366f1);box-shadow:0 10px 32px rgba(0,0,0,.1);transform:translateY(-3px);color:inherit;text-decoration:none}
+
+.nc-top{display:flex;align-items:center;gap:.85rem}
+.nc-num{width:2.2rem;height:2.2rem;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:white;flex-shrink:0;background:var(--nc-accent,#4f46e5)}
+.nc-icon{font-size:1.5rem;line-height:1;flex-shrink:0}
+.nc-title{font-weight:800;font-size:1.05rem;color:#1e293b;line-height:1.2}
+.nc-desc{font-size:.83rem;color:#475569;line-height:1.6;flex:1}
+.nc-tags{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.15rem}
+.nc-tag{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:999px;white-space:nowrap}
+.nc-footer{display:flex;align-items:center;justify-content:flex-end;padding-top:.75rem;border-top:1px solid #f1f5f9;margin-top:auto}
+.nc-cta{font-size:.8rem;font-weight:700;color:var(--nc-accent,#6366f1);display:flex;align-items:center;gap:.3rem;transition:gap .15s}
+.nav-card:hover .nc-cta{gap:.55rem}

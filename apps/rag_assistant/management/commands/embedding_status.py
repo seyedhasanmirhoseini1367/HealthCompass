@@ -14,6 +14,22 @@ import json
 from django.core.management.base import BaseCommand
 
 
+_PICKLE_PREFIXES = (b'\x80\x03', b'\x80\x04', b'\x80\x05')
+
+
+def legacy_pickled_count() -> int:
+    """How many stored embeddings still start with a pickle protocol header."""
+    from apps.rag_assistant.models import GeneralKnowledgeChunk, MedicalChunk
+
+    count = 0
+    for Model in (MedicalChunk, GeneralKnowledgeChunk):
+        for raw in (Model.objects.exclude(embedding__isnull=True)
+                    .values_list('embedding', flat=True).iterator()):
+            if bytes(raw)[:2] in _PICKLE_PREFIXES:
+                count += 1
+    return count
+
+
 class Command(BaseCommand):
     help = 'Report which embedding models produced the stored vectors, and flag stale ones.'
 
@@ -48,6 +64,16 @@ class Command(BaseCommand):
                 raise SystemExit(1)
         else:
             self.stdout.write(self.style.SUCCESS('\nAll stored embeddings are compatible.'))
+
+        # Readers no longer unpickle stored vectors (migration 0012 converted the
+        # legacy rows). Any still pickle-encoded would be silently mis-read.
+        legacy = legacy_pickled_count()
+        if legacy:
+            self.stdout.write(self.style.ERROR(
+                f'\n{legacy} embedding(s) are still pickle-encoded. Run '
+                '`python manage.py migrate rag_assistant` (migration 0012 converts them).'))
+            if options['fail_on_stale']:
+                raise SystemExit(1)
 
     def _render(self, rep):
         self.stdout.write(self.style.MIGRATE_HEADING(f"\n{rep['model']}"))

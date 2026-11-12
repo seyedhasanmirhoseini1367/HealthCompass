@@ -1,0 +1,9 @@
+{% extends 'emails/_base.html' %}
+{% block subject %}Confirm your email address{% endblock %}
+{% block body %}
+<p>Hi {{ user.get_full_name|default:user.username }},</p>
+<p>Please confirm that <strong>{{ email }}</strong> is your email address.</p>
+<p><a href="{{ activate_url }}" style="display:inline-block;background:#0369a1;color:#ffffff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600">Confirm my address</a></p>
+<p style="color:#475569;font-size:13px">Or copy this address into your browser:<br>{{ activate_url }}</p>
+<p>Until you confirm, sharing and the assistant stay locked. If you did not create a HealthCompass account, ignore this message.</p>
+{% endblock %}

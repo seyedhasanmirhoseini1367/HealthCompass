@@ -1,0 +1,11 @@
+# Install once with `pip install pre-commit && pre-commit install`.
+# Same ruff version and rules as CI (ruff.toml), plus a secret scan.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

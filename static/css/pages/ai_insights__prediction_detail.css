@@ -1,0 +1,19 @@
+/* Moved from templates/ai_insights/prediction_detail.html */
+.result-hero{background:white;border-radius:16px;border:1px solid var(--border);padding:2rem;text-align:center;margin-bottom:1.25rem}
+.risk-score{font-size:3.5rem;font-weight:800;line-height:1}
+.risk-bar{height:16px;border-radius:8px;background:#e2e8f0;overflow:hidden;margin:1.25rem auto;max-width:360px}
+.risk-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444)}
+.interp-card{background:linear-gradient(135deg,#f0f9ff,#f5f3ff);border:1px solid #c7d2fe;border-radius:16px;padding:1.5rem;margin-bottom:1.25rem}
+.interp-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.875rem}
+.interp-icon{width:36px;height:36px;border-radius:10px;background:var(--secondary);display:flex;align-items:center;justify-content:center;color:white;font-size:1rem}
+.input-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
+.input-chip{background:#f8fafc;border-radius:10px;padding:.75rem 1rem;font-size:.875rem}
+.input-chip .key{color:var(--muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+.input-chip .val{font-weight:700;color:var(--text);font-size:1rem}
+@media(max-width:500px){
+  .result-hero{padding:1.25rem 1rem;border-radius:12px}
+  .risk-score{font-size:2.4rem}
+  .interp-card{padding:1rem 1.1rem;border-radius:12px}
+  .input-grid{grid-template-columns:repeat(2,1fr)}
+  .input-chip{padding:.55rem .7rem}
+}

@@ -34,6 +34,8 @@ Usage:
 """
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.ops.heartbeat import heartbeat
+
 
 class Command(BaseCommand):
     help = 'Re-embed chunks whose embedding is missing (pending/failed), in place.'
@@ -49,6 +51,7 @@ class Command(BaseCommand):
                             help='Also attempt chunks marked BLOCKED by the consent '
                                  'guard. Off by default — consent is not a failure.')
 
+    @heartbeat('retry_failed_embeddings')
     def handle(self, *args, **options):
         from django.contrib.auth import get_user_model
         from apps.rag_assistant.models import MedicalChunk

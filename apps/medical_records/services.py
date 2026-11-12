@@ -63,6 +63,31 @@ _MAX_FILENAME_LEN = 200
 _MAX_EXT_LEN = 16
 
 
+#: What each upload kind accepts. Validation and the HTML `accept` attributes
+#: are both derived from this, so they cannot disagree again (the wearable
+#: picker offered .xml, which was rejected, and hid .xlsx, which was accepted).
+ALLOWED_EXTENSIONS = {
+    'pdf':      ['pdf'],
+    'kanta':    ['xml'],
+    'wearable': ['csv', 'json', 'parquet', 'xlsx'],
+    'image':    ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+}
+
+
+def accept_attr(kind: str) -> str:
+    """The `accept` attribute value for a file input of this upload kind."""
+    return ','.join(f'.{ext}' for ext in ALLOWED_EXTENSIONS[kind])
+
+
+def upload_kind_for(filename: str):
+    """The upload kind a file's extension belongs to, or None."""
+    ext = os.path.splitext(filename or '')[1].lower().lstrip('.')
+    for kind, exts in ALLOWED_EXTENSIONS.items():
+        if ext in exts:
+            return kind
+    return None
+
+
 def _max_upload_bytes() -> int:
     from django.conf import settings as s
     return int(getattr(s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024))
@@ -349,6 +374,26 @@ def _create_alert(record: MedicalRecord, abnormal_count: int) -> None:
 
 
 
+# Characters removed from names that come out of uploaded files: angle brackets
+# (markup) and ASCII control characters. The name is shown on pages other people
+# see (population statistics), so it is treated as hostile (audit SEC-01).
+_UNSAFE_NAME_CHARS = re.compile(r'[<>\x00-\x1f\x7f]')
+PARAMETER_NAME_MAX = 120
+
+
+def _clean_label(value, max_len: int) -> str:
+    text = _UNSAFE_NAME_CHARS.sub(' ', str(value or ''))
+    return ' '.join(text.split())[:max_len].strip()
+
+
+def normalise_parameter_name(name) -> str:
+    """Strip markup and control characters, collapse whitespace, cap length.
+
+    Returns 'Unknown' when nothing printable is left.
+    """
+    return _clean_label(name, PARAMETER_NAME_MAX) or 'Unknown'
+
+
 def _save_lab_value(record, lv: dict, *, measured_at=None) -> bool:
     """
     Create one ParsedLabValue row. Returns True if is_abnormal.
@@ -358,26 +403,198 @@ def _save_lab_value(record, lv: dict, *, measured_at=None) -> bool:
     pass a precomputed flag: doing so is what allowed the Kanta path to use a
     raw-value comparison while the PDF and text paths computed nothing at all.
     """
-    _val_str = str(lv.get('value', ''))
+    name = normalise_parameter_name(lv.get('name'))
+    _val_str = _clean_label(lv.get('value', ''), 100)
     _canonical, _canon_unit, _orig_unit, _unit_known = normalize_lab_unit(
-        lv.get('name', ''), _val_str, lv.get('unit', ''),
+        name, _val_str, _clean_label(lv.get('unit', ''), 50),
     )
-    is_critical = _is_critical(lv.get('name', ''), _canonical, _canon_unit, _unit_known)
+    is_critical = _is_critical(name, _canonical, _canon_unit, _unit_known)
     is_ab = lv.get('is_abnormal', False) or is_critical
     ParsedLabValue.objects.create(
         record=record,
-        parameter_name=lv.get('name', 'Unknown'),
+        parameter_name=name,
         value=_val_str,
         unit=_canon_unit,
         canonical_value=_canonical,
         original_unit=_orig_unit,
         unit_known=_unit_known,
-        reference_range=lv.get('ref_range', '') or lv.get('reference_range', ''),
+        reference_range=_clean_label(lv.get('ref_range', '') or lv.get('reference_range', ''), 100),
         is_abnormal=is_ab,
         is_critical=is_critical,
         measured_at=measured_at,
     )
     return is_ab
+
+
+def _parse_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_pdf(user, pdf_bytes, *, record_type=None, filename='document.pdf') -> dict:
+    """Parse a PDF into record fields. Local extraction always runs; LLM
+    structuring only with the owner's consent (records.parse)."""
+    from apps.accounts.egress import ExternalProcessingGuard
+    from .parsers import PDFParser
+
+    use_ai = ExternalProcessingGuard.allows(user, 'records.parse')
+    parsed = PDFParser().parse(pdf_bytes, use_ai=use_ai)
+    if parsed.get('error'):
+        return {'error': parsed['error']}
+    structured = parsed.get('structured') or {}
+    return {
+        'structured':  structured,
+        'raw_text':    parsed.get('raw_text', ''),
+        'page_count':  parsed.get('page_count', 0),
+        'record_type': _coerce_record_type(record_type or structured.get('record_type')),
+        'title':       structured.get('title') or filename.rsplit('.', 1)[0],
+        'record_date': _parse_date(structured.get('date')),
+    }
+
+
+def _parse_text(user, raw_text, *, record_type='auto', title_override='', date_override=None) -> dict:
+    from apps.accounts.egress import ExternalProcessingGuard
+    from .parsers import TextParser
+
+    use_ai = ExternalProcessingGuard.allows(user, 'records.parse')
+    structured = TextParser().parse(raw_text, use_ai=use_ai).get('structured') or {}
+    return {
+        'structured':  structured,
+        'record_type': _coerce_record_type(
+            structured.get('record_type') if record_type == 'auto' else record_type),
+        'title':       title_override or structured.get('title')
+                       or raw_text[:60].strip().replace('\n', ' '),
+        'record_date': date_override or _parse_date(structured.get('date')),
+    }
+
+
+# ── Queued ingestion (audit ARCH-02) ─────────────────────────────────────────
+#
+# The upload request stores the input and returns at once; parsing, LLM
+# structuring and lab extraction run in a job on the 'ingest' queue. Under the
+# test runner, and without a worker, the job runs inline, so callers see the
+# same result either way.
+
+PROCESSING_FAILED_MESSAGE = 'This file could not be processed. You can try again.'
+
+
+def queue_pdf(user, pdf_bytes: bytes, *, notes='', record_type=None,
+              filename='document.pdf') -> dict:
+    from django.core.files.base import ContentFile
+
+    digest = content_fingerprint(pdf_bytes)
+    existing = find_duplicate(user, digest)
+    if existing is not None:
+        return {'record': existing, 'flagged': 0, 'duplicate': True}
+    record = MedicalRecord.objects.create(
+        patient=user, record_type=_coerce_record_type(record_type),
+        source=MedicalRecord.Source.MANUAL_UPLOAD, title=filename.rsplit('.', 1)[0],
+        file=ContentFile(pdf_bytes, name=filename), content_hash=digest, notes=notes,
+        processing_status=MedicalRecord.ProcessingStatus.QUEUED,
+        parsed_data={'_ingest': {'kind': 'pdf', 'record_type': record_type or '',
+                                 'filename': filename}},
+    )
+    _enqueue_processing(record)
+    record.refresh_from_db()
+    return {'record': record, 'flagged': _flag_count(record), 'queued': True}
+
+
+def queue_text(user, raw_text: str, *, notes='', record_type='auto', title_override='',
+               date_override=None) -> dict:
+    digest = content_fingerprint(raw_text)
+    existing = find_duplicate(user, digest)
+    if existing is not None:
+        return {'record': existing, 'flagged': 0, 'duplicate': True}
+    record = MedicalRecord.objects.create(
+        patient=user, record_type=MedicalRecord.RecordType.OTHER,
+        source=MedicalRecord.Source.MANUAL_UPLOAD,
+        title=title_override or raw_text[:60].strip().replace('\n', ' '),
+        content_hash=digest, raw_text=raw_text, notes=notes, record_date=date_override,
+        processing_status=MedicalRecord.ProcessingStatus.QUEUED,
+        parsed_data={'_ingest': {'kind': 'text', 'record_type': record_type or 'auto',
+                                 'title_override': title_override}},
+    )
+    _enqueue_processing(record)
+    record.refresh_from_db()
+    return {'record': record, 'flagged': _flag_count(record), 'queued': True}
+
+
+def _flag_count(record) -> int:
+    return record.lab_values.filter(is_abnormal=True).count() if record.is_flagged else 0
+
+
+def _enqueue_processing(record):
+    from healthcompass.tasks import enqueue
+    enqueue(process_record, str(record.pk), queue='ingest')
+
+
+def retry_processing(record) -> bool:
+    """Re-run a failed job. Returns False when the record is not retryable."""
+    if record.processing_status != MedicalRecord.ProcessingStatus.FAILED:
+        return False
+    MedicalRecord.objects.filter(pk=record.pk).update(
+        processing_status=MedicalRecord.ProcessingStatus.QUEUED, processing_error='')
+    _enqueue_processing(record)
+    return True
+
+
+def process_record(record_pk: str) -> None:
+    """The job: parse the stored input and fill in the record.
+
+    Claimed with a compare-and-set from QUEUED, so two workers never process one
+    record. Any failure marks it FAILED with a generic message (never exception
+    text, which can quote the document) and emits an ops event.
+    """
+    from healthcompass.observability import Event as OpsEvent, emit as ops_emit
+
+    S = MedicalRecord.ProcessingStatus
+    claimed = MedicalRecord.objects.filter(pk=record_pk, processing_status=S.QUEUED).update(
+        processing_status=S.PROCESSING)
+    if not claimed:
+        return
+    record = MedicalRecord.objects.get(pk=record_pk)
+    spec = (record.parsed_data or {}).get('_ingest', {})
+    try:
+        if spec.get('kind') == 'pdf':
+            with record.file.open('rb') as fh:
+                pdf_bytes = fh.read()
+            parsed = _parse_pdf(record.patient, pdf_bytes, record_type=spec.get('record_type') or None,
+                                filename=spec.get('filename') or 'document.pdf')
+            if parsed.get('error'):
+                raise ValueError('parse error')
+            record.raw_text = parsed['raw_text']
+        else:
+            parsed = _parse_text(record.patient, record.raw_text,
+                                 record_type=spec.get('record_type') or 'auto',
+                                 title_override=spec.get('title_override') or '',
+                                 date_override=record.record_date)
+        with transaction.atomic():
+            record.lab_values.all().delete()
+            record.record_type = parsed['record_type']
+            record.title = parsed['title']
+            record.record_date = parsed['record_date'] or record.record_date
+            record.parsed_data = parsed['structured']
+            flagged = sum(1 for lv in parsed['structured'].get('lab_values', [])
+                          if _save_lab_value(record, lv))
+            record.is_flagged = bool(flagged)
+            record.processing_status = S.READY
+            record.processing_error = ''
+            # Content fields in update_fields: this save triggers indexing.
+            record.save(update_fields=['raw_text', 'record_type', 'title', 'record_date',
+                                       'parsed_data', 'is_flagged', 'processing_status',
+                                       'processing_error'])
+            if flagged:
+                _create_alert(record, flagged)
+    except Exception as exc:
+        MedicalRecord.objects.filter(pk=record_pk).update(
+            processing_status=S.FAILED, processing_error=PROCESSING_FAILED_MESSAGE)
+        logger.warning('Processing record %s failed: %s', record_pk, type(exc).__name__)
+        ops_emit(OpsEvent.INGESTION_PARSE_FAILED, record_id=str(record_pk),
+                 error_type=type(exc).__name__)
 
 
 # ── Service ───────────────────────────────────────────────────────────────────
@@ -390,8 +607,6 @@ class MedicalRecordService:
                         record_type=None,
                         filename: str = 'document.pdf') -> dict:
         from django.core.files.base import ContentFile
-        from apps.accounts.egress import ExternalProcessingGuard
-        from .parsers import PDFParser
 
         # Idempotency check first, before any parsing. Re-uploading a document
         # previously produced a second record and a second full set of lab
@@ -405,24 +620,11 @@ class MedicalRecordService:
             return {'record': existing, 'flagged': 0, 'page_count': 0,
                     'structured': bool(existing.parsed_data), 'duplicate': True}
 
-        # The consent decision is made here, where the owner is known, and
-        # passed down as a flag: text extraction and table parsing are local and
-        # always run, only the Gemini structuring step is withheld.
-        use_ai = ExternalProcessingGuard.allows(user, 'records.parse')
-        parsed = PDFParser().parse(pdf_bytes, use_ai=use_ai)
+        parsed = _parse_pdf(user, pdf_bytes, record_type=record_type, filename=filename)
         if parsed.get('error'):
             return {'error': parsed['error']}
-
-        structured = parsed.get('structured') or {}
-        rtype  = _coerce_record_type(record_type or structured.get('record_type'))
-        title  = structured.get('title') or filename.rsplit('.', 1)[0]
-
-        rec_date = None
-        if structured.get('date'):
-            try:
-                rec_date = datetime.strptime(structured['date'], '%Y-%m-%d').date()
-            except ValueError:
-                pass
+        structured, rtype, title, rec_date = (parsed['structured'], parsed['record_type'],
+                                              parsed['title'], parsed['record_date'])
 
         with transaction.atomic():
             record = MedicalRecord.objects.create(
@@ -460,9 +662,6 @@ class MedicalRecordService:
                          record_type: str = 'auto',
                          title_override: str = '',
                          date_override=None) -> dict:
-        from apps.accounts.egress import ExternalProcessingGuard
-        from .parsers import TextParser
-
         digest = content_fingerprint(raw_text)
         existing = find_duplicate(user, digest)
         if existing is not None:
@@ -471,20 +670,10 @@ class MedicalRecordService:
             return {'record': existing, 'flagged': 0,
                     'structured': bool(existing.parsed_data), 'duplicate': True}
 
-        use_ai     = ExternalProcessingGuard.allows(user, 'records.parse')
-        parsed     = TextParser().parse(raw_text, use_ai=use_ai)
-        structured = parsed.get('structured') or {}
-
-        rtype = _coerce_record_type(
-            structured.get('record_type') if record_type == 'auto' else record_type)
-        title = title_override or structured.get('title') or raw_text[:60].strip().replace('\n', ' ')
-
-        rec_date = date_override
-        if rec_date is None and structured.get('date'):
-            try:
-                rec_date = datetime.strptime(structured['date'], '%Y-%m-%d').date()
-            except ValueError:
-                pass
+        parsed = _parse_text(user, raw_text, record_type=record_type,
+                             title_override=title_override, date_override=date_override)
+        structured, rtype, title, rec_date = (parsed['structured'], parsed['record_type'],
+                                              parsed['title'], parsed['record_date'])
 
         with transaction.atomic():
             record = MedicalRecord.objects.create(

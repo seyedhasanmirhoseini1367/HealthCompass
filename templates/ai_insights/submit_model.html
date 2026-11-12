@@ -1,28 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Submit AI Model — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.submit-wrap{max-width:680px;margin:0 auto}
-.form-group{margin-bottom:1.25rem}
-.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
-.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
-.form-control:focus{outline:none;border-color:var(--primary)}
-.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
-.error-text{font-size:.8rem;color:#dc2626;margin-top:.3rem}
-.info-box{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:1rem;margin-bottom:1.5rem;font-size:.85rem;color:#5b21b6}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/ai_insights__submit_model.css' %}">
 {% endblock %}
 {% block content %}
+<h1 class="visually-hidden">Submit AI Model</h1>
 
 <div class="submit-wrap">
-  <a href="{% url 'ai_insights:my_models' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
-    <i class="fas fa-arrow-left"></i> My models
+  <a href="{% url 'ai_insights:my_models' %}" class="x-82a84ba4">
+    {% icon 'arrow-left' %} My models
   </a>
 
   <div class="card">
     <div class="card-body">
-      <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:.35rem">Submit AI Model</h2>
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:1.5rem">
+      <h2 class="x-bd2d7d77">Submit AI Model</h2>
+      <p class="x-f4fc3918">
         Upload your trained model. It will be reviewed by an admin before going live.
       </p>
 
@@ -41,7 +34,7 @@
           {% if form.name.errors %}<div class="error-text">{{ form.name.errors.0 }}</div>{% endif %}
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="x-f1117a4a">
           <div class="form-group">
             <label class="form-label">Category</label>
             <select name="category" class="form-control">
@@ -52,7 +45,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Input Type</label>
-            <select name="input_type" class="form-control" id="inputTypeSelect" onchange="toggleSchemaField()">
+            <select name="input_type" class="form-control" id="inputTypeSelect" data-on-change="toggleSchemaField">
               {% for value, label in form.fields.input_type.choices %}
               <option value="{{ value }}" {% if form.input_type.value == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -85,23 +78,23 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Interpretation Guide <span style="color:var(--muted);font-weight:400">(for AI explanation)</span></label>
+          <label class="form-label">Interpretation Guide <span class="x-21bab4f3">(for AI explanation)</span></label>
           <textarea name="interpretation_guide" class="form-control" rows="5"
             placeholder="Describe the disease/condition, what high/moderate/low risk means, and what actions the patient should take. Gemini uses this to generate personalised explanations after each prediction.">{{ form.interpretation_guide.value|default:'' }}</textarea>
           <div class="help-text">Gemini will use this text to generate a patient-friendly interpretation after every prediction.</div>
         </div>
 
-        <div class="form-group" style="background:#fafafa;border:1px solid var(--border);border-radius:10px;padding:1rem;margin-top:.5rem">
-          <p style="font-weight:700;font-size:.875rem;margin-bottom:.75rem;color:var(--text)">⚙️ Inference Handler <span style="font-weight:400;color:var(--muted)">(advanced)</span></p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-            <div class="form-group" style="margin-bottom:0">
+        <div class="form-group x-e9ebf723">
+          <p class="x-65f6b438">⚙️ Inference Handler <span class="x-2af378ae">(advanced)</span></p>
+          <div class="x-f1117a4a">
+            <div class="form-group x-ef0b7a11">
               <label class="form-label">Handler Slug</label>
               <input type="text" name="handler_slug" class="form-control"
                      value="{{ form.handler_slug.value|default:'' }}"
                      placeholder="e.g. eeg_csv, image_classifier, tabular_passthrough">
               <div class="help-text">Leave blank for generic tabular inference. See handler docs below.</div>
             </div>
-            <div class="form-group" style="margin-bottom:0">
+            <div class="form-group x-ef0b7a11">
               <label class="form-label">Handler Config (JSON)</label>
               <textarea name="handler_config_text" class="form-control" rows="3"
                 placeholder='{"sampling_rate_hz": 256, "n_channels": 19}'>{{ form.handler_config_text.value|default:'' }}</textarea>
@@ -109,7 +102,7 @@
               {% if form.handler_config_text.errors %}<div class="error-text">{{ form.handler_config_text.errors.0 }}</div>{% endif %}
             </div>
           </div>
-          <div style="margin-top:.75rem;font-size:.78rem;color:var(--muted)">
+          <div class="x-9c3d8c22">
             <strong>Available handlers:</strong>
             <code>tabular_passthrough</code> — CSV/Parquet tabular data ·
             <code>eeg_csv</code> — EEG signal (CSV/EDF) ·
@@ -123,20 +116,13 @@
           <div class="help-text">If no file is uploaded, a demo rule-based fallback will run instead.</div>
         </div>
 
-        <button type="submit" class="btn" style="width:100%;background:var(--secondary);color:white;padding:.7rem;font-size:.95rem">
-          <i class="fas fa-paper-plane"></i> Submit for Review
+        <button type="submit" class="btn x-12e9ccef">
+          {% icon 'paper-plane' %} Submit for Review
         </button>
       </form>
     </div>
   </div>
 </div>
-<script>
-function toggleSchemaField() {
-  const t = document.getElementById('inputTypeSelect').value;
-  const s = document.getElementById('schemaGroup');
-  s.style.display = t === 'tabular' ? 'block' : 'none';
-}
-toggleSchemaField();
-</script>
+<script src="{% static 'js/pages/ai_insights__submit_model.js' %}"></script>
 
 {% endblock %}

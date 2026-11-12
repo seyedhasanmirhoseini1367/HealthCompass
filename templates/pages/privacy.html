@@ -23,13 +23,30 @@
 <p>Some features use AI. Each use is a separate choice in your <a href="{% url 'accounts:consent' %}">consent settings</a>:</p>
 <ul>
   <li><strong>AI analysis of my health data</strong> and <strong>automated reading of my documents</strong>: processing to organise and summarise your records.</li>
-  <li><strong>Sending my health data to external AI providers</strong>: the assistant and scribe send the relevant text to a language-model provider (Groq, Google, Anthropic or OpenAI) to write an answer. Without this consent, those features do not send your health data out.</li>
+  <li><strong>Sending my health data to external AI providers</strong>: the assistant, document reading and scribe send the relevant text to the AI provider listed below. Without this consent nothing is sent out: uploads are saved but not AI-processed.</li>
   <li><strong>Sharing with linked clinicians</strong> and <strong>anonymised research</strong> are separate choices too.</li>
 </ul>
 <p>You can withdraw any consent at any time. Withdrawing stops future processing for that purpose.</p>
 
+<h2>Who is responsible</h2>
+<p>The controller of your data is {% if controller_name %}<strong>{{ controller_name }}</strong>{% if controller_address %}, {{ controller_address }}{% endif %}{% else %}<em>(TODO: controller name and address)</em>{% endif %}.</p>
+<p><strong>Legal basis:</strong> {% if legal_basis %}{{ legal_basis }}{% else %}<em>(TODO: legal basis for processing health data)</em>{% endif %}</p>
+
 <h2>Who else handles data</h2>
-<p>The service runs on a cloud hosting provider and a managed database provider. Google is used if you choose Google sign-in. The AI providers above receive data only as described. We do not sell your data and do not use it for advertising.</p>
+<table>
+  <thead><tr><th>Processor</th><th>What for</th></tr></thead>
+  <tbody>
+    {% for p in processors %}<tr><td>{{ p.name }}</td><td>{{ p.purpose }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p>We do not sell your data and do not use it for advertising.</p>
+
+<h2>How long we keep it</h2>
+<ul>
+  <li>Your records, documents and measurements: until you delete them or your account.</li>
+  <li>Questions to the assistant and its answers: {{ retention_days }} days, then deleted automatically.</li>
+  <li>The record of who opened your data: kept as an audit trail; your name is removed from it when you delete your account.</li>
+</ul>
 
 <h2>Cookies</h2>
 <p>HealthCompass sets only the cookies it needs to work: one to keep you signed in, one to protect forms against forgery, and short-lived ones for on-screen messages. There are no advertising or analytics cookies, so there is nothing to opt out of.</p>
@@ -37,7 +54,7 @@
 <h2>Your choices</h2>
 <ul>
   <li><a href="{% url 'accounts:data_export' %}">Download your data</a> at any time.</li>
-  <li><a href="/care/#sharing">See and revoke</a> who can see your information.</li>
+  <li><a href="/care/#sharing">See and revoke</a> who can see your information, and <a href="{% url 'accounts:access_history' %}">see who has opened it</a>.</li>
   <li><a href="{% url 'accounts:delete_account' %}">Delete your account</a> and the data in it.</li>
   <li>Change your <a href="{% url 'accounts:consent' %}">consent settings</a>.</li>
 </ul>

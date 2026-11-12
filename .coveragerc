@@ -1,0 +1,14 @@
+# Statement coverage for the application code. CI fails under the floor set in
+# .github/workflows/ci.yml (audit T-06).
+[run]
+source = apps, healthcompass
+omit =
+    */migrations/*
+    */test_*.py
+    */tests.py
+    */tests/*
+parallel = True
+concurrency = multiprocessing
+
+[report]
+skip_empty = True

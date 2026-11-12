@@ -1,0 +1,83 @@
+/* Moved from templates/ai_insights/icu/demo.html */
+/* ── Dark clinical canvas ─────────────────────────────────────────────────── */
+.icu-wrap{background:#0b1220;min-height:calc(100vh - 58px);padding:0 0 2.5rem;margin:-1.5rem -1.5rem 0;color:#475569;font-size:.875rem}
+.icu-inner{max-width:1380px;margin:0 auto;padding:0 1.25rem}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.icu-hdr{background:linear-gradient(135deg,#0f172a 0%,#1a2744 60%,#1e3a5f 100%);border-bottom:1px solid #1e293b;padding:.9rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.icu-hdr-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#7dd3fc;white-space:nowrap}
+.icu-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .65rem;border-radius:20px;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.badge-died{background:#450a0a;color:#b91c1c;border:1px solid #7f1d1d}
+.badge-survived{background:#052e16;color:#4ade80;border:1px solid #14532d}
+.badge-mock{background:#1e1b4b;color:#a5b4fc;border:1px solid #312e81}
+.badge-mimic{background:#082f49;color:#0369a1;border:1px solid #0c4a6e}
+.badge-live{background:#052e16;color:#4ade80;border:1px solid #14532d;animation:pulse-badge 2s infinite}
+@keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.6}}
+.icu-patient-id{font-size:1.15rem;font-weight:800;color:#e2e8f0;letter-spacing:-.02em}
+.icu-patient-meta{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}
+.icu-meta-chip{font-size:.72rem;color:#475569;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:.18rem .55rem}
+.icu-selector-wrap{margin-left:auto;flex-shrink:0}
+.icu-selector{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:.35rem .75rem;font-size:.78rem;cursor:pointer;max-width:340px}
+.icu-selector:focus{border-color:#38bdf8}
+
+/* ── SOFA strip ──────────────────────────────────────────────────────────── */
+.sofa-strip{display:flex;gap:.5rem;align-items:stretch;padding:.85rem 1.25rem;border-bottom:1px solid #1e293b;flex-wrap:wrap}
+.sofa-label{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin-right:.5rem;align-self:center;white-space:nowrap}
+.sofa-cells{display:flex;gap:.4rem;flex:1;flex-wrap:wrap}
+.sofa-cell{flex:1;min-width:88px;background:#111827;border:1px solid #1e293b;border-top:3px solid var(--sc);border-radius:8px;padding:.55rem .65rem;text-align:center}
+.sofa-dim{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem}
+.sofa-val{font-size:1.45rem;font-weight:900;color:var(--sc);line-height:1}
+.sofa-total{background:#0f172a;border:1.5px solid #334155;border-top:3px solid var(--sc);border-radius:8px;padding:.55rem .9rem;text-align:center;min-width:90px}
+.sofa-total .sofa-dim{color:#475569}
+.sofa-severity{font-size:.62rem;color:#475569;margin-top:.15rem}
+
+/* ── Sections / cards ────────────────────────────────────────────────────── */
+.icu-section{padding:.9rem 1.25rem 0}
+.section-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#475569;margin-bottom:.7rem;display:flex;align-items:center;gap:.45rem}
+.section-title::after{content:'';flex:1;height:1px;background:#1e293b}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;animation:blink 1.4s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.chart-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem}
+.chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+@media(max-width:1100px){.chart-grid-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.chart-grid-4,.chart-grid-2{grid-template-columns:1fr}}
+
+.icu-card{background:#111827;border:1px solid #1e293b;border-radius:10px;overflow:hidden}
+.icu-card-hdr{padding:.5rem .75rem;border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between}
+.icu-card-title{font-size:.72rem;font-weight:700;color:#475569;display:flex;align-items:center;gap:.35rem}
+.icu-card-unit{font-size:.66rem;color:#475569;background:#1e293b;border-radius:4px;padding:.1rem .4rem}
+.icu-card-val{font-size:1.1rem;font-weight:800;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
+.chart-wrap{padding:.5rem .5rem .4rem;height:130px;position:relative}
+.no-data{display:flex;align-items:center;justify-content:center;height:100%;color:#334155;font-size:.78rem}
+
+/* ── Lab snapshot table ──────────────────────────────────────────────────── */
+.lab-table{width:100%;border-collapse:collapse}
+.lab-table th{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569;padding:.35rem .5rem;border-bottom:1px solid #1e293b;text-align:left}
+.lab-table td{padding:.3rem .5rem;border-bottom:1px solid #0f172a;font-size:.78rem;vertical-align:middle}
+.lab-val{font-weight:700;font-size:.9rem}
+.lab-range{font-size:.67rem;color:#475569}
+.flag-danger .lab-val{color:#b91c1c}
+.flag-warning .lab-val{color:#b45309}
+.flag-none .lab-val{color:#4ade80}
+
+/* ── Event stream ────────────────────────────────────────────────────────── */
+.ev-table{width:100%;border-collapse:collapse}
+.ev-table td{padding:.32rem .45rem;border-bottom:1px solid #0f172a;font-size:.76rem;vertical-align:middle}
+.ev-delta{font-family:monospace;font-size:.7rem;color:#475569;white-space:nowrap}
+.ev-badge{display:inline-block;padding:.1rem .45rem;border-radius:4px;font-size:.62rem;font-weight:800;letter-spacing:.04em}
+.ev-chart{background:#0c2a4a;color:#0369a1}
+.ev-lab{background:#2d1a00;color:#b45309}
+.ev-input{background:#1a0d2e;color:#c084fc}
+.ev-output{background:#052e16;color:#4ade80}
+.ev-label{color:#475569;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-value{color:#e2e8f0;font-weight:600;text-align:right;white-space:nowrap}
+
+/* ── Scrollable panels ───────────────────────────────────────────────────── */
+.panel-scroll{max-height:260px;overflow-y:auto}
+.panel-scroll::-webkit-scrollbar{width:4px}
+.panel-scroll::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+.panel-body{padding:.4rem .1rem 0}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.icu-footer{padding:.7rem 1.25rem;border-top:1px solid #1e293b;margin-top:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.icu-footer-note{font-size:.67rem;color:#334155}

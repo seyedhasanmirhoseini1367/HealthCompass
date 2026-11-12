@@ -1,17 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Edit Profile — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.edit-wrap{max-width:640px;margin:0 auto}
-.form-group{margin-bottom:1.1rem}
-.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
-.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
-.form-control:focus{outline:none;border-color:var(--primary)}
-select.form-control{appearance:auto}
-.form-errors{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;margin-top:.3rem;font-size:.8rem;color:#b91c1c;list-style:none}
-.form-errors li{margin:0}
-.section-divider{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/accounts__profile_edit.css' %}">
 
 {% comment %}
 Removed: a Jinja2-style macro block left over from a refactor. That tag does not
@@ -22,17 +13,18 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
 {% endblock %}
 
 {% block content %}
+<h1 class="visually-hidden">Edit Profile</h1>
 <div class="edit-wrap">
-  <a href="{% url 'accounts:profile' %}" style="font-size:.875rem;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem">
-    <i class="fas fa-arrow-left"></i> Back to profile
+  <a href="{% url 'accounts:profile' %}" class="x-82a84ba4">
+    {% icon 'arrow-left' %} Back to profile
   </a>
 
   <div class="card">
     <div class="card-body">
-      <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:1.5rem">Edit Profile</h2>
+      <h2 class="x-f5f6ace3">Edit Profile</h2>
 
       {% if form.non_field_errors or profile_form.non_field_errors %}
-      <ul class="form-errors" style="margin-bottom:1rem">
+      <ul class="form-errors x-363cdaa2">
         {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
         {% if profile_form %}{% for e in profile_form.non_field_errors %}<li>{{ e }}</li>{% endfor %}{% endif %}
       </ul>
@@ -44,42 +36,41 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
         <!-- ── Basic Information ── -->
         <div class="section-divider">Basic Information</div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="x-f1117a4a">
           <div class="form-group">
-            <label class="form-label">{{ form.first_name.label }}</label>
+            <label for="{{ form.first_name.id_for_label }}" class="form-label">{{ form.first_name.label }}</label>
             {{ form.first_name }}
             {% if form.first_name.errors %}<ul class="form-errors">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
           <div class="form-group">
-            <label class="form-label">{{ form.last_name.label }}</label>
+            <label for="{{ form.last_name.id_for_label }}" class="form-label">{{ form.last_name.label }}</label>
             {{ form.last_name }}
             {% if form.last_name.errors %}<ul class="form-errors">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">{{ form.email.label }}</label>
-          {{ form.email }}
-          {% if form.email.errors %}<ul class="form-errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <span class="form-label">Email</span>
+          <div>{{ user.email }} · <a href="{% url 'accounts:email_change' %}">Change email</a></div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">{{ form.phone_number.label }}</label>
+          <label for="{{ form.phone_number.id_for_label }}" class="form-label">{{ form.phone_number.label }}</label>
           {{ form.phone_number }}
           {% if form.phone_number.errors %}<ul class="form-errors">{% for e in form.phone_number.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
 
         <div class="form-group">
-          <label class="form-label">{{ form.date_of_birth.label }}</label>
+          <label for="{{ form.date_of_birth.id_for_label }}" class="form-label">{{ form.date_of_birth.label }}</label>
           {{ form.date_of_birth }}
           {% if form.date_of_birth.errors %}<ul class="form-errors">{% for e in form.date_of_birth.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
 
         <div class="form-group">
-          <label class="form-label">{{ form.profile_picture.label }}</label>
+          <label for="{{ profile_form.blood_type.id_for_label }}" class="form-label">{{ form.profile_picture.label }}</label>
           {% if request.user.profile_picture %}
-          <div style="margin-bottom:.5rem">
-            <img src="{{ request.user.profile_picture.url }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">
+          <div class="x-e9520ddd">
+            <img src="{{ request.user.profile_picture.url }}" alt="" class="x-ddf8433f">
           </div>
           {% endif %}
           {{ form.profile_picture }}
@@ -91,7 +82,7 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
           {% if request.user.is_patient %}
           <div class="section-divider">Patient Details</div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="x-f1117a4a">
             <div class="form-group">
               <label class="form-label">{{ profile_form.blood_type.label }}</label>
               {{ profile_form.blood_type }}
@@ -100,19 +91,19 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
           </div>
 
           <div class="form-group">
-            <label class="form-label">{{ profile_form.allergies.label }}</label>
+            <label for="{{ profile_form.allergies.id_for_label }}" class="form-label">{{ profile_form.allergies.label }}</label>
             {{ profile_form.allergies }}
             {% if profile_form.allergies.errors %}<ul class="form-errors">{% for e in profile_form.allergies.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="x-f1117a4a">
             <div class="form-group">
-              <label class="form-label">{{ profile_form.emergency_contact_name.label }}</label>
+              <label for="{{ profile_form.emergency_contact_name.id_for_label }}" class="form-label">{{ profile_form.emergency_contact_name.label }}</label>
               {{ profile_form.emergency_contact_name }}
               {% if profile_form.emergency_contact_name.errors %}<ul class="form-errors">{% for e in profile_form.emergency_contact_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.emergency_contact_phone.label }}</label>
+              <label for="{{ profile_form.emergency_contact_phone.id_for_label }}" class="form-label">{{ profile_form.emergency_contact_phone.label }}</label>
               {{ profile_form.emergency_contact_phone }}
               {% if profile_form.emergency_contact_phone.errors %}<ul class="form-errors">{% for e in profile_form.emergency_contact_phone.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
@@ -120,24 +111,24 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
 
           {% elif request.user.is_doctor %}
           <div class="section-divider">Doctor Details</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="x-f1117a4a">
             <div class="form-group">
-              <label class="form-label">{{ profile_form.specialty.label }}</label>
+              <label for="{{ profile_form.specialty.id_for_label }}" class="form-label">{{ profile_form.specialty.label }}</label>
               {{ profile_form.specialty }}
               {% if profile_form.specialty.errors %}<ul class="form-errors">{% for e in profile_form.specialty.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.license_number.label }}</label>
+              <label for="{{ profile_form.license_number.id_for_label }}" class="form-label">{{ profile_form.license_number.label }}</label>
               {{ profile_form.license_number }}
               {% if profile_form.license_number.errors %}<ul class="form-errors">{% for e in profile_form.license_number.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.hospital.label }}</label>
+              <label for="{{ profile_form.hospital.id_for_label }}" class="form-label">{{ profile_form.hospital.label }}</label>
               {{ profile_form.hospital }}
               {% if profile_form.hospital.errors %}<ul class="form-errors">{% for e in profile_form.hospital.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.department.label }}</label>
+              <label for="{{ profile_form.department.id_for_label }}" class="form-label">{{ profile_form.department.label }}</label>
               {{ profile_form.department }}
               {% if profile_form.department.errors %}<ul class="form-errors">{% for e in profile_form.department.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
@@ -145,19 +136,19 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
 
           {% elif request.user.is_data_scientist %}
           <div class="section-divider">Staff Details</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-            <div class="form-group" style="grid-column:1 / -1">
+          <div class="x-f1117a4a">
+            <div class="form-group x-4ddcfbe5">
               <label class="form-label" for="{{ profile_form.job_title.id_for_label }}">{{ profile_form.job_title.label }}</label>
               {{ profile_form.job_title }}
               {% if profile_form.job_title.errors %}<ul class="form-errors">{% for e in profile_form.job_title.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.institution.label }}</label>
+              <label for="{{ profile_form.institution.id_for_label }}" class="form-label">{{ profile_form.institution.label }}</label>
               {{ profile_form.institution }}
               {% if profile_form.institution.errors %}<ul class="form-errors">{% for e in profile_form.institution.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
             <div class="form-group">
-              <label class="form-label">{{ profile_form.research_area.label }}</label>
+              <label for="{{ profile_form.research_area.id_for_label }}" class="form-label">{{ profile_form.research_area.label }}</label>
               {{ profile_form.research_area }}
               {% if profile_form.research_area.errors %}<ul class="form-errors">{% for e in profile_form.research_area.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
             </div>
@@ -165,11 +156,11 @@ this file. Covered by apps/accounts/test_smoke_urls.py.
           {% endif %}
         {% endif %}
 
-        <div style="display:flex;gap:.75rem;margin-top:1.5rem">
-          <button type="submit" class="btn" style="background:var(--primary);color:white;padding:.65rem 1.5rem">
-            <i class="fas fa-save"></i> Save Changes
+        <div class="x-5583ad48">
+          <button type="submit" class="btn x-10f7bdbb">
+            {% icon 'save' %} Save Changes
           </button>
-          <a href="{% url 'accounts:profile' %}" class="btn" style="background:#f1f5f9;color:var(--text)">Cancel</a>
+          <a href="{% url 'accounts:profile' %}" class="btn x-6f47a536">Cancel</a>
         </div>
       </form>
     </div>

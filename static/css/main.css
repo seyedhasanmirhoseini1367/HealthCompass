@@ -10,11 +10,13 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:hidden}
 :root{
-  /* Brand colours */
-  --primary:#0ea5e9;--primary-dk:#0284c7;--secondary:#6366f1;
-  --success:#22c55e;--warning:#f59e0b;--danger:#ef4444;
-  --bg:#f0f7ff;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;
-  --shadow-sm:0 1px 3px rgba(0,0,0,.07);--radius:14px;
+  /* Legacy names, aliased to tokens.css so templates keep working while they
+     migrate. Values changed for contrast (audit UX-02): primary was #0ea5e9
+     (2.77:1 under white text), muted #64748b (4.41:1 on the page tint). */
+  --primary:var(--brand-600);--primary-dk:var(--brand-700);--secondary:var(--accent-600);
+  --success:var(--success-solid);--warning:var(--warning-solid);--danger:var(--danger-solid);
+  --bg:var(--page-bg);--border:var(--gray-200);--muted:var(--text-muted);
+  --radius:var(--radius-lg);
   --gradient-brand:linear-gradient(135deg,#0ea5e9,#6366f1);
   /* Typography */
   --font-sans:'Inter',system-ui,-apple-system,sans-serif;
@@ -84,7 +86,7 @@ a{color:inherit;text-decoration:none}
 .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
 main{flex:1;padding:1.5rem;max-width:var(--container);margin:0 auto;width:100%;background:var(--surface)}
-footer{background:#0f172a;color:#cbd5e1;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
+footer{background:#0f172a;color:#475569;padding:1.5rem;text-align:center;font-size:.8rem;margin-top:auto}
 footer strong{color:white}
 .site-footer{text-align:left;padding:1.75rem 1.5rem 1.25rem}
 .ft-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;flex-wrap:wrap}
@@ -94,7 +96,7 @@ footer strong{color:white}
 .ft-links{display:flex;flex-wrap:wrap;gap:.4rem 1.4rem}
 .ft-links a{color:#cbd5e1;text-decoration:none;font-size:.85rem}
 .ft-links a:hover,.ft-links a:focus-visible{color:#fff;text-decoration:underline}
-.ft-note{max-width:1100px;margin:1.25rem auto 0;padding-top:1rem;border-top:1px solid #1e293b;color:#64748b;font-size:.75rem}
+.ft-note{max-width:1100px;margin:1.25rem auto 0;padding-top:1rem;border-top:1px solid #1e293b;color:#94a3b8;font-size:.75rem}
 .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.2rem;border-radius:10px;font-weight:600;font-size:.875rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none}
 .btn-primary{background:var(--primary);color:white}
 .btn-primary:hover{background:var(--primary-dk);color:white;transform:translateY(-1px)}
@@ -118,7 +120,7 @@ footer strong{color:white}
 @keyframes hc-spin{to{transform:rotate(360deg)}}
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
 .card-header{padding:.6rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:.875rem;color:white;background:var(--gradient-brand)}
-.card-header i{color:white}
+.card-header .icon{color:white}
 .card-body{padding:.875rem}
 .badge{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:20px;font-size:.72rem;font-weight:600}
 .badge-info{background:#dbeafe;color:#1d4ed8}
@@ -151,25 +153,25 @@ footer strong{color:white}
 .mobile-menu.open{display:block}
 .mm-link{display:flex;align-items:center;gap:.65rem;padding:.65rem .75rem;border-radius:9px;font-size:.9rem;font-weight:500;color:var(--text);transition:background .2s}
 .mm-link:hover{background:var(--bg);color:var(--primary-dk)}
-.mm-link i{width:16px;text-align:center;color:var(--primary)}
+.mm-link .icon{width:16px;text-align:center;color:var(--primary)}
 .mm-divider{height:1px;background:var(--border);margin:.4rem 0}
 .mm-section-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:.5rem .75rem .2rem;display:block}
 .nav-more-wrap{position:relative}
 .nav-more-btn{display:flex;align-items:center;gap:.28rem;padding:.45rem .85rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;transition:all .2s;white-space:nowrap}
 .nav-more-btn:hover{color:var(--primary-dk);background:#e0f2fe}
-.nav-more-btn i.chevron{font-size:.6rem;transition:transform .18s}
-.nav-more-btn.open i.chevron{transform:rotate(180deg)}
+.nav-more-btn .icon.chevron{font-size:.6rem;transition:transform .18s}
+.nav-more-btn.open .icon.chevron{transform:rotate(180deg)}
 .nav-more-menu{display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.13);min-width:210px;z-index:300;overflow:hidden;padding:.35rem 0}
 .nav-more-menu.open{display:block}
 .nav-more-item{display:flex;align-items:center;gap:.6rem;padding:.62rem 1rem;font-size:.875rem;color:var(--text);transition:background .15s;white-space:nowrap}
 .nav-more-item:hover{background:var(--bg);color:var(--primary-dk)}
-.nav-more-item i{width:16px;text-align:center;color:var(--primary);flex-shrink:0}
+.nav-more-item .icon{width:16px;text-align:center;color:var(--primary);flex-shrink:0}
 .nav-more-divider{height:1px;background:var(--border);margin:.3rem 0}
 @media(max-width:768px){
   .nav-links{display:none}
   .nav-hamburger{display:flex}
   .nav-right>a.btn-nav-outline,.nav-right>a.btn-nav-solid{display:none}
-  .nav-user>span,.nav-user>i{display:none}
+  .nav-user>span,.nav-user>.icon{display:none}
 }
 .app-sidebar{position:fixed;top:60px;left:0;bottom:0;width:220px;background:white;border-right:1px solid var(--border);overflow-y:auto;z-index:89;transition:width .22s;display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.04)}
 .app-sidebar.collapsed{width:64px}
@@ -182,18 +184,18 @@ footer strong{color:white}
 .sb-link{display:flex;align-items:center;gap:.6rem;padding:.5rem .65rem;border-radius:9px;font-size:.84rem;font-weight:500;color:var(--text);text-decoration:none;transition:all .15s;margin-bottom:.08rem;white-space:nowrap;overflow:hidden}
 .sb-link:hover{background:var(--bg);color:var(--primary-dk);text-decoration:none}
 .sb-link.active{background:#e0f2fe;color:var(--primary-dk);font-weight:700}
-.sb-link i{width:18px;text-align:center;flex-shrink:0;font-size:.9rem}
+.sb-link .icon{width:18px;text-align:center;flex-shrink:0;font-size:.9rem}
 .sb-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Dashboard group: a link and a disclosure control sharing one row.
    The label navigates; only the chevron toggles. A parent that merely toggles
    leaves no way to open the overview itself. */
 .sb-group{display:flex;align-items:center}
 .sb-group .sb-parent{flex:1;min-width:0}
-.sb-caret{background:none;border:none;cursor:pointer;padding:.45rem .55rem;color:#94a3b8;display:flex;align-items:center;border-radius:8px}
+.sb-caret{background:none;border:none;cursor:pointer;padding:.45rem .55rem;color:#475569;display:flex;align-items:center;border-radius:8px}
 .sb-caret:hover{color:var(--primary-dk);background:var(--bg)}
 .sb-caret:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-.sb-caret i{font-size:.75rem;transition:transform .15s ease}
-.sb-caret.open i{transform:rotate(180deg)}
+.sb-caret .icon{font-size:.75rem;transition:transform .15s ease}
+.sb-caret.open .icon{transform:rotate(180deg)}
 .sb-sub{display:flex;flex-direction:column}
 /* Must out-specify .sb-sub above. An author rule with display:flex beats the
    browser's [hidden]{display:none}, so the panel could never close and the
@@ -201,7 +203,7 @@ footer strong{color:white}
 .sb-sub[hidden]{display:none}
 .sb-sublink{padding-left:2rem;font-size:.8rem}
 .app-sidebar.collapsed .sb-sub,.app-sidebar.collapsed .sb-caret{display:none}
-.sb-badge{margin-left:auto;background:#ef4444;color:white;font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:20px;flex-shrink:0}
+.sb-badge{margin-left:auto;background:#b91c1c;color:white;font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:20px;flex-shrink:0}
 .sb-divider{height:1px;background:var(--border);margin:.4rem .4rem}
 .app-sidebar.collapsed .sb-label,.app-sidebar.collapsed .sb-txt,.app-sidebar.collapsed .sb-badge{display:none}
 .app-sidebar.collapsed .sb-link{padding:.5rem;justify-content:center;gap:0}
@@ -217,7 +219,7 @@ footer strong{color:white}
 .es-icon{font-size:2.5rem;margin-bottom:.75rem;opacity:.5;display:block}
 .es-title{font-weight:700;color:var(--text);margin-bottom:.3rem;font-size:.95rem;display:block}
 .es-desc{font-size:.82rem;line-height:1.6;margin-bottom:1.1rem;display:block}
-.form-control{border:1.5px solid var(--border);border-radius:9px;padding:.5rem .85rem;font-size:.875rem;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;background:white;color:var(--text);display:block;width:100%}
+.form-control{border:1.5px solid var(--border);border-radius:9px;padding:.5rem .85rem;font-size:.875rem;font-family:inherit;transition:border-color .15s,box-shadow .15s;background:white;color:var(--text);display:block;width:100%}
 .form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
 a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-visible,.sb-toggle:focus-visible,.nav-notification:focus-visible,.nav-more-btn:focus-visible,.nav-user:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
 .form-label{display:block;font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:.3rem}
@@ -239,7 +241,7 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .icon-mr       { margin-right:.5rem }
 .text-xs       { font-size:.75rem }
 .text-sm       { font-size:.85rem }
-.text-subtle   { color:#94a3b8 }
+.text-subtle   { color:#475569 }
 .text-muted    { color:var(--muted) }
 .text-danger   { color:var(--danger) }
 .text-success  { color:var(--success) }
@@ -247,19 +249,19 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .counter-row       { display:flex;justify-content:center;gap:2rem;margin-bottom:1.25rem }
 .counter-num       { font-size:1.6rem;font-weight:800 }
 .counter-lbl       { font-size:.75rem;color:var(--muted) }
-.counter-critical  { color:#ef4444 }
-.counter-warning   { color:#f59e0b }
+.counter-critical  { color:#b91c1c }
+.counter-warning   { color:#b45309 }
 .counter-info      { color:#3b82f6 }
 /* Stat-card .num colour variants */
 .num-primary  { color:var(--primary-dk) }
-.num-indigo   { color:#6366f1 }
-.num-date     { color:#64748b;font-size:1.1rem;padding-top:.3rem }
+.num-indigo   { color:#4f46e5 }
+.num-date     { color:#475569;font-size:1.1rem;padding-top:.3rem }
 /* Population .pop-num colour variants */
-.pop-num-indigo  { color:#6366f1 }
-.pop-num-sky     { color:#0ea5e9 }
-.pop-num-teal    { color:#10b981 }
-.pop-num-amber   { color:#f59e0b }
-.pop-num-violet  { color:#8b5cf6 }
+.pop-num-indigo  { color:#4f46e5 }
+.pop-num-sky     { color:#0369a1 }
+.pop-num-teal    { color:#047857 }
+.pop-num-amber   { color:#b45309 }
+.pop-num-violet  { color:#6d28d9 }
 /* Chart wrapper — sets position context; pair with a height modifier */
 .chart-wrap  { position:relative }
 .chart-h-xs  { height:120px }
@@ -276,7 +278,7 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .tag-amber   { background:#fef3c7;color:#92400e }
 .tag-sky     { background:#e0f2fe;color:#0369a1 }
 .tag-green   { background:#d1fae5;color:#065f46 }
-.tag-mint    { background:#f0fdf4;color:#16a34a }
+.tag-mint    { background:#f0fdf4;color:#15803d }
 .tag-pink    { background:#fce7f3;color:#9d174d }
 
 
@@ -284,7 +286,7 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
    :where() keeps specificity at zero, so any page that styles its own
    inputs still wins. Only unstyled forms pick these up. */
 :where(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=hidden]):not([type=submit]):not([type=button]),select,textarea){font:inherit;font-size:.9rem;color:var(--text);background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:.5rem .8rem;transition:border-color .15s,box-shadow .15s;max-width:100%}
-:where(input,select,textarea):focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+:where(input,select,textarea):focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
 :where(input,select,textarea):disabled{background:var(--bg);color:var(--muted);cursor:not-allowed}
 :where(input[type=checkbox],input[type=radio]){accent-color:var(--primary)}
 :where(.form-group){margin-bottom:1rem}
@@ -316,3 +318,21 @@ a:focus-visible,button:focus-visible,.btn:focus-visible,.nav-hamburger:focus-vis
 .hc-drop-file:empty{display:none}
 .hc-drop.has-file{border-style:solid;border-color:#86efac;background:#f0fdf4}
 .hc-drop-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;opacity:0}
+
+/* Logout is a POST form (audit: GET logout let any page sign a user out); its
+   button keeps the look of the menu link it replaced. */
+.logout-form { margin: 0; }
+.logout-form button { background: none; border: 0; width: 100%; cursor: pointer; font: inherit; text-align: left; }
+
+/* Small account-security pages (email change, deletion confirm). */
+.acct-wrap { max-width: 460px; margin: 3rem auto; }
+.acct-card { background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid var(--border); box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+.acct-card h1 { font-size: 1.3rem; margin: 0 0 .5rem; }
+.acct-card p { color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.acct-field { margin-bottom: 1rem; }
+.acct-field label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
+.acct-field input { width: 100%; padding: .6rem .8rem; border: 1.5px solid var(--border); border-radius: 9px; font-size: .9rem; box-sizing: border-box; }
+.acct-actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+.verify-banner { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; border-radius: 10px; padding: .7rem 1rem; margin-bottom: 1rem; font-size: .875rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.verify-banner form { margin: 0; }
+.verify-banner button { background: none; border: 0; padding: 0; color: #92400e; font-weight: 700; text-decoration: underline; cursor: pointer; font: inherit; }

@@ -1,42 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Appointments calendar — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.appt-hero{background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:16px;padding:1.5rem 2rem;color:white;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-.appt-hero h1{font-size:1.5rem;font-weight:800;margin:0}
-.appt-hero p{font-size:.9rem;opacity:.85;margin:.25rem 0 0}
-.hero-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
-.view-switch{display:inline-flex;background:rgba(255,255,255,.18);border-radius:10px;padding:3px;gap:3px}
-.view-switch a{color:white;text-decoration:none;font-size:.82rem;font-weight:600;padding:.35rem .8rem;border-radius:8px}
-.view-switch a.on{background:white;color:var(--primary-dk)}
-.cal-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap}
-.cal-bar h2{font-size:1.15rem;font-weight:800;margin:0}
-.cal-nav{display:flex;gap:.4rem}
-.cal{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.cal-head,.cal-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-.cal-head div{padding:.55rem .6rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)}
-.cal-day{min-height:104px;padding:.4rem .45rem;border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:.25rem;min-width:0}
-.cal-week .cal-day:last-child{border-right:none}
-.cal-week:last-child .cal-day{border-bottom:none}
-.cal-day.out{background:#fafcff}
-.cal-day.out .cal-num{color:#cbd5e1}
-.cal-num{font-size:.8rem;font-weight:700;color:var(--text);width:1.7rem;height:1.7rem;display:grid;place-items:center;border-radius:50%}
-.cal-day.today .cal-num{background:var(--primary);color:white}
-.cal-ev{display:block;font-size:.74rem;line-height:1.3;padding:.2rem .4rem;border-radius:6px;background:#e0f2fe;color:#075985;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cal-ev:hover{background:#bae6fd}
-.cal-ev b{font-weight:700}
-.cal-ev.past{background:#f1f5f9;color:#64748b}
-.cal-ev.cancelled{background:#f1f5f9;color:#94a3b8;text-decoration:line-through}
-.cal-agenda{display:none}
-@media(max-width:700px){
-  .cal-day{min-height:58px;padding:.3rem}
-  .cal-ev{font-size:0;padding:0;width:.5rem;height:.5rem;border-radius:50%;background:var(--primary)}
-  .cal-ev.past,.cal-ev.cancelled{background:#cbd5e1}
-  .cal-agenda{display:block;margin-top:1rem}
-}
-.ag-item{display:flex;gap:.8rem;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.7rem .9rem;margin-bottom:.5rem;text-decoration:none;color:var(--text)}
-.ag-date{font-size:.75rem;font-weight:700;color:var(--primary-dk);min-width:64px}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/appointments__month.css' %}">
 {% endblock %}
 {% block content %}
 <div class="appt-hero">
@@ -46,11 +12,11 @@
   </div>
   <div class="hero-actions">
     <nav class="view-switch" aria-label="View">
-      <a href="{% url 'appointments:list' %}"><i class="fas fa-list"></i> List</a>
-      <a href="{% url 'appointments:month' %}" class="on" aria-current="page"><i class="fas fa-calendar"></i> Calendar</a>
+      <a href="{% url 'appointments:list' %}">{% icon 'list' %} List</a>
+      <a href="{% url 'appointments:month' %}" class="on" aria-current="page">{% icon 'calendar' %} Calendar</a>
     </nav>
-    <a href="{% url 'appointments:create' %}" class="btn btn-primary" style="background:white;color:var(--primary-dk);font-weight:700">
-      <i class="fas fa-plus"></i> New Appointment
+    <a href="{% url 'appointments:create' %}" class="btn btn-primary x-10015ade">
+      {% icon 'plus' %} New Appointment
     </a>
   </div>
 </div>
@@ -58,9 +24,9 @@
 <div class="cal-bar">
   <h2>{{ month|date:"F Y" }}</h2>
   <div class="cal-nav">
-    <a class="btn btn-secondary btn-sm" href="?m={{ prev_m }}" aria-label="Previous month"><i class="fas fa-chevron-left"></i></a>
+    <a class="btn btn-secondary btn-sm" href="?m={{ prev_m }}" aria-label="Previous month">{% icon 'chevron-left' %}</a>
     <a class="btn btn-secondary btn-sm" href="?m={{ this_m }}">Today</a>
-    <a class="btn btn-secondary btn-sm" href="?m={{ next_m }}" aria-label="Next month"><i class="fas fa-chevron-right"></i></a>
+    <a class="btn btn-secondary btn-sm" href="?m={{ next_m }}" aria-label="Next month">{% icon 'chevron-right' %}</a>
   </div>
 </div>
 
@@ -89,7 +55,7 @@
   {% for week in weeks %}{% for day in week %}{% if day.in_month %}{% for a in day.appts %}
   <a class="ag-item" href="{% url 'appointments:edit' a.pk %}">
     <span class="ag-date">{{ a.appointment_datetime|date:"D j" }}<br>{{ a.appointment_datetime|date:"H:i" }}</span>
-    <span>{{ a.title }}{% if a.is_cancelled %} <em style="color:#94a3b8">(cancelled)</em>{% endif %}</span>
+    <span>{{ a.title }}{% if a.is_cancelled %} <em class="x-5dcdf2de">(cancelled)</em>{% endif %}</span>
   </a>
   {% endfor %}{% endif %}{% endfor %}{% endfor %}
 </div>

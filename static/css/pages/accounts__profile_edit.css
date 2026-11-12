@@ -1,0 +1,10 @@
+/* Moved from templates/accounts/profile_edit.html */
+.edit-wrap{max-width:640px;margin:0 auto}
+.form-group{margin-bottom:1.1rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.35rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
+.form-control:focus{border-color:var(--primary)}
+select.form-control{appearance:auto}
+.form-errors{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;margin-top:.3rem;font-size:.8rem;color:#b91c1c;list-style:none}
+.form-errors li{margin:0}
+.section-divider{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:1.5rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}

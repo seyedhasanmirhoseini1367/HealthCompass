@@ -20,7 +20,7 @@ def _send_approval_email(user, approved):
         body = (
             f'Hi {user.get_full_name() or user.username},\n\n'
             f'Your HealthCompass account ({user.get_role_display()}) has been approved.\n'
-            f'You can now log in at https://{settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else "healthcompass.hasanai.net"}/accounts/login/\n\n'
+            f'You can now log in at {settings.ACCOUNT_DEFAULT_HTTP_PROTOCOL}://{settings.SITE_DOMAIN}/accounts/login/\n\n'
             f'Welcome aboard!\nThe HealthCompass Team'
         )
     else:

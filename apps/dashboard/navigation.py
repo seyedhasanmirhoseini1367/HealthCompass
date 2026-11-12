@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.utils.translation import gettext_lazy as _
+
 #: Section heading in the menu. A string entry in a menu list renders as one.
-AI_TOOLS = 'AI tools'
+AI_TOOLS = _('AI tools')
 #: A horizontal rule.
 DIVIDER = '---'
 
@@ -21,25 +23,25 @@ DIVIDER = '---'
 @dataclass(frozen=True)
 class Item:
     href: str
-    label: str
+    label: object  # str or lazy translation
     icon: str  # Font Awesome name without the "fa-" prefix
 
 
-MY_HEALTH = Item('/dashboard/health/', 'My Health', 'heart-pulse')
-RECORDS = Item('/records/', 'Records', 'file-medical')
-APPOINTMENTS = Item('/appointments/', 'Appointments', 'calendar-check')
-COMPANIONS = Item('/care/', 'Companions', 'hand-holding-heart')
-ASSISTANT = Item('/assistant/', 'Assistant', 'robot')
-ANALYTICS = Item('/insights/', 'Analytics', 'brain')
-SCRIBE = Item('/scribe/', 'Scribe', 'microphone')
-MONITORING = Item('/dashboard/monitoring/', 'Monitoring', 'chart-line')
-SETTINGS = Item('/dashboard/settings/', 'Settings', 'gear')
+MY_HEALTH = Item('/dashboard/health/', _('My Health'), 'heart-pulse')
+RECORDS = Item('/records/', _('Records'), 'file-medical')
+APPOINTMENTS = Item('/appointments/', _('Appointments'), 'calendar-check')
+COMPANIONS = Item('/care/', _('Companions'), 'hand-holding-heart')
+ASSISTANT = Item('/assistant/', _('Assistant'), 'robot')
+ANALYTICS = Item('/insights/', _('Analytics'), 'brain')
+SCRIBE = Item('/scribe/', _('Scribe'), 'microphone')
+MONITORING = Item('/dashboard/monitoring/', _('Monitoring'), 'chart-line')
+SETTINGS = Item('/dashboard/settings/', _('Settings'), 'gear')
 
 #: Each role's home page. /dashboard/ renders the right one per role.
-MY_PATIENTS = Item('/dashboard/', 'My Patients', 'user-doctor')
-WORKSPACE = Item('/dashboard/', 'Workspace', 'flask')
-HOSPITAL = Item('/dashboard/', 'Hospital', 'hospital')
-ADMIN = Item('/dashboard/', 'Admin', 'shield-halved')
+MY_PATIENTS = Item('/dashboard/', _('My Patients'), 'user-doctor')
+WORKSPACE = Item('/dashboard/', _('Workspace'), 'flask')
+HOSPITAL = Item('/dashboard/', _('Hospital'), 'hospital')
+ADMIN = Item('/dashboard/', _('Admin'), 'shield-halved')
 
 MENUS = {
     'patient': [MY_HEALTH, RECORDS, APPOINTMENTS, COMPANIONS,
@@ -80,9 +82,37 @@ def home_url(user) -> str:
     return MY_HEALTH.href if user.is_patient else '/dashboard/'
 
 
+#: Research demos, listed only when LABS_ENABLED (see apps/ai_insights/labs.py).
+LABS = Item('/insights/models/', _('Labs'), 'flask')
+LABS_ROLES = {'patient', 'data_scientist', 'admin'}
+
+
+def items_for(user) -> list:
+    from apps.ai_insights.labs import labs_enabled
+
+    items = list(menu_for(user))
+    if labs_enabled() and menu_key(user) in LABS_ROLES:
+        at = items.index(DIVIDER) if DIVIDER in items else len(items)
+        items.insert(at, LABS)
+    return items
+
+
+def current_href(items, path: str):
+    """The menu entry for this page: the longest href that prefixes the path."""
+    best = None
+    for item in items:
+        href = getattr(item, 'href', None)
+        if href and path.startswith(href) and (best is None or len(href) > len(best)):
+            best = href
+    return best
+
+
 def nav_menu(request):
-    """Context processor: `nav_menu` and `nav_home` for the signed-in layout."""
+    """Context processor for the signed-in layout: `nav_menu` (entries),
+    `nav_current` (the href to mark aria-current) and `nav_home`."""
     user = getattr(request, 'user', None)
     if not (user and user.is_authenticated):
         return {}
-    return {'nav_menu': menu_for(user), 'nav_home': home_url(user)}
+    items = items_for(user)
+    return {'nav_menu': items, 'nav_home': home_url(user),
+            'nav_current': current_href(items, request.path)}

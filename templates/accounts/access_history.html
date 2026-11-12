@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Who has seen my data — HealthCompass{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Who has seen my data</h1></div>
+<p class="field-help">Every time someone you share with, or a clinician you approved, opens your information, it is recorded here. You see only your own history.</p>
+<div class="card"><div class="card-body">
+{% if entries %}
+<table class="table">
+  <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr><td>{{ e.when|date:"DATETIME_FORMAT" }}</td><td>{{ e.who }}</td><td>{{ e.what }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if page.has_other_pages %}
+<nav class="cluster" aria-label="Pages">
+  {% if page.has_previous %}<a class="btn btn-secondary btn-sm" href="?page={{ page.previous_page_number }}">Newer</a>{% endif %}
+  <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn btn-secondary btn-sm" href="?page={{ page.next_page_number }}">Older</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty-state"><p>Nobody has opened your information yet.</p></div>
+{% endif %}
+</div></div>
+{% endblock %}

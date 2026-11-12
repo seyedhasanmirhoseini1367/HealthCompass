@@ -98,6 +98,9 @@ def seizure_realtime_analyze(request):
     f = request.FILES.get('signal_file')
     if not f:
         return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+    from django.conf import settings as _s
+    if (getattr(f, 'size', 0) or 0) > int(getattr(_s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024)):
+        return Response({'error': 'File too large.'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
     try:
         import pandas as pd
         raw  = f.read()

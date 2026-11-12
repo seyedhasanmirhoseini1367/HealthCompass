@@ -1,5 +1,7 @@
+import logging
 import sys
 from django.apps import AppConfig
+logger = logging.getLogger(__name__)
 
 
 class AppointmentsConfig(AppConfig):
@@ -22,8 +24,8 @@ class AppointmentsConfig(AppConfig):
             try:
                 from django.core.management import call_command
                 call_command('send_appointment_reminders', verbosity=0)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning('Startup appointment reminder run failed: %s', type(exc).__name__)
             timer = threading.Timer(600, _run)   # every 10 minutes
             timer.daemon = True
             timer.start()

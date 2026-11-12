@@ -49,13 +49,13 @@ def purge_user_data(user) -> None:
     DoctorAccessLog rows where this user was the patient are NOT deleted —
     they are the audit trail required by Finnish health law. The patient FK
     becomes NULL via on_delete=SET_NULL, anonymising the reference without
-    destroying the audit chain.
+    destroying the audit chain. On the rows that record the user acting on
+    their OWN data (granting, revoking, sharing), actor_label still held their
+    username; it is blanked first, so nothing names them afterwards.
 
-    Note: FAISS vector-store files on disk are shared across users; individual
-    embeddings cannot be selectively removed. The source content (MedicalChunk
-    rows) is deleted by CASCADE, leaving the FAISS index stale. A full rebuild
-    of the index handles the gap; for a per-user right-to-erasure guarantee,
-    migrate to a per-user index or a DB-backed vector store.
+    Embeddings live in the database (MedicalChunk), so CASCADE removes them.
+    Assistant answers ABOUT this user stored in someone else's chat history
+    (QueryLog.subject, a caregiver's questions) are removed by CASCADE too.
     """
     from apps.ai_insights.models import AIModel, ModelPrediction
     from healthcompass.observability import Event as OpsEvent, emit as ops_emit
@@ -85,7 +85,9 @@ def purge_user_data(user) -> None:
             targets.append((f'ai_model:{model.pk}', model.model_file))
 
     # ── 2. Delete the DB rows first — CASCADE handles everything linked ──────
+    from .models import DoctorAccessLog
     with transaction.atomic():
+        DoctorAccessLog.objects.filter(actor=user, patient=user).update(actor_label='')
         user.delete()
 
     # ── 3. Only then remove the files ────────────────────────────────────────

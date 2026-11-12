@@ -1,69 +1,126 @@
 """
-EncryptedCharField — AES-128-CBC + HMAC-SHA256 (Fernet) at the model layer.
+EncryptedCharField — Fernet (AES-128-CBC + HMAC-SHA256) at the model layer.
 
-Key derivation: PBKDF2-HMAC-SHA256 over settings.SECRET_KEY, 100 000 iterations,
-32-byte output → base64url-encoded Fernet key.  The key is cached per-process so
-the derivation runs only once.
+Keys (audit SEC-15)
+-------------------
+settings.FIELD_ENCRYPTION_KEYS is a list of Fernet keys, newest first. New
+values are encrypted with the first; every key is tried on read
+(cryptography's MultiFernet). The key the project used before this setting
+existed, derived from SECRET_KEY with PBKDF2, is always appended LAST, so data
+written under it stays readable until `rotate_field_encryption` re-encrypts it.
+With no keys configured the derived key is the only key, as before.
 
-Trade-offs accepted:
-- Key is tied to SECRET_KEY. Rotating the key requires a data migration that
-  re-encrypts all rows.  Document in the ops runbook before go-live.
-- Not searchable: you cannot do .filter(national_id=x) against encrypted rows.
-  Use the raw value in Python after fetching the object.
-- Legacy plaintext rows (written before this field was added) are returned as-is
-  and will fail HMAC verification. The fallback returns the raw stored value.
+Fail closed
+-----------
+A value no key can decrypt is never handed to the caller as if it were the
+plaintext (the old fallback returned the raw ciphertext). It loads as an
+`UnreadableValue`: an empty string flagged `.unreadable`, which templates show
+as nothing and views can show as "unavailable". It keeps the stored bytes, so
+saving the row writes them back unchanged rather than wiping the field. Code
+that must have the real value calls `require_readable()`, which raises
+FieldDecryptionError.
+
+Not searchable: you cannot .filter(national_id=x) against encrypted rows.
 """
 import base64
 import functools
 import hashlib
+import logging
 
 from django.conf import settings
 from django.db import models
 
+logger = logging.getLogger(__name__)
 
-@functools.lru_cache(maxsize=1)
-def _fernet():
-    """Return a cached Fernet instance derived from SECRET_KEY."""
-    from cryptography.fernet import Fernet
-    dk = hashlib.pbkdf2_hmac(
-        'sha256',
-        settings.SECRET_KEY.encode(),
-        b'healthcompass-field-key',  # static salt — key rotation via SECRET_KEY change
-        100_000,
-        dklen=32,
-    )
-    return Fernet(base64.urlsafe_b64encode(dk))
+
+class FieldDecryptionError(Exception):
+    """An encrypted field could not be decrypted with any configured key."""
+
+
+class UnreadableValue(str):
+    """Placeholder for a value that could not be decrypted. Empty as a string;
+    carries the stored ciphertext so it is preserved on save."""
+    unreadable = True
+
+    def __new__(cls, raw):
+        obj = super().__new__(cls, '')
+        obj.raw = raw
+        return obj
+
+    def __repr__(self):
+        return '<UnreadableValue>'
+
+
+def require_readable(value):
+    if isinstance(value, UnreadableValue):
+        raise FieldDecryptionError('This value could not be decrypted with the configured keys.')
+    return value
+
+
+def _legacy_key() -> bytes:
+    dk = hashlib.pbkdf2_hmac('sha256', settings.SECRET_KEY.encode(),
+                             b'healthcompass-field-key', 100_000, dklen=32)
+    return base64.urlsafe_b64encode(dk)
+
+
+def _configured_keys() -> tuple:
+    keys = getattr(settings, 'FIELD_ENCRYPTION_KEYS', None) or []
+    if isinstance(keys, str):
+        keys = [k for k in keys.split(',')]
+    return tuple(k.strip() for k in keys if k and k.strip())
+
+
+@functools.lru_cache(maxsize=4)
+def _multifernet(keys: tuple, secret_key: str):
+    from cryptography.fernet import Fernet, MultiFernet
+    fernets = [Fernet(k.encode() if isinstance(k, str) else k) for k in keys]
+    fernets.append(Fernet(_legacy_key()))
+    return MultiFernet(fernets)
+
+
+def fernet():
+    """The MultiFernet for the current settings (primary key first)."""
+    return _multifernet(_configured_keys(), settings.SECRET_KEY)
+
+
+def decrypt(token: str) -> str:
+    from cryptography.fernet import InvalidToken
+    try:
+        return fernet().decrypt(token.encode()).decode()
+    except (InvalidToken, ValueError, TypeError) as exc:
+        raise FieldDecryptionError(str(exc) or 'invalid token') from exc
+
+
+def encrypt(plaintext: str) -> str:
+    return fernet().encrypt(plaintext.encode()).decode()
 
 
 class EncryptedCharField(models.TextField):
     """
     Stores a string value encrypted (Fernet) in a TextField column.
 
-    max_length on the parent CharField is advisory only; the DB column is TEXT.
-    The ciphertext is base64 (~130 chars for a 15-char plaintext).
+    max_length is advisory only; the DB column is TEXT. The ciphertext is
+    base64 (~130 chars for a 15-character plaintext).
     """
 
     def from_db_value(self, value, expression, connection):
         if not value:
             return value
         try:
-            return _fernet().decrypt(value.encode()).decode()
-        except Exception:
-            # Legacy plaintext or wrong key — return as-is, log for ops.
-            import logging
-            logging.getLogger(__name__).warning(
-                'EncryptedCharField: decryption failed; returning raw value. '
-                'This is expected for legacy plaintext rows before encryption was enabled.'
-            )
-            return value
+            return decrypt(value)
+        except FieldDecryptionError:
+            logger.warning('EncryptedCharField: a stored value could not be decrypted '
+                           'with any configured key; returning it as unreadable.')
+            return UnreadableValue(value)
 
     def get_prep_value(self, value):
+        if isinstance(value, UnreadableValue):
+            return value.raw  # unchanged: never overwrite what we could not read
         if not value:
             return value
-        return _fernet().encrypt(value.encode()).decode()
+        return encrypt(str(value))
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        # Use the full dotted path so migrations can reconstruct the field
         path = 'apps.accounts.fields.EncryptedCharField'
         return name, path, args, kwargs

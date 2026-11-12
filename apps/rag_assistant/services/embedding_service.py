@@ -53,6 +53,13 @@ COMPAT_MODEL_MISMATCH = 'model_mismatch'
 COMPAT_DIM_MISMATCH   = 'dim_mismatch'
 
 
+def use_pgvector() -> bool:
+    """In-database vector search: PostgreSQL only, and RAG_PGVECTOR not off."""
+    from django.conf import settings
+    from django.db import connection
+    return connection.vendor == 'postgresql' and getattr(settings, 'RAG_PGVECTOR', True)
+
+
 def active_embedding_model() -> str:
     """Model configured for indexing and querying right now."""
     model = settings.RAG_CONFIG.get('EMBEDDING_MODEL', '')
@@ -336,6 +343,8 @@ class EmbeddingService:
                 unusable.append(chunk)
                 continue
             chunk.embedding               = vec.astype(np.float32).tobytes()
+            if use_pgvector():
+                chunk.embedding_vec       = vec.astype(np.float32)
             chunk.embedding_model         = model
             chunk.embedding_model_version = version
             chunk.embedding_dimensions    = int(len(vec))
@@ -358,12 +367,13 @@ class EmbeddingService:
         if embedded:
             # type(...) rather than a hardcoded MedicalChunk: the same path is
             # used for GeneralKnowledgeChunk, which shares the provenance mixin.
-            type(embedded[0]).objects.bulk_update(embedded, [
-                'embedding', 'embedding_model', 'embedding_model_version',
-                'embedding_dimensions', 'embedded_at',
-                'embedding_status', 'embedding_error',
-                'embedding_attempts', 'embedding_attempted_at',
-            ])
+            fields = ['embedding', 'embedding_model', 'embedding_model_version',
+                      'embedding_dimensions', 'embedded_at',
+                      'embedding_status', 'embedding_error',
+                      'embedding_attempts', 'embedding_attempted_at']
+            if use_pgvector():
+                fields.append('embedding_vec')
+            type(embedded[0]).objects.bulk_update(embedded, fields)
 
     # ── Load all embeddings for a patient ─────────────────────────────────────
 
@@ -371,9 +381,18 @@ class EmbeddingService:
         self,
         patient,
         document_type=None,
+        *,
+        query_vector=None,
+        candidates: int = 0,
     ) -> Tuple[List[str], np.ndarray, List[Dict[str, Any]]]:
         """
         `document_type` accepts a single type or an iterable of types.
+
+        With `query_vector` and `candidates` on PostgreSQL, only the
+        `candidates` nearest chunks (cosine distance in pgvector, HNSW index)
+        are loaded instead of every chunk the patient has (audit ARCH-05). The
+        patient and type filters apply in SQL before the ordering, so another
+        patient's chunks are never candidates.
 
         Several types are needed because a clinical fact is not confined to the
         document class that introduced it: a medication's *status* is usually
@@ -418,6 +437,15 @@ class EmbeddingService:
         active_dim   = active_embedding_dim()
         strict       = strict_provenance()
 
+        # Only when every chunk in scope has its vector: during a partial
+        # backfill the rest would silently drop out of retrieval.
+        if query_vector is not None and candidates and use_pgvector() \
+                and not qs.filter(embedding_vec__isnull=True).exists():
+            from pgvector.django import CosineDistance
+            qs = (qs.filter(embedding_vec__isnull=False)
+                  .order_by(CosineDistance('embedding_vec', np.asarray(query_vector, dtype=np.float32)))
+                  [:candidates])
+
         chunks = list(qs)
         if not chunks:
             return [], np.zeros((0, active_dim), dtype=np.float32), []
@@ -427,12 +455,9 @@ class EmbeddingService:
         for c in chunks:
             try:
                 raw = bytes(c.embedding)
-                # Legacy rows were pickle-encoded; new rows use raw float32 bytes.
-                if raw[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
-                    import pickle
-                    vec = pickle.loads(raw)
-                else:
-                    vec = np.frombuffer(raw, dtype=np.float32)
+                # Raw float32 only. Legacy pickle-encoded rows were converted by
+                # rag_assistant migration 0012; pickle never runs on stored data.
+                vec = np.frombuffer(raw, dtype=np.float32)
 
                 status = classify_embedding(
                     stored_model = getattr(c, 'embedding_model', ''),

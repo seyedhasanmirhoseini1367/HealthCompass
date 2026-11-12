@@ -1,0 +1,10 @@
+{% comment %}
+  The one navigation list (audit UX-04). Rendered for the sidebar and the phone
+  menu from `nav_menu` (apps/dashboard/navigation.py), so the two cannot differ.
+  Usage: {% include 'partials/nav.html' with variant='sidebar' %} or variant='mobile'.
+{% endcomment %}
+{% for item in nav_menu %}
+  {% if item == '---' %}<div class="{% if variant == 'mobile' %}mm-divider{% else %}sb-divider{% endif %}"></div>
+  {% elif item.href %}<a href="{{ item.href }}" class="{% if variant == 'mobile' %}mm-link{% else %}sb-link{% endif %}{% if item.href == nav_current %} active{% endif %}"{% if item.href == nav_current %} aria-current="page"{% endif %}>{% icon item.icon %}{% if variant == 'mobile' %} {{ item.label }}{% else %}<span class="sb-txt">{{ item.label }}</span>{% endif %}</a>
+  {% else %}<span class="{% if variant == 'mobile' %}mm-section-label{% else %}sb-label{% endif %}">{{ item }}</span>{% endif %}
+{% endfor %}

@@ -1,0 +1,37 @@
+/* Moved from templates/appointments/list.html */
+.appt-hero{background:linear-gradient(135deg,#0369a1,#4f46e5);border-radius:16px;padding:1.5rem 2rem;color:white;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.appt-hero h1{font-size:1.5rem;font-weight:800;margin:0}
+.appt-hero p{font-size:.9rem;opacity:.85;margin:.25rem 0 0}
+.section-h{font-size:1rem;font-weight:700;margin:1.5rem 0 .75rem;display:flex;align-items:center;gap:.5rem;color:var(--text)}
+.section-h .icon{color:var(--primary)}
+.appt-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1rem 1.25rem;margin-bottom:.75rem;display:flex;align-items:flex-start;gap:1rem;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
+.appt-card:hover{box-shadow:0 4px 12px rgba(14,165,233,.12)}
+.appt-date{min-width:56px;text-align:center;background:linear-gradient(135deg,#e0f2fe,#ede9fe);border-radius:10px;padding:.5rem .4rem;line-height:1}
+.appt-date .day{font-size:1.5rem;font-weight:800;color:var(--primary-dk)}
+.appt-date .mon{font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--muted)}
+.appt-info{flex:1;min-width:0}
+.appt-title{font-weight:700;font-size:.95rem;margin:0 0 .2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt-meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.5rem .75rem;margin-top:.3rem}
+.appt-meta span{display:flex;align-items:center;gap:.25rem}
+.appt-actions{display:flex;gap:.4rem;align-items:center;flex-shrink:0}
+.past-card{opacity:.65}
+.view-switch{display:inline-flex;background:rgba(255,255,255,.18);border-radius:10px;padding:3px;gap:3px}
+.view-switch a{color:white;text-decoration:none;font-size:.82rem;font-weight:600;padding:.35rem .8rem;border-radius:8px}
+.view-switch a.on{background:white;color:var(--primary-dk)}
+.addcal{position:relative}
+.addcal summary{list-style:none;cursor:pointer}
+.addcal summary::-webkit-details-marker{display:none}
+.addcal-menu{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.12);padding:.35rem;min-width:200px;z-index:20}
+.addcal-menu a{display:flex;align-items:center;gap:.55rem;padding:.5rem .65rem;border-radius:7px;font-size:.85rem;color:var(--text);text-decoration:none}
+.addcal-menu a:hover{background:var(--bg)}
+.hero-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.next-card{background:white;border:1px solid #bae6fd;border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;box-shadow:0 4px 16px rgba(14,165,233,.10);position:relative;overflow:hidden}
+.next-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gradient-brand)}
+.next-card .appt-date{min-width:68px;padding:.65rem .5rem}
+.next-card .appt-date .day{font-size:1.9rem}
+.next-when{font-size:.8rem;font-weight:700;color:var(--primary-dk);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+.next-card .appt-title{font-size:1.1rem;white-space:normal}
+.reminder-chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.45rem}
+.chip{display:inline-flex;align-items:center;gap:.2rem;padding:.1rem .45rem;border-radius:20px;font-size:.68rem;font-weight:600;background:#dbeafe;color:#1d4ed8}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty-state .icon{font-size:2.5rem;color:#c7d2fe;margin-bottom:.75rem;display:block}

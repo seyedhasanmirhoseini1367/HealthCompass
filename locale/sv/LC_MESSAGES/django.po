@@ -1,0 +1,214 @@
+# HealthCompass interface strings. Translations are left empty for a translator.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: sv\n"
+
+#: templates/base.html
+msgid "AI &amp; Analytics"
+msgstr ""
+
+#: templates/base.html
+msgid "AI Assistant"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "AI tools"
+msgstr ""
+
+#: templates/base.html
+#: templates/pages/_legal.html
+msgid "About"
+msgstr ""
+
+#: templates/pages/_legal.html
+msgid "About and legal"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Admin"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Analytics"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Appointments"
+msgstr ""
+
+#: templates/base.html
+msgid "Are you sure?"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Assistant"
+msgstr ""
+
+#: templates/base.html
+msgid "Cancel"
+msgstr ""
+
+#: templates/dashboard/settings_hub.html
+msgid "Change"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Companions"
+msgstr ""
+
+#: templates/base.html
+#: templates/pages/_legal.html
+msgid "Contact"
+msgstr ""
+
+#: templates/base.html
+msgid "Delete"
+msgstr ""
+
+#: templates/base.html
+msgid "Emergency Card"
+msgstr ""
+
+#: templates/dashboard/settings_hub.html
+msgid "Finnish and Swedish are being translated; untranslated text stays in English."
+msgstr ""
+
+#: templates/base.html
+msgid "For your privacy you will be signed out in a minute because nothing has happened for a while."
+msgstr ""
+
+#: templates/base.html
+msgid "Get started"
+msgstr ""
+
+#: templates/base.html
+msgid "Home"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Hospital"
+msgstr ""
+
+#: templates/base.html
+msgid "How it works"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Labs"
+msgstr ""
+
+#: templates/dashboard/settings_hub.html
+msgid "Language"
+msgstr ""
+
+#: templates/base.html
+msgid "Log in"
+msgstr ""
+
+#: templates/base.html
+msgid "Log out"
+msgstr ""
+
+#: templates/base.html
+msgid "Main"
+msgstr ""
+
+#: templates/base.html
+#: templates/pages/_legal.html
+msgid "Medical disclaimer"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Monitoring"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "My Health"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "My Patients"
+msgstr ""
+
+#: templates/base.html
+msgid "My Profile"
+msgstr ""
+
+#: templates/base.html
+msgid "Not a substitute for professional medical advice. In an emergency call 112."
+msgstr ""
+
+#: templates/base.html
+msgid "Open navigation menu"
+msgstr ""
+
+#: templates/base.html
+#, python-format
+msgid "Please confirm your email address <strong>%(email)s</strong>. Sharing and the assistant unlock once you do."
+msgstr ""
+
+#: templates/base.html
+#: templates/pages/_legal.html
+msgid "Privacy"
+msgstr ""
+
+#: templates/base.html
+msgid "Privacy &amp; Consent"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Records"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Scribe"
+msgstr ""
+
+#: templates/base.html
+msgid "Send the link again"
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Settings"
+msgstr ""
+
+#: templates/base.html
+msgid "Sharing"
+msgstr ""
+
+#: templates/base.html
+msgid "Sign out now"
+msgstr ""
+
+#: templates/base.html
+msgid "Skip to content"
+msgstr ""
+
+#: templates/base.html
+msgid "Stay signed in"
+msgstr ""
+
+#: templates/base.html
+msgid "Still there?"
+msgstr ""
+
+#: templates/base.html
+msgid "Terms"
+msgstr ""
+
+#: templates/pages/_legal.html
+msgid "Terms of use"
+msgstr ""
+
+#: templates/base.html
+msgid "This action cannot be undone."
+msgstr ""
+
+#: apps/dashboard/navigation.py
+msgid "Workspace"
+msgstr ""
+
+#: templates/base.html
+msgid "Your health records, reminders and care in one place."
+msgstr ""

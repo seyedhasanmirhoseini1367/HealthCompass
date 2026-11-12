@@ -9,6 +9,8 @@ from django_ratelimit.decorators import ratelimit
 
 from .models import ChatSession, QueryLog
 from .services.rag_service import RAGService
+from apps.accounts.verification import require_verified_email
+from healthcompass.net import scoped_ratelimit
 
 _RATE_EXCEEDED = JsonResponse(
     {'error': 'Rate limit exceeded. Please wait a moment before sending another message.'},
@@ -17,13 +19,8 @@ _RATE_EXCEEDED = JsonResponse(
 
 logger = logging.getLogger(__name__)
 
-#: Longest accepted question.
-#
-# There was no cap. DATA_UPLOAD_MAX_MEMORY_SIZE is 50 MB and does not restrict a
-# single JSON field, so a multi-megabyte "question" was accepted, sent to the LLM
-# provider at cost, and stored verbatim in QueryLog.query — a TextField with no
-# database ceiling.
-MAX_QUESTION_CHARS = 4000
+#: Longest accepted question; defined once in chat_service for web and API.
+from .services.chat_service import MAX_QUESTION_CHARS  # noqa: E402
 
 
 
@@ -103,6 +100,9 @@ def new_session(request):
 @login_required
 @require_POST
 @ratelimit(key='user', rate='20/m', block=False)
+# Daily cap shared with the API's ai_daily scope (SEC-16).
+@scoped_ratelimit('ai_daily')
+@require_verified_email
 def send_message(request):
     if getattr(request, 'limited', False):
         return _RATE_EXCEEDED
@@ -111,87 +111,26 @@ def send_message(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    query = body.get('message', '').strip()
-    session_id = body.get('session_id')
-
-    if len(query) > MAX_QUESTION_CHARS:
-        return JsonResponse(
-            {'error': f'Message is too long ({len(query)} characters). '
-                      f'Please keep questions under {MAX_QUESTION_CHARS}.'},
-            status=400)
-
-    if not query:
-        return JsonResponse({'error': 'Empty message'}, status=400)
-
-    # Get or create session
-    if session_id:
-        try:
-            session = ChatSession.objects.get(pk=session_id, patient=request.user)
-        except ChatSession.DoesNotExist:
-            session = ChatSession.objects.create(patient=request.user, title=query[:50])
-    else:
-        session = ChatSession.objects.create(patient=request.user, title=query[:50])
-
-    # Get history for context
-    history = list(session.messages.values('query', 'response').order_by('-created_at')[:3])
-    history.reverse()
-
-    # Whose records is this about?
-    #
-    # The value comes from the client and is untrusted; `resolve` checks it
-    # against accounts.authz and refuses indistinguishably from "no such
-    # person", so this cannot be used to probe which user ids exist.
     from apps.rag_assistant import subject as subject_mod
+    from .services import chat_service
 
+    query = (body.get('message') or '').strip()
+    error = chat_service.question_error(query)
+    if error:
+        return JsonResponse({'error': error}, status=400)
+
+    # Whose records: untrusted client input, checked against accounts.authz;
+    # refused indistinguishably from "no such person".
     try:
         subjects = subject_mod.resolve(request.user, body.get('subject'))
     except subject_mod.SubjectNotPermitted:
         return JsonResponse({'error': 'Not available.'}, status=404)
 
-    # Answered per person, never merged. One prompt holding three people's
-    # records produces answers nobody can attribute.
-    answers = []
-    sources, provider, chunks_count = [], '', 0
-    safety_routed, triggered_rules = False, []
-    for person in subjects:
-        subject_mod.record_access(request.user, person, query)
-        text, srcs, prov, n, routed, rules = RAGService().ask(
-            person, query, history)
-        answers.append((subject_mod.label_for(request.user, person), text))
-        sources.extend(srcs)
-        provider = provider or prov
-        chunks_count += n
-        safety_routed = safety_routed or routed
-        triggered_rules.extend(rules)
-
-    if len(answers) == 1:
-        response_text = answers[0][1]
-    else:
-        # Labelled, so no sentence is left ambiguous about whose data it used.
-        # This is why "Everyone" is not one merged prompt: three people's
-        # records in a single context produce a medication list nobody can
-        # attribute, and attributing a drug to the wrong person is a clinical
-        # error, not a formatting one.
-        parts = [f'**{name}**\n\n{text}' for name, text in answers]
-        response_text = '\n\n'.join(parts)
-
-    # Auto-title the session on first message
-    if session.messages.count() == 0:
-        session.title = query[:60]
-        session.save(update_fields=['title'])
-
-    # Save to DB — include observability + impact measurement fields
-    log = QueryLog.objects.create(
-        session                = session,
-        query                  = query,
-        response               = response_text,
-        sources                = sources,
-        llm_provider           = provider,
-        retrieved_chunks_count = chunks_count,
-        safety_routed          = safety_routed,
-        triggered_rules        = triggered_rules,
-    )
-
+    session = chat_service.resolve_session(request.user, body.get('session_id'), query)
+    response_text, sources, _provider, log = chat_service.ask(request.user, session, query, subjects)
+    if log is None:
+        return JsonResponse({'error': chat_service.EMPTY_ANSWER_MESSAGE, 'retry': True,
+                             'session_id': str(session.pk)}, status=502)
     return JsonResponse({
         'response': response_text,
         'sources': sources,
@@ -222,7 +161,8 @@ def rename_session(request, pk):
     title = body.get('title', '').strip()
     if not title:
         return JsonResponse({'error': 'Title cannot be empty'}, status=400)
-    session.title = title[:100]
+    from .services.chat_service import RENAME_TITLE_MAX
+    session.title = title[:RENAME_TITLE_MAX]
     session.save(update_fields=['title'])
     return JsonResponse({'ok': True, 'title': session.title})
 
@@ -242,6 +182,9 @@ def delete_session(request, pk):
 @login_required
 @require_POST
 @ratelimit(key='user', rate='20/m', block=False)
+# Daily cap shared with the API's ai_daily scope (SEC-16).
+@scoped_ratelimit('ai_daily')
+@require_verified_email
 def stream_message(request):
     """
     SSE endpoint. Streams tokens from RAGService.stream_ask().
@@ -266,106 +209,26 @@ def stream_message(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    query      = body.get('message', '').strip()
-    session_id = body.get('session_id')
-
-    if len(query) > MAX_QUESTION_CHARS:
-        return JsonResponse(
-            {'error': f'Message is too long ({len(query)} characters). '
-                      f'Please keep questions under {MAX_QUESTION_CHARS}.'},
-            status=400)
-
-    if not query:
-        return JsonResponse({'error': 'Empty message'}, status=400)
-
-    # Resolve / create session
-    if session_id:
-        try:
-            session = ChatSession.objects.get(pk=session_id, patient=request.user)
-        except ChatSession.DoesNotExist:
-            session = ChatSession.objects.create(patient=request.user, title=query[:50])
-    else:
-        session = ChatSession.objects.create(patient=request.user, title=query[:50])
-
-    history = list(session.messages.values('query', 'response').order_by('-created_at')[:3])
-    history.reverse()
-
     from apps.rag_assistant import subject as subject_mod
+    from .services import chat_service
+
+    query = (body.get('message') or '').strip()
+    error = chat_service.question_error(query)
+    if error:
+        return JsonResponse({'error': error}, status=400)
 
     try:
         subjects = subject_mod.resolve(request.user, body.get('subject'))
     except subject_mod.SubjectNotPermitted:
         return JsonResponse({'error': 'Not available.'}, status=404)
 
-    # Streaming answers one subject. "Everyone" is a multi-answer shape that
-    # does not fit a single token stream, so the selector's All option uses the
-    # non-streaming path; here it degrades to the asker rather than silently
-    # streaming somebody else's records.
+    # One subject per stream. "Everyone" uses the non-streaming path; here it
+    # degrades to the asker rather than streaming somebody else's records.
     stream_subject = subjects[0] if len(subjects) == 1 else request.user
-    subject_mod.record_access(request.user, stream_subject, query)
+    session = chat_service.resolve_session(request.user, body.get('session_id'), query)
 
     def _event_stream():
-        collected_tokens          = []
-        collected_sources         = []
-        collected_provider        = ''
-        collected_chunks          = 0
-        collected_safety_routed   = False
-        collected_triggered_rules = []
-        collected_mode            = 'personal'
-        collected_chart_data      = None
-
-        try:
-            for event_str in RAGService().stream_ask(
-                patient  = stream_subject,
-                query    = query,
-                history  = history,
-            ):
-                # event_str is already SSE-formatted ("data: {...}\n\n")
-                yield event_str
-
-                # Parse to collect tokens + sources + meta for DB save
-                try:
-                    raw = event_str.strip()
-                    if raw.startswith('data: '):
-                        payload = json.loads(raw[6:])
-                        t = payload.get('type')
-                        if t == 'token':
-                            collected_tokens.append(payload.get('content', ''))
-                        elif t == 'sources':
-                            collected_sources.extend(payload.get('sources', []))
-                        elif t == 'chart':
-                            collected_chart_data = payload.get('chart')
-                        elif t == 'meta':
-                            collected_provider        = payload.get('provider', '')
-                            collected_chunks          = payload.get('chunks', 0)
-                            collected_safety_routed   = payload.get('safety_routed', False)
-                            collected_triggered_rules = payload.get('triggered_rules', [])
-                            collected_mode            = payload.get('mode', 'personal')
-                except Exception:
-                    pass  # parsing failure doesn't break the stream
-
-        finally:
-            # Persist response to DB once the stream is exhausted
-            try:
-                full_response = ''.join(collected_tokens)
-                if session.messages.count() == 0:
-                    session.title = query[:60]
-                    session.save(update_fields=['title'])
-
-                QueryLog.objects.create(
-                    session                = session,
-                    query                  = query,
-                    response               = full_response,
-                    sources                = collected_sources,
-                    llm_provider           = collected_provider,
-                    retrieved_chunks_count = collected_chunks,
-                    safety_routed          = collected_safety_routed,
-                    triggered_rules        = collected_triggered_rules,
-                    query_mode             = collected_mode,
-                    chart_data             = collected_chart_data,
-                )
-            except Exception as exc:
-                logger.exception('Failed to save streamed QueryLog: %s', exc)
+        yield from chat_service.stream(request.user, session, query, stream_subject)
 
     response = StreamingHttpResponse(_event_stream(), content_type='text/event-stream')
     response['Cache-Control']    = 'no-cache'

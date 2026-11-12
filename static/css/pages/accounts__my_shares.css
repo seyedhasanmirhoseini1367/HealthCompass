@@ -1,0 +1,28 @@
+/* Moved from templates/accounts/my_shares.html */
+.sh-page { max-width:760px; margin:0 auto; }
+.sh-page h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0 0 .35rem; }
+.sh-intro { font-size:.85rem; color:#475569; margin-bottom:1.4rem; line-height:1.55; }
+.sh-card { background:white; border:1.5px solid var(--border); border-radius:12px;
+           padding:1rem 1.1rem; margin-bottom:.85rem; }
+.sh-name { font-size:.95rem; font-weight:700; color:#1e293b; margin:0 0 .2rem; }
+.sh-meta { font-size:.75rem; color:#475569; }
+.sh-scopes { display:flex; gap:.35rem; flex-wrap:wrap; margin:.5rem 0 0; }
+.sh-scope { display:inline-block; padding:.14rem .55rem; border-radius:20px;
+            font-size:.7rem; font-weight:700; background:#e0f2fe; color:#0369a1; }
+.sh-row { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.sh-btn { padding:.4rem .95rem; border-radius:8px; font-size:.78rem; font-weight:700;
+          border:none; cursor:pointer; }
+.sh-btn.stop { background:white; color:#b91c1c; border:1.5px solid #fecaca; }
+.sh-btn.share { background:var(--primary); color:white; }
+.sh-badge { display:inline-block; padding:.12rem .5rem; border-radius:5px; font-size:.66rem;
+            font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+.sh-badge.off { background:#fee2e2; color:#b91c1c; }
+.sh-form { background:#f8fafc; border:1px solid var(--border); border-radius:12px;
+           padding:1rem 1.1rem; margin-bottom:1.5rem; }
+.sh-form label { display:block; font-size:.8rem; font-weight:600; color:#334155; margin-bottom:.3rem; }
+.sh-form input[type=text] { width:100%; padding:.5rem .8rem; border:1.5px solid var(--border);
+                            border-radius:9px; font-size:.88rem; font-family:inherit; }
+.sh-check { display:flex; align-items:flex-start; gap:.5rem; margin:.5rem 0; font-size:.83rem; color:#334155; }
+.sh-check span.hint { display:block; font-size:.75rem; color:#475569; }
+.sh-empty { font-size:.85rem; color:#475569; padding:1rem 0; }
+.sh-section { font-size:.95rem; font-weight:800; color:var(--text); margin:1.8rem 0 .5rem; }

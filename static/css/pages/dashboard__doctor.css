@@ -1,0 +1,11 @@
+/* Moved from templates/dashboard/doctor.html */
+/* .dash-header replaced by global .page-hero */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:var(--primary)}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.patient-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.patient-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;cursor:pointer;transition:all .2s}
+.patient-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);border-color:#cbd5e1}
+.patient-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0369a1,#4f46e5);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0}
+.flagged-dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;margin-left:.3rem}

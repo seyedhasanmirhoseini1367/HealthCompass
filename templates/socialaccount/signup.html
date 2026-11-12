@@ -1,11 +1,13 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Completing sign-in — HealthCompass{% endblock %}
 {% block content %}
-<div style="max-width:440px;margin:4rem auto;text-align:center">
-  <div style="font-size:2.5rem;margin-bottom:1rem">🧭</div>
-  <h2 style="font-weight:700;margin-bottom:.5rem">Almost there…</h2>
-  <p style="color:var(--muted);margin-bottom:2rem">Setting up your account, please wait.</p>
-  <div style="width:2rem;height:2rem;border:3px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></div>
+<h1 class="visually-hidden">Completing sign-in</h1>
+<div class="x-e5f9af8b">
+  <div class="x-cabccd5c">🧭</div>
+  <h2 class="x-485a2291">Almost there…</h2>
+  <p class="x-2a1ab649">Setting up your account, please wait.</p>
+  <div class="x-1c7e0910"></div>
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<link rel="stylesheet" href="{% static 'css/pages/socialaccount__signup.css' %}">
 {% endblock %}

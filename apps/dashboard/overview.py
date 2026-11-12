@@ -532,3 +532,30 @@ def _ago(when) -> str:
         return f'{hours} hour{"" if hours == 1 else "s"} ago'
     days = hours // 24
     return f'{days} day{"" if days == 1 else "s"} ago'
+
+
+def first_run_checklist(user):
+    """The three steps a new patient needs (audit UX-06), or None once all are
+    done or the patient closed the list.
+
+    The assistant is blocked until external_llm consent is granted, and sign-up
+    used to land on a page that said nothing about it.
+    """
+    from apps.accounts.models import Consent, PatientProfile
+    from apps.medical_records.models import MedicalRecord
+    from apps.rag_assistant.models import QueryLog
+
+    profile = PatientProfile.objects.filter(user=user).only('onboarding_dismissed').first()
+    if profile is not None and profile.onboarding_dismissed:
+        return None
+    steps = [
+        {'label': 'Review your privacy choices', 'href': '/accounts/consent/',
+         'done': Consent.objects.filter(user=user).exists()},
+        {'label': 'Add your first record', 'href': '/records/',
+         'done': MedicalRecord.objects.filter(patient=user).exists()},
+        {'label': 'Ask your first question', 'href': '/assistant/',
+         'done': QueryLog.objects.filter(session__patient=user).exists()},
+    ]
+    if all(step['done'] for step in steps):
+        return None
+    return {'steps': steps, 'done': sum(step['done'] for step in steps), 'total': len(steps)}

@@ -1,12 +1,21 @@
 from django.urls import path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from apps.ai_insights.labs import labs_only
 
 app_name = 'api'
 
 urlpatterns = [
     # Auth
+    # OpenAPI schema and Swagger UI, staff only (SPECTACULAR_SETTINGS).
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('docs/', SpectacularSwaggerView.as_view(url_name='api:schema'), name='docs'),
     path('auth/register/',         views.register,         name='register'),
+    path('auth/logout/',           views.logout,           name='logout'),
+    path('auth/logout-all/',       views.logout_all,       name='logout_all'),
+    path('auth/account/',          views.account_delete,   name='account_delete'),
+    path('auth/account/delete-request/', views.account_delete_request, name='account_delete_request'),
     path('auth/login/',            views.login,            name='login'),
     path('auth/refresh/',          TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/',               views.me,               name='me'),
@@ -26,6 +35,7 @@ urlpatterns = [
     path('records/',                 views.records_list,    name='records_list'),
     # Before the <str:pk> route, which would otherwise swallow the literal.
     path('records/<str:pk>/',        views.record_detail,   name='record_detail'),
+    path('records/<str:pk>/status/',  views.record_status,  name='record_status'),
     path('records/<str:pk>/delete/', views.record_delete,   name='record_delete'),
 
     # Dashboard
@@ -70,7 +80,7 @@ urlpatterns = [
     path('export/download/', views.export_download, name='export_download'),
 
     # Seizure Analysis
-    path('seizure-analysis/',      views.seizure_analysis,      name='seizure_analysis'),
+    path('seizure-analysis/',      labs_only(views.seizure_analysis),      name='seizure_analysis'),
 
     # Profile picture
     path('auth/profile/picture/',  views.profile_picture_upload, name='profile_picture'),
@@ -79,15 +89,17 @@ urlpatterns = [
     path('population/',            views.population_insights,    name='population_insights'),
 
     # ICU Demo
-    path('icu/',                          views.icu_dashboard_api,        name='icu_dashboard_api'),
+    path('icu/',                          labs_only(views.icu_dashboard_api),        name='icu_dashboard_api'),
 
     # Seizure Realtime
-    path('seizure-realtime/analyze/',     views.seizure_realtime_analyze, name='seizure_realtime_analyze'),
+    path('seizure-realtime/analyze/',     labs_only(views.seizure_realtime_analyze), name='seizure_realtime_analyze'),
 
     # Sharing / companions
     path('sharing/companions/',            views.sharing_companions,     name='sharing_companions'),
     path('sharing/companions/create/',     views.create_share,           name='create_share'),
     path('sharing/companions/<int:pk>/revoke/', views.revoke_share,      name='revoke_share'),
+    path('sharing/companions/<int:pk>/accept/', views.accept_share,      name='accept_share'),
+    path('sharing/companions/<int:pk>/decline/', views.decline_share,    name='decline_share'),
     path('sharing/companions/<int:pk>/',   views.shared_patient_detail,  name='shared_patient_detail'),
 
     # Care monitoring
@@ -97,3 +109,9 @@ urlpatterns = [
     path('care/occurrences/<uuid:pk>/respond/', views.occurrence_respond, name='occurrence_respond'),
     path('care/reports/',                views.patient_reports_list_create, name='care_reports'),
 ]
+
+
+# OpenAPI shapes for the function views (see apps/api/schema.py).
+from .schema import annotate as _annotate_schema  # noqa: E402
+
+_annotate_schema(urlpatterns)

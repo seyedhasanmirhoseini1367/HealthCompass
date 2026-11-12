@@ -1,5 +1,6 @@
 import logging
 
+from healthcompass.net import scoped_ratelimit
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -53,6 +54,7 @@ _RUNNABLE_STATUSES = frozenset({AIModel.Status.ACTIVE, AIModel.Status.APPROVED})
 
 
 @login_required
+@scoped_ratelimit('prediction')
 def run_prediction(request, slug):
     # Fetch by slug only — status is enforced explicitly below.
     # Using a separate PermissionDenied (403) rather than a 404 means the caller

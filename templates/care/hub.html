@@ -1,52 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Companions — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.cr-wrap{max-width:800px;margin:0 auto}
-.cr-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
-.cr-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
-.cr-sec{font-size:1.05rem;font-weight:800;color:var(--text);margin:1.8rem 0 .7rem}
-.cr-sec:first-of-type{margin-top:0}
-.cr-card{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:.7rem}
-.cr-task{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:.5rem 0;border-bottom:1px solid #f1f5f9}
-.cr-task:last-child{border-bottom:none}
-.cr-label{font-weight:700;font-size:.98rem;color:var(--text)}
-.cr-when{font-size:.85rem;color:#94a3b8}
-.cr-actions{display:flex;gap:.45rem;flex-wrap:wrap}
-.cr-btn{border:1.5px solid var(--border);background:white;border-radius:10px;padding:.5rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;color:var(--text)}
-.cr-btn.done{background:#059669;border-color:#059669;color:white}
-.cr-state{font-size:.8rem;font-weight:700;padding:.2rem .6rem;border-radius:6px}
-.cr-state.confirmed{background:#d1fae5;color:#065f46}
-.cr-state.skipped{background:#e0e7ff;color:#3730a3}
-.cr-state.missed{background:#fee2e2;color:#991b1b}
-.cr-state.unconfirmed{background:#f1f5f9;color:#475569}
-.cr-person{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;text-decoration:none}
-.cr-person:hover{border-color:#cbd5e1}
-.cr-person-n{font-size:1rem;font-weight:700;color:var(--text)}
-.cr-person-d{font-size:.86rem;color:#64748b;margin-top:.1rem}
-.cr-note{font-size:.85rem;color:#64748b;background:#f8fafc;border-radius:10px;padding:.8rem 1rem;line-height:1.55;margin:0}
-.cr-empty{font-size:.92rem;color:#64748b;line-height:1.6;margin:0}
-.cr-link{color:var(--primary);text-decoration:none;font-weight:600;font-size:.88rem}
-.cr-say textarea{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:.7rem;font-size:.95rem;font-family:inherit;resize:vertical;min-height:76px}
-.cr-attn{background:#fef3c7;color:#92400e;font-size:.8rem;font-weight:700;padding:.25rem .7rem;border-radius:7px;white-space:nowrap}
-.cr-scope{display:inline-block;padding:.12rem .55rem;border-radius:20px;font-size:.72rem;font-weight:700;background:#e0f2fe;color:#0369a1;margin-right:.25rem}
-.cr-form{background:#f8fafc;border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-top:.8rem}
-.cr-form-t{font-weight:700;font-size:.95rem;color:var(--text);margin:0 0 .15rem}
-.cr-form-d{font-size:.83rem;color:#64748b;margin:0 0 .7rem;line-height:1.5}
-.cr-form input[type=text],.cr-form textarea{width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:10px;font-size:.9rem;font-family:inherit;background:white}
-.cr-check{display:flex;align-items:flex-start;gap:.5rem;margin:.45rem 0;font-size:.86rem;color:#334155}
-.cr-check .hint{display:block;font-size:.76rem;color:#94a3b8}
-.cr-checks{margin:.7rem 0}
-.cr-btn.primary{background:var(--primary);border-color:var(--primary);color:white}
-.cr-btn.stop{color:#b91c1c;border-color:#fecaca}
-.cr-req{border:1.5px solid #fde68a;background:#fffbeb}
-.cr-quote{font-size:.88rem;color:#475569;font-style:italic;margin:.4rem 0 0}
-.cr-tabs{display:flex;gap:.5rem;flex-wrap:wrap}
-.cr-tabs details{flex:1;min-width:260px}
-.cr-tabs summary{cursor:pointer;list-style:none}
-.cr-tabs summary::-webkit-details-marker{display:none}
-#sharing{scroll-margin-top:80px}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/care__hub.css' %}">
 {% endblock %}
 {% block content %}
 <div class="cr-wrap">
@@ -64,6 +20,27 @@
     First when present: someone is waiting for an answer, and nothing is
     shared until the patient approves here, choosing what to share.
   {% endcomment %}
+  {% if invitations %}
+  <h2 class="cr-sec">Invitations for you</h2>
+  {% for grant in invitations %}
+  <div class="cr-card cr-req">
+    <div class="cr-label">{{ grant.patient.get_full_name|default:grant.patient.username }} wants to share their health information with you</div>
+    <div class="cr-when">
+      {% if grant.can_view_records %}<span class="cr-scope">Records</span>{% endif %}
+      {% if grant.can_view_alerts %}<span class="cr-scope">Care &amp; alerts</span>{% endif %}
+      {% if grant.can_view_appointments %}<span class="cr-scope">Appointments</span>{% endif %}
+      · offered {{ grant.created_at|timesince }} ago
+    </div>
+    <div class="cr-actions x-acef0958">
+      <form method="post" action="{% url 'accounts:accept_share' grant.pk %}">{% csrf_token %}
+        <button type="submit" class="cr-btn primary">Accept</button></form>
+      <form method="post" action="{% url 'accounts:decline_share' grant.pk %}">{% csrf_token %}
+        <button type="submit" class="cr-btn">Decline</button></form>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
   {% if incoming %}
   <h2 class="cr-sec">Requests for you</h2>
   {% for req in incoming %}
@@ -71,7 +48,7 @@
     <div class="cr-label">{{ req.requester.get_full_name|default:req.requester.username }} asked to see your health information</div>
     <div class="cr-when">{{ req.created_at|timesince }} ago · nothing is shared unless you approve</div>
     {% if req.message %}<p class="cr-quote">&ldquo;{{ req.message }}&rdquo;</p>{% endif %}
-    <form method="post" action="{% url 'accounts:answer_share_request' req.pk %}" style="margin-top:.6rem">
+    <form method="post" action="{% url 'accounts:answer_share_request' req.pk %}" class="x-acef0958">
       {% csrf_token %}
       <div class="cr-checks">
         {% include 'care/_scope_checks.html' with prefix=req.pk %}
@@ -108,7 +85,7 @@
         {% endif %}
       </span>
     </span>
-    <span style="display:flex;align-items:center;gap:.7rem">
+    <span class="x-4d7c373c">
       {% if row.open_signals %}<span class="cr-attn">Needs attention</span>{% endif %}
       <span class="cr-link">View →</span>
     </span>
@@ -134,34 +111,46 @@
     <div class="cr-task">
       <div>
         <div class="cr-label">{{ grant.recipient.get_full_name|default:grant.recipient.username }}</div>
-        <div class="cr-when" style="margin-top:.25rem">
+        <div class="cr-when x-4b4bfd43">
           {% if grant.can_view_records %}<span class="cr-scope">Records</span>{% endif %}
           {% if grant.can_view_alerts %}<span class="cr-scope">Care &amp; alerts</span>{% endif %}
           {% if grant.can_view_appointments %}<span class="cr-scope">Appointments</span>{% endif %}
-          since {{ grant.created_at|date:"j M Y" }}{% if grant.expires_at %} · ends {{ grant.expires_at|date:"j M Y" }}{% endif %}
+          since {{ grant.created_at|date:"DATE_FORMAT" }}{% if grant.expires_at %} · ends {{ grant.expires_at|date:"DATE_FORMAT" }}{% endif %}
         </div>
       </div>
       <form method="post" action="{% url 'accounts:revoke_share' grant.pk %}"
-            onsubmit="return confirm('Stop sharing with {{ grant.recipient.get_full_name|default:grant.recipient.username|escapejs }}? They lose access immediately.');">
+            data-confirm="Stop sharing with {{ grant.recipient.get_full_name|default:grant.recipient.username }}? They lose access immediately.">
         {% csrf_token %}
         <button type="submit" class="cr-btn stop">Stop sharing</button>
       </form>
     </div>
     {% empty %}
-    <p class="cr-empty">You are not sharing your health information with anyone.</p>
+    {% if not offered %}<p class="cr-empty">You are not sharing your health information with anyone.</p>{% endif %}
+    {% endfor %}
+    {% for grant in offered %}
+    <div class="cr-task">
+      <div>
+        <div class="cr-label">{{ grant.recipient.get_full_name|default:grant.recipient.email }}</div>
+        <div class="cr-when x-4b4bfd43">Invitation waiting for them to accept · nothing is shared yet</div>
+      </div>
+      <form method="post" action="{% url 'accounts:revoke_share' grant.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="cr-btn">Withdraw</button>
+      </form>
+    </div>
     {% endfor %}
   </div>
 
   <div class="cr-tabs">
     <details class="cr-form" {% if not granted and not people %}open{% endif %}>
       <summary>
-        <p class="cr-form-t"><i class="fas fa-share-nodes" aria-hidden="true"></i> Share with someone</p>
+        <p class="cr-form-t">{% icon 'share-nodes' %} Share with someone</p>
         <p class="cr-form-d">A family member or carer. You choose what they see and can stop at any time.</p>
       </summary>
       <form method="post" action="{% url 'accounts:create_share' %}">
         {% csrf_token %}
-        <label for="share-recipient" class="cr-when">Their username or email</label>
-        <input type="text" id="share-recipient" name="recipient" autocomplete="off" required>
+        <label for="share-recipient" class="cr-when">Their email address</label>
+        <input type="email" id="share-recipient" name="recipient" autocomplete="off" required>
         <div class="cr-checks">
           {% include 'care/_scope_checks.html' with prefix='share' %}
         </div>
@@ -171,17 +160,17 @@
 
     <details class="cr-form">
       <summary>
-        <p class="cr-form-t"><i class="fas fa-hand" aria-hidden="true"></i> Ask someone to share with me</p>
+        <p class="cr-form-t">{% icon 'hand' %} Ask someone to share with me</p>
         <p class="cr-form-d">They get a request and decide what, if anything, to share.</p>
       </summary>
       <form method="post" action="{% url 'accounts:request_share' %}">
         {% csrf_token %}
-        <label for="ask-patient" class="cr-when">Their username or email</label>
-        <input type="text" id="ask-patient" name="patient" autocomplete="off" required>
-        <label for="ask-message" class="cr-when" style="display:block;margin-top:.6rem">Message (optional)</label>
+        <label for="ask-patient" class="cr-when">Their email address</label>
+        <input type="email" id="ask-patient" name="patient" autocomplete="off" required>
+        <label for="ask-message" class="cr-when x-6f45daaa">Message (optional)</label>
         <textarea id="ask-message" name="message" maxlength="300" rows="2"
                   placeholder="e.g. So I can help with your appointments"></textarea>
-        <button type="submit" class="cr-btn primary" style="margin-top:.6rem">Send request</button>
+        <button type="submit" class="cr-btn primary x-acef0958">Send request</button>
       </form>
     </details>
   </div>
@@ -204,7 +193,7 @@
   </div>
   {% endif %}
 
-  <p class="cr-note" style="margin-top:1.2rem">
+  <p class="cr-note x-43a96eea">
     Clinicians linked to your care are managed separately, under
     <a class="cr-link" href="{% url 'accounts:my_doctors' %}">My doctors</a>.
   </p>

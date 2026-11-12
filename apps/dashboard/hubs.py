@@ -22,6 +22,8 @@ people list in Care — goes through `accounts.authz.shared_with`, the same seam
 the notification pipeline and the person page use.
 """
 from __future__ import annotations
+from django.shortcuts import redirect
+from django.views.decorators.http import require_POST
 
 import logging
 
@@ -65,9 +67,11 @@ def my_health(request):
     # service, so its state rules (absence is never good news, no invented
     # numbers) are unchanged. Patients only: other roles have their own home.
     today = {}
+    checklist = None
     if request.user.is_patient:
-        from apps.dashboard.overview import build_dashboard
+        from apps.dashboard.overview import build_dashboard, first_run_checklist
         today = build_dashboard(request.user)
+        checklist = first_run_checklist(request.user)
 
     # My Health is now a patient's home page, so one failing section must not
     # take it down. The Today block already degrades per section; measurements
@@ -86,6 +90,7 @@ def my_health(request):
         adherence_data = None
 
     return render(request, 'dashboard/my_health.html', {
+        'checklist': checklist,
         **today,
         'adherence':     adherence_data,
         'occurrences':   occurrences,
@@ -188,6 +193,13 @@ def care_overview(request):
     granted = [g for g in SharingGrant.objects.filter(patient=user)
                .select_related('recipient') if g.is_effective]
 
+    # Shares offered but not yet accepted, in both directions (audit SEC-02).
+    invited = SharingGrant.Status.PENDING
+    invitations = list(SharingGrant.objects.filter(recipient=user, status=invited)
+                       .select_related('patient'))
+    offered = list(SharingGrant.objects.filter(patient=user, status=invited)
+                   .select_related('recipient'))
+
     pending = ShareRequest.Status.PENDING
     incoming = list(ShareRequest.objects.filter(patient=user, status=pending)
                     .select_related('requester'))
@@ -199,4 +211,14 @@ def care_overview(request):
         'granted':  granted,
         'incoming': incoming,
         'outgoing': outgoing,
+        'invitations': invitations,
+        'offered':  offered,
     }
+
+
+@login_required
+@require_POST
+def dismiss_checklist(request):
+    from apps.accounts.models import PatientProfile
+    PatientProfile.objects.update_or_create(user=request.user, defaults={'onboarding_dismissed': True})
+    return redirect('dashboard:my_health')

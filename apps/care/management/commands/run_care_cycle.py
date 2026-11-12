@@ -14,6 +14,8 @@ import logging
 
 from django.core.management.base import BaseCommand
 
+from apps.ops.heartbeat import heartbeat
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +35,7 @@ class Command(BaseCommand):
             help='Do the monitoring work but contact nobody. Useful for '
                  'backfilling signals without messaging a family about history.')
 
+    @heartbeat('run_care_cycle')
     def handle(self, *args, **options):
         from django.contrib.auth import get_user_model
         from django.db import transaction

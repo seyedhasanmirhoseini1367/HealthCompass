@@ -1,20 +1,21 @@
 {% extends 'base.html' %}
 {% block title %}Delete Record — HealthCompass{% endblock %}
 {% block content %}
-<div style="max-width:480px;margin:0 auto">
+<h1 class="visually-hidden">Delete Record</h1>
+<div class="x-409f15df">
   <div class="card">
-    <div class="card-body" style="text-align:center;padding:2rem">
-      <div style="font-size:2.5rem;margin-bottom:1rem">🗑️</div>
-      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Delete Record?</h2>
-      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.5rem">
+    <div class="card-body x-395a512e">
+      <div class="x-cabccd5c">🗑️</div>
+      <h2 class="x-1b199a2e">Delete Record?</h2>
+      <p class="x-3ca9d017">
         This will permanently delete <strong>{{ record.title }}</strong> including all parsed lab values and data points.
         This cannot be undone.
       </p>
-      <div style="display:flex;gap:.75rem;justify-content:center">
-        <a href="{% url 'medical_records:list' %}" class="btn" style="background:#f1f5f9;color:var(--text)">Cancel</a>
+      <div class="x-481978a0">
+        <a href="{% url 'medical_records:list' %}" class="btn x-6f47a536">Cancel</a>
         <form method="post">
           {% csrf_token %}
-          <button type="submit" class="btn" style="background:#dc2626;color:white;border:none;cursor:pointer">
+          <button type="submit" class="btn x-fa435dc7">
             Delete permanently
           </button>
         </form>

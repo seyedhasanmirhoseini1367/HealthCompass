@@ -80,11 +80,11 @@
     honest version is more useful anyway: it says what would make the page
     work.
   {% endcomment %}
-  <div class="db-calm" style="background:#f8fafc;border-color:var(--border)">
-    <p style="color:#334155">Nothing needs your attention in what is set up so far.</p>
-    <div style="margin-top:.6rem;display:flex;gap:.6rem;flex-wrap:wrap">
+  <div class="db-calm x-31ecd88f">
+    <p class="x-6944b26e">Nothing needs your attention in what is set up so far.</p>
+    <div class="x-a0e37d5f">
       {% for gap in setup_gaps %}
-      <a href="{{ gap.href }}" style="font-size:.88rem;font-weight:600;color:var(--primary);text-decoration:none">
+      <a href="{{ gap.href }}" class="x-7e6f9753">
         {{ gap.label }} →
       </a>
       {% endfor %}
@@ -100,13 +100,13 @@
       <span class="db-person-n">{{ item.title }}</span>
       <span class="db-person-d">{{ item.detail }}</span>
     </span>
-    <span style="display:flex;align-items:center;gap:.7rem">
+    <span class="x-4d7c373c">
       <span class="db-state {{ item.style.tone }}">{{ item.style.dot }} {{ item.style.label }}</span>
-      <span style="font-size:.85rem;font-weight:700;color:var(--primary);white-space:nowrap">View →</span>
+      <span class="x-2034b533">View →</span>
     </span>
   </a>
   {% endif %}{% endfor %}
-  <p style="font-size:.85rem;color:#64748b;margin:.3rem 0 1.6rem">
-    <a href="{% url 'care:my_care' %}" style="color:var(--primary);text-decoration:none">Everyone you look after is on Companions →</a>
+  <p class="x-dbdfc033">
+    <a href="{% url 'care:my_care' %}" class="x-1cdc0f83">Everyone you look after is on Companions →</a>
   </p>
   {% endif %}

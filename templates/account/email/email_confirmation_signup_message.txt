@@ -1,0 +1,11 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Please confirm that {{ email }} is your email address by opening this link:
+
+{{ activate_url }}
+
+Until you confirm, you can sign in and see your records, but sharing and the
+assistant stay locked. If you did not create a HealthCompass account, ignore
+this message.
+
+The HealthCompass team

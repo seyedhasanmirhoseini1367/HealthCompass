@@ -1,19 +1,15 @@
 # Lint configuration.
 #
-# The selected rules are deliberately narrow: syntax errors (E9), undefined
-# names (F821/F822/F823), broken comparisons (F63) and unreachable-ish
-# constructs (F7). Every one of them is a bug that would fail at runtime, not a
-# style preference — an undefined name in an error branch is exactly the kind of
-# defect that only surfaces when something has already gone wrong.
+# Runtime-bug rules (E9, F63, F7, F82) plus three security- and Django-focused
+# families: flake8-bugbear (B), bandit (S) and flake8-django (DJ). Every new
+# file is held to all of them.
 #
-# This set passes on the codebase today, which is what makes it usable as a CI
-# gate. A gate that is expected to be red teaches people to ignore it.
+# Code that predates B/S/DJ is grandfathered through per-file ignores below,
+# one line per file and rule, so the gate is green today and the list shrinks
+# as files are touched. Do not add a file here to silence a NEW finding: fix it,
+# or suppress the single line with `# noqa: <rule>` and a reason.
 #
-# NOT enabled yet: F401 (unused imports), F841 (unused locals), E711/E712
-# (comparisons to None/True) and flake8-bugbear. Together they report 79 issues,
-# mostly in scripts/ and management commands. Worth cleaning, but that is a
-# separate change with its own review — turning them on now would break the
-# gate on arrival.
+# NOT enabled yet: F401 (unused imports), F841 (unused locals), E711/E712.
 line-length = 100
 
 exclude = [
@@ -24,4 +20,39 @@ exclude = [
 ]
 
 [lint]
-select = ["E9", "F63", "F7", "F82"]
+select = ["E9", "F63", "F7", "F82", "B", "S", "DJ"]
+
+[lint.per-file-ignores]
+# Tests: fixture passwords, asserts and deterministic randomness are the point.
+"**/test_*.py" = ["S101", "S608", "S105", "S106", "S108", "S110", "S311", "B904", "B007", "S301", "S603", "S607", "S314", "S112", "B017"]
+"**/tests.py" = ["S101", "S105", "S106", "S311", "B904"]
+"scripts/**" = ["S", "B"]
+
+# Grandfathered findings in code that predates B/S/DJ (2026-11 audit, prompt 3).
+"apps/accounts/egress.py" = ["B904"]
+"apps/accounts/management/commands/backup_database.py" = ["B904"]
+"apps/accounts/models.py" = ["DJ012"]
+"apps/ai_insights/forms.py" = ["B904"]
+"apps/ai_insights/inference/base.py" = ["B904"]
+"apps/ai_insights/inference/eeg_csv.py" = ["B904"]
+"apps/ai_insights/inference/image_classifier.py" = ["B904"]
+"apps/ai_insights/inference/seizure_eeg.py" = ["B904"]
+"apps/ai_insights/models.py" = ["DJ012"]
+"apps/ai_insights/views/icu.py" = ["S311"]            # demo data, not security
+"apps/api/views/assistant.py" = ["S110"]
+"apps/api/views/icu.py" = ["S311"]                    # demo data, not security
+"apps/medical_records/management/commands/reconcile_orphaned_files.py" = ["S112"]
+"apps/medical_records/management/commands/seed_population.py" = ["S106", "S311"]
+"apps/medical_records/models.py" = ["DJ012"]
+"apps/medical_records/parsers/*.py" = ["S314"]  # ET is defusedxml, enforced in parsers/__init__.py
+"apps/rag_assistant/management/commands/reindex_records.py" = ["B904"]
+"apps/rag_assistant/management/commands/retry_failed_embeddings.py" = ["B007", "B904"]
+"apps/rag_assistant/management/commands/seed_trajectory_patient.py" = ["S105"]
+"apps/rag_assistant/services/general_knowledge_service.py" = ["S112"]
+"apps/rag_assistant/subject.py" = ["B904"]
+"apps/rag_assistant/views.py" = ["S110"]
+"apps/scribe/management/commands/scribe_eval.py" = ["B904"]
+"apps/scribe/models.py" = ["DJ008"]
+"healthcompass/backup.py" = ["S603"]                  # pg_dump with a fixed argv
+"healthcompass/urls.py" = ["B904"]
+"loadtest/**" = ["S311"]                    # random choice of test user

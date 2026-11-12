@@ -37,8 +37,10 @@ def health_view(request):
 
     biomarker_map, trending_biomarkers, latest_values = get_patient_biomarker_data(patient)
 
+    # "Everyone else": the viewer's own readings never count towards the
+    # population they are compared against (audit SEC-11).
     pop_trending_raw, _, pop_avg_raw, pop_unit = get_population_biomarker_stats(
-        biomarker_names=list(biomarker_map.keys()) or None
+        biomarker_names=list(biomarker_map.keys()) or None, exclude_patient=patient,
     )
     user_unit = {name: pts[-1]['unit'] for name, pts in biomarker_map.items() if pts}
     pop_avg = {

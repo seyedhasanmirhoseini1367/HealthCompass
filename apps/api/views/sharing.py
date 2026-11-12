@@ -1,6 +1,5 @@
 import logging
 
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -11,6 +10,7 @@ from ..serializers import (AppointmentSerializer, HealthAlertSerializer,
                            MedicalRecordSerializer, MonitoringSignalSerializer,
                            SharingGrantSerializer, UserSerializer)
 from healthcompass.errors import client_error
+from apps.accounts.verification import require_verified_email
 
 _log = logging.getLogger(__name__)
 
@@ -57,83 +57,60 @@ def sharing_companions(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@require_verified_email
 def create_share(request):
-    """Share part of your record with someone. The grantor is always request.user."""
+    """Invite someone to see part of your record (they must accept). The reply
+    is identical whether or not the address has an account (SEC-02, SEC-14)."""
+    from apps.accounts.sharing_service import SharingError, offer_share
+
+    scopes = request.data.get('scopes') or []
+    if not isinstance(scopes, list):
+        scopes = [scopes]
     try:
-        from apps.accounts.authz import can_create_grant
-        from apps.accounts.models import CustomUser, DoctorAccessLog, SharingGrant
+        message = offer_share(request.user, request.data.get('identifier'), scopes)
+    except SharingError as exc:
+        code = status.HTTP_403_FORBIDDEN if exc.code == 'forbidden' else status.HTTP_400_BAD_REQUEST
+        return Response({'error': exc.message, 'code': exc.code}, status=code)
+    return Response({'detail': message}, status=status.HTTP_202_ACCEPTED)
 
-        identifier = (request.data.get('identifier') or '').strip().lower()
-        if not identifier:
-            return Response({'error': 'Enter the username or email of the person to share with.'},
-                            status=status.HTTP_400_BAD_REQUEST)
 
-        recipient = (CustomUser.objects
-                     .filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
-                     .first())
-        if recipient is None:
-            # Same message whether or not the account exists, so this endpoint
-            # cannot be used to confirm which emails are registered.
-            return Response({'error': 'No account matches that username or email.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def accept_share(request, pk):
+    """The recipient accepts an invitation."""
+    from apps.accounts.sharing_service import SharingError, accept_share as accept
 
-        if recipient.pk == request.user.pk:
-            return Response({'error': 'You already have access to your own records.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+    try:
+        grant = accept(request.user, pk)
+    except SharingError as exc:
+        return Response({'error': exc.message}, status=status.HTTP_404_NOT_FOUND)
+    return Response(SharingGrantSerializer(grant).data)
 
-        if not can_create_grant(request.user, request.user):
-            return Response({'error': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
 
-        scopes = request.data.get('scopes') or []
-        if not scopes:
-            return Response({'error': 'Choose at least one thing to share.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def decline_share(request, pk):
+    from apps.accounts.sharing_service import SharingError, decline_share as decline
 
-        grant, created = SharingGrant.objects.get_or_create(
-            patient=request.user, recipient=recipient,
-            defaults={'can_view_records':      'records' in scopes,
-                      'can_view_alerts':        'alerts' in scopes,
-                      'can_view_appointments':  'appointments' in scopes})
-
-        if not created:
-            # Re-sharing updates the scopes and un-revokes, rather than failing
-            # on the uniqueness constraint — an explicit act either way.
-            grant.can_view_records = 'records' in scopes
-            grant.can_view_alerts = 'alerts' in scopes
-            grant.can_view_appointments = 'appointments' in scopes
-            grant.status = SharingGrant.Status.ACTIVE
-            grant.revoked_at = None
-            grant.revoked_by = None
-            grant.revoke_reason = ''
-            grant.save()
-
-        DoctorAccessLog.objects.create(
-            actor=request.user, patient=request.user,
-            resource=f'share_granted:{recipient.pk}')
-
-        return Response(SharingGrantSerializer(grant).data, status=status.HTTP_201_CREATED)
-    except Exception as exc:
-        _log.exception('create_share error: %s', exc)
-        return Response(client_error(exc, context='sharing'), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    try:
+        decline(request.user, pk)
+    except SharingError as exc:
+        return Response({'error': exc.message}, status=status.HTTP_404_NOT_FOUND)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def revoke_share(request, pk):
     """Stop sharing. Takes effect on the recipient's next request."""
-    from apps.accounts.authz import can_revoke_grant
-    from apps.accounts.models import DoctorAccessLog, SharingGrant
+    from apps.accounts.models import SharingGrant
+    from apps.accounts.sharing_service import SharingError, revoke_share as revoke
 
     grant = get_object_or_404(SharingGrant, pk=pk)
-    if not can_revoke_grant(request.user, grant):
+    try:
+        revoke(request.user, grant, request.data.get('reason') or '')
+    except SharingError:
         return Response({'error': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
-
-    grant.revoke(by=request.user, reason=(request.data.get('reason') or ''))
-
-    DoctorAccessLog.objects.create(
-        actor=request.user, patient=grant.patient,
-        resource=f'share_revoked:{grant.recipient_id}')
-
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

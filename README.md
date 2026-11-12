@@ -23,13 +23,16 @@ HealthCompass is built around a single idea: your health data should be understa
 
 | Module | Purpose |
 |---|---|
-| `accounts` | Custom user model with role-based profiles (Patient, Doctor, Data Scientist, Hospital Admin) |
-| `medical_records` | Upload and manage records; parse lab values; ingest wearable CSV |
-| `rag_assistant` | Vector store, chat sessions, AI chat interface |
-| `ai_insights` | AI-generated health summaries and trend analysis |
-| `dashboard` | Patient dashboard with health overview |
-| `integrations` | Third-party data source integrations |
-| `notifications` | In-app notification system |
+| `accounts` | Users and role profiles, sign-in (with MFA for staff and clinicians), consent, sharing, emergency card, export and erasure |
+| `medical_records` | Upload and manage records; parsers per format (`parsers/`); lab values and corrections |
+| `rag_assistant` | Embeddings, retrieval, chat sessions and the assistant (`services/chat_service.py`) |
+| `ai_insights` | Health analytics, population statistics, model catalogue; research demos behind `LABS_ENABLED` |
+| `dashboard` | Role-based home pages and navigation |
+| `care` | Companions: care tasks, monitoring signals, people who share with you |
+| `appointments` | Appointments, reminders, calendar export |
+| `notifications` | In-app notifications, push delivery |
+| `scribe` | Experimental visit-audio scribe |
+| `api` | Mobile REST API under `/api/v1/` (JWT; OpenAPI schema in `openapi.yaml`) |
 
 ### Record types supported
 
@@ -226,3 +229,15 @@ python manage.py runserver
 - **LLM integration** — google-genai v1.x, Anthropic, OpenAI SDKs; system prompts; chat history management
 - **Data engineering** — PDF text extraction, CSV wearable ingestion, lab value parsing, abnormal flagging
 - **ML** — Gemini gemini-embedding-001 dense vectors, BM25 sparse retrieval, cosine similarity, MMR re-ranking, scikit-learn, scipy
+
+## Tests
+
+| Layer | Command | Notes |
+|---|---|---|
+| Unit and request tests | `python manage.py test apps --parallel auto` | Per-app `tests/` packages; SQLite; no keys or network needed |
+| PostgreSQL | same, with `DATABASE_URL` set | CI runs it against `pgvector/pgvector:pg16` |
+| Browser journeys | `python manage.py test e2e` | Playwright + axe-core; `pip install playwright axe-playwright-python && playwright install chromium` |
+| Coverage | `coverage run manage.py test apps && coverage combine && coverage report` | CI floor 74% (`.coveragerc`) |
+| Load | see `loadtest/README.md` | Locust, stub provider |
+
+New tests use `apps/testing/factories.py`.

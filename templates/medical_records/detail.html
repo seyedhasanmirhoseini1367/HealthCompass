@@ -1,33 +1,34 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ record.title }} — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.rec-header{background:white;border-radius:16px;border:1px solid var(--border);padding:1.5rem;margin-bottom:1.25rem;display:flex;align-items:flex-start;gap:1.25rem}
-.rec-header-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;background:#dbeafe}
-.rec-title{font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:.35rem}
-.rec-meta{font-size:.85rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
-.section-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
-.section-h{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
-.lab-table{width:100%;border-collapse:collapse;font-size:.875rem}
-.lab-table th{text-align:left;padding:.5rem .75rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
-.lab-table td{padding:.5rem .75rem;border-bottom:1px solid #f1f5f9}
-.lab-table tr:last-child td{border-bottom:none}
-.flag-ab{color:#f59e0b;font-weight:700}
-.flag-crit{color:#dc2626;font-weight:700}
-.wearable-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
-.metric-card{background:#f8fafc;border-radius:10px;padding:1rem;text-align:center}
-.metric-val{font-size:1.375rem;font-weight:700;color:var(--primary)}
-.metric-label{font-size:.78rem;color:var(--muted);margin-top:.2rem}
-.json-section{background:#f8fafc;border-radius:10px;padding:1rem;font-size:.8rem;font-family:monospace;overflow-x:auto;max-height:300px;overflow-y:auto}
-.back-btn{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted);font-size:.875rem;text-decoration:none;margin-bottom:1rem}
-.back-btn:hover{color:var(--primary)}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/medical_records__detail.css' %}">
 {% endblock %}
 {% block content %}
+<h1 class="visually-hidden">{{ record.title }}</h1>
 
 <a href="{% url 'medical_records:list' %}" class="back-btn">
-  <i class="fas fa-arrow-left"></i> Back to records
+  {% icon 'arrow-left' %} Back to records
 </a>
+<a href="{% url 'medical_records:edit' record.pk %}" class="btn btn-secondary btn-sm">{% icon 'pen' %} Edit details</a>
+
+{% if record.processing_status != 'ready' %}
+<div class="verify-banner" role="status">
+  <span data-processing-status="{{ record.processing_status }}" data-status-url="{% url 'medical_records:status' record.pk %}">{{ record.get_processing_status_display }}</span>
+  {% if record.processing_status == 'failed' %}
+  <span>{{ record.processing_error }}</span>
+  <form method="post" action="{% url 'medical_records:retry' record.pk %}">{% csrf_token %}<button type="submit">Try again</button></form>
+  {% else %}<span>Parsing usually takes under a minute. This page updates by itself.</span>{% endif %}
+</div>
+<script src="{% static 'js/record-status.js' %}" defer></script>
+{% endif %}
+{% if record.index_status == 'blocked' %}
+<div class="verify-banner" role="status">
+  <span>This record is saved, but it has not been processed by AI: you have not agreed to
+  sending health data to external AI providers. The assistant cannot use it yet.</span>
+  <a href="{% url 'accounts:consent' %}"><strong>Review privacy choices</strong></a>
+</div>
+{% endif %}
 
 <div class="rec-header {% if record.is_flagged %}flagged{% endif %}">
   <div class="rec-header-icon">
@@ -42,19 +43,19 @@
     {% else %}📁{% endif %}
     {% endwith %}
   </div>
-  <div style="flex:1">
+  <div class="x-97445a8d">
     <div class="rec-title">{{ record.title }}</div>
     <div class="rec-meta">
       <span>{{ record.get_record_type_display }}</span>
       <span>{{ record.get_source_display }}</span>
-      {% if record.record_date %}<span>{{ record.record_date|date:"F j, Y" }}</span>{% endif %}
-      <span>Uploaded {{ record.uploaded_at|date:"M d, Y H:i" }}</span>
+      {% if record.record_date %}<span>{{ record.record_date|date:"DATE_FORMAT" }}</span>{% endif %}
+      <span>Uploaded {{ record.uploaded_at|date:"DATETIME_FORMAT" }}</span>
     </div>
     {% if record.notes %}
-    <p style="font-size:.875rem;color:var(--muted);margin-top:.5rem">{{ record.notes }}</p>
+    <p class="x-c37ca280">{{ record.notes }}</p>
     {% endif %}
     {% if record.is_flagged %}
-    <div style="margin-top:.5rem;font-size:.85rem;color:#f59e0b;font-weight:700">
+    <div class="x-f35ac0bf">
       ⚠️ This record contains abnormal values
     </div>
     {% endif %}
@@ -79,20 +80,20 @@
     <tbody>
       {% for lv in lab_values %}
       <tr {% if lv.is_critical %}style="background:#fef2f2"{% elif lv.is_abnormal %}style="background:#fffbeb"{% endif %}>
-        <td style="font-weight:600">{{ lv.parameter_name }}</td>
+        <td class="x-eed0f8fb">{{ lv.parameter_name }}</td>
         <td>{{ lv.value }}</td>
-        <td style="color:var(--muted)">{{ lv.unit }}</td>
-        <td style="color:var(--muted)">{{ lv.reference_range|default:"—" }}</td>
+        <td class="x-57f9e31d">{{ lv.unit }}</td>
+        <td class="x-57f9e31d">{{ lv.reference_range|default:"—" }}</td>
         <td>
           {% if lv.is_critical %}
             <span class="flag-crit">🔴 Critical</span>
           {% elif lv.is_abnormal %}
             <span class="flag-ab">⚠️ Abnormal</span>
           {% else %}
-            <span style="color:#10b981">✓ Normal</span>
+            <span class="x-acd97a46">✓ Normal</span>
           {% endif %}
         </td>
-        <td style="color:var(--muted)">{{ lv.measured_at|date:"M d, Y"|default:"—" }}</td>
+        <td class="x-57f9e31d">{{ lv.measured_at|date:"DATE_FORMAT"|default:"—" }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -110,7 +111,7 @@
     {% with last=group.list|last %}
     <div class="metric-card">
       <div class="metric-val">{{ last.value|floatformat:1 }}</div>
-      <div style="font-size:.7rem;color:var(--muted)">{{ last.unit }}</div>
+      <div class="x-27e09ca5">{{ last.unit }}</div>
       <div class="metric-label">{{ group.grouper }}</div>
     </div>
     {% endwith %}
@@ -125,23 +126,23 @@
   <div class="section-h">📊 Parsed Data</div>
 
   {% if record.parsed_data.structured.summary %}
-  <p style="font-size:.9rem;margin-bottom:1rem">{{ record.parsed_data.structured.summary }}</p>
+  <p class="x-ff793b98">{{ record.parsed_data.structured.summary }}</p>
   {% endif %}
 
   {% if record.parsed_data.records %}
     {% for doc in record.parsed_data.records %}
-    <div style="margin-bottom:1.25rem">
-      <p style="font-weight:700;font-size:.9rem">{{ doc.type }}: {{ doc.title }}</p>
-      <p style="font-size:.8rem;color:var(--muted)">{{ doc.date|default:"" }} — {{ doc.author|default:"" }}</p>
+    <div class="x-3ffdc926">
+      <p class="x-7039f036">{{ doc.type }}: {{ doc.title }}</p>
+      <p class="x-435c262d">{{ doc.date|default:"" }} — {{ doc.author|default:"" }}</p>
       {% for section in doc.sections %}
         {% if section.entries %}
-        <p style="font-size:.83rem;font-weight:600;margin-top:.5rem;margin-bottom:.25rem">{{ section.display }}</p>
-        <ul style="font-size:.83rem;padding-left:1.25rem;color:var(--muted)">
+        <p class="x-f121d1b3">{{ section.display }}</p>
+        <ul class="x-8ca89334">
           {% for e in section.entries %}
           <li>
             {% if e.kind == 'lab' %}
               <strong>{{ e.name }}</strong>: {{ e.value }} {{ e.unit }}
-              {% if e.is_abnormal %} <span style="color:#f59e0b">⚠️</span>{% endif %}
+              {% if e.is_abnormal %} <span class="x-6a6a237e">⚠️</span>{% endif %}
             {% elif e.kind == 'medication' %}
               💊 {{ e.name }} {{ e.dose }} {{ e.unit }} {{ e.route }}
             {% else %}
@@ -151,7 +152,7 @@
           {% endfor %}
         </ul>
         {% elif section.text %}
-        <p style="font-size:.8rem;color:var(--muted);margin-top:.4rem">{{ section.text|truncatechars:300 }}</p>
+        <p class="x-6f3852cf">{{ section.text|truncatechars:300 }}</p>
         {% endif %}
       {% endfor %}
     </div>
@@ -166,7 +167,7 @@
 {% if record.raw_text %}
 <div class="section-card">
   <div class="section-h">📝 Raw Text</div>
-  <div class="json-section" style="font-family:inherit;white-space:pre-wrap">{{ record.raw_text|truncatechars:3000 }}</div>
+  <div class="json-section x-a2a30ccf">{{ record.raw_text|truncatechars:3000 }}</div>
 </div>
 {% endif %}
 
@@ -175,7 +176,7 @@
 <div class="section-card">
   <div class="section-h">📎 Attached File</div>
   <a href="{{ record.file.url }}" class="btn" download>
-    <i class="fas fa-download"></i> Download {{ record.file.name|slice:"15:" }}
+    {% icon 'download' %} Download {{ record.file.name|slice:"15:" }}
   </a>
 </div>
 {% endif %}

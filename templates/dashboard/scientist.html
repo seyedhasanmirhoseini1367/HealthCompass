@@ -1,23 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Workspace — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-/* .dash-header replaced by global .page-hero */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
-.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
-.stat-card .num{font-size:1.8rem;font-weight:800;color:var(--primary-dk)}
-.stat-card .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
-.section-h{font-size:1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
-.section-h i{color:var(--primary)}
-.item-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-radius:10px;background:#f8fafc;margin-bottom:.5rem;font-size:.875rem}
-.item-row:last-child{margin-bottom:0}
-.empty-msg{color:var(--muted);font-size:.85rem;text-align:center;padding:2rem}
-.alert-critical{border-left:4px solid var(--danger);background:#fff5f5}
-.alert-warning{border-left:4px solid var(--warning);background:#fffbf0}
-.alert-info{border-left:4px solid var(--primary);background:#f0f9ff}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
-@media(max-width:768px){.grid-2{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/dashboard__scientist.css' %}">
 {% endblock %}
 {% block content %}
 <div class="page-hero">
@@ -30,14 +15,14 @@
   <div class="stat-card"><div class="num">{{ total_runs }}</div><div class="lbl">Total Runs</div></div>
 </div>
 
-<div style="margin-bottom:1.25rem">
-  <a href="{% url 'dashboard:monitoring' %}" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:.5rem">
-    <i class="fas fa-chart-line"></i> MLOps Monitoring
+<div class="x-3ffdc926">
+  <a href="{% url 'dashboard:monitoring' %}" class="btn btn-primary x-112947ef">
+    {% icon 'chart-line' %} MLOps Monitoring
   </a>
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="fas fa-brain"></i> My Models</div>
+  <div class="card-header">{% icon 'brain' %} My Models</div>
   <div class="card-body">
     {% if my_models %}
       {% for m in my_models %}

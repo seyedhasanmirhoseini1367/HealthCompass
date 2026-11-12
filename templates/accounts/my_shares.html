@@ -1,35 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Sharing — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.sh-page { max-width:760px; margin:0 auto; }
-.sh-page h1 { font-size:1.3rem; font-weight:800; color:var(--text); margin:0 0 .35rem; }
-.sh-intro { font-size:.85rem; color:#64748b; margin-bottom:1.4rem; line-height:1.55; }
-.sh-card { background:white; border:1.5px solid var(--border); border-radius:12px;
-           padding:1rem 1.1rem; margin-bottom:.85rem; }
-.sh-name { font-size:.95rem; font-weight:700; color:#1e293b; margin:0 0 .2rem; }
-.sh-meta { font-size:.75rem; color:#94a3b8; }
-.sh-scopes { display:flex; gap:.35rem; flex-wrap:wrap; margin:.5rem 0 0; }
-.sh-scope { display:inline-block; padding:.14rem .55rem; border-radius:20px;
-            font-size:.7rem; font-weight:700; background:#e0f2fe; color:#0369a1; }
-.sh-row { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
-.sh-btn { padding:.4rem .95rem; border-radius:8px; font-size:.78rem; font-weight:700;
-          border:none; cursor:pointer; }
-.sh-btn.stop { background:white; color:#b91c1c; border:1.5px solid #fecaca; }
-.sh-btn.share { background:var(--primary); color:white; }
-.sh-badge { display:inline-block; padding:.12rem .5rem; border-radius:5px; font-size:.66rem;
-            font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
-.sh-badge.off { background:#fee2e2; color:#b91c1c; }
-.sh-form { background:#f8fafc; border:1px solid var(--border); border-radius:12px;
-           padding:1rem 1.1rem; margin-bottom:1.5rem; }
-.sh-form label { display:block; font-size:.8rem; font-weight:600; color:#334155; margin-bottom:.3rem; }
-.sh-form input[type=text] { width:100%; padding:.5rem .8rem; border:1.5px solid var(--border);
-                            border-radius:9px; font-size:.88rem; font-family:inherit; }
-.sh-check { display:flex; align-items:flex-start; gap:.5rem; margin:.5rem 0; font-size:.83rem; color:#334155; }
-.sh-check span.hint { display:block; font-size:.75rem; color:#94a3b8; }
-.sh-empty { font-size:.85rem; color:#94a3b8; padding:1rem 0; }
-.sh-section { font-size:.95rem; font-weight:800; color:var(--text); margin:1.8rem 0 .5rem; }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/accounts__my_shares.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -45,15 +18,15 @@
   <form method="post" action="{% url 'accounts:create_share' %}" class="sh-form">
     {% csrf_token %}
     <label for="recipient">Share with</label>
-    <input type="text" id="recipient" name="recipient" autocomplete="off"
-           placeholder="Their username or email address" required>
+    <input type="email" id="recipient" name="recipient" autocomplete="off"
+           placeholder="Their email address" required>
 
     {% comment %}
       Scopes are separate on purpose. "Tell me if something is wrong, but do not
       read my file" is the case people actually want, and a single switch cannot
       express it.
     {% endcomment %}
-    <div style="margin-top:.9rem">
+    <div class="x-88f2910f">
       <label class="sh-check">
         <input type="checkbox" name="scopes" value="records">
         <span><strong>Medical records</strong>
@@ -71,22 +44,22 @@
       </label>
     </div>
 
-    <button type="submit" class="sh-btn share" style="margin-top:.8rem">Share</button>
+    <button type="submit" class="sh-btn share x-6322ad40">Share</button>
   </form>
 
   <div class="sh-section">People you share with</div>
   {% for grant in granted %}
     <div class="sh-card">
       <div class="sh-row">
-        <div style="flex:1; min-width:220px">
+        <div class="x-6c0d09d5">
           <p class="sh-name">
             {{ grant.recipient.get_full_name|default:grant.recipient.username }}
             {% if grant.status != Status.ACTIVE %}<span class="sh-badge off">Stopped</span>{% endif %}
           </p>
           <p class="sh-meta">
-            Shared since {{ grant.created_at|date:"j M Y" }}
-            {% if grant.expires_at %} · ends {{ grant.expires_at|date:"j M Y" }}{% endif %}
-            {% if grant.revoked_at %} · stopped {{ grant.revoked_at|date:"j M Y" }}{% endif %}
+            Shared since {{ grant.created_at|date:"DATE_FORMAT" }}
+            {% if grant.expires_at %} · ends {{ grant.expires_at|date:"DATE_FORMAT" }}{% endif %}
+            {% if grant.revoked_at %} · stopped {{ grant.revoked_at|date:"DATE_FORMAT" }}{% endif %}
           </p>
           <div class="sh-scopes">
             {% if grant.can_view_records %}<span class="sh-scope">Records</span>{% endif %}
@@ -112,7 +85,7 @@
       <p class="sh-name">
         <a href="{% url 'accounts:shared_patient' grant.patient.pk %}">{{ grant.patient.get_full_name|default:grant.patient.username }}</a>
       </p>
-      <p class="sh-meta">Shared with you since {{ grant.created_at|date:"j M Y" }}</p>
+      <p class="sh-meta">Shared with you since {{ grant.created_at|date:"DATE_FORMAT" }}</p>
       <div class="sh-scopes">
         {% if grant.can_view_records %}<span class="sh-scope">Records</span>{% endif %}
         {% if grant.can_view_alerts %}<span class="sh-scope">Alerts</span>{% endif %}

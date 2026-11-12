@@ -1,0 +1,12 @@
+/* Moved from templates/dashboard/admin.html */
+/* .dash-header replaced by global .page-hero */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:var(--primary)}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.action-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+.action-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;text-align:center;text-decoration:none;transition:all .2s;display:block}
+.action-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);transform:translateY(-2px)}
+.action-icon{font-size:2rem;margin-bottom:.5rem}
+.action-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.2rem}
+.action-desc{font-size:.78rem;color:var(--muted)}

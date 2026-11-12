@@ -1,0 +1,21 @@
+{% load static %}<!DOCTYPE html>
+{# Standalone on purpose: no template inheritance, so this renders even when the
+   shared layout is what failed (audit polish). #}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Bad request — HealthCompass</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/errors.css' %}">
+</head>
+<body>
+  <main class="err">
+    <p class="err-code">400</p>
+    <h1>Bad request</h1>
+    <p>The request could not be understood. Please go back and try again.</p>
+    <p><a class="err-btn" href="/">Go to the start page</a></p>
+  </main>
+</body>
+</html>

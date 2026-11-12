@@ -1,7 +1,35 @@
 # Rollout — `CONSENT_ENFORCED_EGRESS=all`
 
-> **Status: prepared, NOT enabled.** Production is still `rag`.
-> This document is the deployment change and its rollback.
+> **Status (2026-11, audit SEC-09): `all` is now the code default.** A deployment
+> that sets nothing enforces consent at every egress point. A deployment that
+> still sets `CONSENT_ENFORCED_EGRESS=rag` in its environment keeps the old
+> behaviour until that variable is removed. This document is the change and its
+> rollback.
+
+## What changes for users
+
+* Uploads by a user without current `external_llm` consent are **saved** and
+  parsed locally (regex, tables) but not sent for OCR, LLM structuring or
+  embedding. Their record page says so and links to the consent page.
+* When that user later grants `external_llm`, every one of **their** held-back
+  records (index status `blocked`, `pending` or `failed`) is queued for indexing
+  automatically (`apps.rag_assistant.signals.on_consent_saved`). Nobody else's
+  records are touched.
+* `PHI_LLM_PROVIDERS` now defaults to `gemini,anthropic`: one primary and one
+  fallback. Each must be covered by a data-processing agreement and listed in
+  the privacy policy before it receives data. Widen it only with a DPA.
+
+## Before deploying
+
+1. Remove any `CONSENT_ENFORCED_EGRESS=rag` override from the production
+   environment, or set it to `all` explicitly.
+2. Set `PHI_LLM_PROVIDERS` to the vendors you hold DPAs with.
+3. Announce the change: existing users without consent will see uploads saved
+   but not AI-processed until they review their privacy choices.
+
+## Rollback
+
+Set `CONSENT_ENFORCED_EGRESS=rag` and redeploy. Stateless; nothing is deleted.
 
 ## What is implemented vs. what is enabled
 

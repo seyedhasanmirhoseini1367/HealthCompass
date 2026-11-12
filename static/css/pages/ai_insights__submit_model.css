@@ -1,0 +1,9 @@
+/* Moved from templates/ai_insights/submit_model.html */
+.submit-wrap{max-width:680px;margin:0 auto}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box;transition:border .15s}
+.form-control:focus{border-color:var(--primary)}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.error-text{font-size:.8rem;color:#b91c1c;margin-top:.3rem}
+.info-box{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:1rem;margin-bottom:1.5rem;font-size:.85rem;color:#5b21b6}

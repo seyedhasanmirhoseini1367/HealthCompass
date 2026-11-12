@@ -5,9 +5,9 @@
   to Google, so it carries no notes. See apps/appointments/calendar_export.py.
 {% endcomment %}
 <details class="addcal">
-  <summary class="btn btn-secondary btn-sm" aria-label="Add {{ appt.title }} to your calendar"><i class="fas fa-calendar-plus"></i> Add to calendar</summary>
+  <summary class="btn btn-secondary btn-sm" aria-label="Add {{ appt.title }} to your calendar">{% icon 'calendar-plus' %} Add to calendar</summary>
   <div class="addcal-menu">
-    <a href="{{ appt|google_calendar_url }}" target="_blank" rel="noopener"><i class="fab fa-google"></i> Google Calendar</a>
-    <a href="{% url 'appointments:ics' appt.pk %}" download><i class="fas fa-download"></i> Apple, Outlook (.ics)</a>
+    <a href="{{ appt|google_calendar_url }}" target="_blank" rel="noopener">{% icon 'google' %} Google Calendar</a>
+    <a href="{% url 'appointments:ics' appt.pk %}" download>{% icon 'download' %} Apple, Outlook (.ics)</a>
   </div>
 </details>

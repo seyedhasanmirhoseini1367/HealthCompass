@@ -1,48 +1,9 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Impact Measurement Dashboard — HealthCompass{% endblock %}
 
 {% block extra_css %}
-<style>
-html,body{overflow-x:hidden}
-.imp-wrap{max-width:1100px;margin:0 auto;padding:0 2rem 4rem}
-/* header */
-/* .imp-header replaced by global .page-hero */
-.badge-live{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);padding:.25rem .75rem;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:white}
-/* section titles */
-.sec-title{font-size:1.1rem;font-weight:800;color:#1e1b4b;margin:2rem 0 .75rem;display:flex;align-items:center;gap:.6rem}
-.tier-badge{font-size:.68rem;font-weight:700;padding:.2rem .65rem;border-radius:12px;text-transform:uppercase;letter-spacing:.04em}
-.tier-1{background:#dcfce7;color:#15803d}
-.tier-2{background:#dbeafe;color:#1d4ed8}
-.tier-3{background:#fef3c7;color:#92400e}
-/* live stat cards */
-.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;margin-bottom:2rem}
-.stat-card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:1.2rem 1.4rem}
-.stat-card .num{font-size:2rem;font-weight:800;color:#4f46e5;line-height:1}
-.stat-card .lbl{font-size:.78rem;color:#6b7280;font-weight:600;margin-top:.3rem}
-/* measurement table */
-.mtable{width:100%;border-collapse:collapse;font-size:.85rem}
-.mtable th{background:#f8fafc;padding:.75rem 1rem;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e5e7eb;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
-.mtable td{padding:.75rem 1rem;border-bottom:1px solid #f3f4f6;vertical-align:top;line-height:1.55}
-.mtable tr:hover td{background:#fafafa}
-.proven{color:#15803d;font-weight:700}
-.calculated{color:#1d4ed8;font-weight:700}
-.estimated{color:#92400e;font-weight:700}
-.num-big{font-size:1.05rem;font-weight:800}
-.baseline-val{color:#dc2626}
-.target-val{color:#15803d}
-.ref-link{font-size:.75rem;color:#6b7280;text-decoration:none;border-bottom:1px dotted #9ca3af}
-.ref-link:hover{color:#4f46e5}
-/* charts */
-.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin:1.5rem 0}
-.chart-box{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;text-align:center}
-.chart-box img{max-width:100%;border-radius:8px}
-.chart-title{font-size:.82rem;font-weight:700;color:#374151;margin-bottom:.6rem}
-@media(max-width:720px){.charts-row{grid-template-columns:1fr}}
-/* provider pills */
-.prov-pill{display:inline-block;background:#ede9fe;color:#5b21b6;font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:8px;margin:.15rem}
-/* disclaimer */
-.disclaimer{background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:.9rem 1.2rem;font-size:.8rem;color:#78350f;margin-top:2rem;line-height:1.7}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/rag_assistant__impact_dashboard.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -52,7 +13,7 @@ html,body{overflow-x:hidden}
       <h1>Impact Measurement Dashboard</h1>
       <p>Live metrics, A/B evaluation results, and Finland-scale productivity projections.</p>
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center">
+    <div class="x-f6f98eee">
       <span class="badge-live">Live Data</span>
     </div>
   </div>
@@ -79,14 +40,14 @@ html,body{overflow-x:hidden}
     </div>
     {% for prov in provider_breakdown %}
     <div class="stat-card">
-      <div class="num" style="font-size:1.3rem">{{ prov.n }}</div>
+      <div class="num x-27e46985">{{ prov.n }}</div>
       <div class="lbl">Answered by {{ prov.llm_provider|default:"unknown" }}</div>
     </div>
     {% endfor %}
   </div>
 
   {% if rules_counts %}
-  <p style="font-size:.83rem;color:#6b7280;margin-bottom:2rem">
+  <p class="x-60419e0e">
     <strong>Guardrail rules fired:</strong>
     {% for rule, count in rules_counts.items %}
     <span class="prov-pill">{{ rule }}: {{ count }}x</span>
@@ -150,7 +111,7 @@ html,body{overflow-x:hidden}
           median response<br>
           <small>Min: {{ eval.metric_3_response_time.multiagent_min_sec }}s &nbsp;|&nbsp; Max: {{ eval.metric_3_response_time.multiagent_max_sec }}s</small>
           {% else %}
-          <span style="color:#9ca3af">Run eval_harness.py to measure</span>
+          <span class="x-bc63aff9">Run eval_harness.py to measure</span>
           {% endif %}
         </td>
         <td>
@@ -181,7 +142,7 @@ html,body{overflow-x:hidden}
           (same pipeline response)<br>
           <small>Time saved: ~{{ eval.finland_scale_projections.doctor_time_saved_per_consult_min|floatformat:1 }} min / consultation</small>
           {% else %}
-          <span style="color:#9ca3af">Run eval_harness.py to measure</span>
+          <span class="x-bc63aff9">Run eval_harness.py to measure</span>
           {% endif %}
         </td>
         <td>
@@ -259,7 +220,7 @@ html,body{overflow-x:hidden}
           <span class="num-big calculated">{{ finland.finland_doctor_hours_saved_per_year|floatformat:0 }}</span> doctor-hours saved / year<br>
           <small>= {{ finland.finland_extra_consultations_possible|floatformat:0 }} additional consultations possible</small>
           {% else %}
-          <span style="color:#9ca3af">Run eval_harness.py to calculate</span>
+          <span class="x-bc63aff9">Run eval_harness.py to calculate</span>
           {% endif %}
         </td>
         <td>
@@ -284,7 +245,7 @@ html,body{overflow-x:hidden}
           {% if finland.finland_patient_hours_saved_per_year %}
           <span class="num-big calculated">{{ finland.finland_patient_hours_saved_per_year|floatformat:0 }}</span> patient-hours saved / year
           {% else %}
-          <span style="color:#9ca3af">Run eval_harness.py to calculate</span>
+          <span class="x-bc63aff9">Run eval_harness.py to calculate</span>
           {% endif %}
         </td>
         <td>
@@ -311,7 +272,7 @@ html,body{overflow-x:hidden}
         <td>
           <strong>260,000–350,000 fewer tests / year</strong><br>
           <small>@ avg €50/test = €13M–€17.5M saved / year</small><br>
-          <span style="color:#92400e;font-size:.75rem">(Requires deployment data to confirm)</span>
+          <span class="x-149d5a38">(Requires deployment data to confirm)</span>
         </td>
         <td>
           <a class="ref-link" href="https://thl.fi/en/web/thlfi-en/statistics-and-data/data-and-services/wellbeing-services-counties" target="_blank">
@@ -333,7 +294,7 @@ html,body{overflow-x:hidden}
         <td class="target-val">30% reduction in non-urgent contacts</td>
         <td>
           <strong>~1.5M calls deflected / year</strong> in Finland<br>
-          <span style="color:#92400e;font-size:.75rem">(Requires before/after deployment study)</span>
+          <span class="x-149d5a38">(Requires before/after deployment study)</span>
         </td>
         <td>
           <a class="ref-link" href="https://pubmed.ncbi.nlm.nih.gov/31898315/" target="_blank">
@@ -355,7 +316,7 @@ html,body{overflow-x:hidden}
         <td>
           <strong>0 interruptions per HealthCompass session</strong><br>
           (by design — conversational, not rule-push)<br>
-          <span style="color:#92400e;font-size:.75rem">(Clinician satisfaction study needed for validation)</span>
+          <span class="x-149d5a38">(Clinician satisfaction study needed for validation)</span>
         </td>
         <td>
           <a class="ref-link" href="https://www.duodecim.fi/english/products/ebmeds/" target="_blank">
@@ -373,9 +334,9 @@ html,body{overflow-x:hidden}
 
   <!-- ASSUMPTIONS BOX -->
   {% if finland.assumptions %}
-  <div style="margin-top:1.5rem;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:1.2rem 1.5rem">
-    <strong style="font-size:.85rem;color:#374151">Calculation Assumptions (Tier 2 projections)</strong>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.5rem;margin-top:.75rem;font-size:.8rem;color:#6b7280">
+  <div class="x-ff2de97b">
+    <strong class="x-3ee69597">Calculation Assumptions (Tier 2 projections)</strong>
+    <div class="x-256a4925">
       <div>Finnish GP consultations / year: <strong>{{ finland.assumptions.finland_gp_consultations_per_year|floatformat:0 }}</strong></div>
       <div>Finnish population: <strong>{{ finland.assumptions.finland_population|floatformat:0 }}</strong></div>
       <div>Health inquiries / person / year: <strong>{{ finland.assumptions.health_inquiries_per_person_year }}</strong></div>
@@ -383,14 +344,14 @@ html,body{overflow-x:hidden}
       <div>Baseline doctor chart review: <strong>{{ finland.assumptions.baseline_doctor_chart_review_min }} min</strong></div>
       <div>GP consultation slot: <strong>15 min</strong></div>
     </div>
-    <p style="font-size:.75rem;color:#9ca3af;margin-top:.75rem;margin-bottom:0">
+    <p class="x-a1de03b1">
       Sources: {{ finland.assumptions.source_doctor_baseline }} &nbsp;|&nbsp; {{ finland.assumptions.source_finland_consultations }}
     </p>
   </div>
   {% endif %}
 
   <!-- LEGEND -->
-  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.5rem;font-size:.78rem;color:#6b7280">
+  <div class="x-b071f1ef">
     <span><span class="tier-badge tier-1">Tier 1</span> Directly measured by eval_harness.py — fully reproducible</span>
     <span><span class="tier-badge tier-2">Tier 2</span> Arithmetic on Tier 1 numbers × Finnish healthcare statistics</span>
     <span><span class="tier-badge tier-3">Tier 3</span> Literature-backed estimate — requires deployment to confirm</span>

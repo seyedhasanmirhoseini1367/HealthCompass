@@ -1,32 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Emergency Card — {{ patient.get_full_name|default:patient.username }}</title>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:white;min-height:100vh;padding:1rem;display:flex;align-items:flex-start;justify-content:center}
-.card{background:#1e293b;border:2px solid #ef4444;border-radius:16px;padding:1.5rem;max-width:500px;width:100%;margin-top:1rem}
-.top-banner{background:#ef4444;border-radius:9px;padding:.55rem 1rem;display:flex;align-items:center;gap:.6rem;margin-bottom:1.2rem}
-.tb-icon{font-size:1.4rem}
-.tb-text{font-size:.88rem;font-weight:800;color:white}
-.name{font-size:1.5rem;font-weight:900;margin-bottom:.2rem}
-.sub{font-size:.78rem;color:#94a3b8;margin-bottom:1.2rem}
-.section{background:#0f172a;border-radius:10px;padding:.85rem 1rem;margin-bottom:.75rem}
-.sec-title{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.55rem}
-.tag{display:inline-flex;align-items:center;margin:.2rem .2rem 0 0;padding:.22rem .65rem;border-radius:6px;font-size:.78rem;font-weight:700}
-.allergy  {background:#7f1d1d;color:#fca5a5}
-.med      {background:#1e1b4b;color:#a5b4fc}
-.treatment{background:#0c4a6e;color:#7dd3fc}
-.blood-type{font-size:2rem;font-weight:900;color:#f87171;background:#7f1d1d22;border:2px solid #7f1d1d;border-radius:10px;padding:.3rem .9rem;display:inline-block}
-.contact-name{font-size:1rem;font-weight:700;margin-bottom:.2rem}
-.contact-phone{font-size:1.4rem;font-weight:900;color:#34d399;letter-spacing:.04em}
-.disclaimer{font-size:.68rem;color:#475569;margin-top:1rem;text-align:center;line-height:1.5}
-.none-text{font-size:.8rem;color:#475569}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-@media(max-width:400px){.grid2{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/accounts__emergency_card_public.css' %}">
 </head>
 <body>
 <div class="card">
@@ -38,11 +17,12 @@ body{font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:white;mi
 
   <div class="name">{{ patient.get_full_name|default:patient.username }}</div>
   <div class="sub">
-    {% if patient.date_of_birth %}Date of birth: {{ patient.date_of_birth|date:"M d, Y" }} &nbsp;·&nbsp;{% endif %}
+    {% if patient.date_of_birth %}Date of birth: {{ patient.date_of_birth|date:"DATE_FORMAT" }} &nbsp;·&nbsp;{% endif %}
     HealthCompass Emergency Card
   </div>
 
   <div class="grid2">
+    {% if profile.updated_at %}<p class="field-help">Updated on {{ profile.updated_at|date:"DATE_FORMAT" }}</p>{% endif %}
     <!-- Blood type -->
     <div class="section">
       <div class="sec-title">Blood Type</div>

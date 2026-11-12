@@ -1,0 +1,13 @@
+/* Moved from templates/dashboard/hospital_admin.html */
+/* .dash-header replaced by global .page-hero */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center}
+.stat-num{font-size:1.875rem;font-weight:800;color:#b45309}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+.link-row{background:white;border-radius:12px;border:1px solid var(--border);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap}
+.link-names{font-size:.9rem;font-weight:600}
+.link-meta{font-size:.78rem;color:var(--muted)}
+.form-inline{display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end}
+.fi{flex:1;min-width:160px}
+.fi label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
+.fi select,.fi input{width:100%;padding:.5rem .75rem;border-radius:9px;border:1.5px solid var(--border);font-size:.85rem;background:white;box-sizing:border-box}

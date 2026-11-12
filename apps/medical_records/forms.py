@@ -1,12 +1,14 @@
 from django import forms
+from django.conf import settings
 from .models import MedicalRecord
+from .services import accept_attr
 
 
 class KantaUploadForm(forms.Form):
     xml_file = forms.FileField(
         label='Kanta XML file',
         help_text='Upload the XML file exported from Kanta (OmaKanta).',
-        widget=forms.ClearableFileInput(attrs={'accept': '.xml'}),
+        widget=forms.ClearableFileInput(attrs={'accept': accept_attr('kanta')}),
     )
     notes = forms.CharField(
         required=False,
@@ -15,20 +17,13 @@ class KantaUploadForm(forms.Form):
 
 
 class WearableUploadForm(forms.Form):
-    DEVICE_CHOICES = [
-        ('auto', 'Auto-detect'),
-        ('fitbit', 'Fitbit'),
-        ('garmin', 'Garmin'),
-        ('oura', 'Oura Ring'),
-        ('apple_health', 'Apple Health'),
-        ('other', 'Other'),
-    ]
+    # No device selector: the parser detects the vendor from the file, and the
+    # choice was collected and never used (audit CQ-09).
     data_file = forms.FileField(
         label='Data file',
-        help_text='CSV, JSON, Apple Health XML, or Parquet export from your device app.',
-        widget=forms.ClearableFileInput(attrs={'accept': '.csv,.json,.xml,.parquet'}),
+        help_text='CSV, JSON, Excel or Parquet export from your device app.',
+        widget=forms.ClearableFileInput(attrs={'accept': accept_attr('wearable')}),
     )
-    device = forms.ChoiceField(choices=DEVICE_CHOICES, initial='auto')
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
@@ -40,6 +35,7 @@ class TextPasteForm(forms.Form):
 
     text = forms.CharField(
         label='Medical text',
+        max_length=settings.MAX_PASTED_TEXT_CHARS,
         widget=forms.Textarea(attrs={
             'rows': 12,
             'placeholder': (
@@ -69,7 +65,7 @@ class PDFUploadForm(forms.Form):
     pdf_file = forms.FileField(
         label='PDF file',
         help_text='Upload a medical document PDF. AI will extract and structure the content.',
-        widget=forms.ClearableFileInput(attrs={'accept': '.pdf'}),
+        widget=forms.ClearableFileInput(attrs={'accept': accept_attr('pdf')}),
     )
     record_type = forms.ChoiceField(
         choices=MedicalRecord.RecordType.choices,
@@ -79,3 +75,17 @@ class PDFUploadForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
     )
+
+
+class RecordEditForm(forms.ModelForm):
+    """Correct what upload got wrong: title, date, type and notes (audit UX-05)."""
+
+    class Meta:
+        model = MedicalRecord
+        fields = ['title', 'record_date', 'record_type', 'notes']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'input'}),
+            'record_date': forms.DateInput(attrs={'class': 'input', 'type': 'date'}, format='%Y-%m-%d'),
+            'record_type': forms.Select(attrs={'class': 'select'}),
+            'notes': forms.Textarea(attrs={'class': 'textarea', 'rows': 3}),
+        }

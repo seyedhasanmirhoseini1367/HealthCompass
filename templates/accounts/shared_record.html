@@ -1,46 +1,46 @@
 {% extends 'base.html' %}
 {% block title %}{{ record.title }} — Shared with you{% endblock %}
 {% block content %}
-<div style="max-width:820px;margin:0 auto">
-  <p style="font-size:.8rem;color:#64748b;margin-bottom:.6rem">
+<div class="x-2ed15fa2">
+  <p class="x-3a6500c7">
     <a href="{% url 'accounts:shared_patient' subject.pk %}">← {{ subject.get_full_name|default:subject.username }}</a>
   </p>
-  <h1 style="font-size:1.15rem;font-weight:800;color:var(--text);margin:0 0 .2rem">{{ record.title }}</h1>
-  <p style="font-size:.78rem;color:#94a3b8;margin-bottom:1.2rem">
-    {{ record.get_record_type_display }} · {{ record.record_date|default:record.uploaded_at|date:"j M Y" }}
+  <h1 class="x-40e04d63">{{ record.title }}</h1>
+  <p class="x-37ef9d7f">
+    {{ record.get_record_type_display }} · {{ record.record_date|default:record.uploaded_at|date:"DATE_FORMAT" }}
   </p>
 
   {% if lab_values %}
-  <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+  <table class="x-781b7a8c">
     <thead>
       <tr>
-        <th style="text-align:left;padding:.4rem .5rem;border-bottom:1.5px solid var(--border);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8">Test</th>
-        <th style="text-align:left;padding:.4rem .5rem;border-bottom:1.5px solid var(--border);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8">Result</th>
+        <th class="x-bb4a23f8">Test</th>
+        <th class="x-bb4a23f8">Result</th>
       </tr>
     </thead>
     <tbody>
       {% for original, current in lab_values %}
       <tr>
-        <td style="padding:.45rem .5rem;border-bottom:1px solid #f1f5f9">{{ original.parameter_name }}</td>
-        <td style="padding:.45rem .5rem;border-bottom:1px solid #f1f5f9">
+        <td class="x-cd4e890d">{{ original.parameter_name }}</td>
+        <td class="x-cd4e890d">
           {{ current.value }} {{ current.unit }}
           {% comment %}
             A corrected reading says so. The family member may be comparing this
             against a paper copy of the original document.
           {% endcomment %}
-          {% if current != original %}<span style="font-size:.7rem;color:#92400e"> (corrected)</span>{% endif %}
-          {% if original.is_critical %}<span style="font-size:.7rem;color:#b91c1c;font-weight:700"> ⚠</span>{% endif %}
+          {% if current != original %}<span class="x-d934ca9c"> (corrected)</span>{% endif %}
+          {% if original.is_critical %}<span class="x-e43ed69a"> ⚠</span>{% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% else %}
-  <p style="font-size:.85rem;color:#94a3b8">No individual results are attached to this record.</p>
+  <p class="x-df4d313c">No individual results are attached to this record.</p>
   {% endif %}
 
 
-  <p style="font-size:.78rem;color:#64748b;background:#f8fafc;border-radius:9px;padding:.7rem .9rem;margin-top:1.4rem;line-height:1.5">
+  <p class="x-4105de95">
     Shared with you by {{ subject.get_full_name|default:subject.username }}. Opening it is recorded in their access history.
   </p>
 </div>

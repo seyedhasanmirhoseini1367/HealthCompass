@@ -1,4 +1,5 @@
 from rest_framework import status
+from ..pagination import paginated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,8 +11,8 @@ from ..serializers import HealthAlertSerializer, NotificationSerializer
 @permission_classes([IsAuthenticated])
 def alerts_list(request):
     from apps.ai_insights.models import HealthAlert
-    qs = HealthAlert.objects.filter(patient=request.user).order_by('-created_at')[:30]
-    return Response(HealthAlertSerializer(qs, many=True).data)
+    qs = HealthAlert.objects.filter(patient=request.user).order_by('-created_at')
+    return paginated(request, qs, HealthAlertSerializer)
 
 
 @api_view(['PATCH'])
@@ -31,8 +32,8 @@ def alert_mark_read(request, pk):
 @permission_classes([IsAuthenticated])
 def notifications_list(request):
     from apps.notifications.models import Notification
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:30]
-    return Response(NotificationSerializer(qs, many=True).data)
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+    return paginated(request, qs, NotificationSerializer)
 
 
 @api_view(['PATCH'])

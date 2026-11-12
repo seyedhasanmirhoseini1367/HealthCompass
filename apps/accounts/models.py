@@ -64,6 +64,10 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True)
     emergency_contact_name = models.CharField(max_length=100, blank=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True)
+    #: The patient closed the first-run checklist on My Health (audit UX-06).
+    onboarding_dismissed = models.BooleanField(default=False)
+    #: Shown on the emergency card: people may rely on it, so they must see how current it is.
+    updated_at = models.DateTimeField(auto_now=True, null=True)
     national_id     = EncryptedCharField(
                         blank=True,
                         help_text='Encrypted at rest with a Fernet key derived from SECRET_KEY. '
@@ -223,6 +227,9 @@ class SharingGrant(models.Model):
     want, and it is unreachable with a single switch.
     """
     class Status(models.TextChoices):
+        # PENDING: offered by the patient, not yet accepted by the recipient.
+        # Gives nothing; authz.sharing_grant honours ACTIVE only (audit SEC-02).
+        PENDING = 'pending', 'Waiting for acceptance'
         ACTIVE  = 'active',  'Active'
         REVOKED = 'revoked', 'Revoked'
 
@@ -315,6 +322,10 @@ class SharingGrant(models.Model):
         self.revoked_by = by if getattr(by, 'pk', None) else None
         self.revoke_reason = reason[:200]
         self.save(update_fields=['status', 'revoked_at', 'revoked_by', 'revoke_reason'])
+        # Answers the recipient got about this patient stay out of their
+        # history once the share ends (audit SEC-12).
+        from apps.rag_assistant.models import QueryLog
+        QueryLog.objects.filter(session__patient=self.recipient, subject=self.patient).delete()
 
 
 class ShareRequest(models.Model):

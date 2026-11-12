@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Change email — HealthCompass{% endblock %}
+{% block content %}
+<div class="acct-wrap"><div class="acct-card">
+  <h1>Change your email address</h1>
+  <p>Your current address is <strong>{{ user.email }}</strong>. We will send a link to the new address; the change happens when you open it, and we let your current address know.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="acct-field">
+      <label for="new_email">New email address</label>
+      <input type="email" id="new_email" name="new_email" required autocomplete="email">
+    </div>
+    {% if has_password %}
+    <div class="acct-field">
+      <label for="password">Current password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password">
+    </div>
+    {% endif %}
+    <div class="acct-actions">
+      <button type="submit" class="btn btn-primary">Send confirmation link</button>
+      <a href="{% url 'accounts:profile' %}">Cancel</a>
+    </div>
+  </form>
+</div></div>
+{% endblock %}

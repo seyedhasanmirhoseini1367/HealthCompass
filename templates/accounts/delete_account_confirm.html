@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Delete account — HealthCompass{% endblock %}
+{% block content %}
+<div class="acct-wrap"><div class="acct-card">
+  <h1>Delete your account permanently?</h1>
+  <p>This deletes the account <strong>{{ email }}</strong> and all of its records, analyses and chat history. It cannot be undone.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="acct-actions">
+      <button type="submit" class="btn btn-danger">Permanently delete my account</button>
+      <a href="{% url 'home' %}">Cancel</a>
+    </div>
+  </form>
+</div></div>
+{% endblock %}
