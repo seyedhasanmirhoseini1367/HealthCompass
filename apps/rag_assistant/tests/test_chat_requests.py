@@ -23,6 +23,14 @@ def _events(*tokens, done=True):
 
 class _Chat(TestCase):
     def setUp(self):
+        # Closing a streamed response fires request_finished, whose
+        # close_old_connections() closes the connection inside the test
+        # transaction on PostgreSQL. The test client only guards non-streamed
+        # responses, so keep the handler off for these tests.
+        from django.core.signals import request_finished
+        from django.db import close_old_connections
+        request_finished.disconnect(close_old_connections)
+        self.addCleanup(request_finished.connect, close_old_connections)
         cache.clear()
         self.user = make_patient()
         grant_consent(self.user, ConsentPurpose.EXTERNAL_LLM)
