@@ -1,0 +1,9 @@
+/* Moved from templates/notifications/list.html */
+/* .page-hero styles are now global in base.html */
+.notif-row{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.2rem;background:white;border-radius:12px;border:1px solid var(--border);margin-bottom:.6rem;transition:all .18s}
+.notif-row:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.notif-row.unread{border-left:3px solid var(--primary);background:#f0f9ff}
+.notif-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.notif-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.15rem}
+.notif-msg{font-size:.82rem;color:var(--muted);line-height:1.45}
+.notif-time{font-size:.75rem;color:var(--muted);margin-top:.3rem}

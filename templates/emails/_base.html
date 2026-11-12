@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">
+<title>{% block subject %}HealthCompass{% endblock %}</title></head>
+<body style="margin:0;padding:24px;background:#f0f7ff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#0f172a">
+{# Email clients ignore stylesheets, so the few styles here are inline. #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;padding:28px">
+<tr><td style="font-size:15px;line-height:1.6">
+<p style="font-weight:700;color:#0369a1;margin:0 0 16px">HealthCompass</p>
+{% block body %}{% endblock %}
+<p style="margin-top:24px;color:#475569;font-size:13px">You received this because of your HealthCompass account. HealthCompass is not a medical service; in an emergency call 112.</p>
+</td></tr></table></td></tr></table>
+</body></html>

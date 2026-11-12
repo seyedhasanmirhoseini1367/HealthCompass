@@ -1,9 +1,10 @@
 from .auth import (
     login, register, forgot_password, me, register_fcm_token,
     profile_update, profile_picture_upload, change_password, emergency_card,
+    logout, logout_all, account_delete, account_delete_request,
 )
 from .records import (
-    records_list, record_detail, record_delete, record_upload,
+    records_list, record_detail, record_delete, record_upload, record_status,
     upload_pdf_api, upload_text_api, upload_kanta_api,
     upload_wearable_api, scan_ocr_api,
 )
@@ -24,7 +25,7 @@ from .consent import (consent_list, consent_grant, consent_revoke,
                       consent_history_view)
 from .export import export_status, export_download
 from .sharing import (sharing_companions, create_share, revoke_share,
-                      shared_patient_detail)
+                      accept_share, decline_share, shared_patient_detail)
 from .care import (care_tasks_list_create, care_task_stop,
                    care_occurrences_list, occurrence_respond,
                    patient_reports_list_create)
@@ -32,7 +33,8 @@ from .care import (care_tasks_list_create, care_task_stop,
 __all__ = [
     'login', 'register', 'forgot_password', 'me', 'register_fcm_token',
     'profile_update', 'profile_picture_upload', 'change_password', 'emergency_card',
-    'records_list', 'record_detail', 'record_delete', 'record_upload',
+    'logout', 'logout_all', 'account_delete', 'account_delete_request',
+    'records_list', 'record_detail', 'record_delete', 'record_upload', 'record_status',
     'upload_pdf_api', 'upload_text_api', 'upload_kanta_api',
     'upload_wearable_api', 'scan_ocr_api',
     'dashboard_summary', 'analytics', 'population_insights',
@@ -44,7 +46,8 @@ __all__ = [
     'icu_dashboard_api', 'seizure_realtime_analyze',
     'consent_list', 'consent_grant', 'consent_revoke', 'consent_history_view',
     'export_status', 'export_download',
-    'sharing_companions', 'create_share', 'revoke_share', 'shared_patient_detail',
+    'sharing_companions', 'create_share', 'revoke_share', 'accept_share', 'decline_share',
+    'shared_patient_detail',
     'care_tasks_list_create', 'care_task_stop', 'care_occurrences_list',
     'occurrence_respond', 'patient_reports_list_create',
 ]

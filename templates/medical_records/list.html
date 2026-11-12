@@ -1,407 +1,15 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}My Medical Records — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-/* ── Add Record button (inline in toolbar) ─────────────────────────────── */
-.add-record-btn {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .38rem .95rem; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: white; border: none; border-radius: 9px;
-  font-size: .85rem; font-weight: 800; cursor: pointer;
-  transition: opacity .18s; white-space: nowrap; text-decoration: none;
-}
-.add-record-btn:hover { opacity: .88; color: white; }
-
-/* ── Modal ───────────────────────────────────────────────────────────────── */
-.modal-backdrop {
-  display: none; position: fixed; inset: 0; z-index: 400;
-  background: rgba(15,23,42,.45); backdrop-filter: blur(3px);
-  align-items: center; justify-content: center; padding: 1rem;
-}
-.modal-backdrop.open { display: flex; }
-.modal-box {
-  background: white; border-radius: 20px; width: 100%; max-width: 480px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.2);
-  display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;
-  transition: max-width .2s;
-}
-.modal-box.wide { max-width: 540px; }
-.modal-header {
-  padding: 1rem 1.25rem .75rem;
-  display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.modal-header h2 { font-size: 1rem; font-weight: 800; margin: 0; }
-.modal-close {
-  background: var(--bg); border: none; border-radius: 8px;
-  width: 28px; height: 28px; cursor: pointer; font-size: 1rem;
-  display: flex; align-items: center; justify-content: center; color: var(--muted);
-}
-.modal-close:hover { background: #e2e8f0; }
-.modal-options { padding: .6rem .75rem .75rem; display: flex; flex-direction: column; gap: .35rem; overflow-y: auto; }
-.mo-row {
-  display: flex; align-items: center; gap: .75rem;
-  padding: .6rem .75rem; border-radius: 11px;
-  border: 1.5px solid var(--border); text-decoration: none;
-  transition: border-color .15s, background .15s, transform .15s;
-  color: var(--text);
-}
-.mo-row:hover { border-color: var(--primary); background: #f0f9ff; transform: translateX(3px); color: var(--text); }
-.mo-icon {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.05rem; color: white;
-}
-.mo-label { font-size: .88rem; font-weight: 700; }
-.mo-desc  { font-size: .72rem; color: var(--muted); margin-top: .05rem; }
-
-/* ── Modal back button ───────────────────────────────────────────────────── */
-.modal-back {
-  background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px;
-  width: 30px; height: 30px; cursor: pointer; flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--muted); font-size: .82rem; transition: background .15s;
-}
-.modal-back:hover { background: #e2e8f0; }
-
-/* ── Upload panels ───────────────────────────────────────────────────────── */
-.upload-panel { padding: .75rem 1.1rem 1.1rem; overflow-y: auto; }
-.upanel-form  { display: flex; flex-direction: column; gap: .65rem; }
-.up-group     { display: flex; flex-direction: column; gap: .22rem; }
-.up-group label { font-size: .74rem; font-weight: 700; color: var(--text); }
-.up-group input,
-.up-group select,
-.up-group textarea {
-  width: 100%; padding: .44rem .8rem; box-sizing: border-box;
-  border: 1.5px solid var(--border); border-radius: 9px;
-  font-size: .875rem; font-family: inherit; outline: none;
-  background: white; transition: border .15s;
-}
-.up-group input:focus,
-.up-group select:focus,
-.up-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
-.up-group textarea { resize: vertical; min-height: 85px; }
-.up-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
-@media(max-width:500px){ .up-row2 { grid-template-columns: 1fr; } }
-
-/* ── File drop zone ──────────────────────────────────────────────────────── */
-.file-drop-zone {
-  border: 2px dashed var(--border); border-radius: 12px; background: #f8fafc;
-  padding: 1.1rem 1rem; display: flex; flex-direction: column;
-  align-items: center; gap: .35rem; cursor: pointer;
-  transition: border-color .2s, background .2s;
-  font-size: .82rem; color: var(--muted); text-align: center;
-}
-.file-drop-zone i { font-size: 1.75rem; color: #94a3b8; transition: color .2s; }
-.file-drop-zone:hover               { border-color: var(--primary); background: #eef2ff; }
-.file-drop-zone:hover i             { color: var(--primary); }
-.file-drop-zone.pink:hover          { border-color: #ec4899; background: #fdf2f8; }
-.file-drop-zone.pink:hover i        { color: #ec4899; }
-.file-drop-zone.green:hover         { border-color: #10b981; background: #f0fdf4; }
-.file-drop-zone.green:hover i       { color: #10b981; }
-.file-drop-zone.blue:hover          { border-color: #0ea5e9; background: #f0f9ff; }
-.file-drop-zone.blue:hover i        { color: #0ea5e9; }
-.file-drop-zone.purple:hover        { border-color: #7c3aed; background: #f5f3ff; }
-.file-drop-zone.purple:hover i      { color: #7c3aed; }
-.file-chosen { font-size: .75rem; color: var(--primary); font-weight: 600; word-break: break-all; margin-top: .1rem; }
-
-/* ── Upload buttons ──────────────────────────────────────────────────────── */
-.up-submit-btn {
-  display: flex; align-items: center; justify-content: center; gap: .4rem;
-  width: 100%; padding: .58rem 1rem; margin-top: .2rem;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: white; border: none; border-radius: 10px;
-  font-size: .875rem; font-weight: 800; cursor: pointer; transition: opacity .18s;
-}
-.up-submit-btn:hover:not(:disabled) { opacity: .88; }
-.up-submit-btn:disabled { opacity: .55; cursor: not-allowed; }
-.up-action-btn {
-  display: inline-flex; align-items: center; gap: .35rem;
-  padding: .4rem .9rem; border-radius: 8px;
-  font-size: .82rem; font-weight: 700; cursor: pointer; border: none; transition: opacity .15s;
-}
-.up-action-btn:disabled { opacity: .5; cursor: not-allowed; }
-.pink-abtn  { background: #ec4899; color: white; }
-.pink-abtn:hover:not(:disabled) { background: #db2777; }
-.gray-abtn  { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
-.gray-abtn:hover:not(:disabled) { background: #e2e8f0; }
-
-/* ── Inline spinner ──────────────────────────────────────────────────────── */
-.up-spin {
-  display: inline-block; width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,.35); border-top-color: white;
-  border-radius: 50%; animation: usp .7s linear infinite; vertical-align: middle;
-}
-@keyframes usp { to { transform: rotate(360deg); } }
-
-/* ── Form error banner ───────────────────────────────────────────────────── */
-.form-error-banner {
-  display: none; background: #fee2e2; border: 1px solid #fecaca;
-  border-radius: 8px; padding: .42rem .75rem;
-  font-size: .8rem; color: #dc2626;
-}
-
-/* ── Scan capture (in modal) ─────────────────────────────────────────────── */
-.scan-preview-img {
-  width: 100%; max-height: 170px; object-fit: contain;
-  border-radius: 10px; border: 1.5px solid var(--border);
-}
-.scan-status {
-  font-size: .79rem; color: var(--muted); min-height: 1.1rem;
-  display: flex; align-items: center; gap: .35rem; margin-top: .3rem;
-}
-
-/* ── Toast ───────────────────────────────────────────────────────────────── */
-.upload-toast {
-  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 600;
-  padding: .65rem 1.1rem; border-radius: 11px;
-  font-size: .85rem; font-weight: 600; color: white;
-  box-shadow: 0 8px 28px rgba(0,0,0,.18);
-  display: flex; align-items: center; gap: .5rem;
-  transform: translateY(14px); opacity: 0;
-  transition: transform .28s, opacity .28s; pointer-events: none;
-}
-.upload-toast.toast-ok   { background: #10b981; }
-.upload-toast.toast-warn { background: #f59e0b; }
-.upload-toast.visible    { transform: translateY(0); opacity: 1; }
-
-/* ── Main panel ──────────────────────────────────────────────────────────── */
-.records-main { width: 100%; }
-
-.panel-title {
-  font-size: 1.25rem; font-weight: 800; color: var(--text);
-  margin-bottom: 1rem;
-}
-
-.alert-strip {
-  background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px;
-  padding: .7rem 1rem; margin-bottom: 1rem;
-  font-size: .87rem; color: #92400e;
-}
-
-/* ── Filter toolbar ──────────────────────────────────────────────────────── */
-.filter-toolbar {
-  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
-  background: white; border: 1px solid var(--border); border-radius: 14px;
-  padding: .65rem 1rem; margin-bottom: .85rem;
-}
-.vdivider {
-  width: 1px; height: 22px;
-  background: var(--border); flex-shrink: 0; margin: 0 .1rem;
-}
-
-.search-wrap { position: relative; flex: 1; min-width: 180px; }
-.search-wrap input {
-  width: 100%;
-  padding: .42rem .9rem .42rem 2.2rem;
-  border: 1.5px solid var(--border); border-radius: 9px;
-  font-size: .875rem; outline: none;
-  transition: border .18s; background: #f8fafc;
-}
-.search-wrap input:focus { border-color: var(--primary); background: white; }
-.search-wrap .s-icon {
-  position: absolute; left: .65rem; top: 50%; transform: translateY(-50%);
-  color: #94a3b8; font-size: .8rem; pointer-events: none;
-}
-.search-wrap .s-clear {
-  position: absolute; right: .6rem; top: 50%; transform: translateY(-50%);
-  color: #94a3b8; font-size: .78rem; cursor: pointer; display: none;
-}
-.search-wrap input:not(:placeholder-shown) ~ .s-clear { display: block; }
-
-.type-select-wrap { position: relative; flex-shrink: 0; }
-.type-select-wrap select {
-  appearance: none; -webkit-appearance: none;
-  padding: .42rem 1.9rem .42rem .8rem;
-  border: 1.5px solid var(--border); border-radius: 9px;
-  font-size: .83rem; font-weight: 600; color: var(--text);
-  background: #f8fafc; outline: none; cursor: pointer;
-  transition: border .18s;
-}
-.type-select-wrap select:focus { border-color: var(--primary); background: white; }
-.type-select-wrap .sel-arrow {
-  position: absolute; right: .58rem; top: 50%; transform: translateY(-50%);
-  color: #94a3b8; font-size: .7rem; pointer-events: none;
-}
-
-.pill-group { display: flex; gap: .3rem; flex-wrap: wrap; }
-.p-pill {
-  padding: .3rem .72rem; border-radius: 20px;
-  font-size: .78rem; font-weight: 600;
-  border: 1.5px solid var(--border); background: #f8fafc; color: var(--muted);
-  cursor: pointer; transition: all .15s; white-space: nowrap; line-height: 1.4;
-}
-.p-pill:hover { border-color: #a5b4fc; color: #4f46e5; }
-.p-pill.active { background: #6366f1; color: white; border-color: #6366f1; }
-
-.custom-dates {
-  display: none; align-items: center; gap: .5rem; flex-wrap: wrap;
-  background: #f8fafc; border: 1px solid var(--border); border-radius: 10px;
-  padding: .55rem 1rem; margin-bottom: .85rem;
-  font-size: .82rem; color: var(--muted);
-}
-.custom-dates.visible { display: flex; }
-.custom-dates input[type=date] {
-  padding: .32rem .6rem;
-  border: 1.5px solid var(--border); border-radius: 7px;
-  font-size: .82rem; outline: none; background: white;
-}
-.custom-dates input[type=date]:focus { border-color: var(--primary); }
-.apply-btn {
-  padding: .32rem .9rem; border-radius: 7px; border: none; cursor: pointer;
-  background: #6366f1; color: white; font-size: .82rem; font-weight: 700;
-}
-
-/* ── Record count + clear (inside toolbar) ───────────────────────────────── */
-.toolbar-count {
-  margin-left: auto; font-size: .8rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;
-}
-.toolbar-count .count { font-weight: 700; color: var(--text); }
-.clear-link {
-  display: inline-flex; align-items: center; gap: .3rem;
-  color: #f43f5e; text-decoration: none; font-size: .78rem; font-weight: 700;
-  padding: .2rem .55rem; border-radius: 6px;
-  background: #fff1f2; border: 1px solid #fecdd3;
-  transition: background .15s; white-space: nowrap; flex-shrink: 0;
-}
-.clear-link:hover { background: #ffe4e6; }
-
-/* ── Compact record list ─────────────────────────────────────────────────── */
-.record-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.rec-row {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .65rem 1rem;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background .15s;
-}
-.rec-row:last-child { border-bottom: none; }
-.rec-row:hover { background: #f8fafc; }
-.rec-row.flagged { border-left: 3px solid #f59e0b; }
-
-.rec-icon-sm {
-  width: 34px; height: 34px; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1rem; flex-shrink: 0;
-}
-
-.rec-info { flex: 1; min-width: 0; }
-.rec-title {
-  font-size: .87rem; font-weight: 700; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: .15rem;
-}
-.rec-meta-row {
-  display: flex; gap: .5rem; flex-wrap: wrap;
-  font-size: .72rem; color: var(--muted);
-}
-.rec-badge {
-  display: inline-flex; align-items: center;
-  padding: .1rem .45rem; border-radius: 4px;
-  font-size: .7rem; font-weight: 600; white-space: nowrap;
-  background: #f1f5f9; color: #64748b;
-}
-.rec-badge.warn { background: #fef3c7; color: #92400e; }
-
-.rec-row-actions { display: flex; gap: .35rem; flex-shrink: 0; }
-.row-btn {
-  padding: .22rem .6rem; border-radius: 6px; font-size: .73rem; font-weight: 700;
-  text-decoration: none; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: .25rem;
-  transition: opacity .15s;
-}
-.row-btn:hover { opacity: .82; }
-.row-btn.view   { background: #eff6ff; color: #2563eb; }
-.row-btn.delete { background: #fee2e2; color: #dc2626; }
-
-.empty-state {
-  text-align: center; padding: 3rem 1rem; color: var(--muted);
-}
-.empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
-
-/* ── Pagination ──────────────────────────────────────────────────────────── */
-.pagination-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-top: 1rem; padding: .5rem .25rem;
-  font-size: .82rem; color: var(--muted);
-}
-.pg-info { font-size: .8rem; }
-.pg-controls { display: flex; gap: .35rem; }
-.pg-btn {
-  padding: .3rem .7rem; border-radius: 7px; border: 1.5px solid var(--border);
-  background: white; color: var(--text); font-size: .8rem; font-weight: 600;
-  text-decoration: none; display: inline-flex; align-items: center; gap: .25rem;
-  transition: all .15s; cursor: pointer;
-}
-.pg-btn:hover:not(.disabled) { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
-.pg-btn.current { background: #6366f1; color: white; border-color: #6366f1; }
-.pg-btn.disabled { opacity: .4; pointer-events: none; }
-
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .filter-toolbar { gap: .4rem; }
-  .add-record-btn { font-size: .8rem; padding: .34rem .7rem; }
-}
-
-/* ── Local utilities (augment main.css) ─────────────────────────────────── */
-.d-none     { display:none }
-.d-inline   { display:inline }
-.mb-sm      { margin-bottom:.75rem }
-.icon-sm    { font-size:.65rem }
-.btn-row    { display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap }
-.text-primary { color:var(--primary) }
-/* Modal header left section */
-.modal-header-left { display:flex;align-items:center;gap:.6rem;min-width:0 }
-/* pg-btn ellipsis separator */
-.pg-ellipsis { border:none;padding:.3rem .2rem }
-/* Empty state heading/body */
-.es-h { font-size:1rem;font-weight:600;margin-bottom:.5rem;color:var(--text) }
-/* Modal title */
-.modal-title-h { font-size:1rem;font-weight:800;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
-/* Medium icon size */
-.icon-md { font-size:.8rem }
-/* mo-icon accent backgrounds */
-.mo-icon-pink   { background:#ec4899 }
-.mo-icon-teal   { background:#10b981 }
-.mo-icon-amber  { background:#f59e0b }
-.mo-icon-sky    { background:#0ea5e9 }
-.mo-icon-purple { background:#7c3aed }
-/* Record type icon backgrounds */
-.ri-lab_result  { background:#dbeafe }
-.ri-prescription{ background:#dcfce7 }
-.ri-diagnosis   { background:#fce7f3 }
-.ri-vaccination { background:#fef9c3 }
-.ri-imaging     { background:#ede9fe }
-.ri-wearable    { background:#ecfdf5 }
-.ri-discharge   { background:#fff7ed }
-.ri-other       { background:#f1f5f9 }
-/* Scan spinner accent */
-.up-spin-pink { border-top-color:#ec4899;border-color:#fbcfe8 }
-/* Required asterisk colours */
-.req-pink   { color:#ec4899 }
-.req-teal   { color:#10b981 }
-.req-amber  { color:#f59e0b }
-.req-sky    { color:#0ea5e9 }
-.req-purple { color:#7c3aed }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/medical_records__list.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="page-hero">
   <div class="page-hero-inner">
     <div>
-      <h1><i class="fas fa-file-medical icon-mr" style="opacity:.9"></i>My Medical Records</h1>
+      <h1>{% icon 'file-medical' cls='icon-mr x-50a4fce8' %}My Medical Records</h1>
       <p>Your complete health history — labs, prescriptions, and more</p>
     </div>
   </div>
@@ -410,7 +18,7 @@
 
     {% if flagged_count %}
     <div class="alert-strip">
-      <i class="fas fa-triangle-exclamation"></i>
+      {% icon 'triangle-exclamation' %}
       <strong>{{ flagged_count }} record(s)</strong> contain abnormal lab values — review them below.
     </div>
     {% endif %}
@@ -421,30 +29,30 @@
       <input type="hidden" name="period" id="hid-period" value="{{ active_period }}">
 
       <div class="filter-toolbar">
-        <button class="add-record-btn" type="button" onclick="openAddModal()">
-          <i class="fas fa-plus"></i> Add Record
+        <button class="add-record-btn" type="button" data-on-click="openAddModal">
+          {% icon 'plus' %} Add Record
         </button>
         <div class="vdivider"></div>
 
         <div class="search-wrap">
-          <i class="fas fa-magnifying-glass s-icon"></i>
+          {% icon 'magnifying-glass' cls='s-icon' %}
           <input type="text" name="q" id="search-input"
                  placeholder="Search by title…"
                  value="{{ active_q }}"
                  autocomplete="off">
-          <i class="fas fa-xmark s-clear" id="search-clear" title="Clear"></i>
+          <svg id="search-clear" class="icon s-clear" aria-hidden="true" focusable="false"><use href="{% static 'icons.svg' %}#i-xmark"></use></svg>
         </div>
 
         <div class="vdivider"></div>
 
         <div class="type-select-wrap">
-          <select id="type-select" title="Filter by type">
+          <select id="type-select" title="Filter by type" aria-label="Filter by type">
             <option value="" {% if not active_type %}selected{% endif %}>All types</option>
             {% for value, label in record_types %}
             <option value="{{ value }}" {% if active_type == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <i class="fas fa-chevron-down sel-arrow"></i>
+          {% icon 'chevron-down' cls='sel-arrow' %}
         </div>
 
         <div class="vdivider"></div>
@@ -456,7 +64,7 @@
           <button type="button" class="p-pill {% if active_period == '6m'  %}active{% endif %}" data-period="6m">6m</button>
           <button type="button" class="p-pill {% if active_period == '1y'  %}active{% endif %}" data-period="1y">1y</button>
           <button type="button" class="p-pill {% if active_period == 'custom' %}active{% endif %}" data-period="custom">
-            <i class="fas fa-calendar-days icon-sm"></i> Custom
+            {% icon 'calendar-days' cls='icon-sm' %} Custom
           </button>
         </div>
 
@@ -469,13 +77,13 @@
         </span>
         {% if active_type or active_period or active_q %}
         <a href="{% url 'medical_records:list' %}" class="clear-link">
-          <i class="fas fa-xmark"></i> Clear
+          {% icon 'xmark' %} Clear
         </a>
         {% endif %}
       </div>
 
       <div class="custom-dates {% if active_period == 'custom' %}visible{% endif %}" id="custom-dates-row">
-        <i class="fas fa-calendar-range icon-md"></i>
+        {% icon 'calendar-week' cls='icon-md' %}
         <span>From</span>
         <input type="date" name="date_from" id="date-from" value="{{ date_from }}">
         <span>to</span>
@@ -490,7 +98,7 @@
       {% for rec in records %}
       {% with rtype=rec.record_type %}
       <div class="rec-row {% if rec.is_flagged %}flagged{% endif %}"
-           onclick="location.href='{% url 'medical_records:detail' rec.pk %}'">
+           data-href="{% url 'medical_records:detail' rec.pk %}">
         <div class="rec-icon-sm ri-{{ rtype }}">
           {% if rtype == 'lab_result' %}🧪
           {% elif rtype == 'prescription' %}💊
@@ -504,19 +112,20 @@
         <div class="rec-info">
           <div class="rec-title">{{ rec.title }}</div>
           <div class="rec-meta-row">
+            {% if rec.processing_status != 'ready' %}<span class="rec-badge{% if rec.processing_status == 'failed' %} warn{% endif %}" data-processing-status="{{ rec.processing_status }}" data-status-url="{% url 'medical_records:status' rec.pk %}">{{ rec.get_processing_status_display }}</span>{% endif %}
             <span class="rec-badge">{{ rec.get_record_type_display }}</span>
             <span class="rec-badge">{{ rec.get_source_display }}</span>
-            {% if rec.record_date %}<span>{{ rec.record_date|date:"M d, Y" }}</span>{% endif %}
-            <span>Uploaded {{ rec.uploaded_at|date:"M d, Y" }}</span>
+            {% if rec.record_date %}<span>{{ rec.record_date|date:"DATE_FORMAT" }}</span>{% endif %}
+            <span>Uploaded {{ rec.uploaded_at|date:"DATE_FORMAT" }}</span>
             {% if rec.is_flagged %}<span class="rec-badge warn">⚠️ Abnormal</span>{% endif %}
           </div>
         </div>
-        <div class="rec-row-actions" onclick="event.stopPropagation()">
+        <div class="rec-row-actions" data-stop-propagation>
           <a href="{% url 'medical_records:detail' rec.pk %}" class="row-btn view">View</a>
           <form id="del-rec-{{ rec.pk }}" method="post" action="{% url 'medical_records:delete' rec.pk %}" class="d-inline">
             {% csrf_token %}
             <button type="button" class="row-btn delete"
-              onclick="openDeleteModal('Delete &ldquo;{{ rec.title|escapejs }}&rdquo; permanently?', () => document.getElementById('del-rec-{{ rec.pk }}').submit(), 'Delete Record')">Delete</button>
+              data-confirm="Delete &ldquo;{{ rec.title }}&rdquo; permanently?" data-confirm-title="Delete Record" data-submit-form="del-rec-{{ rec.pk }}">Delete</button>
           </form>
         </div>
       </div>
@@ -533,10 +142,10 @@
       <div class="pg-controls">
         {% if page_obj.has_previous %}
         <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
-          <i class="fas fa-chevron-left icon-sm"></i> Prev
+          {% icon 'chevron-left' cls='icon-sm' %} Prev
         </a>
         {% else %}
-        <span class="pg-btn disabled"><i class="fas fa-chevron-left icon-sm"></i> Prev</span>
+        <span class="pg-btn disabled">{% icon 'chevron-left' cls='icon-sm' %} Prev</span>
         {% endif %}
 
         {% for num in page_obj.paginator.page_range %}
@@ -551,10 +160,10 @@
 
         {% if page_obj.has_next %}
         <a class="pg-btn" href="?page={{ page_obj.next_page_number }}&type={{ active_type }}&period={{ active_period }}&q={{ active_q }}&date_from={{ date_from }}&date_to={{ date_to }}">
-          Next <i class="fas fa-chevron-right icon-sm"></i>
+          Next {% icon 'chevron-right' cls='icon-sm' %}
         </a>
         {% else %}
-        <span class="pg-btn disabled">Next <i class="fas fa-chevron-right icon-sm"></i></span>
+        <span class="pg-btn disabled">Next {% icon 'chevron-right' cls='icon-sm' %}</span>
         {% endif %}
       </div>
     </div>
@@ -577,42 +186,49 @@
   </div><!-- /records-main -->
 
 <!-- ══ Add Record Modal ══ -->
-<div class="modal-backdrop" id="addRecordModal" onclick="closeIfBackdrop(event)">
+<div class="modal-backdrop" id="addRecordModal" data-on-click="closeIfBackdrop" data-args='[{"$": "event"}]'>
   <div class="modal-box" id="modalBox">
 
     <!-- Unified header -->
     <div class="modal-header">
       <div class="modal-header-left">
-        <button class="modal-back d-none" id="modalBack" onclick="showOptions()" title="Back">
-          <i class="fas fa-arrow-left"></i>
+        <button class="modal-back d-none" id="modalBack" data-on-click="showOptions" title="Back">
+          {% icon 'arrow-left' %}
         </button>
         <h2 id="modalTitle" class="modal-title-h">
-          <i class="fas fa-plus-circle text-primary"></i> Add Record
+          {% icon 'plus-circle' cls='text-primary' %} Add Record
         </h2>
       </div>
-      <button class="modal-close" onclick="closeAddModal()">✕</button>
+      <button class="modal-close" data-on-click="closeAddModal">✕</button>
     </div>
 
     <!-- ── Step 1: Option picker ── -->
     <div id="panel-options" class="modal-options">
-      <a class="mo-row" href="#" onclick="showPanel('scan');return false">
-        <div class="mo-icon mo-icon-pink"><i class="fas fa-camera"></i></div>
+      <form class="mo-any" method="post" action="{% url 'medical_records:upload_any' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label class="field-label" for="any-file">Add any file: PDF, Kanta XML, wearable export or a photo</label>
+        <input type="file" id="any-file" name="file" accept="{{ upload_accept.pdf }},{{ upload_accept.kanta }},{{ upload_accept.wearable }},{{ upload_accept.image }}">
+        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+        <p class="field-help">We work out the type from the file. Or choose a specific way below.</p>
+      </form>
+      <a class="mo-row" href="#" data-on-click="showPanel" data-args='["scan"]' data-prevent-default>
+        <div class="mo-icon mo-icon-pink">{% icon 'camera' %}</div>
         <div><div class="mo-label">Scan Paper</div><div class="mo-desc">Take a photo — AI reads and extracts the text</div></div>
       </a>
-      <a class="mo-row" href="#" onclick="showPanel('pdf');return false">
-        <div class="mo-icon mo-icon-teal"><i class="fas fa-file-pdf"></i></div>
+      <a class="mo-row" href="#" data-on-click="showPanel" data-args='["pdf"]' data-prevent-default>
+        <div class="mo-icon mo-icon-teal">{% icon 'file-pdf' %}</div>
         <div><div class="mo-label">PDF / Document</div><div class="mo-desc">Lab reports, prescriptions, discharge summaries</div></div>
       </a>
-      <a class="mo-row" href="#" onclick="showPanel('text');return false">
-        <div class="mo-icon mo-icon-amber"><i class="fas fa-paste"></i></div>
+      <a class="mo-row" href="#" data-on-click="showPanel" data-args='["text"]' data-prevent-default>
+        <div class="mo-icon mo-icon-amber">{% icon 'paste' %}</div>
         <div><div class="mo-label">Paste Text</div><div class="mo-desc">Paste any lab result or note — AI parses it</div></div>
       </a>
-      <a class="mo-row" href="#" onclick="showPanel('kanta');return false">
-        <div class="mo-icon mo-icon-sky"><i class="fas fa-file-code"></i></div>
+      <a class="mo-row" href="#" data-on-click="showPanel" data-args='["kanta"]' data-prevent-default>
+        <div class="mo-icon mo-icon-sky">{% icon 'file-code' %}</div>
         <div><div class="mo-label">Kanta XML</div><div class="mo-desc">Import Finnish health records</div></div>
       </a>
-      <a class="mo-row" href="#" onclick="showPanel('wearable');return false">
-        <div class="mo-icon mo-icon-purple"><i class="fas fa-watch"></i></div>
+      <a class="mo-row" href="#" data-on-click="showPanel" data-args='["wearable"]' data-prevent-default>
+        <div class="mo-icon mo-icon-purple">{% icon 'clock' %}</div>
         <div><div class="mo-label">Wearable Data</div><div class="mo-desc">Apple Watch, Fitbit, Garmin — CSV, JSON, or XML export</div></div>
       </a>
     </div>
@@ -620,8 +236,8 @@
     <!-- ── Step 2a: Scan Paper ── -->
     <div id="panel-scan" class="upload-panel d-none">
       <div id="scan-capture-wrap" class="mb-sm">
-        <div class="file-drop-zone pink" onclick="document.getElementById('modal-scan-input').click()">
-          <i class="fas fa-camera"></i>
+        <div class="file-drop-zone pink" data-click-target="modal-scan-input">
+          {% icon 'camera' %}
           <div><strong>Tap to take photo</strong></div>
           <div class="text-xs">or choose an image file</div>
         </div>
@@ -631,10 +247,10 @@
         <img id="modal-scan-preview" class="scan-preview-img" alt="preview">
         <div class="btn-row">
           <button class="up-action-btn pink-abtn" id="modal-extract-btn" type="button">
-            <i class="fas fa-magic"></i> Extract Text with AI
+            {% icon 'magic' %} Extract Text with AI
           </button>
-          <button class="up-action-btn gray-abtn" type="button" onclick="resetScanCapture()">
-            <i class="fas fa-redo"></i> Retake
+          <button class="up-action-btn gray-abtn" type="button" data-on-click="resetScanCapture">
+            {% icon 'redo' %} Retake
           </button>
         </div>
         <div class="scan-status" id="modal-scan-status"></div>
@@ -671,7 +287,7 @@
         </div>
         <div class="form-error-banner" id="err-scan"></div>
         <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_scan' %}">
-          <i class="fas fa-save"></i> Save Record
+          {% icon 'save' %} Save Record
         </button>
       </form>
     </div>
@@ -682,12 +298,12 @@
         {% csrf_token %}
         <div class="up-group">
           <label>PDF File <span class="req-teal">*</span></label>
-          <div class="file-drop-zone green" onclick="document.getElementById('modal-pdf-input').click()">
-            <i class="fas fa-file-pdf"></i>
+          <div class="file-drop-zone green" data-click-target="modal-pdf-input">
+            {% icon 'file-pdf' %}
             <div id="pdf-chosen-name">Click to choose PDF</div>
           </div>
-          <input type="file" id="modal-pdf-input" name="pdf_file" accept=".pdf" hidden
-                 onchange="setChosen('pdf-chosen-name', this)">
+          <input type="file" id="modal-pdf-input" name="pdf_file" accept="{{ upload_accept.pdf }}" hidden
+                 data-on-change="setChosen" data-args='["pdf-chosen-name", {"$": "this"}]'>
         </div>
         <div class="up-row2">
           <div class="up-group">
@@ -703,7 +319,7 @@
         </div>
         <div class="form-error-banner" id="err-pdf"></div>
         <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_pdf' %}">
-          <i class="fas fa-cloud-upload-alt"></i> Upload &amp; Parse
+          {% icon 'cloud-upload-alt' %} Upload &amp; Parse
         </button>
       </form>
     </div>
@@ -732,7 +348,7 @@
         </div>
         <div class="form-error-banner" id="err-text"></div>
         <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_text' %}">
-          <i class="fas fa-save"></i> Save Record
+          {% icon 'save' %} Save Record
         </button>
       </form>
     </div>
@@ -743,12 +359,12 @@
         {% csrf_token %}
         <div class="up-group">
           <label>Kanta XML File <span class="req-sky">*</span></label>
-          <div class="file-drop-zone blue" onclick="document.getElementById('modal-kanta-input').click()">
-            <i class="fas fa-file-code"></i>
+          <div class="file-drop-zone blue" data-click-target="modal-kanta-input">
+            {% icon 'file-code' %}
             <div id="kanta-chosen-name">Click to choose XML file</div>
           </div>
-          <input type="file" id="modal-kanta-input" name="xml_file" accept=".xml" hidden
-                 onchange="setChosen('kanta-chosen-name', this)">
+          <input type="file" id="modal-kanta-input" name="xml_file" accept="{{ upload_accept.kanta }}" hidden
+                 data-on-change="setChosen" data-args='["kanta-chosen-name", {"$": "this"}]'>
         </div>
         <div class="up-group">
           <label>Notes</label>
@@ -756,7 +372,7 @@
         </div>
         <div class="form-error-banner" id="err-kanta"></div>
         <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_kanta' %}">
-          <i class="fas fa-file-import"></i> Import Records
+          {% icon 'file-import' %} Import Records
         </button>
       </form>
     </div>
@@ -767,13 +383,13 @@
         {% csrf_token %}
         <div class="up-group">
           <label>CSV File <span class="req-purple">*</span></label>
-          <div class="file-drop-zone purple" onclick="document.getElementById('modal-wearable-input').click()">
-            <i class="fas fa-watch"></i>
+          <div class="file-drop-zone purple" data-click-target="modal-wearable-input">
+            {% icon 'clock' %}
             <div id="wearable-chosen-name">Click to choose file</div>
             <div class="text-xs">CSV, JSON, XML, or Parquet</div>
           </div>
-          <input type="file" id="modal-wearable-input" name="data_file" accept=".csv,.json,.xml,.parquet" hidden
-                 onchange="setChosen('wearable-chosen-name', this)">
+          <input type="file" id="modal-wearable-input" name="data_file" accept="{{ upload_accept.wearable }}" hidden
+                 data-on-change="setChosen" data-args='["wearable-chosen-name", {"$": "this"}]'>
         </div>
         <div class="up-row2">
           <div class="up-group">
@@ -794,7 +410,7 @@
         </div>
         <div class="form-error-banner" id="err-wearable"></div>
         <button type="submit" class="up-submit-btn" data-url="{% url 'medical_records:upload_wearable' %}">
-          <i class="fas fa-chart-line"></i> Import Data
+          {% icon 'chart-line' %} Import Data
         </button>
       </form>
     </div>
@@ -804,334 +420,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-(function () {
-  var form        = document.getElementById('filter-form');
-  var hidType     = document.getElementById('hid-type');
-  var hidPeriod   = document.getElementById('hid-period');
-  var customRow   = document.getElementById('custom-dates-row');
-  var searchInput = document.getElementById('search-input');
-  var searchClear = document.getElementById('search-clear');
-  var typeSelect  = document.getElementById('type-select');
-
-  typeSelect.addEventListener('change', function () {
-    hidType.value = typeSelect.value;
-    form.submit();
-  });
-
-  document.querySelectorAll('[data-period]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var value = btn.dataset.period;
-      hidPeriod.value = value;
-      document.querySelectorAll('[data-period]').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      customRow.classList.toggle('visible', value === 'custom');
-      if (value !== 'custom') {
-        document.getElementById('date-from').value = '';
-        document.getElementById('date-to').value   = '';
-        form.submit();
-      }
-    });
-  });
-
-  searchClear.addEventListener('click', function () {
-    searchInput.value = '';
-    form.submit();
-  });
-
-  searchInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); form.submit(); }
-  });
-
-  var searchTimer;
-  searchInput.addEventListener('input', function () {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(function () { form.submit(); }, 600);
-  });
-}());
-</script>
-<script>
-/* ── URLs & CSRF ─────────────────────────────────────────────────────────── */
-var SCAN_OCR_URL = '{% url "medical_records:scan_ocr" %}';
-
-function getCsrf() {
-  var el = document.querySelector('#addRecordModal [name=csrfmiddlewaretoken]');
-  return el ? el.value : '';
-}
-
-/* ── Panel titles ────────────────────────────────────────────────────────── */
-var PANEL_TITLES = {
-  scan:     '<i class="fas fa-camera req-pink"></i> Scan Paper',
-  pdf:      '<i class="fas fa-file-pdf req-teal"></i> PDF / Document',
-  text:     '<i class="fas fa-paste req-amber"></i> Paste Text',
-  kanta:    '<i class="fas fa-file-code req-sky"></i> Kanta XML',
-  wearable: '<i class="fas fa-watch req-purple"></i> Wearable Data',
-};
-
-/* ── Modal open/close ────────────────────────────────────────────────────── */
-function openAddModal() {
-  showOptions();
-  document.getElementById('addRecordModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeAddModal() {
-  document.getElementById('addRecordModal').classList.remove('open');
-  document.body.style.overflow = '';
-}
-function closeIfBackdrop(e) {
-  if (e.target === document.getElementById('addRecordModal')) closeAddModal();
-}
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeAddModal();
-});
-
-/* ── Panel navigation ────────────────────────────────────────────────────── */
-/*
- * Visibility is toggled through `d-none`, never through inline display.
- *
- * These three elements are hidden in the markup with `class="d-none"`, and
- * `.d-none` is `display:none !important`. An inline `style.display` cannot beat
- * `!important`, so setting one here was a no-op: picking an option swapped the
- * title but left every panel hidden, and the back arrow never appeared. The
- * modal looked like it had lost its contents.
- *
- * Each class carries its own display (`.modal-options` flex, `.modal-back`
- * inline-flex, `.upload-panel` block), so removing the class restores the right
- * one without this function needing to know which.
- */
-function showOptions() {
-  document.querySelectorAll('.upload-panel').forEach(function(p){ p.classList.add('d-none'); });
-  document.getElementById('panel-options').classList.remove('d-none');
-  document.getElementById('modalBack').classList.add('d-none');
-  document.getElementById('modalTitle').innerHTML =
-    '<i class="fas fa-plus-circle text-primary"></i> Add Record';
-  document.getElementById('modalBox').classList.remove('wide');
-}
-function showPanel(name) {
-  var panel = document.getElementById('panel-' + name);
-  if (!panel) { return; }   // an unknown name must not blank the modal
-
-  document.getElementById('panel-options').classList.add('d-none');
-  document.querySelectorAll('.upload-panel').forEach(function(p){ p.classList.add('d-none'); });
-  panel.classList.remove('d-none');
-  document.getElementById('modalBack').classList.remove('d-none');
-  document.getElementById('modalTitle').innerHTML = PANEL_TITLES[name] || name;
-  document.getElementById('modalBox').classList.add('wide');
-}
-
-/* ── File chosen label ───────────────────────────────────────────────────── */
-function setChosen(labelId, input) {
-  var el = document.getElementById(labelId);
-  if (el && input.files[0]) {
-    el.innerHTML = '<span class="file-chosen">' + esc(input.files[0].name) + '</span>';
-  }
-}
-
-/* ── Form submission ─────────────────────────────────────────────────────── */
-document.querySelectorAll('.upload-panel form').forEach(function(form) {
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var btn = form.querySelector('[type=submit]');
-    var url = btn.dataset.url;
-    submitUploadForm(form, url, btn);
-  });
-});
-
-async function submitUploadForm(form, url, btn) {
-  var origHtml = btn.innerHTML;
-  var errBanner = form.querySelector('.form-error-banner');
-  if (errBanner) { errBanner.style.display = 'none'; }
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="up-spin"></span> Saving…';
-
-  try {
-    var fd = new FormData(form);
-    var res = await fetch(url, {
-      method: 'POST',
-      body: fd,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-    var data = await res.json();
-
-    if (data.success) {
-      closeAddModal();
-      form.reset();
-      resetAllFileLabels();
-      if (data.reload) {
-        showToast(data.message || 'Records imported!', data.flagged ? 'warn' : 'ok');
-        setTimeout(function(){ location.reload(); }, 1200);
-      } else if (data.record) {
-        prependRecord(data.record);
-        showToast(data.message || 'Record saved!', data.flagged ? 'warn' : 'ok');
-        updateRecordCount(1);
-      }
-    } else {
-      showFormError(errBanner, data.error || 'Upload failed.');
-    }
-  } catch(e) {
-    showFormError(errBanner, 'Network error: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origHtml;
-  }
-}
-
-function showFormError(banner, msg) {
-  if (!banner) { alert(msg); return; }
-  banner.textContent = msg;
-  banner.style.display = 'block';
-  banner.scrollIntoView({ behavior:'smooth', block:'nearest' });
-}
-
-function resetAllFileLabels() {
-  var defaults = {
-    'pdf-chosen-name':      'Click to choose PDF',
-    'kanta-chosen-name':    'Click to choose XML file',
-    'wearable-chosen-name': 'Click to choose CSV file',
-  };
-  Object.keys(defaults).forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.innerHTML = defaults[id];
-  });
-}
-
-/* ── Scan capture ────────────────────────────────────────────────────────── */
-var modalScanBlob = null;
-
-document.getElementById('modal-scan-input').addEventListener('change', function() {
-  var file = this.files[0];
-  if (!file) return;
-  modalScanBlob = file;
-  document.getElementById('modal-scan-preview').src = URL.createObjectURL(file);
-  // Same `d-none` rule as the panels: the preview is hidden by an !important
-  // class, so an inline display could never reveal it — you took a photo and
-  // the modal showed you nothing.
-  document.getElementById('scan-capture-wrap').classList.add('d-none');
-  document.getElementById('scan-preview-wrap').classList.remove('d-none');
-  setScanStatus('');
-});
-
-function resetScanCapture() {
-  modalScanBlob = null;
-  document.getElementById('modal-scan-input').value = '';
-  document.getElementById('scan-capture-wrap').classList.remove('d-none');
-  document.getElementById('scan-preview-wrap').classList.add('d-none');
-  document.getElementById('modal-scan-text').value = '';
-  setScanStatus('');
-}
-
-function setScanStatus(msg, loading) {
-  var el = document.getElementById('modal-scan-status');
-  el.innerHTML = loading ? '<span class="up-spin up-spin-pink"></span> ' + msg : msg;
-}
-
-document.getElementById('modal-extract-btn').addEventListener('click', async function() {
-  if (!modalScanBlob) { setScanStatus('No image captured yet.'); return; }
-  this.disabled = true;
-  setScanStatus('Sending to Gemini Vision…', true);
-  try {
-    var fd = new FormData();
-    fd.append('image', modalScanBlob, 'scan.jpg');
-    fd.append('csrfmiddlewaretoken', getCsrf());
-    var res  = await fetch(SCAN_OCR_URL, { method:'POST', body:fd });
-    var data = await res.json();
-    if (data.error) {
-      setScanStatus('<i class="fas fa-triangle-exclamation text-danger"></i> ' + esc(data.error));
-    } else {
-      document.getElementById('modal-scan-text').value = data.text;
-      setScanStatus('<i class="fas fa-check-circle text-success"></i> Text extracted — review and save.');
-    }
-  } catch(e) {
-    setScanStatus('Error: ' + e.message);
-  } finally {
-    this.disabled = false;
-  }
-});
-
-/* ── DOM: prepend new record row ─────────────────────────────────────────── */
-var TYPE_EMOJI = {
-  lab_result:'🧪', prescription:'💊', diagnosis:'🏥',
-  vaccination:'💉', imaging:'🩻', wearable:'⌚', discharge:'📄',
-};
-
-function prependRecord(rec) {
-  var emoji = TYPE_EMOJI[rec.record_type]  || '📁';
-  var csrf  = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  var dateSpan  = rec.record_date ? '<span>' + esc(rec.record_date) + '</span>' : '';
-  var flagBadge = rec.is_flagged  ? '<span class="rec-badge warn">⚠️ Abnormal</span>' : '';
-  var rowCls    = rec.is_flagged  ? 'rec-row flagged' : 'rec-row';
-
-  var html = '<div class="' + rowCls + '" onclick="location.href=\'' + esc(rec.detail_url) + '\'">'
-    + '<div class="rec-icon-sm ri-' + esc(rec.record_type) + '">' + emoji + '</div>'
-    + '<div class="rec-info">'
-      + '<div class="rec-title">' + esc(rec.title) + '</div>'
-      + '<div class="rec-meta-row">'
-        + '<span class="rec-badge">' + esc(rec.record_type_display) + '</span>'
-        + '<span class="rec-badge">' + esc(rec.source_display) + '</span>'
-        + dateSpan
-        + '<span>Uploaded ' + esc(rec.uploaded_at) + '</span>'
-        + flagBadge
-      + '</div>'
-    + '</div>'
-    + '<div class="rec-row-actions" onclick="event.stopPropagation()">'
-      + '<a href="' + esc(rec.detail_url) + '" class="row-btn view">View</a>'
-      + '<form id="del-rec-' + rec.pk + '" method="post" action="' + esc(rec.delete_url) + '" class="d-inline">'
-        + '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrf) + '">'
-        + '<button type="button" class="row-btn delete"'
-          + ' onclick="openDeleteModal(\'Delete this record permanently?\','
-          + ' function(){ document.getElementById(\'del-rec-' + rec.pk + '\').submit(); },'
-          + ' \'Delete Record\')">'
-          + 'Delete'
-        + '</button>'
-      + '</form>'
-    + '</div>'
-  + '</div>';
-
-  var list = document.querySelector('.record-list');
-  if (list) {
-    list.insertAdjacentHTML('afterbegin', html);
-    var empty = document.querySelector('.empty-state');
-    if (empty) empty.remove();
-  } else {
-    var listDiv = document.createElement('div');
-    listDiv.className = 'record-list';
-    listDiv.innerHTML = html;
-    var main  = document.querySelector('.records-main');
-    var empty = main ? main.querySelector('.empty-state') : null;
-    if (empty) main.replaceChild(listDiv, empty);
-    else if (main) main.appendChild(listDiv);
-  }
-}
-
-function esc(str) {
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-/* ── Count update ────────────────────────────────────────────────────────── */
-function updateRecordCount(delta) {
-  var el = document.querySelector('.toolbar-count .count');
-  if (!el) return;
-  var n   = (parseInt(el.textContent) || 0) + delta;
-  var wrap = el.closest('.toolbar-count');
-  wrap.innerHTML = '<span class="count">' + n + '</span> record' + (n !== 1 ? 's' : '');
-}
-
-/* ── Toast ───────────────────────────────────────────────────────────────── */
-function showToast(msg, type) {
-  var toast = document.createElement('div');
-  toast.className = 'upload-toast ' + (type === 'warn' ? 'toast-warn' : 'toast-ok');
-  toast.innerHTML = '<i class="fas fa-' + (type === 'warn' ? 'triangle-exclamation' : 'check-circle') + '"></i> ' + msg;
-  document.body.appendChild(toast);
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){ toast.classList.add('visible'); });
-  });
-  setTimeout(function(){
-    toast.classList.remove('visible');
-    setTimeout(function(){ toast.remove(); }, 350);
-  }, 4500);
-}
-</script>
+<script src="{% static 'js/record-status.js' %}" defer></script>
+<script src="{% static 'js/pages/medical_records__list.js' %}"></script>
+<script type="application/json" id="hc-page-data-medical_records__list-1">{"k1": "{% filter escapejs %}{% url "medical_records:scan_ocr" %}{% endfilter %}"}</script>
+<script src="{% static 'js/pages/medical_records__list-1.js' %}"></script>
 {% endblock %}

@@ -1,19 +1,9 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
 {% block title %}Settings — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.st-wrap{max-width:720px;margin:0 auto}
-.st-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
-.st-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
-.st-sec{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:1.6rem 0 .6rem}
-.st-item{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;
-         border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;
-         text-decoration:none}
-.st-item:hover{border-color:#cbd5e1}
-.st-name{font-size:.98rem;font-weight:700;color:var(--text)}
-.st-desc{font-size:.85rem;color:#64748b;margin-top:.15rem;line-height:1.5}
-.st-meta{font-size:.82rem;color:#94a3b8;white-space:nowrap}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/dashboard__settings_hub.css' %}">
 {% endblock %}
 {% block content %}
 <div class="st-wrap">
@@ -28,7 +18,7 @@
   {% endcomment %}
   <div class="st-sec">Privacy &amp; sharing</div>
 
-  <a class="st-item" href="{% url 'accounts:my_shares' %}">
+  <a class="st-item" href="/care/#sharing">
     <span>
       <span class="st-name">Who can see my health</span>
       <span class="st-desc">People you have shared with, what they can see, and how to stop.</span>
@@ -52,6 +42,14 @@
       <span class="st-desc">A page anyone holding the link can read in an emergency.</span>
     </span>
     <span class="st-meta">{% if emergency_enabled %}On{% else %}Off{% endif %}</span>
+  </a>
+
+  <a class="st-item" href="{% url 'accounts:access_history' %}">
+    <span>
+      <span class="st-name">Who has seen my data</span>
+      <span class="st-desc">Every time someone you share with, or a clinician, opened your information.</span>
+    </span>
+    <span class="st-meta">View →</span>
   </a>
 
   <a class="st-item" href="{% url 'accounts:my_doctors' %}">
@@ -92,10 +90,24 @@
 
   <a class="st-item" href="{% url 'accounts:delete_account' %}">
     <span>
-      <span class="st-name" style="color:#b91c1c">Delete my account</span>
+      <span class="st-name x-881d02da">Delete my account</span>
       <span class="st-desc">Removes your records and files. This cannot be undone.</span>
     </span>
     <span class="st-meta">→</span>
   </a>
 </div>
+<section class="card st-lang" aria-labelledby="lang-title"><div class="card-body">
+  <h2 id="lang-title">{% trans "Language" %}</h2>
+  <form action="{% url 'set_language' %}" method="post" class="cluster">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <label class="visually-hidden" for="language">{% trans "Language" %}</label>
+    {% get_current_language as CURRENT %}{% get_available_languages as LANGS %}
+    <select id="language" name="language" class="select" data-autosubmit>
+      {% for code, name in LANGS %}<option value="{{ code }}"{% if code == CURRENT %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary btn-sm">{% trans "Change" %}</button>
+  </form>
+  <p class="field-help">{% trans "Finnish and Swedish are being translated; untranslated text stays in English." %}</p>
+</div></section>
 {% endblock %}

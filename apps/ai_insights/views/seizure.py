@@ -4,7 +4,7 @@ import logging
 from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
 from django_ratelimit.decorators import ratelimit
 
 from ..models import AIModel, ModelPrediction
@@ -14,10 +14,37 @@ from healthcompass.errors import client_error
 logger = logging.getLogger(__name__)
 
 
+def _too_large(files):
+    """413 response when the uploads exceed MAX_UPLOAD_BYTES, checked from the
+    declared sizes before anything is read into memory."""
+    from django.conf import settings as _s
+    max_bytes = int(getattr(_s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024))
+    total = sum(getattr(f, 'size', 0) or 0 for f in files)
+    if total > max_bytes:
+        return JsonResponse(
+            {'success': False,
+             'error': f'Upload too large ({total // (1024 * 1024)} MB). '
+                      f'Maximum is {max_bytes // (1024 * 1024)} MB.'},
+            status=413)
+    return None
+
+
+def _rate_limited():
+    return JsonResponse({'success': False, 'error': 'Too many requests. Please wait and try again.'},
+                        status=429)
+
+
+# Labs only (see apps/ai_insights/labs.py). Login, a per-user limit and a size
+# check, because each POST forwards the file to a third party and spends model
+# quota on the interpretation (audit SEC-03).
+@login_required
+@ratelimit(key='user', rate='10/h', method='POST', block=False)
 def seizure_analysis(request):
     """Proxy parquet EEG file to PersonalPortfolio seizure comparison API."""
     if request.method == 'GET':
         return render(request, 'ai_insights/seizure_analysis.html', {})
+    if getattr(request, 'limited', False):
+        return _rate_limited()
 
     import requests as http_requests
     from apps.accounts.consent import ConsentRequired
@@ -26,10 +53,11 @@ def seizure_analysis(request):
     signal_file = request.FILES.get('signal_file')
     if not signal_file:
         return JsonResponse({'success': False, 'error': 'No file uploaded.'}, status=400)
+    oversize = _too_large([signal_file])
+    if oversize:
+        return oversize
 
-    # Checked before the file is read. Note this view is csrf_exempt and does not
-    # require login, so an anonymous caller reaches it: ExternalProcessingGuard
-    # returns False for AnonymousUser once this point is enforced.
+    # Checked before the file is read.
     try:
         ExternalProcessingGuard.check(request.user, 'insights.seizure_proxy')
     except ConsentRequired as exc:
@@ -119,19 +147,18 @@ def seizure_analysis(request):
         return JsonResponse({'success': False, 'error': 'Could not reach the analysis server. Please try again.'}, status=500)
 
 
+@login_required
 def seizure_realtime(request):
     return render(request, 'ai_insights/seizure_realtime.html', {})
 
 
-@csrf_exempt
-@ratelimit(key='ip', rate='20/h', method='POST', block=False)
+@login_required
+@ratelimit(key='user', rate='20/h', method='POST', block=False)
 def seizure_realtime_load(request):
     """Parse uploaded parquet/csv and return raw signal as JSON."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    # Unauthenticated and CPU-bound: without a limit an anonymous caller can pin
-    # workers parsing large frames. Kept open (not login-gated) so the public
-    # demo still works.
+    # CPU-bound: without a limit one caller can pin workers parsing large frames.
     if getattr(request, 'limited', False):
         return JsonResponse({'error': 'Too many requests. Please wait and try again.'},
                             status=429)
@@ -186,6 +213,7 @@ def seizure_realtime_load(request):
         return JsonResponse(client_error(exc, context='seizure'), status=500)
 
 
+@login_required
 def seizure_realtime_models(request):
     """Return the three locally available model variants + ensemble."""
     return JsonResponse({'models': [
@@ -196,8 +224,8 @@ def seizure_realtime_models(request):
     ]})
 
 
-@csrf_exempt
-@ratelimit(key='ip', rate='120/h', method='POST', block=False)
+@login_required
+@ratelimit(key='user', rate='120/h', method='POST', block=False)
 def seizure_realtime_predict_chunk(request):
     """Run local ONNX inference on a 10-second EEG window."""
     if request.method != 'POST':

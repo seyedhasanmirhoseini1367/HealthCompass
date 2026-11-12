@@ -1,0 +1,105 @@
+/* Moved from templates/dashboard/monitoring.html */
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.mon-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;border-radius:16px;padding:2rem 1.75rem;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.mon-header h1{font-size:1.4rem;font-weight:800;margin-bottom:.25rem}
+.mon-header p{opacity:.75;font-size:.875rem}
+.mon-header .live-badge{display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.12);padding:.4rem .9rem;border-radius:20px;font-size:.78rem;font-weight:600}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tab-bar{display:flex;gap:.5rem;margin-bottom:1.5rem;border-bottom:2px solid var(--border);padding-bottom:.5rem}
+.tab-btn{padding:.5rem 1.1rem;border-radius:8px 8px 0 0;font-size:.875rem;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;transition:all .2s;display:flex;align-items:center;gap:.4rem}
+.tab-btn.active{color:var(--primary-dk);background:#e0f2fe;border-bottom:2px solid var(--primary)}
+.tab-btn:hover:not(.active){color:var(--text);background:var(--bg)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Stat cards ───────────────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1rem;margin-bottom:1.75rem}
+.stat-card{background:white;border-radius:14px;padding:1.25rem 1rem;border:1px solid var(--border);box-shadow:var(--shadow-sm);text-align:center;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:var(--primary)}
+.stat-card.green::before{background:#22c55e}
+.stat-card.amber::before{background:#f59e0b}
+.stat-card.red::before{background:#ef4444}
+.stat-card.purple::before{background:#8b5cf6}
+.stat-num{font-size:2rem;font-weight:800;color:var(--text);line-height:1}
+.stat-lbl{font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.35rem}
+.stat-sub{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+
+/* ── Section headers ──────────────────────────────────────────────────────── */
+.sec-h{font-size:.95rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;color:var(--text)}
+.sec-h .icon{color:var(--primary)}
+
+/* ── Grid layouts ─────────────────────────────────────────────────────────── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .mon-header{padding:1.25rem 1rem;border-radius:12px}
+  .mon-header h1{font-size:1.1rem}
+  .tab-bar{gap:.25rem;overflow-x:auto;flex-wrap:nowrap;padding-bottom:.25rem}
+  .tab-btn{font-size:.78rem;padding:.4rem .7rem;white-space:nowrap}
+  .risk-grid{grid-template-columns:1fr}
+  .card .mono-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stat-num{font-size:1.5rem}
+}
+
+/* ── Chart card ───────────────────────────────────────────────────────────── */
+.chart-card{background:white;border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:1.25rem;margin-bottom:1.25rem}
+.chart-title{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem}
+.chart-wrap{position:relative;height:180px}
+
+/* ── Progress bar ─────────────────────────────────────────────────────────── */
+.prog-row{margin-bottom:.75rem}
+.prog-header{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.3rem;color:var(--text)}
+.prog-header .lbl{font-weight:600}
+.prog-header .val{color:var(--muted)}
+.prog-track{height:8px;background:#f1f5f9;border-radius:20px;overflow:hidden}
+.prog-fill{height:100%;border-radius:20px;transition:width .6s ease}
+.fill-blue{background:var(--primary)}
+.fill-green{background:#22c55e}
+.fill-amber{background:#f59e0b}
+.fill-red{background:#ef4444}
+.fill-purple{background:#8b5cf6}
+.fill-indigo{background:#6366f1}
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.mono-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.mono-table th{text-align:left;padding:.5rem .75rem;border-bottom:2px solid var(--border);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.mono-table td{padding:.6rem .75rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.mono-table tr:last-child td{border-bottom:none}
+.mono-table tr:hover td{background:#f8fafc}
+
+/* ── Coverage pill ────────────────────────────────────────────────────────── */
+.cov-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:700}
+.cov-good{background:#dcfce7;color:#15803d}
+.cov-warn{background:#fef3c7;color:#92400e}
+.cov-bad{background:#fee2e2;color:#b91c1c}
+
+/* ── Risk bands ───────────────────────────────────────────────────────────── */
+.risk-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem}
+.risk-cell{border-radius:12px;padding:1rem;text-align:center;border:1px solid transparent}
+.risk-low{background:#f0fdf4;border-color:#bbf7d0}
+.risk-med{background:#fffbeb;border-color:#fde68a}
+.risk-high{background:#fff1f2;border-color:#fecdd3}
+.risk-num{font-size:1.6rem;font-weight:800}
+.risk-low .risk-num{color:#15803d}
+.risk-med .risk-num{color:#92400e}
+.risk-high .risk-num{color:#b91c1c}
+.risk-lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:.2rem;font-weight:600}
+
+/* ── Status badge override ────────────────────────────────────────────────── */
+.tag{display:inline-flex;padding:.15rem .55rem;border-radius:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tag-active{background:#dcfce7;color:#15803d}
+.tag-pending{background:#fef3c7;color:#92400e}
+.tag-approved{background:#dbeafe;color:#1d4ed8}
+.tag-rejected{background:#fee2e2;color:#b91c1c}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.85rem}
+.empty-state .icon{font-size:2rem;display:block;margin-bottom:.75rem;opacity:.4}
+
+/* ── Divider ──────────────────────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:1.25rem 0}

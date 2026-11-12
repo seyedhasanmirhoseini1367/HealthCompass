@@ -1,0 +1,5 @@
+"""One date format for the whole site (audit UX-07)."""
+DATE_FORMAT = "j M Y"
+DATETIME_FORMAT = "j M Y, H:i"
+SHORT_DATE_FORMAT = "j.n.Y"
+SHORT_DATETIME_FORMAT = "j.n.Y H:i"

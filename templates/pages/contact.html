@@ -1,0 +1,17 @@
+{% extends 'pages/_legal.html' %}
+{% block title %}Contact — HealthCompass{% endblock %}
+{% block meta_description %}How to contact HealthCompass about your account, your data or this service.{% endblock %}
+{% block doc %}
+<h1>Contact</h1>
+<p class="lg-meta">Questions about your account, your data or this service</p>
+{% if contact_email %}
+<p>Write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>. For privacy requests, say which account (its email address) the request is about.</p>
+{% else %}
+<p><em>(TODO: contact address)</em></p>
+{% endif %}
+<p>You can do most things yourself: <a href="{% url 'accounts:data_export' %}">download your data</a>,
+<a href="{% url 'accounts:delete_account' %}">delete your account</a>, change your
+<a href="{% url 'accounts:consent' %}">consent settings</a> and see
+<a href="{% url 'accounts:access_history' %}">who has opened your records</a>.</p>
+<p>In a medical emergency, call 112. HealthCompass is not a medical service.</p>
+{% endblock %}

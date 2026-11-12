@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from apps.accounts.models import CustomUser, SharingGrant
 from apps.medical_records.models import MedicalRecord
 from apps.ai_insights.models import AIModel, ModelPrediction, HealthAlert
@@ -12,19 +13,20 @@ class UserSerializer(serializers.ModelSerializer):
     role_display    = serializers.CharField(source='get_role_display', read_only=True)
     profile_picture = serializers.SerializerMethodField()
 
-    def get_full_name(self, obj):
+    def get_full_name(self, obj) -> str:
         return obj.get_full_name() or obj.username
 
-    def get_profile_picture(self, obj):
+    def get_profile_picture(self, obj) -> str | None:
         if not obj.profile_picture:
             return None
         url = obj.profile_picture.url
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(url)
-        # Fallback: build absolute URL using the known domain
+        # Fallback: absolute URL from the configured site domain.
         if not url.startswith('http'):
-            return f'https://healthcompass.hasanai.net{url}'
+            from django.conf import settings
+            return f'{settings.ACCOUNT_DEFAULT_HTTP_PROTOCOL}://{settings.SITE_DOMAIN}{url}'
         return url
 
     class Meta:
@@ -58,28 +60,54 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model  = CustomUser
         fields = ['email', 'password', 'password2', 'first_name', 'last_name']
+        # Uniqueness is decided in validate_email / auth_service, not by the
+        # model's unique validator, so a taken address can be answered neutrally.
+        extra_kwargs = {'email': {'validators': []}}
 
     def validate(self, data):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
+        from apps.accounts.auth_service import password_errors
+        errors = password_errors(data['password'], CustomUser(
+            email=data.get('email', ''), first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', '')))
+        if errors:
+            raise serializers.ValidationError({'password': errors})
         return data
 
     def validate_email(self, value):
-        if CustomUser.objects.filter(email__iexact=value).exists():
+        from apps.accounts.auth_service import verification_required
+        if not verification_required() and CustomUser.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return value
 
     def create(self, validated_data):
-        validated_data.pop('password2')
-        user = CustomUser.objects.create_user(
-            username=validated_data['email'],
-            email=validated_data['email'],
-            password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            role=CustomUser.Role.PATIENT,
-        )
-        return user
+        # One registration path for web and API (apps.accounts.auth_service):
+        # validators, a generated username without '@', profile, EmailAddress
+        # row and the confirmation mail.
+        from apps.accounts import auth_service
+        try:
+            return auth_service.register_patient(
+                validated_data['email'], validated_data['password'],
+                validated_data.get('first_name', ''), validated_data.get('last_name', ''),
+                request=self.context.get('request'))
+        except auth_service.AuthError as exc:
+            raise serializers.ValidationError({'email': exc.message}) from exc
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """Fields a user may change on their own profile through the API."""
+
+    class Meta:
+        model  = CustomUser
+        fields = ['first_name', 'last_name', 'phone_number', 'date_of_birth']
+        extra_kwargs = {f: {'required': False} for f in fields}
+
+    def validate_phone_number(self, value):
+        from apps.accounts.validators import PHONE_MESSAGE, PHONE_RE
+        if value and not PHONE_RE.match(value):
+            raise serializers.ValidationError(PHONE_MESSAGE)
+        return value
 
 
 class MedicalRecordSerializer(serializers.ModelSerializer):
@@ -95,12 +123,37 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         read_only_fields = ['uploaded_at', 'is_flagged']
 
 
+class MedicalRecordListSerializer(serializers.ModelSerializer):
+    """List rows: no parsed_data or raw_text (those are on the detail endpoint)."""
+    record_type_display = serializers.CharField(source='get_record_type_display', read_only=True)
+
+    class Meta:
+        model  = MedicalRecord
+        fields = ['id', 'title', 'record_type', 'record_type_display',
+                  'record_date', 'uploaded_at', 'is_flagged', 'notes']
+
+
 class ParsedLabValueSerializer(serializers.ModelSerializer):
+    """The reading that currently stands: a correction, when one exists, replaces
+    the extracted value, unit and flags, as on the web shared-record view."""
+    is_corrected = serializers.SerializerMethodField()
+
     class Meta:
         from apps.medical_records.models import ParsedLabValue
         model  = ParsedLabValue
         fields = ['parameter_name', 'value', 'unit', 'reference_range',
-                  'is_abnormal', 'is_critical', 'measured_at']
+                  'is_abnormal', 'is_critical', 'measured_at', 'is_corrected']
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        current = obj.effective()
+        if current is not obj:
+            for field in ('value', 'unit', 'is_abnormal', 'is_critical'):
+                data[field] = getattr(current, field)
+        return data
+
+    def get_is_corrected(self, obj) -> bool:
+        return obj.effective() is not obj
 
 
 class WearableDataPointSerializer(serializers.ModelSerializer):
@@ -127,16 +180,6 @@ class MedicalRecordDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['uploaded_at', 'is_flagged']
 
 
-class MedicalRecordUploadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = MedicalRecord
-        fields = ['title', 'record_type', 'record_date', 'notes', 'file']
-
-    def create(self, validated_data):
-        validated_data['patient'] = self.context['request'].user
-        return MedicalRecord.objects.create(**validated_data)
-
-
 class HealthAlertSerializer(serializers.ModelSerializer):
     severity_display = serializers.CharField(source='get_severity_display', read_only=True)
 
@@ -152,10 +195,10 @@ class ModelPredictionSerializer(serializers.ModelSerializer):
     risk_pct       = serializers.SerializerMethodField()
     result_label   = serializers.SerializerMethodField()
 
-    def get_risk_pct(self, obj):
+    def get_risk_pct(self, obj) -> float | None:
         return round(float(obj.risk_score) * 100, 1) if obj.risk_score is not None else None
 
-    def get_result_label(self, obj):
+    def get_result_label(self, obj) -> str:
         return obj.result.get('label') or obj.result.get('prediction_label', '') if obj.result else ''
 
     class Meta:

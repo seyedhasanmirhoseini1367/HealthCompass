@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block extra_css %}
+<style>
+.sc-wrap{max-width:1100px;margin:0 auto}
+.sc-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:10px;padding:.65rem 1rem;font-weight:700;font-size:.9rem;margin-bottom:1.2rem}
+.sc-h{font-size:1.25rem;font-weight:800;color:var(--text);margin:0 0 .3rem}
+.sc-sub{font-size:.85rem;color:#64748b;margin-bottom:1.2rem}
+.sc-card{background:white;border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.8rem}
+.sc-btn{display:inline-block;border:1.5px solid var(--border);background:white;border-radius:10px;padding:.45rem .9rem;font-size:.85rem;font-weight:600;cursor:pointer;color:var(--text);text-decoration:none}
+.sc-btn.primary{background:#0f766e;border-color:#0f766e;color:white}
+.sc-btn.danger{border-color:#fca5a5;color:#b91c1c}
+.sc-btn:disabled{opacity:.5;cursor:not-allowed}
+.sc-status{font-size:.75rem;font-weight:700;padding:.2rem .6rem;border-radius:6px;background:#f1f5f9;color:#475569;white-space:nowrap}
+.sc-status.done{background:#d1fae5;color:#065f46}
+.sc-status.failed{background:#fee2e2;color:#991b1b}
+.sc-status.transcribing,.sc-status.generating,.sc-status.uploaded{background:#e0f2fe;color:#075985}
+.sc-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.sc-muted{color:#94a3b8;font-size:.82rem}
+.sc-error{background:#fee2e2;color:#991b1b;border-radius:10px;padding:.7rem 1rem;font-size:.88rem}
+</style>
+{% block scribe_css %}{% endblock %}
+{% endblock %}
+{% block content %}
+<div class="sc-wrap">
+  <div class="sc-banner" role="note">⚠ Experimental demo — not for clinical use.</div>
+  {% block scribe_content %}{% endblock %}
+</div>
+{% endblock %}

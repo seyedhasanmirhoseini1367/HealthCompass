@@ -1,18 +1,17 @@
 # Deployment gate — the test suite must pass before code reaches production.
 #
-# Until this existed, nothing ran the suite automatically: tests were executed
-# by hand on a developer machine, and Railway deployed whatever was pushed.
-#
 # The suite is deliberately runnable with NO secrets. It needs only SECRET_KEY
-# (any value), uses the SQLite fallback, and every external provider call in the
-# tests is patched. Verified: 653 tests pass with all four AI provider keys
-# empty, Firebase empty and no network. Keys are therefore NOT configured here —
-# if a test ever starts requiring one it will fail loudly rather than silently
-# skipping, which is the property that makes this a gate rather than a formality.
+# (any value), and every external provider call in the tests is patched. Keys
+# are therefore NOT configured here — if a test ever starts requiring one it
+# will fail loudly rather than silently skipping.
 #
-# DATABASE_URL is deliberately left UNSET, not set to "". dj_database_url
-# returns {} for an empty-but-set value, which yields a database with no ENGINE
-# and fails every test for a reason unrelated to the change under test.
+# Two test jobs: SQLite (fast, with coverage) and PostgreSQL 16 (production's
+# engine — column lengths, case sensitivity, partial unique constraints and
+# locking differ, and several defects only showed there; audit ARCH-04).
+#
+# DATABASE_URL is deliberately left UNSET in the SQLite job, not set to "".
+# dj_database_url returns {} for an empty-but-set value, which yields a database
+# with no ENGINE and fails every test for a reason unrelated to the change.
 
 name: CI
 
@@ -26,23 +25,28 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SECRET_KEY: ci-secret-key-not-used-for-anything-real
+  DEBUG: "False"
+  ALLOWED_HOSTS: 127.0.0.1,localhost
+  # medical_records.E001 refuses DEBUG=False without durable object storage,
+  # and accounts.E002 refuses it without a shared cache. A CI runner is thrown
+  # away after every job, so both are exactly right here.
+  ALLOW_EPHEMERAL_MEDIA: "True"
+  ALLOW_LOCAL_CACHE: "True"
+
 jobs:
-  test:
-    name: Test suite
+  lint-and-checks:
+    name: Lint, checks and dependency audit
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    env:
-      SECRET_KEY: ci-secret-key-not-used-for-anything-real
-      DEBUG: "False"
-      ALLOWED_HOSTS: 127.0.0.1,localhost
-
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # gitleaks scans the history
 
-      # Matches the development environment the pins were verified against.
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -53,10 +57,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Catches the failure mode this workflow exists for: a security-critical
-      # dependency going missing. parsers.py raises on a missing defusedxml, but
-      # this reports it as a clear step failure instead of a stack trace buried
-      # in test output.
+      # A security-critical dependency going missing: parsers.py raises on a
+      # missing defusedxml, but this reports it as a clear step failure.
       - name: Verify security-critical dependencies are present
         run: |
           python -c "import defusedxml; print('defusedxml', defusedxml.__version__)"
@@ -65,10 +67,18 @@ jobs:
       - name: Check for dependency conflicts
         run: pip check
 
-      # Narrow on purpose — see ruff.toml. Only rules that flag runtime bugs
-      # (syntax errors, undefined names, broken comparisons) are enabled, so
-      # this gate is green today and a failure means something is actually
-      # wrong rather than merely untidy.
+      # Fails on any known advisory in a pinned package (audit SEC-07).
+      - name: Dependency vulnerability audit
+        run: |
+          pip install pip-audit==2.10.1
+          pip-audit -r requirements.txt --progress-spinner off
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Runtime-bug rules plus bugbear, bandit and flake8-django; see ruff.toml.
       - name: Lint
         run: |
           pip install ruff==0.6.9
@@ -77,12 +87,128 @@ jobs:
       - name: Django system checks
         run: python manage.py check
 
+      # Production-like settings: every deploy warning is a failure. The only
+      # silenced check is the ephemeral-media warning this runner chooses.
+      - name: Deployment checks
+        env:
+          SECRET_KEY: ci-deploy-check-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGH
+          CACHE_URL: redis://localhost:6379/0
+          ALLOW_LOCAL_CACHE: "False"
+          EMAIL_HOST_USER: ci@example.invalid
+          EMAIL_HOST_PASSWORD: not-a-real-password
+          SILENCED_SYSTEM_CHECKS: medical_records.W001
+          # Owner details for the privacy page (pages.E001); dummy values here.
+          DEFAULT_FROM_EMAIL: noreply@example.invalid
+          SITE_DOMAIN: app.example.invalid
+          LEGAL_CONTROLLER_NAME: CI Example Oy
+          LEGAL_CONTROLLER_ADDRESS: Example street 1, Helsinki
+          LEGAL_BASIS: Explicit consent, GDPR Art. 6(1)(a) and 9(2)(a)
+          CONTACT_EMAIL: privacy@example.invalid
+          LEGAL_HOSTING_PROVIDER: Example hosting, EU
+          LEGAL_DATABASE_PROVIDER: Example database, EU
+        run: python manage.py check --deploy --fail-level WARNING
+
       # A model changed without its migration is how production and the code
-      # drift apart silently. Enabled once the one outstanding difference — a
-      # help_text on AIModel.model_file, no SQL involved — was recorded in
-      # ai_insights migration 0004.
+      # drift apart silently.
+      # The committed schema is what the mobile client generates from; it must
+      # match the code. Regenerate with: python manage.py spectacular --file openapi.yaml
+      - name: OpenAPI schema is up to date
+        run: |
+          python manage.py spectacular --file /tmp/openapi.yaml
+          diff -u openapi.yaml /tmp/openapi.yaml
+
       - name: Check for missing migrations
         run: python manage.py makemigrations --check --dry-run
 
+      # The static manifest must build: a missing file referenced from CSS or
+      # a template is a production 500 (audit ARCH-01).
+      - name: Collect static files with the manifest storage
+        run: python manage.py collectstatic --noinput --verbosity 0
+
+  test-sqlite:
+    name: Test suite (SQLite, coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install tblib==3.0.0 coverage==7.6.12
+
+      # Parallel workers report tracebacks through tblib. Coverage runs in
+      # parallel mode and is combined afterwards; the floor stops it drifting
+      # down (audit T-06).
+      - name: Run test suite with coverage
+        run: |
+          coverage run manage.py test apps --parallel auto --verbosity 1   # options in .coveragerc
+          coverage combine
+          coverage report --fail-under=74 --skip-covered
+
+  test-postgres:
+    name: Test suite (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16   # the migrations create the vector extension
+        env:
+          POSTGRES_USER: healthcompass
+          POSTGRES_PASSWORD: healthcompass
+          POSTGRES_DB: healthcompass
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U healthcompass"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://healthcompass:healthcompass@localhost:5432/healthcompass
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install tblib==3.0.0
       - name: Run test suite
-        run: python manage.py test apps --verbosity 2
+        run: python manage.py test apps --parallel auto --verbosity 1
+
+  e2e:
+    name: Browser journeys (Playwright + axe)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright==1.65.1 axe-playwright-python==0.1.8
+          python -m playwright install --with-deps chromium
+      # Sign-up, consent, records, a streamed answer, sharing, export, deletion,
+      # and the stored-XSS check, each page checked for JS errors and by axe.
+      - name: Run journeys
+        run: python manage.py test e2e --verbosity 2
+      - name: Keep traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: e2e/artifacts/
+          if-no-files-found: ignore

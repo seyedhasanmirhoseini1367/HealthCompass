@@ -1,0 +1,7 @@
+# Only for `python manage.py scribe_eval` — not needed to run the app, and
+# deliberately kept out of the root requirements.txt: bert-score pulls in
+# torch + transformers (several hundred MB), which production never uses.
+#
+#   pip install -r apps/scribe/requirements-eval.txt
+rouge-score==0.1.2
+bert-score==0.3.13

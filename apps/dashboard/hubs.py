@@ -22,6 +22,8 @@ people list in Care — goes through `accounts.authz.shared_with`, the same seam
 the notification pipeline and the person page use.
 """
 from __future__ import annotations
+from django.shortcuts import redirect
+from django.views.decorators.http import require_POST
 
 import logging
 
@@ -61,7 +63,36 @@ def my_health(request):
                            due_at__lte=now + timedelta(days=1))
                    .select_related('task').order_by('due_at'))
 
+    # Today: what used to be the patient Dashboard. Built by the same overview
+    # service, so its state rules (absence is never good news, no invented
+    # numbers) are unchanged. Patients only: other roles have their own home.
+    today = {}
+    checklist = None
+    if request.user.is_patient:
+        from apps.dashboard.overview import build_dashboard, first_run_checklist
+        today = build_dashboard(request.user)
+        checklist = first_run_checklist(request.user)
+
+    # My Health is now a patient's home page, so one failing section must not
+    # take it down. The Today block already degrades per section; measurements
+    # get the same treatment here.
+    try:
+        measurements = recent_measurements(request.user, limit=6)
+    except Exception:
+        logger.exception('my_health: recent measurements failed')
+        measurements = []
+
+    try:
+        from apps.care.adherence import adherence
+        adherence_data = adherence(request.user)
+    except Exception:
+        logger.exception('my_health: adherence failed')
+        adherence_data = None
+
     return render(request, 'dashboard/my_health.html', {
+        'checklist': checklist,
+        **today,
+        'adherence':     adherence_data,
         'occurrences':   occurrences,
         'tasks':         CareTask.objects.filter(patient=request.user,
                                                  is_active=True),
@@ -72,7 +103,7 @@ def my_health(request):
         'reports':       PatientReport.objects.filter(patient=request.user)[:5],
         'alerts':        alerts,
         'unread_alerts': sum(1 for a in alerts if not a.is_read),
-        'measurements':  recent_measurements(request.user, limit=6),
+        'measurements':  measurements,
         'record_count':  MedicalRecord.objects.filter(patient=request.user).count(),
         'recent_records': MedicalRecord.objects.filter(patient=request.user)
                           .order_by('-uploaded_at')[:5],
@@ -127,24 +158,33 @@ def care_overview(request):
     Called from `care.views.hub` rather than being a view itself, so the care app
     keeps ownership of its own URL.
     """
-    from apps.accounts.authz import shared_with
-    from apps.accounts.models import SharingGrant
+    from apps.accounts.models import SharingGrant, ShareRequest
     from apps.care.models import MonitoringSignal
     from apps.notifications.recipients import CARE_SCOPE
 
     user = request.user
 
+    # Everyone who currently shares anything with me. Sharing is managed on
+    # this page now, so someone who shares only records or appointments has to
+    # appear here too, not only those who share care alerts. Attention counts
+    # are read only where the alerts scope allows it.
     people = []
-    for subject in shared_with(user, CARE_SCOPE):
-        open_signals = MonitoringSignal.objects.filter(
-            patient=subject, resolved_at__isnull=True).count()
-        latest = (MonitoringSignal.objects.filter(patient=subject)
-                  .order_by('-created_at').first())
-        people.append({
-            'subject':      subject,
-            'open_signals': open_signals,
-            'last_activity': latest.created_at if latest else None,
-        })
+    received = (SharingGrant.objects
+                .filter(recipient=user, status=SharingGrant.Status.ACTIVE)
+                .select_related('patient'))
+    for grant in received:
+        if not grant.is_effective:
+            continue
+        subject = grant.patient
+        row = {'subject': subject, 'grant': grant, 'open_signals': 0,
+               'last_activity': None, 'sees_alerts': grant.allows(CARE_SCOPE)}
+        if row['sees_alerts']:
+            row['open_signals'] = MonitoringSignal.objects.filter(
+                patient=subject, resolved_at__isnull=True).count()
+            latest = (MonitoringSignal.objects.filter(patient=subject)
+                      .order_by('-created_at').first())
+            row['last_activity'] = latest.created_at if latest else None
+        people.append(row)
     # Whoever needs something comes first.
     people.sort(key=lambda p: (-p['open_signals'],))
 
@@ -153,7 +193,32 @@ def care_overview(request):
     granted = [g for g in SharingGrant.objects.filter(patient=user)
                .select_related('recipient') if g.is_effective]
 
+    # Shares offered but not yet accepted, in both directions (audit SEC-02).
+    invited = SharingGrant.Status.PENDING
+    invitations = list(SharingGrant.objects.filter(recipient=user, status=invited)
+                       .select_related('patient'))
+    offered = list(SharingGrant.objects.filter(patient=user, status=invited)
+                   .select_related('recipient'))
+
+    pending = ShareRequest.Status.PENDING
+    incoming = list(ShareRequest.objects.filter(patient=user, status=pending)
+                    .select_related('requester'))
+    outgoing = list(ShareRequest.objects.filter(requester=user, status=pending)
+                    .select_related('patient'))
+
     return {
-        'people':  people,
-        'granted': granted,
+        'people':   people,
+        'granted':  granted,
+        'incoming': incoming,
+        'outgoing': outgoing,
+        'invitations': invitations,
+        'offered':  offered,
     }
+
+
+@login_required
+@require_POST
+def dismiss_checklist(request):
+    from apps.accounts.models import PatientProfile
+    PatientProfile.objects.update_or_create(user=request.user, defaults={'onboarding_dismissed': True})
+    return redirect('dashboard:my_health')

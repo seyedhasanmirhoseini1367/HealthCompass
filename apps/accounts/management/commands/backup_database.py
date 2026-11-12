@@ -21,6 +21,8 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.ops.heartbeat import heartbeat
+
 
 class Command(BaseCommand):
     help = 'Back up the database and write a verifiable manifest alongside it.'
@@ -31,6 +33,7 @@ class Command(BaseCommand):
         parser.add_argument('--alias', default='default',
                             help='Database alias to back up.')
 
+    @heartbeat('backup_database')
     def handle(self, *args, **options):
         from healthcompass.backup import (
             build_manifest, database_engine, dump_postgres, dump_sqlite,

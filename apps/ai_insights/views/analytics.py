@@ -37,8 +37,10 @@ def health_view(request):
 
     biomarker_map, trending_biomarkers, latest_values = get_patient_biomarker_data(patient)
 
+    # "Everyone else": the viewer's own readings never count towards the
+    # population they are compared against (audit SEC-11).
     pop_trending_raw, _, pop_avg_raw, pop_unit = get_population_biomarker_stats(
-        biomarker_names=list(biomarker_map.keys()) or None
+        biomarker_names=list(biomarker_map.keys()) or None, exclude_patient=patient,
     )
     user_unit = {name: pts[-1]['unit'] for name, pts in biomarker_map.items() if pts}
     pop_avg = {
@@ -108,15 +110,15 @@ def health_view(request):
 
 @login_required
 def population_view(request):
-    # Cohort statistics, not patient-facing. This view was @login_required only,
-    # so any patient could read biomarker averages, alert counts and risk
-    # buckets over every other patient in the deployment.
+    # Open to every signed-in user. Research/admin roles see every figure;
+    # everyone else sees only figures based on at least MIN_PATIENTS distinct
+    # patients (services/population_privacy.py), because an average over a
+    # handful of people can reveal one of them.
     from apps.accounts.authz import can_view_population_analytics
-    if not can_view_population_analytics(request.user):
-        messages.error(request, 'Access denied.')
-        return redirect('dashboard:home')
-
     from apps.medical_records.models import MedicalRecord
+    from ..services import population_privacy as privacy
+
+    full_view = can_view_population_analytics(request.user)
 
     User = get_user_model()
 
@@ -147,7 +149,31 @@ def population_view(request):
 
     risk_buckets, pop_avg_risk, _ = get_population_risk_buckets()
 
+    limited = not full_view
+    too_few = alerts_hidden = risk_hidden = False
+    if limited:
+        cohort = MedicalRecord.objects.values('patient').distinct().count()
+        too_few = not privacy.enough(cohort)
+        pop_trending, pop_latest = privacy.public_biomarkers(pop_trending, pop_latest)
+        total_biomarkers = len(pop_latest)
+        alerts_hidden = not privacy.enough(
+            HealthAlert.objects.values('patient').distinct().count())
+        risk_hidden = not privacy.enough(
+            ModelPrediction.objects.filter(risk_score__isnull=False)
+            .values('patient').distinct().count())
+        if alerts_hidden:
+            alerts_summary = {'critical': 0, 'warning': 0, 'info': 0}
+            total_alerts = 0
+        if risk_hidden:
+            risk_buckets = {k: 0 for k in risk_buckets}
+            pop_avg_risk = None
+
     return render(request, 'ai_insights/population.html', {
+        'limited':             limited,
+        'too_few':             too_few,
+        'alerts_hidden':       alerts_hidden,
+        'risk_hidden':         risk_hidden,
+        'min_patients':        privacy.min_patients(),
         'trending_json':       script_safe_json(pop_trending),
         'latest_values':       pop_latest,
         'alerts_summary_json': script_safe_json(alerts_summary),
@@ -161,7 +187,7 @@ def population_view(request):
         'total_biomarkers':    total_biomarkers,
         'total_alerts':        total_alerts,
         'total_records':       total_records,
-        'has_data':            total_records > 0,
+        'has_data':            total_records > 0 and not too_few,
     })
 
 

@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from pgvector.django import HalfVectorField
 
 
 # ── Vector store models ────────────────────────────────────────────────────────
@@ -115,6 +116,13 @@ class MedicalChunk(EmbeddingProvenanceMixin):
     chunk_index = models.IntegerField()
     embedding   = models.BinaryField(null=True, blank=True)
     metadata    = models.JSONField(default=dict, blank=True)
+    # PostgreSQL vector column for in-database nearest-neighbour search
+    # (audit ARCH-05). halfvec, because pgvector's HNSW index on `vector` stops
+    # at 2,000 dimensions. Written alongside `embedding` on PostgreSQL only; the
+    # BinaryField stays the source of truth until backfill_embedding_vectors
+    # --verify has passed. NULL on SQLite.
+    embedding_vec = HalfVectorField(dimensions=settings.RAG_CONFIG['EMBEDDING_DIM'],
+                                    null=True, blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -141,6 +149,13 @@ class GeneralKnowledgeChunk(EmbeddingProvenanceMixin):
     chunk_index = models.IntegerField(default=0)
     embedding   = models.BinaryField(null=True, blank=True)
     metadata    = models.JSONField(default=dict, blank=True)
+    # PostgreSQL vector column for in-database nearest-neighbour search
+    # (audit ARCH-05). halfvec, because pgvector's HNSW index on `vector` stops
+    # at 2,000 dimensions. Written alongside `embedding` on PostgreSQL only; the
+    # BinaryField stays the source of truth until backfill_embedding_vectors
+    # --verify has passed. NULL on SQLite.
+    embedding_vec = HalfVectorField(dimensions=settings.RAG_CONFIG['EMBEDDING_DIM'],
+                                    null=True, blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -177,6 +192,14 @@ class QueryLog(models.Model):
                               related_name='messages', null=True, blank=True)
     query                 = models.TextField()
     response              = models.TextField()
+    # Whose records this answer used (audit SEC-12). Differs from the session's
+    # owner when a caregiver asks about someone who shares with them. CASCADE:
+    # erasing that person removes answers about them from everyone's history,
+    # and history is only replayed within one subject.
+    subject               = models.ForeignKey(
+                              settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                              null=True, blank=True, related_name='assistant_answers_about',
+                              help_text='The person whose records were used for this answer.')
     sources               = models.JSONField(default=list)
     # MLOps observability fields
     llm_provider          = models.CharField(

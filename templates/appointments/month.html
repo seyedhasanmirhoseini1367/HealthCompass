@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Appointments calendar — HealthCompass{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/appointments__month.css' %}">
+{% endblock %}
+{% block content %}
+<div class="appt-hero">
+  <div>
+    <h1>📅 My Appointments</h1>
+    <p>Schedule visits and get reminders right on time</p>
+  </div>
+  <div class="hero-actions">
+    <nav class="view-switch" aria-label="View">
+      <a href="{% url 'appointments:list' %}">{% icon 'list' %} List</a>
+      <a href="{% url 'appointments:month' %}" class="on" aria-current="page">{% icon 'calendar' %} Calendar</a>
+    </nav>
+    <a href="{% url 'appointments:create' %}" class="btn btn-primary x-10015ade">
+      {% icon 'plus' %} New Appointment
+    </a>
+  </div>
+</div>
+
+<div class="cal-bar">
+  <h2>{{ month|date:"F Y" }}</h2>
+  <div class="cal-nav">
+    <a class="btn btn-secondary btn-sm" href="?m={{ prev_m }}" aria-label="Previous month">{% icon 'chevron-left' %}</a>
+    <a class="btn btn-secondary btn-sm" href="?m={{ this_m }}">Today</a>
+    <a class="btn btn-secondary btn-sm" href="?m={{ next_m }}" aria-label="Next month">{% icon 'chevron-right' %}</a>
+  </div>
+</div>
+
+<div class="cal" role="grid" aria-label="{{ month|date:'F Y' }}">
+  <div class="cal-head" role="row">{% for d in weekdays %}<div role="columnheader">{{ d }}</div>{% endfor %}</div>
+  {% for week in weeks %}
+  <div class="cal-week" role="row">
+    {% for day in week %}
+    <div class="cal-day{% if not day.in_month %} out{% endif %}{% if day.date == today %} today{% endif %}" role="gridcell">
+      <span class="cal-num"{% if day.date == today %} aria-current="date"{% endif %}>{{ day.date.day }}</span>
+      {% for a in day.appts %}
+      <a class="cal-ev{% if a.is_cancelled %} cancelled{% elif day.date < today %} past{% endif %}"
+         href="{% url 'appointments:edit' a.pk %}"
+         title="{{ a.appointment_datetime|date:'H:i' }} {{ a.title }}{% if a.is_cancelled %} (cancelled){% endif %}">
+        <b>{{ a.appointment_datetime|date:"H:i" }}</b> {{ a.title }}
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+{% comment %} On a phone the grid shows dots only; the list underneath has the details. {% endcomment %}
+<div class="cal-agenda">
+  {% for week in weeks %}{% for day in week %}{% if day.in_month %}{% for a in day.appts %}
+  <a class="ag-item" href="{% url 'appointments:edit' a.pk %}">
+    <span class="ag-date">{{ a.appointment_datetime|date:"D j" }}<br>{{ a.appointment_datetime|date:"H:i" }}</span>
+    <span>{{ a.title }}{% if a.is_cancelled %} <em class="x-5dcdf2de">(cancelled)</em>{% endif %}</span>
+  </a>
+  {% endfor %}{% endif %}{% endfor %}{% endfor %}
+</div>
+{% endblock %}

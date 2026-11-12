@@ -26,6 +26,8 @@ Usage:
 """
 from django.core.management.base import BaseCommand
 
+from apps.ops.heartbeat import heartbeat
+
 
 class Command(BaseCommand):
     help = 'Index medical records that were never successfully indexed.'
@@ -41,6 +43,7 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true',
                             help='Report what would be indexed; change nothing.')
 
+    @heartbeat('reindex_unindexed_records')
     def handle(self, *args, **options):
         from datetime import timedelta
 

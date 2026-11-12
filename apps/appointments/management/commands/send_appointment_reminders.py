@@ -1,6 +1,8 @@
 import logging
 
 from django.core.management.base import BaseCommand
+
+from apps.ops.heartbeat import heartbeat
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = 'Send push/in-app reminders for upcoming appointments'
 
+    @heartbeat('send_appointment_reminders')
     def handle(self, *args, **options):
         from apps.appointments.models import Appointment
         from apps.notifications.models import Notification

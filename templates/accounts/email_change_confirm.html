@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Confirm new email — HealthCompass{% endblock %}
+{% block content %}
+<div class="acct-wrap"><div class="acct-card">
+  <h1>Confirm your new email address</h1>
+  <p>Make <strong>{{ new_email }}</strong> the email address of your HealthCompass account?</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="acct-actions"><button type="submit" class="btn btn-primary">Confirm new address</button></div>
+  </form>
+</div></div>
+{% endblock %}

@@ -2,168 +2,17 @@
 {% load static %}
 {% block title %}AI Health Assistant — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.chat-layout{display:grid;grid-template-columns:220px 1fr;gap:1.25rem;height:calc(100vh - 112px);min-height:500px;overflow:hidden}
-@media(max-width:700px){
-  /* Fix main so chat-layout can go full-screen below the navbar */
-  main{padding:0 !important;overflow:hidden !important;max-width:100% !important}
-  /* Pin the chat to the visible viewport, below the sticky navbar */
-  .chat-layout{
-    position:fixed !important;
-    top:60px;
-    left:0;
-    right:0;
-    bottom:0;
-    grid-template-columns:1fr !important;
-    height:auto !important;
-    min-height:0 !important;
-    overflow:hidden;
-    padding:.5rem;
-    box-sizing:border-box;
-    gap:.4rem;
-  }
-  .sidebar{display:none !important}
-  .chat-main{
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    overflow:hidden;
-    min-height:0;
-  }
-  .chat-header{padding:.6rem .875rem;margin-bottom:.4rem;border-radius:10px;flex-shrink:0}
-  .chat-header h1{font-size:.9rem}
-  .chat-header p{display:none}
-  .chat-header>div:first-child{font-size:1.1rem}
-  .messages-area{flex:1;min-height:0;overflow-y:auto;padding:.75rem .6rem;gap:.75rem}
-  .msg-user{max-width:88%}
-  .msg-assistant{max-width:95%}
-  .bubble{font-size:.875rem;padding:.6rem .8rem}
-  .chat-input-area{flex-shrink:0;gap:.4rem;margin-top:.35rem}
-  .chat-input{font-size:.9rem;padding:.55rem .75rem;border-radius:10px}
-  .send-btn{padding:.55rem .9rem;border-radius:10px;font-size:.875rem;flex-shrink:0}
-  .no-records-banner{font-size:.78rem;padding:.5rem .7rem;margin-bottom:.35rem;flex-shrink:0}
-}
-.sidebar{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto}
-.sidebar-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:.25rem .5rem;margin-bottom:.25rem}
-.session-row{position:relative;display:flex;align-items:center;border-radius:9px;transition:background .15s}
-.session-row:hover{background:#f1f5f9}
-.session-row.active{background:#dbeafe}
-.session-item{flex:1;padding:.5rem .75rem;border-radius:9px;font-size:.83rem;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none;display:block;min-width:0}
-.session-row.active .session-item{color:#0369a1;font-weight:600}
-.session-menu-btn{flex-shrink:0;padding:.25rem .4rem;background:none;border:none;cursor:pointer;color:var(--muted);border-radius:6px;font-size:.78rem;opacity:0;transition:opacity .15s}
-.session-row:hover .session-menu-btn,.session-row.active .session-menu-btn{opacity:1}
-.session-menu-btn:hover{background:#e2e8f0;color:var(--text)}
-.session-dropdown{position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:140px;padding:.3rem;display:none}
-.session-dropdown.open{display:block}
-.session-dropdown button{display:flex;align-items:center;gap:.5rem;width:100%;padding:.45rem .75rem;background:none;border:none;font-size:.82rem;color:var(--text);cursor:pointer;border-radius:7px;text-align:left}
-.session-dropdown button:hover{background:#f1f5f9}
-.session-dropdown button.danger{color:#dc2626}
-.session-dropdown button.danger:hover{background:#fee2e2}
-.new-chat-btn{display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border-radius:9px;font-size:.83rem;color:var(--primary);font-weight:600;cursor:pointer;border:1.5px dashed var(--primary);background:transparent;transition:all .15s;text-decoration:none;margin-bottom:.25rem}
-.new-chat-btn:hover{background:#e0f2fe}
-.chat-main{display:flex;flex-direction:column;min-height:0}
-.chat-header{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem}
-.chat-header h1{font-size:1rem;font-weight:700;margin:0}
-.chat-header p{font-size:.8rem;opacity:.85;margin:0}
-.messages-area{flex:1;overflow-y:auto;background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;display:flex;flex-direction:column;gap:1rem;min-height:0}
-.msg-user{align-self:flex-end;max-width:75%}
-.msg-assistant{align-self:flex-start;max-width:85%}
-.bubble{padding:.75rem 1rem;border-radius:14px;font-size:.9rem;line-height:1.55}
-.bubble-user{background:var(--primary);color:white;border-radius:14px 14px 4px 14px}
-.bubble-assistant{background:#f1f5f9;color:var(--text);border-radius:14px 14px 14px 4px;position:relative}
-.bubble-assistant .copy-btn{position:absolute;top:.4rem;right:.4rem;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.2rem .4rem;border-radius:5px;transition:all .15s;opacity:0}
-.bubble-assistant:hover .copy-btn,.bubble-assistant .copy-btn:focus-visible{opacity:1}
-.bubble-assistant .copy-btn:hover,.bubble-assistant .copy-btn:focus-visible{background:#e2e8f0}
-.bubble-assistant .copy-btn:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
-.msg-time{font-size:.7rem;color:var(--muted);margin-top:.25rem;text-align:right}
-.msg-user .msg-time{text-align:right}
-.msg-assistant .msg-time{text-align:left}
-.sources-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem}
-.source-chip{font-size:.7rem;background:white;border:1px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--muted)}
-.source-chip.general{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
-.source-chip.general a{color:#1d4ed8;text-decoration:none}
-.mode-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.65rem;font-weight:700;padding:.15rem .55rem;border-radius:10px;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.05em}
-.mode-badge.personal{background:#ede9fe;color:#6d28d9}
-.mode-badge.general{background:#dbeafe;color:#1d4ed8}
-.mode-badge.hybrid{background:#d1fae5;color:#065f46}
-.mode-badge.trajectory{background:#fef3c7;color:#92400e}
-.chart-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem 1.1rem;margin-top:.65rem;max-width:480px}
-.chart-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem}
-.chart-card-title{font-size:.78rem;font-weight:800;color:#1e1b4b}
-.chart-trend-up{color:#ef4444;font-size:.72rem;font-weight:700}
-.chart-trend-down{color:#16a34a;font-size:.72rem;font-weight:700}
-.chart-trend-stable{color:#64748b;font-size:.72rem;font-weight:700}
-.chart-canvas-wrap{position:relative;height:140px}
-.chat-input-area{margin-top:.75rem;display:flex;gap:.6rem;align-items:flex-end}
-.chat-input{flex:1;padding:.65rem 1rem;border:1.5px solid var(--border);border-radius:12px;font-size:.9rem;resize:none;font-family:inherit;transition:border .15s,box-shadow .15s;max-height:120px;outline:none}
-.chat-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
-.send-btn{padding:.65rem 1.1rem;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:.9rem;transition:all .15s;flex-shrink:0}
-.send-btn:hover{background:#0284c7}
-.send-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-.send-btn:disabled{opacity:.5;cursor:not-allowed}
-.typing-indicator{display:none;align-self:flex-start}
-.typing-bubble{background:#f1f5f9;border-radius:14px 14px 14px 4px;padding:.65rem 1rem;display:flex;gap:.35rem;align-items:center}
-.typing-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;animation:bounce .8s infinite}
-.typing-dot:nth-child(2){animation-delay:.15s}
-.typing-dot:nth-child(3){animation-delay:.3s}
-@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-.no-records-banner{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:.75rem 1rem;font-size:.83rem;color:#92400e;margin-bottom:.75rem}
-/* Markdown rendering */
-.bubble-assistant p{margin:.25rem 0}
-.bubble-assistant ul,.bubble-assistant ol{padding-left:1.25rem;margin:.35rem 0}
-.bubble-assistant li{margin:.15rem 0}
-.bubble-assistant code{background:#e2e8f0;padding:.1rem .3rem;border-radius:4px;font-size:.83em}
-.bubble-assistant pre{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:.75rem;overflow-x:auto;font-size:.82em;margin:.5rem 0}
-.bubble-assistant h3{font-size:.95rem;font-weight:700;margin:.5rem 0 .2rem}
-.bubble-assistant strong{font-weight:700}
-/* Prevent the page itself from scrolling — only messages-area scrolls */
-body,main{overflow:hidden!important}
-footer{display:none!important}
-#drawerBtn{display:none}
-@media(max-width:700px){#drawerBtn{display:inline-flex !important;align-items:center;gap:.35rem}}
-/* ── Local utilities ──────────────────────────────────────────────────────── */
-.icon-14  { width:14px }
-.mb-xs    { margin-bottom:.5rem }
-/* Mobile session drawer */
-.mobile-overlay { position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;background:rgba(0,0,0,.45) }
-.drawer-sheet   { position:absolute;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:1rem;max-height:70vh;overflow-y:auto }
-.drawer-header  { display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem }
-.drawer-title   { font-weight:700;font-size:.95rem }
-.drawer-close   { background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted) }
-/* Drawer open button */
-.drawer-btn { background:rgba(255,255,255,.2);border:none;color:white;border-radius:8px;padding:.4rem .65rem;font-size:.78rem;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap }
-/* Chat header sub-elements */
-.chat-bot-icon  { font-size:1.5rem;flex-shrink:0 }
-.chat-header-info { flex:1;min-width:0 }
-.subject-picker{display:flex;align-items:center;gap:.4rem;margin-right:.6rem}
-.subject-picker label{font-size:.72rem;color:rgba(255,255,255,.85);white-space:nowrap}
-.subject-picker select{border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);
-  color:#fff;border-radius:8px;padding:.28rem .5rem;font-size:.8rem;font-weight:600;max-width:150px}
-.subject-picker select option{color:#1e293b}
-.subject-picker select:focus-visible{outline:2px solid #fff;outline-offset:1px}
-/* Records banner link */
-.link-amber { color:#92400e;font-weight:700;margin-left:.3rem }
-/* Empty state */
-.empty-chat      { text-align:center;color:var(--muted);padding:3rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center }
-.empty-chat-icon { font-size:2.5rem;margin-bottom:.75rem }
-.empty-chat-h    { font-weight:600;font-size:.975rem;color:var(--text);margin-bottom:.5rem }
-.empty-chat-p    { font-size:.85rem;max-width:360px }
-/* Prompt chip buttons */
-.prompt-chips { display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:1.25rem }
-.chip-btn     { background:#f1f5f9;border:1px solid var(--border);border-radius:20px;padding:.35rem .9rem;font-size:.8rem;cursor:pointer;transition:all .15s }
-/* Disclaimer */
-.disclaimer { font-size:.72rem;color:var(--muted);margin-top:.4rem;text-align:center }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/rag_assistant__chat.css' %}">
 {% endblock %}
 {% block content %}
 
 <div class="chat-layout">
   <!-- Sidebar: session list -->
   <div class="sidebar">
-    <form method="post" action="{% url 'rag_assistant:new_session' %}" style="display:contents">
+    <form method="post" action="{% url 'rag_assistant:new_session' %}" class="x-ae125572">
       {% csrf_token %}
       <button type="submit" class="new-chat-btn">
-        <i class="fas fa-plus"></i> New chat
+        {% icon 'plus' %} New chat
       </button>
     </form>
     <div class="sidebar-title">Recent chats</div>
@@ -173,16 +22,16 @@ footer{display:none!important}
       <a href="/assistant/?session={{ s.pk }}" class="session-item">
         {{ s.title|truncatechars:26 }}
       </a>
-      <button class="session-menu-btn" onclick="toggleMenu(event,'menu-{{ s.pk }}')"
+      <button class="session-menu-btn" data-on-click="toggleMenu" data-args='[{"$": "event"}, "menu-{{ s.pk }}"]'
               title="Options">
-        <i class="fas fa-ellipsis-v"></i>
+        {% icon 'ellipsis-v' %}
       </button>
       <div class="session-dropdown" id="menu-{{ s.pk }}">
-        <button onclick="renameSession('{{ s.pk }}','srow-{{ s.pk }}')">
-          <i class="fas fa-pen icon-14"></i> Rename
+        <button data-on-click="renameSession" data-args='["{{ s.pk }}", "srow-{{ s.pk }}"]'>
+          {% icon 'pen' cls='icon-14' %} Rename
         </button>
-        <button class="danger" onclick="deleteSession('{{ s.pk }}','srow-{{ s.pk }}')">
-          <i class="fas fa-trash icon-14"></i> Delete
+        <button class="danger" data-on-click="deleteSession" data-args='["{{ s.pk }}", "srow-{{ s.pk }}"]'>
+          {% icon 'trash' cls='icon-14' %} Delete
         </button>
       </div>
     </div>
@@ -190,16 +39,16 @@ footer{display:none!important}
   </div>
 
   <!-- Mobile session drawer -->
-  <div id="mobileDrawer" class="mobile-overlay d-none" onclick="closeMobileDrawer()">
-    <div onclick="event.stopPropagation()" class="drawer-sheet">
+  <div id="mobileDrawer" class="mobile-overlay d-none" data-on-click="closeMobileDrawer">
+    <div data-stop-propagation class="drawer-sheet">
       <div class="drawer-header">
         <span class="drawer-title">Chats</span>
-        <button onclick="closeMobileDrawer()" class="drawer-close">&times;</button>
+        <button data-on-click="closeMobileDrawer" class="drawer-close">&times;</button>
       </div>
-      <form method="post" action="{% url 'rag_assistant:new_session' %}" style="display:contents">
+      <form method="post" action="{% url 'rag_assistant:new_session' %}" class="x-ae125572">
       {% csrf_token %}
       <button type="submit" class="new-chat-btn mb-xs">
-        <i class="fas fa-plus"></i> New chat
+        {% icon 'plus' %} New chat
         </button>
       </form>
       {% for s in sessions %}
@@ -237,14 +86,14 @@ footer{display:none!important}
         </select>
       </div>
       {% endif %}
-      <button id="drawerBtn" onclick="openMobileDrawer()" class="drawer-btn d-none">
-        <i class="fas fa-history"></i> Chats
+      <button id="drawerBtn" data-on-click="openMobileDrawer" class="drawer-btn d-none">
+        {% icon 'history' %} Chats
       </button>
     </div>
 
     {% if not has_records %}
     <div class="no-records-banner">
-      <i class="fas fa-info-circle"></i>
+      {% icon 'info-circle' %}
       <strong>No records yet.</strong> Upload your medical records for personalized answers.
       <a href="{% url 'medical_records:list' %}" class="link-amber">Upload records →</a>
     </div>
@@ -260,10 +109,10 @@ footer{display:none!important}
           Ask about your latest lab results, what a medication does, or any general health question.
         </p>
         <div class="prompt-chips">
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">What do my latest lab results show?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">Do I have any abnormal values?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">What are my current medications?</button>
-          <button onclick="usePrompt(this.textContent)" class="chip-btn">Explain my recent diagnosis</button>
+          {# Built from the user's own data: see apps/rag_assistant/suggestions.py #}
+          {% for q in suggestions %}
+          <button type="button" data-on-click="usePrompt" data-args='[{"$": "text"}]' class="chip-btn">{{ q }}</button>
+          {% endfor %}
         </div>
       </div>
       {% else %}
@@ -274,7 +123,7 @@ footer{display:none!important}
         </div>
         <div class="msg-assistant" data-history-idx="{{ forloop.counter0 }}">
           <div class="bubble bubble-assistant" data-raw="{{ msg.response }}">
-            <button class="copy-btn" onclick="copyMsg(this)" aria-label="Copy message"><i class="fas fa-copy" aria-hidden="true"></i></button>
+            <button class="copy-btn" data-on-click="copyMsg" data-args='[{"$": "this"}]' aria-label="Copy message">{% icon 'copy' %}</button>
             <div class="md-content"></div>
           </div>
           <div class="sources-row"></div>
@@ -298,9 +147,10 @@ footer{display:none!important}
                 placeholder="Ask a health question…"
                 aria-label="Ask a health question"
                 autofocus
-                onkeydown="handleKey(event)"></textarea>
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
-        <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                data-on-keydown="handleKey" data-args='[{"$": "event"}]'></textarea>
+      <button type="button" class="btn btn-secondary btn-sm" id="stopBtn" data-on-click="stopStreaming" hidden>Stop</button>
+      <button class="send-btn" id="sendBtn" data-on-click="sendMessage" aria-label="Send message">
+        {% icon 'paper-plane' %}
       </button>
     </div>
     <p class="disclaimer">
@@ -314,665 +164,6 @@ footer{display:none!important}
 {{ history_data|json_script:"history-data" }}
 <script src="{% static 'vendor/marked.min.js' %}"></script>
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
-<script>
-const SESSION_ID = "{{ session.pk }}";
-const STREAM_URL = "{% url 'rag_assistant:stream_message' %}";
-// Non-streaming endpoint, used for "Everyone" — see the send handler.
-const ASK_URL    = "{% url 'rag_assistant:send_message' %}";
-const CSRF = "{{ csrf_token }}";
-
-// ── LINK SAFETY ─ BEGIN (extracted verbatim by test_chat_link_safety.py) ─────
-//
-// Keep this block free of Django template tags: the test slices it out of this
-// file and executes it, so it must be valid JavaScript on its own.
-
-// Assistant text is untrusted: it is generated by an external model from
-// retrieved document content, so it can contain HTML — including HTML an
-// uploaded document talked the model into echoing. marked() passes raw HTML
-// straight through to innerHTML, so neutralise markup BEFORE rendering.
-// Markdown itself still works: only literal tags are defanged.
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-// Separate from escapeHtml because it is used INSIDE an attribute value.
-// escapeHtml stays exactly as it was: it runs over the whole message before
-// parsing, and widening it there would change how ordinary quotes in an answer
-// are rendered and double-escape URLs that legitimately contain them.
-function escapeAttr(s) {
-  return escapeHtml(s).replace(/"/g, '&quot;');
-}
-
-// The one rule for whether a URL may become a clickable target.
-//
-// Resolution against location.origin is deliberate: it means a relative
-// "/records/1" and a protocol-relative "//evil.example" are both judged as the
-// absolute URL the browser would actually navigate to, rather than by how they
-// look. Anything that is not http(s) after that — javascript:, data:, vbscript:,
-// and every casing of them — is refused.
-function safeUrl(raw, sameOriginOnly) {
-  if (!raw) return null;
-  try {
-    const parsed = new URL(raw, location.origin);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-    if (sameOriginOnly && parsed.origin !== location.origin) return null;
-    return parsed.href;
-  } catch (e) {
-    return null;   // unparseable URL — not a link
-  }
-}
-
-// escapeHtml cannot defend the hrefs marked builds for itself.
-//
-// It runs BEFORE parsing, so it neutralises literal <a> tags in the model's
-// output — but `[click](javascript:alert(1))` contains no markup to escape. The
-// anchor does not exist yet; marked constructs it afterwards, from text that
-// survived escaping untouched. Verified against the bundled marked 12.0.2:
-// without this override that input renders <a href="javascript:alert(1)">.
-//
-// Images are refused outright rather than validated. Nothing in an assistant
-// answer needs one — charts go through renderChart and citations through
-// renderSources — and an <img> is fetched without the reader doing anything, so
-// an attacker-chosen src is an exfiltration channel on sight, whatever its
-// protocol. The alt text is rendered as plain text instead.
-const _mdRenderer = new marked.Renderer();
-
-_mdRenderer.link = function (href, title, text) {
-  const safe = safeUrl(href);
-  if (!safe) return text;          // no anchor at all; the label survives as text
-  const external = !safe.startsWith(location.origin + '/');
-  return '<a href="' + escapeAttr(safe) + '"'
-       + (title ? ' title="' + escapeAttr(title) + '"' : '')
-       + (external ? ' target="_blank" rel="noopener noreferrer"' : '')
-       + '>' + text + '</a>';
-};
-
-_mdRenderer.image = function (href, title, text) {
-  return escapeHtml(text || '');
-};
-
-marked.use({ renderer: _mdRenderer });
-
-function renderMarkdown(text) {
-  return marked.parse(escapeHtml(text));
-}
-// ── LINK SAFETY ─ END ────────────────────────────────────────────────────────
-const HISTORY_DATA = JSON.parse(document.getElementById('history-data').textContent);
-
-// ── Initialise history messages (markdown + mode badge + sources + chart) ────
-document.querySelectorAll('.bubble-assistant[data-raw]').forEach(bubble => {
-  bubble.querySelector('.md-content').innerHTML = renderMarkdown(bubble.getAttribute('data-raw'));
-});
-
-document.querySelectorAll('.msg-assistant[data-history-idx]').forEach(wrap => {
-  const idx  = parseInt(wrap.getAttribute('data-history-idx'), 10);
-  const data = HISTORY_DATA[idx];
-  if (!data) return;
-
-  if (data.query_mode) renderModeBadge(wrap, data.query_mode);
-  if (data.sources && data.sources.length) renderSources(wrap, data.sources);
-  if (data.chart_data) renderChart(wrap, data.chart_data);
-});
-
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-  // Auto-resize textarea
-  const ta = e.target;
-  ta.style.height = 'auto';
-  ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-}
-
-function usePrompt(text) {
-  document.getElementById('msgInput').value = text;
-  sendMessage();
-}
-
-async function sendMessage() {
-  const input = document.getElementById('msgInput');
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  const btn = document.getElementById('sendBtn');
-  btn.disabled = true;
-  input.value = '';
-  input.style.height = 'auto';
-
-  // Hide empty state
-  const empty = document.getElementById('emptyState');
-  if (empty) empty.style.display = 'none';
-
-  const area = document.getElementById('messagesArea');
-  area.appendChild(makeBubble('user', msg));
-
-  // Re-append typing indicator AFTER the user bubble so dots appear below it
-  const typing = document.getElementById('typingIndicator');
-  area.appendChild(typing);
-  typing.style.display = 'flex';
-  _autoScroll = true;
-  scrollToBottom(true);
-
-  // Create the assistant bubble up-front so tokens stream into it
-  const assistantWrap = makeAssistantBubble('', []);
-  const contentDiv    = assistantWrap.querySelector('.md-content');
-  const rawBuf        = [];   // collects raw text for copy & markdown re-render
-
-  let firstToken = true;
-
-  // Whose records to answer from. The server re-checks this on every request;
-  // sending it here only saves the user re-stating it.
-  const picker  = document.getElementById('subjectSelect');
-  const subject = picker ? picker.value : 'self';
-
-  try {
-    // "Everyone" produces one labelled answer per person, which is not a
-    // shape a single token stream can carry — so it takes the non-streaming
-    // endpoint instead of silently streaming just one of them.
-    if (subject === 'all') {
-      const r = await fetch(ASK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({ message: msg, session_id: SESSION_ID, subject: subject }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      typing.style.display = 'none';
-      if (firstToken) { area.appendChild(assistantWrap); firstToken = false; }
-      rawBuf.push(data.response || '');
-      contentDiv.innerHTML = renderMarkdown(rawBuf.join(''));
-      if (data.sources) renderSources(assistantWrap, data.sources);
-      // Same bookkeeping the stream's 'done' event does, so the copy button
-      // works identically on a multi-person answer.
-      assistantWrap.querySelector('.bubble-assistant')
-                   .setAttribute('data-raw', rawBuf.join(''));
-      scrollToBottom();
-      return;
-    }
-
-    const resp = await fetch(STREAM_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-      body: JSON.stringify({ message: msg, session_id: SESSION_ID, subject: subject }),
-    });
-
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-    const reader  = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let   buf     = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buf += decoder.decode(value, { stream: true });
-
-      // SSE lines are separated by double newline
-      const lines = buf.split('\n\n');
-      buf = lines.pop();   // keep incomplete tail
-
-      for (const block of lines) {
-        const line = block.trim();
-        if (!line.startsWith('data: ')) continue;
-        let payload;
-        try { payload = JSON.parse(line.slice(6)); } catch { continue; }
-
-        if (payload.type === 'token') {
-          if (firstToken) {
-            typing.style.display = 'none';
-            area.appendChild(assistantWrap);
-            firstToken = false;
-          }
-          rawBuf.push(payload.content);
-          // Re-render markdown on every token so formatting appears incrementally
-          contentDiv.innerHTML = renderMarkdown(rawBuf.join(''));
-          scrollToBottom();
-
-        } else if (payload.type === 'sources') {
-          renderSources(assistantWrap, payload.sources || []);
-
-        } else if (payload.type === 'chart') {
-          renderChart(assistantWrap, payload.chart);
-
-        } else if (payload.type === 'chart_unavailable') {
-          renderChartUnavailable(assistantWrap, payload.reason);
-
-        } else if (payload.type === 'meta') {
-          renderModeBadge(assistantWrap, payload.mode || 'personal');
-          if (payload.mode === 'consent_required') {
-            renderConsentAction(assistantWrap, payload.consent_url);
-          }
-
-        } else if (payload.type === 'error') {
-          typing.style.display = 'none';
-          if (firstToken) area.appendChild(assistantWrap);
-          rawBuf.push(payload.message || 'An error occurred.');
-          contentDiv.innerHTML = renderMarkdown(rawBuf.join(''));
-          firstToken = false;
-
-        } else if (payload.type === 'done') {
-          // Store full raw text for copy button
-          assistantWrap.querySelector('.bubble-assistant').setAttribute('data-raw', rawBuf.join(''));
-        }
-      }
-    }
-
-  } catch(err) {
-    typing.style.display = 'none';
-    if (firstToken) area.appendChild(makeAssistantBubble('Network error. Please check your connection.', []));
-  } finally {
-    typing.style.display = 'none';
-    if (firstToken) area.appendChild(makeAssistantBubble('Sorry, I couldn\'t get a response. Please try again.', []));
-    btn.disabled = false;
-    scrollToBottom();
-  }
-}
-
-function makeBubble(role, text) {
-  const wrap = document.createElement('div');
-  wrap.className = `msg-${role}`;
-  const bubble = document.createElement('div');
-  bubble.className = `bubble bubble-${role}`;
-  bubble.textContent = text;
-  wrap.appendChild(bubble);
-  const time = document.createElement('div');
-  time.className = 'msg-time';
-  time.textContent = new Date().toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
-  wrap.appendChild(time);
-  return wrap;
-}
-
-function makeAssistantBubble(text, sources) {
-  const wrap = document.createElement('div');
-  wrap.className = 'msg-assistant';
-
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble bubble-assistant';
-  bubble.setAttribute('data-raw', text);
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'copy-btn';
-  copyBtn.setAttribute('aria-label', 'Copy message');
-  copyBtn.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i>';
-  copyBtn.onclick = function() { copyMsg(this); };
-
-  const content = document.createElement('div');
-  content.className = 'md-content';
-  if (text) content.innerHTML = renderMarkdown(text);
-
-  bubble.appendChild(copyBtn);
-  bubble.appendChild(content);
-  wrap.appendChild(bubble);
-
-  // Placeholder sources row — filled later by renderSources()
-  const sourcesRow = document.createElement('div');
-  sourcesRow.className = 'sources-row';
-  wrap.appendChild(sourcesRow);
-
-  if (sources && sources.length) {
-    renderSources(wrap, sources);
-  }
-
-  const time = document.createElement('div');
-  time.className = 'msg-time';
-  time.textContent = new Date().toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
-  wrap.appendChild(time);
-  return wrap;
-}
-
-function renderSources(wrap, sources) {
-  if (!sources || !sources.length) return;
-  const row = wrap.querySelector('.sources-row');
-  if (!row) return;
-  row.innerHTML = '';
-  sources.forEach(s => {
-    const chip = document.createElement('span');
-    if (s.is_general) {
-      // Mirrors the personal branch below: DOM construction, never innerHTML.
-      // This branch previously interpolated s.source_url into an href and
-      // s.source_name into element content unescaped. Knowledge-base rows are
-      // admin-controlled today, so the present risk was low — but `javascript:`
-      // URLs and quote-breakout both worked, and the inconsistency between two
-      // adjacent branches is how that becomes exploitable the day the knowledge
-      // base ingests an external feed.
-      chip.className = 'source-chip general';
-      const label = `🔗 ${(s.source_name || s.title || 'Source').substring(0, 30)}`;
-
-      // Only http(s) may become a link. Anything else renders as plain text, so
-      // a javascript: or data: URL cannot survive as a clickable target.
-      // Same rule as the markdown link renderer — one implementation, so the
-      // two cannot drift into disagreeing about what is safe.
-      const safeHref = safeUrl(s.source_url);
-
-      if (safeHref) {
-        const link = document.createElement('a');
-        link.href = safeHref;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.textContent = label;
-        chip.appendChild(link);
-      } else {
-        chip.textContent = label;
-      }
-    } else {
-      chip.className = 'source-chip';
-      const link = document.createElement('a');
-      link.href = s.record_id ? `/records/${s.record_id}/` : '#';
-      link.style.color = 'inherit';
-      link.textContent = `📎 ${(s.title || 'Record').substring(0, 25)}`;
-      chip.appendChild(link);
-    }
-    row.appendChild(chip);
-  });
-}
-
-function renderModeBadge(wrap, mode) {
-  const labels = {
-    personal:   ['🔒 Your records', 'personal'],
-    general:    ['🌐 General knowledge', 'general'],
-    hybrid:     ['✨ Records + Guidelines', 'hybrid'],
-    trajectory: ['📈 Health trend', 'trajectory'],
-    emergency:  ['🚨 Emergency', 'personal'],
-  };
-  const [label, cls] = labels[mode] || ['', 'personal'];
-  if (!label) return;
-  const existing = wrap.querySelector('.mode-badge');
-  if (existing) return;
-  const badge = document.createElement('div');
-  badge.className = `mode-badge ${cls}`;
-  badge.textContent = label;
-  const sourcesRow = wrap.querySelector('.sources-row');
-  if (sourcesRow) wrap.insertBefore(badge, sourcesRow);
-}
-
-// The assistant refuses without consent and used to name "Privacy & Consent
-// settings" in prose, with no link — and the page had none anywhere in the UI
-// either, so the refusal was a dead end. Consent is a control the patient is
-// entitled to exercise, so the refusal carries the way to exercise it.
-function renderConsentAction(wrap, url) {
-  if (wrap.querySelector('.consent-action')) return;
-
-  // Same-origin only. The URL arrives over the wire, and an absolute or
-  // scheme-relative one would turn this into an open redirect on a button the
-  // patient is being told to trust — so this is the same rule as everywhere
-  // else in this file, with the stricter option applied.
-  const href = safeUrl(url, true) || '/accounts/consent/';
-
-  const row = document.createElement('div');
-  row.className = 'consent-action';
-  row.style.cssText = 'margin-top:.75rem';
-
-  const link = document.createElement('a');
-  link.href = href;
-  link.className = 'btn btn-primary';
-  link.style.cssText = 'font-size:.82rem;padding:.42rem .9rem';
-  link.textContent = 'Open Privacy & Consent settings';
-
-  row.appendChild(link);
-  const sourcesRow = wrap.querySelector('.sources-row');
-  if (sourcesRow) wrap.insertBefore(row, sourcesRow); else wrap.appendChild(row);
-}
-
-
-// Why no chart, when one was asked for.
-//
-// Nothing used to be rendered in this case while the system prompt separately
-// told the model to say "Here is your chart:" — so the patient was promised a
-// chart, shown nothing, and left to guess which half had broken.
-//
-// textContent rather than innerHTML for the same reason renderChart uses it:
-// the reason can name a biomarker that came from an uploaded document, and
-// there is no escaping anywhere in that chain.
-function renderChartUnavailable(wrap, reason) {
-  if (!reason) return;
-  const note = document.createElement('div');
-  note.className = 'chart-card';
-  note.style.color = '#475569';
-  note.style.fontSize = '.82rem';
-  note.style.lineHeight = '1.5';
-  note.textContent = reason;
-  wrap.appendChild(note);
-  scrollToBottom();
-}
-
-function renderChart(wrap, data) {
-  if (!data || !data.values || data.values.length < 2) return;
-
-  const dir   = data.trend_direction || 'STABLE';
-  const color = dir === 'INCREASING' ? '#ef4444' : dir === 'DECREASING' ? '#16a34a' : '#6366f1';
-  const arrow = dir === 'INCREASING' ? '↑' : dir === 'DECREASING' ? '↓' : '→';
-  const cls   = dir === 'INCREASING' ? 'chart-trend-up' : dir === 'DECREASING' ? 'chart-trend-down' : 'chart-trend-stable';
-  const pct   = (data.pct_change >= 0 ? '+' : '') + data.pct_change + '%';
-
-  // Built with DOM APIs rather than innerHTML, deliberately.
-  //
-  // `display_name` and `unit` come from ParsedLabValue rows, which are populated
-  // from uploaded PDFs, Kanta XML and LLM parsing output — attacker-influenced
-  // text with no escaping anywhere in that chain. A unit column carrying an
-  // image tag with an error handler reached innerHTML here and executed on a
-  // page that holds the CSRF token in scope. (The payload is deliberately not
-  // written out: this comment is served to the browser, and apps/accounts/
-  // test_appsec.py scans the rendered page for exactly that string.)
-  //
-  // textContent is used instead of escapeHtml() + innerHTML so the escaping
-  // cannot be forgotten by a later edit: there is no HTML-parsing path to
-  // forget it on. See apps/rag_assistant/test_chart_xss.py.
-  const card = document.createElement('div');
-  card.className = 'chart-card';
-
-  const header = document.createElement('div');
-  header.className = 'chart-card-header';
-
-  const titleEl = document.createElement('span');
-  titleEl.className = 'chart-card-title';
-  titleEl.textContent = `📈 ${data.display_name} · ${data.unit}`;
-
-  const trendEl = document.createElement('span');
-  trendEl.className = cls;
-  trendEl.textContent = `${arrow} ${pct} over ${data.labels.length} readings`;
-
-  header.appendChild(titleEl);
-  header.appendChild(trendEl);
-
-  const canvasWrap = document.createElement('div');
-  canvasWrap.className = 'chart-canvas-wrap';
-  const canvasEl = document.createElement('canvas');
-  canvasEl.id = `chart-${Date.now()}`;
-  canvasWrap.appendChild(canvasEl);
-
-  card.appendChild(header);
-  card.appendChild(canvasWrap);
-
-  const bubble = wrap.querySelector('.bubble-assistant');
-  if (bubble) bubble.after(card);
-  else wrap.appendChild(card);
-
-  const canvas = card.querySelector('canvas');
-
-  // ── Guard against unit-mismatch scale distortion ─────────────────────────
-  // Only show a reference line if it's within 5× of the actual data range.
-  const dataMin = Math.min(...data.values);
-  const dataMax = Math.max(...data.values);
-  const dataRange = Math.max(dataMax - dataMin, dataMax * 0.05, 0.001);
-  const scale5x  = dataMax * 5;
-
-  const rawLow  = data.reference_low  != null ? data.reference_low  : null;
-  const rawHigh = data.reference_high != null ? data.reference_high : null;
-  const refLow  = (rawLow  != null && rawLow  < scale5x) ? rawLow  : null;
-  const refHigh = (rawHigh != null && rawHigh < scale5x) ? rawHigh : null;
-
-  // Y-axis bounds: fit data + small padding; include ref lines if they're sane
-  const candidates = [dataMin, dataMax];
-  if (refLow  != null) candidates.push(refLow);
-  if (refHigh != null) candidates.push(refHigh);
-  const yMin = Math.min(...candidates) - dataRange * 0.15;
-  const yMax = Math.max(...candidates) + dataRange * 0.15;
-
-  // Point colours: red if above high ref, orange if below low ref, else match trend
-  const ptColors = data.values.map(v => {
-    if (refHigh != null && v > refHigh) return '#ef4444';
-    if (refLow  != null && v < refLow)  return '#f59e0b';
-    return color;
-  });
-
-  const datasets = [{
-    label: data.display_name,
-    data:  data.values,
-    borderColor: color,
-    backgroundColor: color + '18',
-    borderWidth: 2.5,
-    pointRadius: 5,
-    pointHoverRadius: 7,
-    pointBackgroundColor: ptColors,
-    pointBorderColor: ptColors,
-    tension: 0.35,
-    fill: true,
-  }];
-
-  if (refHigh != null) {
-    datasets.push({
-      label: 'Upper limit',
-      data: data.labels.map(() => refHigh),
-      borderColor: '#fbbf24',
-      borderWidth: 1.5,
-      borderDash: [5, 4],
-      pointRadius: 0,
-      fill: false,
-    });
-  }
-  if (refLow != null) {
-    datasets.push({
-      label: 'Lower limit',
-      data: data.labels.map(() => refLow),
-      borderColor: '#94a3b8',
-      borderWidth: 1.5,
-      borderDash: [4, 4],
-      pointRadius: 0,
-      fill: false,
-    });
-  }
-
-  new Chart(canvas, {
-    type: 'line',
-    data: { labels: data.labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: datasets.length > 1, labels: { font: { size: 10 }, boxWidth: 14 } },
-        tooltip: {
-          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} ${data.unit}` },
-        },
-      },
-      scales: {
-        x: { ticks: { font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
-        y: {
-          min: yMin,
-          max: yMax,
-          ticks: { font: { size: 10 }, callback: v => v + (data.unit ? ' ' + data.unit : '') },
-          grid: { color: '#f1f5f9' },
-        },
-      },
-    },
-  });
-}
-
-function copyMsg(btn) {
-  const bubble = btn.closest('.bubble-assistant');
-  const text = bubble.getAttribute('data-raw');
-  navigator.clipboard.writeText(text).then(() => {
-    btn.setAttribute('aria-label', 'Copied!');
-    btn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
-    setTimeout(() => {
-      btn.setAttribute('aria-label', 'Copy message');
-      btn.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i>';
-    }, 1500);
-  });
-}
-
-// Track whether the user has scrolled up away from the bottom.
-// Streaming tokens only auto-scroll when the user is already at the bottom.
-let _autoScroll = true;
-document.getElementById('messagesArea').addEventListener('scroll', function() {
-  _autoScroll = (this.scrollHeight - this.scrollTop - this.clientHeight) < 80;
-}, { passive: true });
-
-function scrollToBottom(force) {
-  const area = document.getElementById('messagesArea');
-  if (force || _autoScroll) area.scrollTop = area.scrollHeight;
-}
-
-// Scroll to bottom on load
-scrollToBottom(true);
-
-function openMobileDrawer() {
-  document.getElementById('mobileDrawer').classList.remove('d-none');
-}
-function closeMobileDrawer() {
-  document.getElementById('mobileDrawer').classList.add('d-none');
-}
-
-// ── Session menu ──────────────────────────────────────────────────────────────
-
-function toggleMenu(e, menuId) {
-  e.preventDefault();
-  e.stopPropagation();
-  document.querySelectorAll('.session-dropdown.open').forEach(m => {
-    if (m.id !== menuId) m.classList.remove('open');
-  });
-  document.getElementById(menuId).classList.toggle('open');
-}
-
-// Close menus when clicking outside
-document.addEventListener('click', () => {
-  document.querySelectorAll('.session-dropdown.open').forEach(m => m.classList.remove('open'));
-});
-
-async function renameSession(pk, rowId) {
-  document.getElementById('menu-' + pk).classList.remove('open');
-  const row   = document.getElementById(rowId);
-  const link  = row.querySelector('.session-item');
-  const current = link.textContent.trim();
-  const title = prompt('Rename chat:', current);
-  if (!title || title.trim() === current) return;
-  const resp = await fetch(`/assistant/session/${pk}/rename/`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
-    body: JSON.stringify({title: title.trim()}),
-  });
-  const data = await resp.json();
-  if (data.ok) {
-    link.textContent = data.title.length > 26 ? data.title.substring(0, 26) + '…' : data.title;
-  }
-}
-
-async function deleteSession(pk, rowId) {
-  document.getElementById('menu-' + pk).classList.remove('open');
-  openDeleteModal('Delete this chat? This cannot be undone.', async () => {
-    const resp = await fetch(`/assistant/session/${pk}/delete/`, {
-      method: 'POST',
-      headers: {'X-CSRFToken': CSRF},
-    });
-    const data = await resp.json();
-    if (data.ok) {
-      const row = document.getElementById(rowId);
-      row.remove();
-      if (row.classList.contains('active')) {
-        // new_session is POST-only now — a GET that creates a row was
-        // CSRF-exempt by construction.
-        const f = document.createElement('form');
-        f.method = 'POST'; f.action = '/assistant/new/';
-        const t = document.createElement('input');
-        t.type = 'hidden'; t.name = 'csrfmiddlewaretoken'; t.value = CSRF;
-        f.appendChild(t); document.body.appendChild(f); f.submit();
-      }
-    }
-  }, 'Delete Chat');
-}
-</script>
+<script type="application/json" id="hc-page-data-rag_assistant__chat">{"k1": "{% filter escapejs %}{{ session.pk }}{% endfilter %}", "k2": "{% filter escapejs %}{% url 'rag_assistant:stream_message' %}{% endfilter %}", "k3": "{% filter escapejs %}{% url 'rag_assistant:send_message' %}{% endfilter %}", "k4": "{% filter escapejs %}{{ csrf_token }}{% endfilter %}"}</script>
+<script src="{% static 'js/pages/rag_assistant__chat.js' %}"></script>
 {% endblock %}

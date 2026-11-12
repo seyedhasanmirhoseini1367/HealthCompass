@@ -1,0 +1,61 @@
+# Local stack that mirrors production: PostgreSQL with pgvector, Redis, the web
+# process, the RQ worker and the scheduler.
+#
+#   cp .env.example .env   # set SECRET_KEY at least
+#   docker compose up --build
+#   open http://localhost:8000
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: healthcompass
+      POSTGRES_PASSWORD: healthcompass
+      POSTGRES_DB: healthcompass
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthcompass"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  web: &app
+    build: .
+    env_file: .env
+    environment: &env
+      DATABASE_URL: postgres://healthcompass:healthcompass@db:5432/healthcompass
+      CACHE_URL: redis://redis:6379/0
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CSRF_TRUSTED_ORIGINS: http://localhost:8000
+      SECURE_SSL_REDIRECT: "False"
+      TRUSTED_PROXY_COUNT: "0"
+      ALLOW_EPHEMERAL_MEDIA: "True"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn healthcompass.wsgi:application --bind 0.0.0.0:8000
+             --workers 2 --worker-class gthread --threads 8 --timeout 120"
+    ports: ["8000:8000"]
+    volumes: [media:/app/media]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    <<: *app
+    command: python manage.py rqworker ingest default
+    ports: []
+
+  scheduler:
+    <<: *app
+    command: python manage.py run_scheduler
+    ports: []
+
+volumes:
+  pgdata:
+  media:

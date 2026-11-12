@@ -102,11 +102,9 @@ class GeneralKnowledgeService:
         for c in chunks:
             try:
                 raw = bytes(c.embedding)
-                if raw[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
-                    import pickle
-                    vec = pickle.loads(raw)
-                else:
-                    vec = np.frombuffer(raw, dtype=np.float32)
+                # Raw float32 only. Legacy pickle-encoded rows were converted by
+                # rag_assistant migration 0012; pickle never runs on stored data.
+                vec = np.frombuffer(raw, dtype=np.float32)
 
                 # Without this, vectors of differing length reach np.array()
                 # below and produce a ragged/object array — a hard failure or,

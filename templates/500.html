@@ -1,11 +1,22 @@
-{% extends 'base.html' %}
-{% block title %}Server Error — HealthCompass{% endblock %}
-{% block content %}
-<div style="text-align:center;padding:4rem 2rem">
-  <p style="font-size:5rem">⚙️</p>
-  <h1 style="font-size:3rem;font-weight:800;color:var(--danger);margin:.5rem 0">500</h1>
-  <p style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem">Something Went Wrong</p>
-  <p style="color:var(--muted);margin-bottom:2rem">Please try again in a moment.</p>
-  <a href="/" class="btn btn-primary">Go Home</a>
-</div>
-{% endblock %}
+{% load static %}<!DOCTYPE html>
+{# Standalone on purpose: no template inheritance, so this renders even when the
+   shared layout is what failed (audit polish). #}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Something went wrong — HealthCompass</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/errors.css' %}">
+</head>
+<body>
+  <main class="err">
+    <p class="err-code">500</p>
+    <h1>Something went wrong</h1>
+    <p>The problem has been logged. Please try again in a moment.</p>
+    {% if reference %}<p class="err-ref">Reference: <code>{{ reference }}</code>. Quote it if you contact us.</p>{% endif %}
+    <p><a class="err-btn" href="/">Go to the start page</a></p>
+  </main>
+</body>
+</html>

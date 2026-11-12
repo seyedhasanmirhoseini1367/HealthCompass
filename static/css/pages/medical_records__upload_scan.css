@@ -1,0 +1,64 @@
+/* Moved from templates/medical_records/upload_scan.html */
+.scan-page { max-width: 900px; margin: 0 auto; }
+.scan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+@media(max-width:700px){ .scan-grid { grid-template-columns: 1fr; } }
+
+.scan-panel {
+  background: white; border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 1.25rem;
+}
+.scan-panel-title {
+  font-size: .75rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.scan-panel-title span {
+  background: #be185d; color: white;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .7rem;
+}
+
+/* Camera area */
+.camera-area {
+  border: 2px dashed #fbcfe8; border-radius: 12px;
+  background: #fdf2f8; min-height: 200px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .75rem; padding: 1.5rem;
+  cursor: pointer; transition: border-color .2s, background .2s;
+}
+.camera-area:hover { border-color: #ec4899; background: #fce7f3; }
+.camera-area .icon { font-size: 2.5rem; color: #be185d; }
+.camera-area p { font-size: .85rem; color: var(--muted); margin: 0; text-align: center; }
+
+#preview-wrap { display: none; }
+#preview-img { width: 100%; border-radius: 10px; border: 1.5px solid var(--border); }
+
+.btn-scan { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.2rem;
+  border-radius: 10px; font-weight: 700; font-size: .875rem; cursor: pointer;
+  border: none; transition: all .2s; text-decoration: none; }
+.btn-pink  { background: #be185d; color: white; }
+.btn-pink:hover { background: #db2777; }
+.btn-gray  { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+.btn-gray:hover { background: #e2e8f0; }
+
+.ocr-status { font-size: .82rem; color: var(--muted); display: flex; align-items: center; gap: .4rem; margin-top: .6rem; min-height: 1.2rem; }
+.spinner { width: 14px; height: 14px; border: 2px solid #fbcfe8; border-top-color: #ec4899; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Webcam modal */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 500; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal-box { background: white; border-radius: 18px; padding: 1.25rem; max-width: 480px; width: 95%; }
+.modal-title { font-weight: 800; margin-bottom: .75rem; display: flex; align-items: center; justify-content: space-between; }
+#webcamVideo { width: 100%; border-radius: 10px; background: #0f172a; }
+
+/* Right panel form */
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media(max-width:500px){ .form-row2 { grid-template-columns: 1fr; } }
+.flabel { font-size: .78rem; font-weight: 700; color: var(--text); display: block; margin-bottom: .25rem; }
+.finput { width: 100%; padding: .5rem .85rem; border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .875rem; font-family: inherit;  transition: border .15s; background: white; }
+.finput:focus { border-color: #ec4899; box-shadow: 0 0 0 3px rgba(236,72,153,.1); }
+textarea.finput { resize: vertical; min-height: 160px; }
+.fgroup { margin-bottom: .9rem; }

@@ -23,12 +23,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 def _decode_len(raw):
-    """Length of a stored vector, handling both pickle and raw-float32 encodings."""
-    raw = bytes(raw)
-    if raw[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
-        import pickle
-        return len(pickle.loads(raw))
-    return len(np.frombuffer(raw, dtype=np.float32))
+    """Length of a stored raw-float32 vector (pickled rows: see migration 0012)."""
+    return len(np.frombuffer(bytes(raw), dtype=np.float32))
 
 
 class Command(BaseCommand):

@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import login_required
 import json
 import os
 import random  # local Random() below — never the module-level RNG
@@ -218,6 +219,7 @@ def _icu_mock_context():
     }
 
 
+@login_required
 def icu_demo(request):
     if not (_DATA_BASE and os.path.isfile(_INDEX_PATH)):
         return render(request, 'ai_insights/icu/demo.html', _icu_mock_context())

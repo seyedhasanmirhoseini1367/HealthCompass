@@ -1,0 +1,17 @@
+# Weekly dependency updates so pinned versions do not freeze known advisories in
+# place (audit SEC-07). Minor and patch bumps arrive as one grouped PR; major
+# versions come one PR each so they can be reviewed on their own.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

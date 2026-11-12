@@ -1,0 +1,20 @@
+/* Moved from templates/medical_records/detail.html */
+.rec-header{background:white;border-radius:16px;border:1px solid var(--border);padding:1.5rem;margin-bottom:1.25rem;display:flex;align-items:flex-start;gap:1.25rem}
+.rec-header-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;background:#dbeafe}
+.rec-title{font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:.35rem}
+.rec-meta{font-size:.85rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
+.section-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
+.section-h{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.lab-table{width:100%;border-collapse:collapse;font-size:.875rem}
+.lab-table th{text-align:left;padding:.5rem .75rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+.lab-table td{padding:.5rem .75rem;border-bottom:1px solid #f1f5f9}
+.lab-table tr:last-child td{border-bottom:none}
+.flag-ab{color:#b45309;font-weight:700}
+.flag-crit{color:#b91c1c;font-weight:700}
+.wearable-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
+.metric-card{background:#f8fafc;border-radius:10px;padding:1rem;text-align:center}
+.metric-val{font-size:1.375rem;font-weight:700;color:var(--primary)}
+.metric-label{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+.json-section{background:#f8fafc;border-radius:10px;padding:1rem;font-size:.8rem;font-family:monospace;overflow-x:auto;max-height:300px;overflow-y:auto}
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted);font-size:.875rem;text-decoration:none;margin-bottom:1rem}
+.back-btn:hover{color:var(--primary)}

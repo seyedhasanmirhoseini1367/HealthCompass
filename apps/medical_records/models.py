@@ -88,6 +88,21 @@ class MedicalRecord(models.Model):
     CLAIMABLE_INDEX_STATES = (IndexStatus.PENDING, IndexStatus.FAILED,
                               IndexStatus.BLOCKED)
 
+    # Upload processing (audit ARCH-02). Slow uploads (PDF, pasted text) are
+    # stored and answered at once, then parsed by a job; READY is the default so
+    # every synchronous path and every existing row reads as done.
+    class ProcessingStatus(models.TextChoices):
+        QUEUED     = 'queued',     'Waiting to be processed'
+        PROCESSING = 'processing', 'Being processed'
+        READY      = 'ready',      'Ready'
+        FAILED     = 'failed',     'Processing failed'
+
+    processing_status = models.CharField(
+        max_length=12, choices=ProcessingStatus.choices,
+        default=ProcessingStatus.READY, db_index=True)
+    #: Short and generic: never exception text, which can quote the document.
+    processing_error = models.CharField(max_length=200, blank=True, default='')
+
     index_status = models.CharField(
         max_length=16, choices=IndexStatus.choices,
         default=IndexStatus.PENDING, db_index=True,

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static i18n %}
+{% comment %}
+  Shared layout for About, Privacy, Terms and Disclaimer.
+
+  The legal pages describe what this code actually does (which data, which
+  processors, which cookies). They are a plain-language draft, not reviewed
+  legal advice: have them checked before relying on them, and update them
+  whenever a processor or a data flow changes.
+{% endcomment %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/pages___legal.css' %}">
+{% endblock %}
+{% block content %}
+<div class="lg-wrap">
+  <nav class="lg-side" aria-label="{% trans "About and legal" %}">
+    <h2>HealthCompass</h2>
+    <a href="{% url 'about' %}" {% if page == 'about' %}class="on" aria-current="page"{% endif %}>{% trans "About" %}</a>
+    <a href="{% url 'privacy' %}" {% if page == 'privacy' %}class="on" aria-current="page"{% endif %}>{% trans "Privacy" %}</a>
+    <a href="{% url 'terms' %}" {% if page == 'terms' %}class="on" aria-current="page"{% endif %}>{% trans "Terms of use" %}</a>
+    <a href="{% url 'disclaimer' %}" {% if page == 'disclaimer' %}class="on" aria-current="page"{% endif %}>{% trans "Medical disclaimer" %}</a>
+    <a href="{% url 'contact' %}" {% if page == 'contact' %}class="on" aria-current="page"{% endif %}>{% trans "Contact" %}</a>
+  </nav>
+  <article class="lg-doc">
+    {% if show_todos and owner_todos %}
+    <div class="alert alert-warning" role="status"><strong>TODO for the site owner</strong> (shown only in development): fill in {{ owner_todos|join:"; " }}. Production deploys fail <code>check --deploy</code> until you do.</div>
+    {% endif %}
+    {% block doc %}{% endblock %}
+  </article>
+</div>
+{% endblock %}

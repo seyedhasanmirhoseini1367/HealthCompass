@@ -1,0 +1,11 @@
+/* Standalone error pages (templates/4xx.html, 500.html). */
+body { margin:0; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; background:var(--page-bg); color:var(--text); }
+.err { max-width:520px; margin:12vh auto; padding:0 var(--space-5); text-align:center; line-height:1.6; }
+.err-code { font-size:var(--fs-3xl); font-weight:800; color:var(--brand-600); margin:0; }
+.err h1 { font-size:var(--fs-2xl); margin:var(--space-2) 0; }
+.err p { color:var(--text-muted); }
+.err-ref code { background:var(--gray-100); padding:.1rem .4rem; border-radius:var(--radius-sm); color:var(--text); }
+.err-btn { display:inline-block; margin-top:var(--space-4); padding:.6rem 1.2rem; border-radius:var(--radius-md);
+  background:var(--brand-600); color:#fff; text-decoration:none; font-weight:600; }
+.err-btn:hover { background:var(--brand-700); }
+.err-btn:focus-visible { outline:2px solid var(--brand-600); outline-offset:2px; }

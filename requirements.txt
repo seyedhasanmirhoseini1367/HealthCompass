@@ -18,8 +18,8 @@
 # a Windows development machine can omit platform-conditional packages and would
 # be a false guarantee. Tracked as a follow-up in the roadmap.
 
-django==5.2.12
-pillow==12.2.0
+django==5.2.17
+pillow==13.0.0
 python-decouple==3.8
 google-genai==1.72.0
 groq==1.2.0
@@ -53,18 +53,23 @@ anthropic==0.88.0
 pyarrow==23.0.1
 joblib==1.5.3
 scipy==1.17.1
-langgraph==0.2.28
+langgraph==1.2.14
 
 # Google OAuth. Was `>=65.0.0,<66.0.0`; 66+ may have breaking changes, and
 # allauth 65.x has a known interaction documented in the project memory
 # (never combine a settings APP key with a DB SocialApp).
 django-allauth==65.16.1
+# allauth.mfa (TOTP for staff and clinicians) imports fido2 for its URL
+# config even when only TOTP is enabled; this is allauth's [mfa] extra.
+fido2==2.2.1
 
-PyJWT==2.12.1
+PyJWT==2.15.0
 requests==2.33.1
 
 # Mobile API
-djangorestframework==3.17.1
+djangorestframework==3.18.2
+# OpenAPI schema for the mobile client (/api/v1/schema/, staff-only docs).
+drf-spectacular==0.30.0
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 firebase-admin==7.5.0
@@ -74,7 +79,7 @@ firebase-admin==7.5.0
 # EncryptedCharField in apps/accounts/fields.py.
 # It is already a transitive dependency of several packages (google-genai,
 # anthropic, etc.) — listed here explicitly to guarantee it is present.
-cryptography==46.0.6
+cryptography==50.0.0
 django-ratelimit==4.1.0
 
 # Cache backend for django-ratelimit (multi-worker safe) and population insights.
@@ -87,3 +92,20 @@ gunicorn==26.0.0
 psycopg2-binary==2.9.12
 whitenoise==6.12.0
 dj-database-url==3.1.2
+
+# Experimental AI scribe (apps/scribe) — local speech-to-text on CPU.
+# Pulls in ctranslate2 (inference engine) and av (bundled FFmpeg, so mp3/m4a
+# decode without a system ffmpeg). Reuses onnxruntime above for voice-activity
+# detection. The Whisper "small" weights (~480 MB) are downloaded from Hugging
+# Face on first use, not at install time; the model needs ~1 GB RAM when loaded.
+faster-whisper==1.2.1
+
+# Background work (audit ARCH-02): one Redis-backed queue, the Redis that rate
+# limits already need. Jobs run inline under the test runner and when
+# RQ_ASYNC=False, so nothing else needs Redis locally.
+django-rq==4.2.0
+rq==2.9.1
+# Vector search in PostgreSQL (audit ARCH-05); SQLite keeps the NumPy path.
+pgvector==0.5.1
+# Error tracking, enabled only when SENTRY_DSN is set (audit ARCH-09).
+sentry-sdk==2.73.0

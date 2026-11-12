@@ -1,5 +1,6 @@
 import logging
 
+from ..pagination import paginated
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -18,8 +19,9 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 def my_predictions(request):
     from apps.ai_insights.models import ModelPrediction
-    qs = ModelPrediction.objects.filter(patient=request.user).order_by('-created_at')
-    return Response(ModelPredictionSerializer(qs, many=True).data)
+    qs = (ModelPrediction.objects.filter(patient=request.user)
+          .select_related('model').order_by('-created_at'))
+    return paginated(request, qs, ModelPredictionSerializer)
 
 
 @api_view(['GET'])
@@ -39,7 +41,7 @@ def prediction_detail_api(request, pk):
 def ai_models_list(request):
     from apps.ai_insights.models import AIModel
     qs = AIModel.objects.filter(status='active').order_by('-run_count', '-created_at')
-    return Response(AIModelListSerializer(qs, many=True).data)
+    return paginated(request, qs, AIModelListSerializer)
 
 
 @api_view(['GET'])
@@ -111,6 +113,9 @@ def seizure_analysis(request):
     uploaded_file = request.FILES.get('signal_file')
     if not uploaded_file:
         return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+    from django.conf import settings as _s
+    if (getattr(uploaded_file, 'size', 0) or 0) > int(getattr(_s, 'MAX_UPLOAD_BYTES', 25 * 1024 * 1024)):
+        return Response({'error': 'File too large.'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
     # Checked before the file is read, so the EEG bytes never leave the process
     # without consent. hasanai.net is a third party outside this system.

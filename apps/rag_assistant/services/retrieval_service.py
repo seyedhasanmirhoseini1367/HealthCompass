@@ -112,13 +112,23 @@ class RetrievalService:
         """
         from apps.rag_assistant.services.embedding_service import EmbeddingService
 
+        from apps.rag_assistant.services.embedding_service import use_pgvector
+
         emb_svc = EmbeddingService()
-        texts, matrix, meta = emb_svc.load_patient_embeddings(patient, document_type)
+        k = top_k or self.top_k
+        q_vec = None
+        if use_pgvector():
+            # PostgreSQL: let pgvector pick the candidates, then score only
+            # those. Scoring weights and thresholds are unchanged.
+            q_vec = emb_svc.embed(query, user=patient)
+            texts, matrix, meta = emb_svc.load_patient_embeddings(
+                patient, document_type, query_vector=q_vec,
+                candidates=k * self.rerank_recall_factor)
+        else:
+            texts, matrix, meta = emb_svc.load_patient_embeddings(patient, document_type)
 
         if not texts:
             return []
-
-        k = top_k or self.top_k
 
         intent = query_intent or self.classify_query_intent(query)
         bm25_w, sem_w = self.intent_weights.get(intent, (self.bm25_weight, self.sem_weight))
@@ -128,7 +138,8 @@ class RetrievalService:
         recall_k = min(k * self.rerank_recall_factor, len(texts))
 
         bm25   = self._bm25_scores(query, texts)
-        q_vec  = emb_svc.embed(query, user=patient)
+        if q_vec is None:
+            q_vec = emb_svc.embed(query, user=patient)
         cosine = self._cosine_scores(q_vec, matrix)
         hybrid = bm25_w * bm25 + sem_w * cosine
         hybrid = self._apply_time_decay(hybrid, meta)
@@ -347,8 +358,8 @@ class RetrievalService:
                 if age_days > self.decay_days:
                     t = min(1.0, (age_days - self.decay_days) / self.decay_days)
                     scores[i] *= (1 - self.decay_factor * t)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug('Time decay skipped for a chunk: %s', type(exc).__name__)
         return scores
 
     # ── Context-type boost (δ·Context) ────────────────────────────────────────

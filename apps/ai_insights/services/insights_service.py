@@ -52,13 +52,21 @@ def get_patient_biomarker_data(patient):
     return biomarker_map, trending, latest
 
 
-def get_population_biomarker_stats(biomarker_names=None):
+def get_population_biomarker_stats(biomarker_names=None, *, exclude_patient=None):
     """
     Compute population-level biomarker statistics from all patients'
     ParsedLabValue rows.  Results are cached for 1 hour.
 
+    Minimum cohort (audit SEC-11): every monthly point and every overall
+    average must rest on at least settings.POPULATION_MIN_COHORT distinct
+    patients, or it is dropped. One patient's readings over two months used to
+    become "the population", and a comparison could show another single
+    person's value.
+
     Args:
         biomarker_names: optional list of parameter names to restrict; None = all
+        exclude_patient: leave this person's readings out (pass the viewer when
+                         comparing someone against "everyone else")
 
     Returns:
         (pop_trending, pop_latest, pop_avg, pop_unit)
@@ -71,8 +79,12 @@ def get_population_biomarker_stats(biomarker_names=None):
     from django.core.cache import cache
     from apps.medical_records.models import ParsedLabValue
 
+    from django.conf import settings
+
+    min_cohort = int(getattr(settings, 'POPULATION_MIN_COHORT', 5))
+    excluded_pk = getattr(exclude_patient, 'pk', exclude_patient)
     _cache_key = (
-        'ai_insights:pop_biomarker:'
+        f'ai_insights:pop_biomarker:v3:k{min_cohort}:x{excluded_pk or "-"}:'
         + (','.join(sorted(biomarker_names)) if biomarker_names else 'all')
     )
     cached = cache.get(_cache_key)
@@ -82,39 +94,51 @@ def get_population_biomarker_stats(biomarker_names=None):
     # Model instances rather than .values(): a corrected reading supersedes the
     # extracted one, and `effective()` is where that is decided. Aggregating the
     # raw column would publish numbers the system no longer stands behind.
-    qs = (ParsedLabValue.objects
-          .select_related('record')
-          .prefetch_related('corrections'))
+    qs = ParsedLabValue.objects.all()
     if biomarker_names:
         qs = qs.filter(parameter_name__in=biomarker_names)
+    if excluded_pk is not None:
+        qs = qs.exclude(record__patient_id=excluded_pk)
+
+    # Uncorrected rows are read as plain values: no model instance or
+    # effective() call per row (audit PERF-03). Only rows that have a
+    # correction load the correction, so corrected readings still win.
+    rows = list(qs.filter(corrections__isnull=True).values_list(
+        'parameter_name', 'value', 'unit', 'record__record_date', 'record__uploaded_at',
+        'record__patient_id'))
+    for row in (qs.filter(corrections__isnull=False).distinct()
+                .select_related('record').prefetch_related('corrections')):
+        current = row.effective()
+        rows.append((row.parameter_name, current.value, current.unit, row.record.record_date,
+                     row.record.uploaded_at, row.record.patient_id))
 
     per_unit_monthly = defaultdict(lambda: defaultdict(list))
-    for row in qs:
-        current = row.effective()
-        lv = {
-            'parameter_name': row.parameter_name,
-            'value': current.value,
-            'unit': current.unit,
-            'record__record_date': row.record.record_date,
-            'record__uploaded_at': row.record.uploaded_at,
-        }
+    # Distinct patients behind each point: cells below the minimum cohort are
+    # dropped further down.
+    per_unit_patients = defaultdict(lambda: defaultdict(set))
+    for name, value, unit, record_date, uploaded_at, patient_id in rows:
         try:
-            numeric = float(lv['value'])
+            numeric = float(value)
         except (ValueError, TypeError):
             continue
-        date_val  = lv['record__record_date'] or lv['record__uploaded_at'].date()
+        date_val  = record_date or uploaded_at.date()
         month_key = date_val.strftime('%Y-%m')
-        key       = (lv['parameter_name'], lv.get('unit') or '')
+        key       = (name, unit or '')
         per_unit_monthly[key][month_key].append(numeric)
+        per_unit_patients[key][month_key].add(patient_id)
 
     by_name = defaultdict(list)
     for (name, unit), months in per_unit_monthly.items():
         total = sum(len(vs) for vs in months.values())
-        by_name[name].append((unit, total, months))
+        by_name[name].append((unit, total, months, per_unit_patients[(name, unit)]))
 
     pop_trending, pop_latest, pop_avg, pop_unit = {}, {}, {}, {}
     for name, groups in by_name.items():
-        best_unit, _, best_months = max(groups, key=lambda x: x[1])
+        best_unit, _, best_months, best_patients = max(groups, key=lambda x: x[1])
+        # Cells below the minimum cohort are dropped before anything is derived.
+        best_months = {m: vs for m, vs in best_months.items()
+                       if len(best_patients[m]) >= min_cohort}
+        everyone = set().union(*best_patients.values()) if best_patients else set()
         all_vals      = [v for vs in best_months.values() for v in vs]
         sorted_months = sorted(best_months.keys())
         series = [
@@ -122,6 +146,7 @@ def get_population_biomarker_stats(biomarker_names=None):
                 'date':  m,
                 'value': round(sum(best_months[m]) / len(best_months[m]), 2),
                 'count': len(best_months[m]),
+                'patients': len(best_patients[m]),
                 'unit':  best_unit,
             }
             for m in sorted_months if best_months[m]
@@ -131,8 +156,9 @@ def get_population_biomarker_stats(biomarker_names=None):
             pop_trending[name] = series
         if series:
             last = series[-1]
-            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count']}
-        if len(all_vals) >= 3:
+            pop_latest[name] = {'value': last['value'], 'unit': best_unit, 'count': last['count'],
+                                'patients': last['patients']}
+        if len(all_vals) >= 3 and len(everyone) >= min_cohort and best_months:
             pop_avg[name] = round(sum(all_vals) / len(all_vals), 2)
 
     result = (pop_trending, pop_latest, pop_avg, pop_unit)

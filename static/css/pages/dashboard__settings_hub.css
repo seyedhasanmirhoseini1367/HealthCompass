@@ -1,0 +1,12 @@
+/* Moved from templates/dashboard/settings_hub.html */
+.st-wrap{max-width:720px;margin:0 auto}
+.st-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
+.st-sub{font-size:.95rem;color:#475569;margin:0 0 1.6rem}
+.st-sec{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#475569;margin:1.6rem 0 .6rem}
+.st-item{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;
+         border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;
+         text-decoration:none}
+.st-item:hover{border-color:#cbd5e1}
+.st-name{font-size:.98rem;font-weight:700;color:var(--text)}
+.st-desc{font-size:.85rem;color:#475569;margin-top:.15rem;line-height:1.5}
+.st-meta{font-size:.82rem;color:#475569;white-space:nowrap}

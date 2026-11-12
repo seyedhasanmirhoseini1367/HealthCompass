@@ -9,37 +9,28 @@ echo "Working directory: $(pwd)"
 echo "BASE_DIR contents:"
 ls -la
 
-# ── collectstatic ─────────────────────────────────────────────────────────────
+# ── collectstatic (normally done in the build phase) ──────────────────────────
+# scripts/build.sh runs collectstatic once per deploy. Only when the image was
+# built without it (no manifest) is it run here as a fallback.
 echo ""
-echo ">>> [1/6] Running collectstatic (verbose)..."
-python manage.py collectstatic --noinput --verbosity 2
-
-echo ""
-echo ">>> Verifying staticfiles directory was created..."
-if [ ! -d "./staticfiles" ]; then
-    echo "ERROR: collectstatic exited 0 but ./staticfiles/ was NOT created."
-    echo ""
-    echo "--- Disk usage ---"
-    df -h .
-    echo ""
-    echo "--- Directory permissions ---"
-    ls -la .
-    echo ""
-    echo "--- Django check output ---"
-    python manage.py check --deploy 2>&1 || true
-    exit 1
+if [ -f "./staticfiles/staticfiles.json" ]; then
+    echo ">>> [1/6] Static files already collected at build time."
+else
+    echo ">>> [1/6] No static manifest found; running scripts/build.sh as a fallback..."
+    bash scripts/build.sh
 fi
 
-STATIC_COUNT=$(find ./staticfiles -type f | wc -l)
-echo "OK: ./staticfiles/ exists with ${STATIC_COUNT} file(s)."
-
-# ── migrations ────────────────────────────────────────────────────────────────
+# ── migrations (normally done in the release phase) ───────────────────────────
+# scripts/release.sh backs up the database and migrates once per deploy. Set
+# RELEASE_PHASE_HANDLED=true where the platform runs it (Procfile `release:`,
+# Render pre-deploy command); otherwise it runs here, before gunicorn.
 echo ""
-echo ">>> [2/6] Running migrations..."
-python manage.py migrate --noinput
-echo ""
-echo ">>> Migration status (appointments):"
-python manage.py showmigrations appointments || echo "(appointments app not found)"
+if [ "${RELEASE_PHASE_HANDLED:-false}" = "true" ]; then
+    echo ">>> [2/6] Release phase handled by the platform; not migrating here."
+else
+    echo ">>> [2/6] Running release steps (backup, migrate)..."
+    bash scripts/release.sh
+fi
 
 # ── superuser (one-time bootstrap) ───────────────────────────────────────────
 if [ "$CREATE_ADMIN" = "true" ]; then

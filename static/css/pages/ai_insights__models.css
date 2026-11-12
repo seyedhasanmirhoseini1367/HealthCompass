@@ -1,0 +1,45 @@
+/* Moved from templates/ai_insights/models.html */
+/* .page-hero styles are now global in base.html */
+.back-btn{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:.35rem .85rem;font-size:.78rem;font-weight:600;color:white;text-decoration:none;transition:background .15s;white-space:nowrap}
+.back-btn:hover{background:rgba(255,255,255,.28);color:white;text-decoration:none}
+
+.featured-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-bottom:1.25rem}
+@media(max-width:800px){.featured-row{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.featured-row{grid-template-columns:1fr}}
+.feat-card{display:flex;align-items:center;gap:.9rem;border-radius:14px;padding:1rem 1.2rem;color:white;text-decoration:none;transition:opacity .18s}
+.feat-card:hover{opacity:.88;text-decoration:none;color:white}
+.feat-emoji{font-size:1.75rem;flex-shrink:0}
+.feat-title{font-size:.9rem;font-weight:800}
+.feat-sub{font-size:.75rem;opacity:.82}
+.feat-arrow{margin-left:auto;font-weight:700;opacity:.85;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#6ee7b7;display:inline-block;animation:pulse 1.4s infinite;margin-right:.3rem}
+
+.models-toolbar{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.models-search{flex:1;min-width:180px;padding:.5rem .9rem;border:1.5px solid var(--border);border-radius:10px;font-size:.875rem;font-family:inherit;transition:border .15s}
+.models-search:focus{border-color:var(--primary)}
+.models-sort{border:1px solid var(--border);border-radius:9px;padding:.4rem .65rem;font-size:.82rem;color:var(--text);background:white}
+.cat-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.cat-chip{border:1.5px solid var(--border);background:white;border-radius:20px;padding:.28rem .8rem;font-size:.78rem;font-weight:600;color:#475569;cursor:pointer;transition:all .18s}
+.cat-chip.active,.cat-chip:hover{border-color:#10b981;background:#d1fae5;color:#065f46}
+
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+.model-card{background:white;border-radius:14px;border:1px solid var(--border);padding:1.15rem 1.2rem;display:flex;flex-direction:column;gap:.6rem;cursor:pointer;position:relative;overflow:hidden;transition:all .2s}
+.model-card:hover{box-shadow:0 8px 24px rgba(0,0,0,.09);transform:translateY(-2px);border-color:#cbd5e1}
+.model-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.cat-cardiovascular::before{background:#ef4444}.cat-diabetes::before{background:#f59e0b}
+.cat-oncology::before{background:#8b5cf6}.cat-neurology::before{background:#6366f1}
+.cat-wearable::before{background:#10b981}.cat-general::before{background:#0ea5e9}.cat-other::before{background:#94a3b8}
+.model-cat-badge{display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:20px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cat-cardiovascular .model-cat-badge{background:#fee2e2;color:#b91c1c}
+.cat-diabetes .model-cat-badge{background:#fef3c7;color:#92400e}
+.cat-oncology .model-cat-badge{background:#ede9fe;color:#5b21b6}
+.cat-neurology .model-cat-badge{background:#e0e7ff;color:#3730a3}
+.cat-wearable .model-cat-badge{background:#d1fae5;color:#065f46}
+.cat-general .model-cat-badge{background:#dbeafe;color:#0369a1}
+.cat-other .model-cat-badge{background:#f1f5f9;color:#475569}
+.model-name{font-size:.95rem;font-weight:700;color:var(--text)}
+.model-desc{font-size:.82rem;color:var(--muted);line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.model-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.6rem;border-top:1px solid #f1f5f9;margin-top:auto}
+.run-count{font-size:.75rem;color:var(--muted)}
+.run-btn{font-size:.76rem;padding:.28rem .8rem;background:var(--primary);color:white;border-radius:8px;font-weight:600}

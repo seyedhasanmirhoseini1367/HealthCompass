@@ -8,7 +8,11 @@ class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         PATIENT        = 'patient',        'Patient'
         DOCTOR         = 'doctor',         'Doctor'
-        DATA_SCIENTIST = 'data_scientist', 'Data Scientist'
+        # Shown as "Staff": developers, data scientists, analysts and others who
+        # work on the platform. The stored value stays 'data_scientist' so no
+        # existing account, permission or approval changes. The person's actual
+        # job is DataScientistProfile.job_title.
+        DATA_SCIENTIST = 'data_scientist', 'Staff'
         HOSPITAL_ADMIN = 'hospital_admin', 'Hospital Admin'
         ADMIN          = 'admin',          'Admin'
 
@@ -22,7 +26,7 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=20, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     is_approved = models.BooleanField(default=True,
-        help_text='Patients are auto-approved. Doctors, Data Scientists, and Hospital Admins require admin approval.')
+        help_text='Patients are auto-approved. Doctors, Staff, and Hospital Admins require admin approval.')
 
     def save(self, *args, **kwargs):
         """
@@ -60,6 +64,10 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True)
     emergency_contact_name = models.CharField(max_length=100, blank=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True)
+    #: The patient closed the first-run checklist on My Health (audit UX-06).
+    onboarding_dismissed = models.BooleanField(default=False)
+    #: Shown on the emergency card: people may rely on it, so they must see how current it is.
+    updated_at = models.DateTimeField(auto_now=True, null=True)
     national_id     = EncryptedCharField(
                         blank=True,
                         help_text='Encrypted at rest with a Fernet key derived from SECRET_KEY. '
@@ -106,7 +114,22 @@ class DoctorProfile(models.Model):
 
 
 class DataScientistProfile(models.Model):
+    """Profile for the Staff role (stored role value: 'data_scientist')."""
+
+    class JobTitle(models.TextChoices):
+        DATA_SCIENTIST = 'data_scientist', 'Data Scientist'
+        DEVELOPER      = 'developer',      'Developer'
+        PROGRAMMER     = 'programmer',     'Programmer'
+        ANALYST        = 'analyst',        'Analyst'
+        DESIGNER       = 'designer',       'Designer'
+        RESEARCHER     = 'researcher',     'Researcher'
+        OTHER          = 'other',          'Other'
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='scientist_profile')
+    # Display only: shown next to "Staff" in the top bar. Never used for access.
+    # Existing profiles get the default, which is what they were before.
+    job_title = models.CharField(max_length=20, choices=JobTitle.choices,
+                                 default=JobTitle.DATA_SCIENTIST)
     institution = models.CharField(max_length=200, blank=True)
     research_area = models.CharField(max_length=200, blank=True)
     approved_by = models.ForeignKey(CustomUser, null=True, blank=True,
@@ -204,6 +227,9 @@ class SharingGrant(models.Model):
     want, and it is unreachable with a single switch.
     """
     class Status(models.TextChoices):
+        # PENDING: offered by the patient, not yet accepted by the recipient.
+        # Gives nothing; authz.sharing_grant honours ACTIVE only (audit SEC-02).
+        PENDING = 'pending', 'Waiting for acceptance'
         ACTIVE  = 'active',  'Active'
         REVOKED = 'revoked', 'Revoked'
 
@@ -296,6 +322,59 @@ class SharingGrant(models.Model):
         self.revoked_by = by if getattr(by, 'pk', None) else None
         self.revoke_reason = reason[:200]
         self.save(update_fields=['status', 'revoked_at', 'revoked_by', 'revoke_reason'])
+        # Answers the recipient got about this patient stay out of their
+        # history once the share ends (audit SEC-12).
+        from apps.rag_assistant.models import QueryLog
+        QueryLog.objects.filter(session__patient=self.recipient, subject=self.patient).delete()
+
+
+class ShareRequest(models.Model):
+    """
+    Someone asking a patient to share with them.
+
+    A request is never access. It is a separate row on purpose: SharingGrant's
+    invariant is that only the patient creates it, and that stays true — the
+    grant is still created by the patient, when they approve, choosing the
+    scopes themselves. The requester cannot pick what they get.
+
+    A declined request is not announced to the requester (no notification) so
+    saying no costs the patient nothing socially, and a recent decline blocks a
+    repeat request for DECLINE_COOLDOWN_DAYS so "no" cannot be worn down.
+    """
+    DECLINE_COOLDOWN_DAYS = 30
+    MAX_PENDING_SENT = 10
+
+    class Status(models.TextChoices):
+        PENDING   = 'pending',   'Pending'
+        APPROVED  = 'approved',  'Approved'
+        DECLINED  = 'declined',  'Declined'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    id        = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requester = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='share_requests_sent')
+    patient   = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                  related_name='share_requests_received')
+    message   = models.CharField(max_length=300, blank=True, default='')
+    status    = models.CharField(max_length=10, choices=Status.choices,
+                  default=Status.PENDING, db_index=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            # At most one open request per pair.
+            models.UniqueConstraint(fields=['requester', 'patient'],
+                                    condition=models.Q(status='pending'),
+                                    name='one_pending_share_request_per_pair'),
+            models.CheckConstraint(check=~models.Q(requester=models.F('patient')),
+                                   name='share_request_not_self'),
+        ]
+        indexes = [models.Index(fields=['patient', 'status'])]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.requester.username} asks {self.patient.username} [{self.status}]'
 
 
 class AdminAuditEvent(models.Model):

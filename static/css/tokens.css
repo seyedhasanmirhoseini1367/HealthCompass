@@ -1,0 +1,44 @@
+/*
+ * Design tokens (audit UX-01, UX-02). Every colour pair used for text meets
+ * WCAG AA (4.5:1); ratios are listed in docs/DESIGN_SYSTEM.md and checked by
+ * apps/dashboard/test_design_system.py.
+ */
+:root {
+  /* Neutrals (slate) */
+  --gray-50:#f8fafc; --gray-100:#f1f5f9; --gray-200:#e2e8f0; --gray-300:#cbd5e1;
+  --gray-400:#94a3b8; --gray-500:#64748b; --gray-600:#475569; --gray-700:#334155;
+  --gray-800:#1e293b; --gray-900:#0f172a;
+
+  /* Brand */
+  --brand-50:#f0f9ff; --brand-100:#e0f2fe; --brand-600:#0369a1; --brand-700:#075985;
+  --accent-600:#4f46e5;
+
+  /* Semantic: -bg tint, -border, -text (text on the tint and on white), -solid (fill behind white text) */
+  --success-bg:#f0fdf4; --success-border:#bbf7d0; --success-text:#166534; --success-solid:#15803d;
+  --warning-bg:#fffbeb; --warning-border:#fde68a; --warning-text:#92400e; --warning-solid:#b45309;
+  --danger-bg:#fef2f2;  --danger-border:#fecaca;  --danger-text:#991b1b;  --danger-solid:#b91c1c;
+  --info-bg:#f0f9ff;    --info-border:#bae6fd;    --info-text:#075985;    --info-solid:#0369a1;
+
+  /* Text and surfaces */
+  --text:var(--gray-900);
+  --text-muted:#475569;
+  --surface:#fff;
+  --page-bg:#f0f7ff;
+
+  /* Type scale */
+  --fs-xs:.75rem; --fs-sm:.875rem; --fs-base:1rem; --fs-lg:1.125rem;
+  --fs-xl:1.25rem; --fs-2xl:1.5rem; --fs-3xl:2rem;
+  --lh-heading:1.25; --lh-body:1.6;
+
+  /* Spacing (4px grid) */
+  --space-1:.25rem; --space-2:.5rem; --space-3:.75rem; --space-4:1rem;
+  --space-5:1.25rem; --space-6:1.5rem; --space-7:2rem; --space-8:3rem;
+
+  /* Radius and shadow */
+  --radius-sm:6px; --radius-md:10px; --radius-lg:16px;
+  --shadow-sm:0 1px 3px rgba(15,23,42,.08);
+  --shadow-md:0 8px 24px rgba(15,23,42,.12);
+
+  /* Motion */
+  --ease:cubic-bezier(.2,.7,.3,1); --dur-fast:120ms; --dur:200ms;
+}

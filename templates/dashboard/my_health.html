@@ -1,29 +1,34 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}My Health — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.hb-wrap{max-width:860px;margin:0 auto}
-.hb-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
-.hb-sub{font-size:.95rem;color:#64748b;margin:0 0 1.6rem}
-.hb-sec{font-size:1.05rem;font-weight:800;color:var(--text);margin:1.8rem 0 .7rem}
-.hb-sec:first-of-type{margin-top:0}
-.hb-card{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:.7rem}
-.hb-row{display:flex;justify-content:space-between;gap:1rem;font-size:.92rem;color:#475569;padding:.4rem 0;border-bottom:1px solid #f1f5f9}
-.hb-row:last-child{border-bottom:none}
-.hb-row b{color:var(--text);font-weight:600}
-.hb-empty{font-size:.92rem;color:#64748b;line-height:1.6;margin:0}
-.hb-link{color:var(--primary);text-decoration:none;font-weight:600;font-size:.88rem}
-.hb-pill{font-size:.75rem;font-weight:700;padding:.15rem .55rem;border-radius:6px}
-.hb-pill.critical{background:#fee2e2;color:#991b1b}
-.hb-pill.warning{background:#fef3c7;color:#92400e}
-.hb-pill.info{background:#dbeafe;color:#1d4ed8}
-.hb-warn{background:#fffbeb;border-color:#fcd34d}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/dashboard__my_health.css' %}">
 {% endblock %}
 {% block content %}
 <div class="hb-wrap">
   <h1 class="hb-h1">My Health</h1>
-  <p class="hb-sub">What your records say about you right now.</p>
+  <p class="hb-sub">{% if greeting %}{{ greeting }}, {{ user.first_name|default:user.get_full_name|default:user.username }}. {% endif %}What needs you today, then everything you manage.</p>
+
+  {% if checklist %}
+  <section class="card first-run" aria-labelledby="first-run-title">
+    <div class="card-body">
+      <h2 id="first-run-title">Getting started <span class="badge badge-info">{{ checklist.done }} of {{ checklist.total }}</span></h2>
+      <ol class="first-run-steps">
+        {% for step in checklist.steps %}
+        <li class="{% if step.done %}is-done{% endif %}">
+          {% if step.done %}{% icon 'circle-check' cls='text-success' label='Done' %}{% else %}{% icon 'circle' label='To do' %}{% endif %}
+          <a href="{{ step.href }}">{{ step.label }}</a>
+        </li>
+        {% endfor %}
+      </ol>
+      <form method="post" action="{% url 'dashboard:dismiss_checklist' %}">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost btn-sm">Hide this list</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if sections %}{% include 'dashboard/_today.html' %}{% endif %}
 
   {% comment %}
     Medications & conditions was removed at the owner's request. It derived a
@@ -35,7 +40,38 @@
   {% comment %}
     ── My reminders ── (moved here from Companions: a dose you take is a fact about you, not about the person you look after)──────────────────────────────────────────────────────
   {% endcomment %}
-  <h2 class="hb-sec">My reminders</h2>
+  <h2 class="hb-sec" id="reminders">My reminders</h2>
+  {% if adherence %}
+  {% comment %}
+    Two weeks at a glance. "No answer" is grey and never called missed: only
+    the patient can say a dose was missed (see apps/care/adherence.py).
+  {% endcomment %}
+  <div class="hb-card ad-card">
+    <div class="ad-head">
+      <span class="cr-label">Last {{ adherence.span }} days</span>
+      {% if adherence.percent is not None %}
+      <span class="ad-sum"><b>{{ adherence.confirmed }} of {{ adherence.answered_due }}</b> confirmed{% if adherence.no_answer %} · {{ adherence.no_answer }} with no answer{% endif %}</span>
+      {% endif %}
+    </div>
+    <div class="ad-bars" role="img" aria-label="Reminder answers over the last {{ adherence.span }} days: {{ adherence.confirmed }} of {{ adherence.answered_due }} confirmed{% if adherence.no_answer %}, {{ adherence.no_answer }} with no answer{% endif %}.">
+      {% for d in adherence.days %}
+      <div class="ad-col{% if d.is_today %} today{% endif %}" title="{{ d.label }}">
+        <div class="ad-stack">
+          {% for kind, n, pct in d.parts %}<span class="ad-seg {{ kind }} x-59fce93f"1u" }}%"></span>{% endfor %}
+        </div>
+        <span class="ad-day">{{ d.date|date:"j" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="ad-legend" aria-hidden="true">
+      <span><i class="ad-dot confirmed"></i>Done</span>
+      <span><i class="ad-dot skipped"></i>Skipped</span>
+      <span><i class="ad-dot missed"></i>Missed (you said)</span>
+      <span><i class="ad-dot no_answer"></i>No answer</span>
+      <span><i class="ad-dot waiting"></i>Waiting</span>
+    </div>
+  </div>
+  {% endif %}
   <div class="hb-card">
     {% for occ in occurrences %}
     <div class="cr-task">
@@ -46,7 +82,7 @@
       {% if occ.state == states.PENDING or occ.state == states.UNCONFIRMED %}
       <div class="cr-actions">
         {% for value, label in answers %}
-        <form method="post" action="{% url 'care:respond' occ.pk %}" style="display:inline">
+        <form method="post" action="{% url 'care:respond' occ.pk %}" class="x-cccfa456">
           {% csrf_token %}
           <input type="hidden" name="state" value="{{ value }}">
           <button class="cr-btn {% if value == 'confirmed' %}done{% endif %}" type="submit">{{ label }}</button>
@@ -58,16 +94,16 @@
       {% endif %}
     </div>
     {% empty %}
-    <p class="hb-empty" style="margin-bottom:.6rem">Nothing scheduled right now.</p>
+    <p class="hb-empty x-630cfbaa">Nothing scheduled right now.</p>
     {% endfor %}
   </div>
 
   <div class="hb-card">
-    <div class="cr-label" style="margin-bottom:.5rem">Set up a reminder</div>
+    <div class="cr-label x-e9520ddd">Set up a reminder</div>
     {% for task in tasks %}
     <div class="cr-task">
       <div>
-        <span style="font-weight:600">{{ task.label }}</span>
+        <span class="x-eed0f8fb">{{ task.label }}</span>
         <span class="cr-when">· {{ task.times_of_day|join:", " }}</span>
       </div>
       <form method="post" action="{% url 'care:stop_task' task.pk %}">
@@ -76,17 +112,17 @@
       </form>
     </div>
     {% endfor %}
-    <form method="post" action="{% url 'care:add_task' %}" style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">
+    <form method="post" action="{% url 'care:add_task' %}" class="x-2fec6892">
       {% csrf_token %}
-      <label for="task-label" class="sr-only" style="position:absolute;left:-9999px">What to take</label>
+      <label for="task-label" class="sr-only x-f93d1285">What to take</label>
       <input id="task-label" name="label" placeholder="What to take, e.g. morning tablet"
-             style="flex:2 1 200px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
-      <label for="task-times" class="sr-only" style="position:absolute;left:-9999px">Times of day</label>
+             class="x-80c61460" data-inline-style="flex:2 1 200px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
+      <label for="task-times" class="sr-only x-f93d1285">Times of day</label>
       <input id="task-times" name="times" placeholder="08:00, 20:00"
-             style="flex:1 1 120px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
+             class="x-4602a46c" data-inline-style="flex:1 1 120px;border:1.5px solid var(--border);border-radius:10px;padding:.6rem .75rem;font-size:.95rem">
       <button class="cr-btn done" type="submit">Add</button>
     </form>
-    <p style="font-size:.8rem;color:#94a3b8;margin:.6rem 0 0;line-height:1.5">
+    <p class="x-45673c10">
       {% comment %}
         Said plainly: a reminder is something the patient set, not something a
         document prescribed. The two are separate objects in this system and
@@ -100,23 +136,23 @@
   {% comment %}
     ── How I am ────────────────────────────────────────────────────────────
   {% endcomment %}
-  <h2 class="hb-sec">How are you feeling?</h2>
+  <h2 class="hb-sec" id="feeling">How are you feeling?</h2>
   <div class="hb-card cr-say">
     <form method="post" action="{% url 'care:report' %}">
       {% csrf_token %}
-      <label for="report-text" style="position:absolute;left:-9999px">What you want to tell us</label>
+      <label for="report-text" class="x-f93d1285">What you want to tell us</label>
       <textarea id="report-text" name="text" placeholder="For example: I felt dizzy this morning."></textarea>
-      <button class="cr-btn done" type="submit" style="margin-top:.6rem">Send</button>
+      <button class="cr-btn done x-acef0958" type="submit">Send</button>
     </form>
-    <p style="font-size:.8rem;color:#94a3b8;margin:.6rem 0 0;line-height:1.5">
+    <p class="x-45673c10">
       Saved in your own words. The people you share with are told that you
       reported something — they read it in the app, not in the notification.
     </p>
   </div>
 
-  <p class="hb-empty" style="margin-top:1.4rem">
+  <p class="hb-empty x-5913c7b7">
     If you don't answer a reminder, we record that we didn't hear back — not
-    that you missed it. Only you can say what actually happened.
+    that a dose was missed. Only you can say what actually happened.
   </p>
 
   <h2 class="hb-sec">Health alerts</h2>

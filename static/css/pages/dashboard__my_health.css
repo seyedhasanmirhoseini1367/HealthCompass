@@ -1,0 +1,87 @@
+/* Moved from templates/dashboard/my_health.html */
+.hb-wrap{max-width:860px;margin:0 auto}
+.hb-h1{font-size:1.35rem;font-weight:800;color:var(--text);margin:0 0 .2rem}
+.hb-sub{font-size:.95rem;color:#475569;margin:0 0 1.6rem}
+.hb-sec{font-size:1.05rem;font-weight:800;color:var(--text);margin:1.8rem 0 .7rem}
+.hb-sec:first-of-type{margin-top:0}
+.hb-card{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:.7rem}
+.hb-row{display:flex;justify-content:space-between;gap:1rem;font-size:.92rem;color:#475569;padding:.4rem 0;border-bottom:1px solid #f1f5f9}
+.hb-row:last-child{border-bottom:none}
+.hb-row b{color:var(--text);font-weight:600}
+.hb-empty{font-size:.92rem;color:#475569;line-height:1.6;margin:0}
+.hb-link{color:var(--primary);text-decoration:none;font-weight:600;font-size:.88rem}
+.hb-pill{font-size:.75rem;font-weight:700;padding:.15rem .55rem;border-radius:6px}
+.hb-pill.critical{background:#fee2e2;color:#991b1b}
+.hb-pill.warning{background:#fef3c7;color:#92400e}
+.hb-pill.info{background:#dbeafe;color:#1d4ed8}
+.hb-warn{background:#fffbeb;border-color:#fcd34d}
+
+/* ── Today (formerly the patient Dashboard) ── */
+/*
+  Deliberately few things, deliberately large.
+
+  The previous version led with five counters — records, alerts, medications,
+  conditions, AI runs. A count answers "how many rows exist", which is not a
+  question anyone opens a health app to ask. This leads with what needs doing
+  and says nothing at all when nothing does.
+
+  Type is 1rem+ in the body and colour is never the only carrier of meaning:
+  every state has a word next to its dot, because a red dot alone is unreadable
+  to a colour-blind reader and ambiguous to everyone else.
+*/
+
+.db-attention{background:#fffbeb;border:1.5px solid #fcd34d;border-radius:16px;padding:1.1rem 1.25rem;margin-bottom:1.6rem}
+.db-attention.urgent{background:#fef2f2;border-color:#fca5a5}
+.db-attention h2{font-size:1.05rem;font-weight:800;color:#92400e;margin:0 0 .8rem}
+.db-attention.urgent h2{color:#991b1b}
+.db-att-item{display:block;text-decoration:none;padding:.7rem 0;border-top:1px solid #fde68a}
+.db-attention.urgent .db-att-item{border-top-color:#fecaca}
+.db-att-item:first-of-type{border-top:none}
+.db-att-title{font-weight:700;font-size:1rem;color:#78350f}
+.db-attention.urgent .db-att-title{color:#7f1d1d}
+.db-att-detail{font-size:.9rem;color:#92400e;line-height:1.55;margin-top:.15rem}
+.db-att-cta{display:inline-block;margin-top:.5rem;font-size:.88rem;font-weight:700;color:#92400e;text-decoration:underline}
+
+.db-calm{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:16px;padding:1.1rem 1.25rem;margin-bottom:1.6rem}
+.db-calm p{margin:0;font-size:1rem;font-weight:600;color:#065f46}
+
+.hb-sec[id]{scroll-margin-top:76px}
+.ad-head{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;flex-wrap:wrap;margin-bottom:.8rem}
+.ad-sum{font-size:.85rem;color:#475569}
+.ad-bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px;align-items:end;height:96px}
+.ad-col{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.ad-stack{flex:1;width:100%;max-width:22px;display:flex;flex-direction:column-reverse;border-radius:5px;overflow:hidden;background:#f1f5f9}
+.ad-seg{display:block;width:100%}
+.ad-seg.confirmed,.ad-dot.confirmed{background:#22c55e}
+.ad-seg.skipped,.ad-dot.skipped{background:#f59e0b}
+.ad-seg.missed,.ad-dot.missed{background:#ef4444}
+.ad-seg.no_answer,.ad-dot.no_answer{background:#94a3b8}
+.ad-seg.waiting,.ad-dot.waiting{background:#bae6fd}
+.ad-day{font-size:.66rem;color:var(--muted);line-height:1}
+.ad-col.today .ad-day{color:var(--primary-dk);font-weight:800}
+.ad-legend{display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.75rem;font-size:.75rem;color:#475569}
+.ad-legend span{display:inline-flex;align-items:center;gap:.35rem}
+.ad-dot{width:.6rem;height:.6rem;border-radius:3px;display:inline-block}
+.db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:1.6rem}
+.db-card{display:block;text-decoration:none;background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem}
+.db-card:hover{border-color:#cbd5e1}
+.db-card-h{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.5rem}
+.db-card-t{font-size:1rem;font-weight:700;color:var(--text)}
+.db-state{font-size:.78rem;font-weight:700;white-space:nowrap}
+.db-state.ok{color:#059669}.db-state.warn{color:#b45309}.db-state.urgent{color:#b91c1c}
+.db-state.info{color:#0369a1}.db-state.muted{color:#475569}
+.db-card-s{font-size:.92rem;color:#475569;line-height:1.5}
+.db-line{font-size:.9rem;color:#475569;padding:.35rem 0;line-height:1.5}
+.db-line b{color:var(--text)}
+
+.db-sec-h{font-size:1.05rem;font-weight:800;color:var(--text);margin:0 0 .7rem}
+.db-person{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:white;border:1px solid var(--border);border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.6rem;text-decoration:none}
+.db-person:hover{border-color:#cbd5e1}
+.db-person-n{font-size:1rem;font-weight:700;color:var(--text)}
+.db-person-d{font-size:.86rem;color:#475569;margin-top:.1rem}
+
+.db-quiet{background:white;border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.2rem;margin-bottom:1.6rem}
+.db-quiet-t{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#475569;margin-bottom:.6rem}
+.db-quiet a{color:var(--primary);text-decoration:none}
+.db-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+@media(max-width:640px){.db-grid{grid-template-columns:1fr}.db-greet{font-size:1.2rem}}

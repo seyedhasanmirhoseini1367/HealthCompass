@@ -1,0 +1,22 @@
+{% load static %}<!DOCTYPE html>
+{# Standalone on purpose: no template inheritance, so this renders even when the
+   shared layout is what failed (audit polish). #}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Too many requests — HealthCompass</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/errors.css' %}">
+</head>
+<body>
+  <main class="err">
+    <p class="err-code">429</p>
+    <h1>Too many requests</h1>
+    <p>Please wait a moment and try again.</p>
+    {% if retry_after %}<p>You can try again in {{ retry_after }} seconds.</p>{% endif %}
+    <p><a class="err-btn" href="/">Go to the start page</a></p>
+  </main>
+</body>
+</html>

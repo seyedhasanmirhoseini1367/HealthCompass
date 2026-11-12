@@ -1,5 +1,6 @@
 import logging
 
+from ..pagination import paginated
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -28,7 +29,7 @@ def appointments_list_create(request):
                 qs = qs.order_by('appointment_datetime')
             else:
                 qs = qs.filter(appointment_datetime__gte=now, is_cancelled=False)
-            return Response(AppointmentSerializer(qs, many=True).data)
+            return paginated(request, qs, AppointmentSerializer)
 
         ser = AppointmentSerializer(data=request.data)
         if ser.is_valid():

@@ -1,8 +1,11 @@
 import logging
+from healthcompass.net import scoped_ratelimit
 from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.utils.formats import date_format
+from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
@@ -11,7 +14,8 @@ from django.urls import reverse
 
 from .forms import KantaUploadForm, WearableUploadForm, PDFUploadForm, TextPasteForm
 from .models import MedicalRecord
-from .services import MedicalRecordService, validate_upload
+from .services import (ALLOWED_EXTENSIONS, MedicalRecordService, accept_attr, queue_pdf,
+                       queue_text, retry_processing, validate_upload)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,9 @@ def record_list(request):
     }
     date_from = request.GET.get('date_from', '').strip()
     date_to   = request.GET.get('date_to',   '').strip()
+    # Malformed dates are ignored rather than handed to the ORM (a 500 before).
+    from healthcompass.params import parse_date_param
+    from_d, to_d = parse_date_param(date_from), parse_date_param(date_to)
 
     if period in PERIOD_CUTOFFS:
         cutoff = PERIOD_CUTOFFS[period]
@@ -46,15 +53,15 @@ def record_list(request):
             Q(record_date__isnull=True, uploaded_at__date__gte=cutoff)
         )
     elif period == 'custom':
-        if date_from:
+        if from_d:
             qs = qs.filter(
-                Q(record_date__gte=date_from) |
-                Q(record_date__isnull=True, uploaded_at__date__gte=date_from)
+                Q(record_date__gte=from_d) |
+                Q(record_date__isnull=True, uploaded_at__date__gte=from_d)
             )
-        if date_to:
+        if to_d:
             qs = qs.filter(
-                Q(record_date__lte=date_to) |
-                Q(record_date__isnull=True, uploaded_at__date__lte=date_to)
+                Q(record_date__lte=to_d) |
+                Q(record_date__isnull=True, uploaded_at__date__lte=to_d)
             )
 
     q = request.GET.get('q', '').strip()
@@ -81,6 +88,7 @@ def record_list(request):
         'flagged_count':  flagged_count,
         'total_count':    total_count,
         'filtered_count': filtered_count,
+        'upload_accept':  {kind: accept_attr(kind) for kind in ALLOWED_EXTENSIONS},
     })
 
 
@@ -111,13 +119,14 @@ def record_delete(request, pk):
 # ─── Kanta XML Upload ─────────────────────────────────────────────────────────
 
 @login_required
+@scoped_ratelimit('upload')
 def upload_kanta(request):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = KantaUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         xml_file = request.FILES['xml_file']
 
-        ok, msg = validate_upload(xml_file, ['xml'])
+        ok, msg = validate_upload(xml_file, ALLOWED_EXTENSIONS['kanta'])
         if not ok:
             if is_ajax:
                 return JsonResponse({'success': False, 'error': msg}, status=400)
@@ -156,13 +165,14 @@ def upload_kanta(request):
 # ─── Wearable Data Upload ─────────────────────────────────────────────────────
 
 @login_required
+@scoped_ratelimit('upload')
 def upload_wearable(request):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = WearableUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         data_file = request.FILES['data_file']
 
-        ok, msg = validate_upload(data_file, ['csv', 'json', 'parquet', 'xlsx'])
+        ok, msg = validate_upload(data_file, ALLOWED_EXTENSIONS['wearable'])
         if not ok:
             if is_ajax:
                 return JsonResponse({'success': False, 'error': msg}, status=400)
@@ -199,36 +209,36 @@ def upload_wearable(request):
 # ─── PDF Upload ───────────────────────────────────────────────────────────────
 
 @login_required
+@scoped_ratelimit('upload')
 def upload_pdf(request):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = PDFUploadForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         pdf_file = request.FILES['pdf_file']
 
-        ok, safe_name = validate_upload(pdf_file, ['pdf'])
+        ok, safe_name = validate_upload(pdf_file, ALLOWED_EXTENSIONS['pdf'])
         if not ok:
             if is_ajax:
                 return JsonResponse({'success': False, 'error': safe_name}, status=400)
             messages.error(request, safe_name)
             return render(request, 'medical_records/upload_pdf.html', {'form': form})
 
-        result = MedicalRecordService.create_from_pdf(
+        # Stored and answered at once; parsing runs as a job (audit ARCH-02).
+        result = queue_pdf(
             request.user, pdf_file.read(),
             notes=form.cleaned_data.get('notes', ''),
             record_type=form.cleaned_data.get('record_type') or None,
             filename=safe_name,
         )
-        if result.get('error'):
-            err = f'PDF parse error: {result["error"]}'
+        record = result['record']
+        if _failed_inline(record):
+            err = 'This PDF could not be read. Please check the file.'
             if is_ajax:
                 return JsonResponse({'success': False, 'error': err}, status=400)
             messages.error(request, err)
             return render(request, 'medical_records/upload_pdf.html', {'form': form})
 
-        record  = result['record']
-        summary = f'Document uploaded and parsed ({result["page_count"]} page(s)).'
-        if result['structured']:
-            summary += ' AI extracted structured data.'
+        summary = _upload_summary(record, 'Document uploaded and parsed.')
 
         if is_ajax:
             return JsonResponse({'success': True, 'record': _record_json(record),
@@ -244,11 +254,12 @@ def upload_pdf(request):
 # ─── Plain Text / Paste Upload ───────────────────────────────────────────────
 
 @login_required
+@scoped_ratelimit('upload')
 def upload_text(request):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     form = TextPasteForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        result = MedicalRecordService.create_from_text(
+        result = queue_text(
             request.user,
             form.cleaned_data['text'],
             notes=form.cleaned_data.get('notes', ''),
@@ -256,9 +267,7 @@ def upload_text(request):
         )
 
         record  = result['record']
-        summary = 'Record saved from pasted text.'
-        if result['structured']:
-            summary += ' AI extracted structured data.'
+        summary = _upload_summary(record, 'Record saved from pasted text.')
         if result['flagged']:
             summary += f' ⚠️ {result["flagged"]} abnormal value(s) detected.'
 
@@ -279,6 +288,7 @@ def upload_text(request):
 # ─── Camera / OCR Scan ───────────────────────────────────────────────────────
 
 @login_required
+@scoped_ratelimit('ocr')
 def scan_ocr(request):
     """AJAX: receive an image, return OCR text via Gemini Vision."""
     if request.method != 'POST':
@@ -288,7 +298,7 @@ def scan_ocr(request):
     if not image:
         return JsonResponse({'error': 'No image received'}, status=400)
 
-    ok, msg = validate_upload(image, ['jpg', 'jpeg', 'png', 'gif', 'webp'])
+    ok, msg = validate_upload(image, ALLOWED_EXTENSIONS['image'])
     if not ok:
         return JsonResponse({'error': msg}, status=400)
 
@@ -306,6 +316,7 @@ def scan_ocr(request):
 
 
 @login_required
+@scoped_ratelimit('upload')
 def upload_scan(request):
     """Camera scan page: capture image → OCR → review text → save record."""
     is_ajax      = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -315,9 +326,18 @@ def upload_scan(request):
         raw_text    = request.POST.get('raw_text', '').strip()
         title       = request.POST.get('title', '').strip()
         record_type = request.POST.get('record_type', MedicalRecord.RecordType.OTHER)
+        if record_type not in MedicalRecord.RecordType.values:
+            record_type = MedicalRecord.RecordType.OTHER
         notes       = request.POST.get('notes', '').strip()
         date_str    = request.POST.get('record_date', '').strip()
 
+        from django.conf import settings as _s
+        if len(raw_text) > _s.MAX_PASTED_TEXT_CHARS:
+            msg = f'Text is too long. The limit is {_s.MAX_PASTED_TEXT_CHARS:,} characters.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': msg}, status=400)
+            messages.error(request, msg)
+            return render(request, 'medical_records/upload_scan.html', {'record_types': record_types})
         if not raw_text:
             if is_ajax:
                 return JsonResponse({'success': False,
@@ -364,16 +384,148 @@ def upload_scan(request):
 
 # ─── Helpers (presentation only) ─────────────────────────────────────────────
 
+def _failed_inline(record) -> bool:
+    """The job ran inline (no worker) and failed: answer like the old
+    synchronous upload did, with an error and no half-made record."""
+    if record.processing_status == MedicalRecord.ProcessingStatus.FAILED:
+        record.delete()
+        return True
+    return False
+
+
+def _upload_summary(record, done_message: str) -> str:
+    if record.processing_status in (MedicalRecord.ProcessingStatus.QUEUED,
+                                    MedicalRecord.ProcessingStatus.PROCESSING):
+        return 'Received. The record is being processed and will update in a moment.'
+    if record.parsed_data:
+        return done_message + ' AI extracted structured data.'
+    return done_message
+
+
 def _record_json(record):
     return {
         'pk':                  str(record.pk),
+        'processing_status':   record.processing_status,
+        'status_url':          reverse('medical_records:status', kwargs={'pk': record.pk}),
         'title':               record.title,
         'record_type':         record.record_type,
         'record_type_display': record.get_record_type_display(),
         'source_display':      record.get_source_display(),
-        'record_date':         record.record_date.strftime('%b %d, %Y') if record.record_date else None,
-        'uploaded_at':         record.uploaded_at.strftime('%b %d, %Y'),
+        'record_date':         date_format(record.record_date) if record.record_date else None,
+        'uploaded_at':         date_format(record.uploaded_at),
         'is_flagged':          record.is_flagged,
         'detail_url':          reverse('medical_records:detail', kwargs={'pk': record.pk}),
         'delete_url':          reverse('medical_records:delete', kwargs={'pk': record.pk}),
     }
+
+
+# ─── Processing status (polled by the records pages) ─────────────────────────
+
+@login_required
+def record_status(request, pk):
+    record = get_object_or_404(MedicalRecord, pk=pk, patient=request.user)
+    return JsonResponse({'status': record.processing_status,
+                         'status_display': record.get_processing_status_display(),
+                         'error': record.processing_error})
+
+
+@login_required
+@require_POST
+@scoped_ratelimit('upload')
+def record_retry(request, pk):
+    record = get_object_or_404(MedicalRecord, pk=pk, patient=request.user)
+    if retry_processing(record):
+        messages.success(request, 'Processing again.')
+    else:
+        messages.info(request, 'This record does not need processing.')
+    return redirect('medical_records:detail', pk=record.pk)
+
+
+# ─── One "Add record" entry (audit UX-05) ─────────────────────────────────────
+
+@login_required
+@require_POST
+@scoped_ratelimit('upload')
+def upload_any(request):
+    """Drop any file or paste text: the type is decided here from the validated
+    extension and routed to the same service the typed uploads use."""
+    from django.conf import settings as _s
+
+    from .services import upload_kind_for
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def fail(message, code=400):
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': message}, status=code)
+        messages.error(request, message)
+        return redirect('medical_records:list')
+
+    upload = request.FILES.get('file')
+    text = (request.POST.get('text') or '').strip()
+    notes = request.POST.get('notes', '')
+    if not upload and not text:
+        return fail('Choose a file or paste some text.')
+    if text and not upload:
+        if len(text) > _s.MAX_PASTED_TEXT_CHARS:
+            return fail(f'Text is too long. The limit is {_s.MAX_PASTED_TEXT_CHARS:,} characters.')
+        result = queue_text(request.user, text, notes=notes)
+        return _upload_done(request, is_ajax, result['record'], 'Record saved from pasted text.')
+
+    kind = upload_kind_for(upload.name)
+    if kind is None:
+        allowed = ', '.join(e for exts in ALLOWED_EXTENSIONS.values() for e in exts)
+        return fail(f'This file type is not supported. Accepted: {allowed}.')
+    ok, safe_name = validate_upload(upload, ALLOWED_EXTENSIONS[kind])
+    if not ok:
+        return fail(safe_name)
+
+    if kind == 'pdf':
+        record = queue_pdf(request.user, upload.read(), notes=notes, filename=safe_name)['record']
+        if _failed_inline(record):
+            return fail('This PDF could not be read. Please check the file.')
+        return _upload_done(request, is_ajax, record, 'Document uploaded and parsed.')
+    if kind == 'kanta':
+        result = MedicalRecordService.create_from_kanta(request.user, upload.read(), notes=notes)
+        if result.get('error'):
+            return fail(result['error'])
+        message = f"Imported {result['records_created']} record(s) from Kanta."
+        if is_ajax:
+            return JsonResponse({'success': True, 'message': message, 'reload': True})
+        messages.success(request, message)
+        return redirect('medical_records:list')
+    if kind == 'wearable':
+        result = MedicalRecordService.create_from_wearable(request.user, upload.read(),
+                                                           filename=safe_name, notes=notes)
+        if result.get('error'):
+            return fail(result['error'])
+        return _upload_done(request, is_ajax, result['record'], 'Wearable data imported.')
+    # An image: read the text with OCR, then treat it as pasted text.
+    result = MedicalRecordService.ocr_image(upload.read(), mime_type=upload.content_type or 'image/jpeg',
+                                            user=request.user)
+    if result.get('error'):
+        return fail(result['error'], 403 if result.get('consent_required') else 400)
+    record = queue_text(request.user, result['text'], notes=notes)['record']
+    return _upload_done(request, is_ajax, record, 'Record saved from the scanned image.')
+
+
+def _upload_done(request, is_ajax, record, done_message):
+    summary = _upload_summary(record, done_message)
+    if is_ajax:
+        return JsonResponse({'success': True, 'record': _record_json(record), 'message': summary,
+                             'flagged': record.is_flagged})
+    messages.success(request, summary)
+    return redirect('medical_records:detail', pk=record.pk)
+
+
+@login_required
+def record_edit(request, pk):
+    from .forms import RecordEditForm
+
+    record = get_object_or_404(MedicalRecord, pk=pk, patient=request.user)
+    form = RecordEditForm(request.POST or None, instance=record)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Record updated.')
+        return redirect('medical_records:detail', pk=record.pk)
+    return render(request, 'medical_records/edit.html', {'form': form, 'record': record})

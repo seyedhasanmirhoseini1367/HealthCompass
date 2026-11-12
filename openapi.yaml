@@ -1,0 +1,2850 @@
+openapi: 3.0.3
+info:
+  title: HealthCompass API
+  version: 1.0.0
+  description: Mobile API. JWT bearer authentication (auth/login/, auth/refresh/).
+paths:
+  /api/v1/ai-models/:
+    get:
+      operationId: ai_models
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - ai-models
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIModelList'
+          description: ''
+  /api/v1/ai-models/{slug}/:
+    get:
+      operationId: ai_model_detail
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ai-models
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/ai-models/{slug}/run/:
+    post:
+      operationId: run_model
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ai-models
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/alerts/:
+    get:
+      operationId: alerts_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - alerts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthAlert'
+          description: ''
+  /api/v1/alerts/{id}/read/:
+    patch:
+      operationId: alert_read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/analytics/:
+    get:
+      operationId: analytics
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/appointments/:
+    get:
+      operationId: appointments_get
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - appointments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Appointment'
+          description: ''
+    post:
+      operationId: appointments_post
+      tags:
+      - appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/appointments/{id}/:
+    get:
+      operationId: appointment_detail_get
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - appointments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: appointment_detail_patch
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: appointment_detail_delete
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - appointments
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/assistant/ask/:
+    post:
+      operationId: assistant_ask
+      tags:
+      - assistant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAnswer'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/assistant/sessions/:
+    get:
+      operationId: assistant_sessions
+      tags:
+      - assistant
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/assistant/sessions/{session_id}/:
+    get:
+      operationId: assistant_session_detail_get
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - assistant
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: assistant_session_detail_patch
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - assistant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: assistant_session_detail_delete
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - assistant
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/assistant/stream/:
+    post:
+      operationId: assistant_stream
+      description: |-
+        JWT-authenticated SSE counterpart to `assistant_ask`, for the mobile app.
+
+        Wraps the same RAGService.stream_ask() generator the web chat UI uses
+        (apps/rag_assistant/views.py::stream_message), so the event shape is
+        identical:
+
+            data: {"type": "token",   "content": "..."}
+            data: {"type": "sources", "sources": [...]}
+            data: {"type": "meta",    "provider": "...", "chunks": N, "mode": "..."}
+            data: {"type": "chart",   "chart": {...}}
+            data: {"type": "done"}
+            data: {"type": "error",   "message": "..."}
+      tags:
+      - assistant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                type: string
+          description: ''
+  /api/v1/auth/account/:
+    delete:
+      operationId: account_delete
+      description: |-
+        Delete the caller's account. Requires the password, or for accounts
+        without one, the token from auth/account/delete-request/.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/auth/account/delete-request/:
+    post:
+      operationId: account_delete_request
+      description: |-
+        For accounts without a password: email a signed, 30-minute deletion
+        token (and a web link). The token is then sent to DELETE auth/account/.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/v1/auth/change-password/:
+    post:
+      operationId: change_password
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/auth/emergency-card/:
+    get:
+      operationId: emergency_card_get
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: emergency_card_patch
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/fcm-token/:
+    post:
+      operationId: fcm_token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/forgot-password/:
+    post:
+      operationId: forgot_password
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: login
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/auth/logout/:
+    post:
+      operationId: logout
+      description: Blacklist the supplied refresh token and forget this device's push
+        token.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '205':
+          description: No response body
+  /api/v1/auth/logout-all/:
+    post:
+      operationId: logout_all
+      description: Blacklist every refresh token this account holds, on every device.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutAll'
+          description: ''
+  /api/v1/auth/me/:
+    get:
+      operationId: me
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/auth/profile/:
+    patch:
+      operationId: profile_update
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProfileUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/auth/profile/picture/:
+    post:
+      operationId: profile_picture
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/auth/register/:
+    post:
+      operationId: register
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/care/occurrences/:
+    get:
+      operationId: care_occurrences
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - care
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskOccurrence'
+          description: ''
+  /api/v1/care/occurrences/{id}/respond/:
+    post:
+      operationId: occurrence_respond
+      description: |-
+        Record the patient's answer to one occurrence.
+
+        Ownership is the filter, not a check after the fact — an occurrence
+        belonging to someone else is not found rather than found-and-refused.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - care
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/care/reports/:
+    get:
+      operationId: care_reports_get
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - care
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientReport'
+          description: ''
+    post:
+      operationId: care_reports_post
+      tags:
+      - care
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/care/tasks/:
+    get:
+      operationId: care_tasks_get
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - care
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CareTask'
+          description: ''
+    post:
+      operationId: care_tasks_post
+      tags:
+      - care
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/care/tasks/{id}/stop/:
+    post:
+      operationId: care_task_stop
+      description: Stop a reminder without erasing what it already recorded.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - care
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/consent/:
+    get:
+      operationId: consent_list
+      description: Current consent state for every purpose, for the authenticated
+        user.
+      tags:
+      - consent
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/consent/grant/:
+    post:
+      operationId: consent_grant
+      tags:
+      - consent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/consent/history/:
+    get:
+      operationId: consent_history
+      description: Append-only trail of the caller's own consent decisions.
+      tags:
+      - consent
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/consent/revoke/:
+    post:
+      operationId: consent_revoke
+      tags:
+      - consent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/dashboard/:
+    get:
+      operationId: dashboard
+      tags:
+      - dashboard
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/export/:
+    get:
+      operationId: export_status
+      description: What an export would contain. Always `ready` — generation is synchronous.
+      tags:
+      - export
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/export/download/:
+    get:
+      operationId: export_download
+      description: Stream the caller's own data archive.
+      tags:
+      - export
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/icu/:
+    get:
+      operationId: icu_dashboard_api
+      description: Return ICU demo context as JSON for the mobile app.
+      tags:
+      - icu
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/notifications/:
+    get:
+      operationId: notifications
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/{id}/read/:
+    patch:
+      operationId: notification_read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/population/:
+    get:
+      operationId: population_insights
+      tags:
+      - population
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/predictions/:
+    get:
+      operationId: my_predictions
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - predictions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelPrediction'
+          description: ''
+  /api/v1/predictions/{id}/:
+    get:
+      operationId: prediction_detail
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - predictions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/records/:
+    get:
+      operationId: records_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (20 per page).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Items per page, at most 100.
+      tags:
+      - records
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MedicalRecordList'
+          description: ''
+  /api/v1/records/{id}/:
+    get:
+      operationId: record_detail
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - records
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecordDetail'
+          description: ''
+  /api/v1/records/{id}/delete/:
+    delete:
+      operationId: record_delete
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - records
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/records/{id}/status/:
+    get:
+      operationId: record_status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - records
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/records/upload/:
+    post:
+      operationId: record_upload
+      description: |-
+        Generic upload: the file type is detected from its validated extension
+        and routed to the same service the typed endpoints use. It used to save any
+        file directly, with no extension, magic-byte or size check (audit SEC-08).
+      tags:
+      - records
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecord'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/records/upload/kanta/:
+    post:
+      operationId: upload_kanta
+      tags:
+      - records
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/records/upload/pdf/:
+    post:
+      operationId: upload_pdf
+      tags:
+      - records
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecord'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/records/upload/scan/:
+    post:
+      operationId: scan_ocr
+      tags:
+      - records
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/records/upload/text/:
+    post:
+      operationId: upload_text
+      tags:
+      - records
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/records/upload/wearable/:
+    post:
+      operationId: upload_wearable
+      tags:
+      - records
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecord'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/seizure-analysis/:
+    post:
+      operationId: seizure_analysis
+      description: Proxy EEG parquet/CSV file to hasanai.net seizure comparison API.
+      tags:
+      - seizure-analysis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/seizure-realtime/analyze/:
+    post:
+      operationId: seizure_realtime_analyze
+      description: |-
+        Accept a parquet/csv EEG file. Run the local ONNX ensemble across
+        overlapping 10-second windows and return a time-series of predictions.
+      tags:
+      - seizure-realtime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sharing/companions/:
+    get:
+      operationId: sharing_companions
+      description: Who I look after, and who can see me. Mirrors dashboard.hubs.care_overview.
+      tags:
+      - sharing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sharing/companions/{id}/:
+    get:
+      operationId: shared_patient_detail
+      description: |-
+        What the caller may actually see of someone who shared with them.
+
+        Mirrors accounts.views.shared_patient exactly, including 404 (never 403)
+        when no grant exists at all, so this endpoint cannot be used to confirm a
+        subject id exists to someone with zero access.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sharing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sharing/companions/{id}/accept/:
+    post:
+      operationId: accept_share
+      description: The recipient accepts an invitation.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sharing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharingGrant'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/sharing/companions/{id}/decline/:
+    post:
+      operationId: decline_share
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sharing
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/sharing/companions/{id}/revoke/:
+    post:
+      operationId: revoke_share
+      description: Stop sharing. Takes effect on the recipient's next request.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sharing
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/sharing/companions/create/:
+    post:
+      operationId: create_share
+      description: |-
+        Invite someone to see part of your record (they must accept). The reply
+        is identical whether or not the address has an account (SEC-02, SEC-14).
+      tags:
+      - sharing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareOfferRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ShareOfferRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShareOfferRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+components:
+  schemas:
+    AIModelList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          oneOf:
+          - type: string
+            maxLength: 220
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        category_display:
+          type: string
+          readOnly: true
+        input_type:
+          allOf:
+          - $ref: '#/components/schemas/InputTypeEnum'
+          description: |-
+            How the patient provides input data
+
+            * `tabular` - Tabular (manual form)
+            * `image` - Image (JPG/PNG/DICOM)
+            * `eeg_csv` - EEG / Signal (CSV)
+            * `parquet` - Tabular file (Parquet/CSV upload)
+            * `audio` - Audio file
+            * `file` - Generic file
+        input_type_display:
+          type: string
+          readOnly: true
+        run_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - category_display
+      - description
+      - id
+      - input_type_display
+      - name
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        doctor_name:
+          type: string
+          maxLength: 255
+        location:
+          type: string
+          maxLength: 500
+        appointment_datetime:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        remind_24h:
+          type: boolean
+        remind_3h:
+          type: boolean
+        remind_2h:
+          type: boolean
+        remind_1h:
+          type: boolean
+        is_completed:
+          type: boolean
+        is_cancelled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - appointment_datetime
+      - created_at
+      - id
+      - title
+    AppointmentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        doctor_name:
+          type: string
+          maxLength: 255
+        location:
+          type: string
+          maxLength: 500
+        appointment_datetime:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        remind_24h:
+          type: boolean
+        remind_3h:
+          type: boolean
+        remind_2h:
+          type: boolean
+        remind_1h:
+          type: boolean
+        is_completed:
+          type: boolean
+        is_cancelled:
+          type: boolean
+      required:
+      - appointment_datetime
+      - title
+    AssistantAnswer:
+      type: object
+      properties:
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        session_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        consent_required:
+          type: string
+      required:
+      - answer
+      - message_id
+      - session_id
+      - sources
+    AssistantQuestionRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          minLength: 1
+        session_id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+          minLength: 1
+      required:
+      - query
+    CareTask:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        kind:
+          $ref: '#/components/schemas/CareTaskKindEnum'
+        kind_display:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          maxLength: 120
+        times_of_day:
+          description: List of "HH:MM" local times this is due, e.g. ["08:00", "20:00"].
+        grace_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Minutes after the due time before an unanswered occurrence
+            is recorded as unconfirmed (NOT as missed).
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_active
+      - kind_display
+      - label
+      - updated_at
+    CareTaskKindEnum:
+      enum:
+      - medication
+      - measurement
+      - activity
+      - other
+      type: string
+      description: |-
+        * `medication` - Medication
+        * `measurement` - Measurement
+        * `activity` - Activity
+        * `other` - Other
+    CategoryEnum:
+      enum:
+      - cardiovascular
+      - diabetes
+      - oncology
+      - neurology
+      - general
+      - wearable
+      - other
+      type: string
+      description: |-
+        * `cardiovascular` - Cardiovascular
+        * `diabetes` - Diabetes
+        * `oncology` - Oncology
+        * `neurology` - Neurology
+        * `general` - General Health
+        * `wearable` - Wearable Analytics
+        * `other` - Other
+    ChangePasswordRequest:
+      type: object
+      properties:
+        old_password:
+          type: string
+          minLength: 1
+        new_password:
+          type: string
+          minLength: 1
+      required:
+      - new_password
+      - old_password
+    Detail:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        reference:
+          type: string
+      required:
+      - error
+    FileUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        notes:
+          type: string
+          minLength: 1
+      required:
+      - file
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+    HealthAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        severity_display:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - severity_display
+      - title
+    InputMethodEnum:
+      enum:
+      - web
+      - voice
+      - phone
+      - api
+      type: string
+      description: |-
+        * `web` - Typed in the app
+        * `voice` - Spoken
+        * `phone` - Telephone
+        * `api` - Mobile app
+    InputTypeEnum:
+      enum:
+      - tabular
+      - image
+      - eeg_csv
+      - parquet
+      - audio
+      - file
+      type: string
+      description: |-
+        * `tabular` - Tabular (manual form)
+        * `image` - Image (JPG/PNG/DICOM)
+        * `eeg_csv` - EEG / Signal (CSV)
+        * `parquet` - Tabular file (Parquet/CSV upload)
+        * `audio` - Audio file
+        * `file` - Generic file
+    LoginRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required:
+      - email
+      - password
+    LogoutAll:
+      type: object
+      properties:
+        revoked:
+          type: integer
+      required:
+      - revoked
+    LogoutRequestRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+        fcm_token:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    MedicalRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        record_type:
+          $ref: '#/components/schemas/RecordTypeEnum'
+        record_type_display:
+          type: string
+          readOnly: true
+        record_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the record was created/measured
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_flagged:
+          type: boolean
+          readOnly: true
+          description: Flagged by AI as having abnormal values
+        notes:
+          type: string
+        parsed_data:
+          description: Structured parsed data
+      required:
+      - id
+      - is_flagged
+      - record_type_display
+      - title
+      - uploaded_at
+    MedicalRecordDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        record_type:
+          $ref: '#/components/schemas/RecordTypeEnum'
+        record_type_display:
+          type: string
+          readOnly: true
+        record_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the record was created/measured
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_flagged:
+          type: boolean
+          readOnly: true
+          description: Flagged by AI as having abnormal values
+        notes:
+          type: string
+        parsed_data:
+          description: Structured parsed data
+        raw_text:
+          type: string
+          description: Extracted text from file
+        lab_values:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParsedLabValue'
+          readOnly: true
+        wearable_points:
+          type: array
+          items:
+            $ref: '#/components/schemas/WearableDataPoint'
+          readOnly: true
+      required:
+      - id
+      - is_flagged
+      - lab_values
+      - record_type_display
+      - title
+      - uploaded_at
+      - wearable_points
+    MedicalRecordList:
+      type: object
+      description: 'List rows: no parsed_data or raw_text (those are on the detail
+        endpoint).'
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        record_type:
+          $ref: '#/components/schemas/RecordTypeEnum'
+        record_type_display:
+          type: string
+          readOnly: true
+        record_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date the record was created/measured
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_flagged:
+          type: boolean
+          description: Flagged by AI as having abnormal values
+        notes:
+          type: string
+      required:
+      - id
+      - record_type_display
+      - title
+      - uploaded_at
+    MetricEnum:
+      enum:
+      - heart_rate
+      - steps
+      - sleep
+      - calories
+      - blood_oxygen
+      - weight
+      - temperature
+      - other
+      type: string
+      description: |-
+        * `heart_rate` - Heart Rate (bpm)
+        * `steps` - Steps
+        * `sleep` - Sleep (hours)
+        * `calories` - Calories Burned
+        * `blood_oxygen` - Blood Oxygen (%)
+        * `weight` - Weight (kg)
+        * `temperature` - Body Temperature
+        * `other` - Other
+    ModelPrediction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        model_name:
+          type: string
+          readOnly: true
+        model_category:
+          type: string
+          readOnly: true
+        model_slug:
+          type: string
+          readOnly: true
+        risk_score:
+          type: number
+          format: double
+          nullable: true
+          description: 0.0 - 1.0 risk score if applicable
+        risk_pct:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        result_label:
+          type: string
+          readOnly: true
+        interpretation:
+          type: string
+          description: AI-generated patient-friendly interpretation of the result
+        result: {}
+        input_data: {}
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - model_category
+      - model_name
+      - model_slug
+      - result_label
+      - risk_pct
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        type_display:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+        is_read:
+          type: boolean
+        link:
+          type: string
+          description: URL to navigate to on click
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - title
+      - type_display
+    ParsedLabValue:
+      type: object
+      description: |-
+        The reading that currently stands: a correction, when one exists, replaces
+        the extracted value, unit and flags, as on the web shared-record view.
+      properties:
+        parameter_name:
+          type: string
+          maxLength: 200
+        value:
+          type: string
+          maxLength: 100
+        unit:
+          type: string
+          maxLength: 50
+        reference_range:
+          type: string
+          maxLength: 100
+        is_abnormal:
+          type: boolean
+        is_critical:
+          type: boolean
+        measured_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_corrected:
+          type: boolean
+          readOnly: true
+      required:
+      - is_corrected
+      - parameter_name
+      - value
+    PatchedProfileUpdateRequest:
+      type: object
+      description: Fields a user may change on their own profile through the API.
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone_number:
+          type: string
+          maxLength: 20
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+    PatientReport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        kind:
+          $ref: '#/components/schemas/PatientReportKindEnum'
+        input_method:
+          allOf:
+          - $ref: '#/components/schemas/InputMethodEnum'
+          readOnly: true
+        text:
+          type: string
+          description: The report in the reporter's own words. Not normalised.
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the reporter says it happened. NULL when they did not
+            say.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - input_method
+      - text
+    PatientReportKindEnum:
+      enum:
+      - symptom
+      - wellbeing
+      - observation
+      type: string
+      description: |-
+        * `symptom` - Symptom
+        * `wellbeing` - General wellbeing
+        * `observation` - Other observation
+    RecordTypeEnum:
+      enum:
+      - lab_result
+      - prescription
+      - diagnosis
+      - vaccination
+      - imaging
+      - wearable
+      - discharge
+      - other
+      type: string
+      description: |-
+        * `lab_result` - Lab Result
+        * `prescription` - Prescription
+        * `diagnosis` - Diagnosis
+        * `vaccination` - Vaccination
+        * `imaging` - Imaging Report
+        * `wearable` - Wearable Data
+        * `discharge` - Discharge Summary
+        * `other` - Other
+    RegisterRequest:
+      type: object
+      description: |-
+        Self-service registration always creates a PATIENT.
+
+        `role` is deliberately NOT a writable field. It was previously accepted from
+        the request body and passed straight to create_user() while `is_approved`
+        defaults to True, so anyone could self-register as `doctor`,
+        `data_scientist`, `hospital_admin` or `admin` and inherit that role's
+        privileges. The server-rendered signup form never exposed `role`, so this
+        only ever affected the API.
+
+        Professional roles are assigned by an administrator (Django admin), which is
+        also where `is_approved` is granted.
+      properties:
+        email:
+          nullable: true
+          title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password2:
+          type: string
+          writeOnly: true
+          minLength: 1
+        first_name:
+          type: string
+        last_name:
+          type: string
+      required:
+      - password
+      - password2
+    RoleEnum:
+      enum:
+      - patient
+      - doctor
+      - data_scientist
+      - hospital_admin
+      - admin
+      type: string
+      description: |-
+        * `patient` - Patient
+        * `doctor` - Doctor
+        * `data_scientist` - Staff
+        * `hospital_admin` - Hospital Admin
+        * `admin` - Admin
+    SeverityEnum:
+      enum:
+      - info
+      - warning
+      - critical
+      type: string
+      description: |-
+        * `info` - Info
+        * `warning` - Warning
+        * `critical` - Critical
+    ShareOfferRequest:
+      type: object
+      properties:
+        identifier:
+          type: string
+          format: email
+          minLength: 1
+        scopes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+      required:
+      - identifier
+      - scopes
+    SharingGrant:
+      type: object
+      description: |-
+        Read-only: writes always go through the dedicated create/revoke actions
+        (apps.api.views.sharing), never through this serializer's .save(), so the
+        business rules in accounts.authz cannot be bypassed by posting a grant
+        directly.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        patient:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        recipient:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        can_view_records:
+          type: boolean
+          readOnly: true
+          description: Medical records, lab values and the files behind them.
+        can_view_alerts:
+          type: boolean
+          readOnly: true
+          description: That an alert exists and how severe — not its values.
+        can_view_appointments:
+          type: boolean
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        is_effective:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: After this instant the grant gives nothing, without anyone
+            having to revoke it.
+        data_cutoff:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: When set, only records uploaded before this instant are visible.
+        revoked_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        revoke_reason:
+          type: string
+          readOnly: true
+      required:
+      - can_view_alerts
+      - can_view_appointments
+      - can_view_records
+      - created_at
+      - data_cutoff
+      - expires_at
+      - id
+      - is_effective
+      - patient
+      - recipient
+      - revoke_reason
+      - revoked_at
+      - status
+    StateEnum:
+      enum:
+      - pending
+      - confirmed
+      - skipped
+      - missed
+      - unconfirmed
+      type: string
+      description: |-
+        * `pending` - Waiting
+        * `confirmed` - Confirmed done
+        * `skipped` - Deliberately skipped
+        * `missed` - Reported as missed
+        * `unconfirmed` - No response — unknown
+    StatusEnum:
+      enum:
+      - pending
+      - active
+      - revoked
+      type: string
+      description: |-
+        * `pending` - Waiting for acceptance
+        * `active` - Active
+        * `revoked` - Revoked
+    TaskOccurrence:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        task:
+          type: string
+          format: uuid
+          readOnly: true
+        task_label:
+          type: string
+          readOnly: true
+        task_kind:
+          type: string
+          readOnly: true
+        due_at:
+          type: string
+          format: date-time
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+        responded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        response_input:
+          allOf:
+          - $ref: '#/components/schemas/InputMethodEnum'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - due_at
+      - id
+      - responded_at
+      - response_input
+      - state
+      - task
+      - task_kind
+      - task_label
+    TokenPair:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - refresh
+      - user
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TypeEnum:
+      enum:
+      - health_alert
+      - record_parsed
+      - model_result
+      - system
+      type: string
+      description: |-
+        * `health_alert` - Health Alert
+        * `record_parsed` - Record Parsed
+        * `model_result` - Model Result
+        * `system` - System
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+          title: Email address
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        role_display:
+          type: string
+          readOnly: true
+        is_approved:
+          type: boolean
+          readOnly: true
+          description: Patients are auto-approved. Doctors, Staff, and Hospital Admins
+            require admin approval.
+        profile_picture:
+          type: string
+          nullable: true
+          readOnly: true
+        phone_number:
+          type: string
+          maxLength: 20
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - email
+      - full_name
+      - id
+      - is_approved
+      - profile_picture
+      - role
+      - role_display
+      - username
+    WearableDataPoint:
+      type: object
+      properties:
+        metric:
+          $ref: '#/components/schemas/MetricEnum'
+        metric_display:
+          type: string
+          readOnly: true
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          maxLength: 20
+        recorded_at:
+          type: string
+          format: date-time
+      required:
+      - metric_display
+      - recorded_at
+      - value
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

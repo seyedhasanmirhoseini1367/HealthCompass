@@ -342,8 +342,8 @@ class TrajectoryService:
                 try:
                     rd = chunk.document.record.record_date
                     record_date = str(rd) if rd else ''
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug('No record date for a chunk: %s', type(exc).__name__)
             if not record_date:
                 continue
 

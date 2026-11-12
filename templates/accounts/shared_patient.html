@@ -1,33 +1,15 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ subject.get_full_name|default:subject.username }} — Shared with you{% endblock %}
 {% block extra_css %}
-<style>
-.sp-page { max-width:820px; margin:0 auto; }
-.sp-head { background:linear-gradient(135deg,#0ea5e9,#6366f1); color:white; border-radius:14px;
-           padding:1.1rem 1.25rem; margin-bottom:1.2rem; }
-.sp-head h1 { font-size:1.1rem; font-weight:800; margin:0 0 .2rem; }
-.sp-head p { font-size:.82rem; opacity:.9; margin:0; }
-.sp-section { font-size:.95rem; font-weight:800; color:var(--text); margin:1.6rem 0 .6rem; }
-.sp-card { background:white; border:1.5px solid var(--border); border-radius:12px;
-           padding:.85rem 1rem; margin-bottom:.6rem; }
-.sp-title { font-size:.9rem; font-weight:700; color:#1e293b; margin:0 0 .15rem; }
-.sp-meta { font-size:.74rem; color:#94a3b8; }
-.sp-sev { display:inline-block; padding:.12rem .5rem; border-radius:5px; font-size:.66rem;
-          font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
-.sp-sev.critical { background:#fee2e2; color:#b91c1c; }
-.sp-sev.warning  { background:#fef3c7; color:#92400e; }
-.sp-sev.info     { background:#dbeafe; color:#1d4ed8; }
-.sp-empty { font-size:.83rem; color:#94a3b8; padding:.6rem 0; }
-.sp-note { font-size:.78rem; color:#64748b; background:#f8fafc; border-radius:9px;
-           padding:.7rem .9rem; margin:1.2rem 0; line-height:1.5; }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/accounts__shared_patient.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="sp-page">
   <div class="sp-head">
     <h1>{{ subject.get_full_name|default:subject.username }}</h1>
-    <p>Shared with you since {{ grant.created_at|date:"j M Y" }}{% if grant.expires_at %} · access ends {{ grant.expires_at|date:"j M Y" }}{% endif %}</p>
+    <p>Shared with you since {{ grant.created_at|date:"DATE_FORMAT" }}{% if grant.expires_at %} · access ends {{ grant.expires_at|date:"DATE_FORMAT" }}{% endif %}</p>
   </div>
 
   {% comment %}
@@ -43,40 +25,40 @@
     <div class="sp-section">Does anything need attention?</div>
     {% if care_signals %}
       {% for item in care_signals %}
-      <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:.9rem 1.1rem;margin-bottom:.6rem">
-        <p style="font-weight:700;font-size:.92rem;color:#92400e;margin:0">{{ item.headline }}</p>
+      <div class="x-3995aeb2">
+        <p class="x-3886173d">{{ item.headline }}</p>
         {% if item.is_their_words %}
-        <p style="font-size:.88rem;color:#78350f;margin:.35rem 0 0;line-height:1.55">“{{ item.detail }}”</p>
-        <p style="font-size:.75rem;color:#a16207;margin:.25rem 0 0">
+        <p class="x-bd5d4a0e">“{{ item.detail }}”</p>
+        <p class="x-5aa7be14">
           Their own words, {{ item.signal.window_start|date:"j M, H:i" }}
         </p>
         {% else %}
-        <p style="font-size:.88rem;color:#78350f;margin:.35rem 0 0;line-height:1.55">{{ item.detail }}</p>
+        <p class="x-bd5d4a0e">{{ item.detail }}</p>
         {% endif %}
       </div>
       {% endfor %}
     {% else %}
-      <div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:.95rem 1.1rem">
-        <p style="font-size:.92rem;color:#065f46;margin:0;font-weight:600">
+      <div class="x-1c2ff19c">
+        <p class="x-0f86e4aa">
           Nothing needs your attention right now.
         </p>
       </div>
     {% endif %}
 
     {% if care_activity.any %}
-    <div class="sp-card" style="margin-top:.6rem">
-      <p class="sp-meta" style="text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem">Last 7 days</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:.7rem;text-align:center">
-        <div><div style="font-size:1.25rem;font-weight:800;color:#059669">{{ care_activity.confirmed }}</div>
-             <div style="font-size:.7rem;color:#94a3b8">Confirmed</div></div>
-        <div><div style="font-size:1.25rem;font-weight:800;color:#64748b">{{ care_activity.unconfirmed }}</div>
-             <div style="font-size:.7rem;color:#94a3b8">No answer</div></div>
-        <div><div style="font-size:1.25rem;font-weight:800;color:#b91c1c">{{ care_activity.missed }}</div>
-             <div style="font-size:.7rem;color:#94a3b8">Said missed</div></div>
-        <div><div style="font-size:1.25rem;font-weight:800;color:#4338ca">{{ care_activity.skipped }}</div>
-             <div style="font-size:.7rem;color:#94a3b8">Said skipped</div></div>
+    <div class="sp-card x-acef0958">
+      <p class="sp-meta x-2ae6f352">Last 7 days</p>
+      <div class="x-27c22114">
+        <div><div class="x-cb572153">{{ care_activity.confirmed }}</div>
+             <div class="x-df910bd4">Confirmed</div></div>
+        <div><div class="x-4de785c2">{{ care_activity.unconfirmed }}</div>
+             <div class="x-df910bd4">No answer</div></div>
+        <div><div class="x-c5eb6fcf">{{ care_activity.missed }}</div>
+             <div class="x-df910bd4">Said missed</div></div>
+        <div><div class="x-594ee415">{{ care_activity.skipped }}</div>
+             <div class="x-df910bd4">Said skipped</div></div>
       </div>
-      <p style="font-size:.78rem;color:#64748b;margin:.8rem 0 0;line-height:1.5">
+      <p class="x-64e13680">
         {% comment %}
           Said next to the number a caregiver is most likely to misread. These
           are four separate counts on purpose — never one adherence figure.
@@ -98,7 +80,7 @@
         <p class="sp-title">
           <a href="{% url 'accounts:shared_record' subject.pk record.pk %}">{{ record.title }}</a>
         </p>
-        <p class="sp-meta">{{ record.get_record_type_display }} · {{ record.record_date|default:record.uploaded_at|date:"j M Y" }}</p>
+        <p class="sp-meta">{{ record.get_record_type_display }} · {{ record.record_date|default:record.uploaded_at|date:"DATE_FORMAT" }}</p>
       </div>
     {% empty %}
       <p class="sp-empty">No records to show.</p>
@@ -113,7 +95,7 @@
           <span class="sp-sev {{ alert.severity }}">{{ alert.severity }}</span>
           {{ alert.title }}
         </p>
-        <p class="sp-meta">{{ alert.created_at|date:"j M Y, H:i" }}</p>
+        <p class="sp-meta">{{ alert.created_at|date:"DATETIME_FORMAT" }}</p>
       </div>
     {% empty %}
       <p class="sp-empty">No alerts.</p>
@@ -133,7 +115,7 @@
       <div class="sp-card">
         <p class="sp-title">{{ appointment.title }}</p>
         <p class="sp-meta">
-          {{ appointment.appointment_datetime|date:"j M Y, H:i" }}
+          {{ appointment.appointment_datetime|date:"DATETIME_FORMAT" }}
           {% if appointment.location %} · {{ appointment.location }}{% endif %}
         </p>
       </div>

@@ -1,127 +1,25 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}AI & Analytics — HealthCompass{% endblock %}
 
 {% block extra_css %}
-<style>
-/* ── Tab switcher ─────────────────────────────────────────────────────────── */
-.dual-tab-bar{display:flex;gap:.5rem;background:#f1f5f9;border-radius:14px;padding:.35rem;margin-bottom:1.75rem}
-.dual-tab-btn{flex:1;border:none;background:transparent;padding:.6rem 1rem;font-size:.88rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .2s;color:#64748b;display:flex;align-items:center;justify-content:center;gap:.4rem}
-.dual-tab-btn.active{background:white;color:#6366f1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-.dual-tab-btn i{font-size:.95rem}
-.tab-pane{display:none}
-.tab-pane.active{display:block}
-
-/* ── Layout ─────────────────────────────────────────────────────────────── */
-/* .analytics-header replaced by global .page-hero */
-
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
-.stat-card{background:white;border-radius:14px;padding:1.25rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
-.stat-card .num{font-size:1.8rem;font-weight:800}
-.stat-card .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
-
-.section-title{font-size:1rem;font-weight:700;margin:2rem 0 1rem;display:flex;align-items:center;gap:.5rem;color:#1e293b}
-.section-title i{color:var(--primary)}
-
-/* ── Biomarker trend cards ───────────────────────────────────────────────── */
-.chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.25rem;margin-bottom:2rem}
-.chart-card{background:white;border-radius:16px;padding:1.25rem 1.25rem 1rem;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
-.chart-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
-.chart-card-title{font-weight:700;font-size:.95rem;color:#1e293b}
-.trend-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:600;padding:.2rem .6rem;border-radius:999px}
-.trend-up  {background:#fee2e2;color:#dc2626}
-.trend-down{background:#dcfce7;color:#16a34a}
-.trend-stable{background:#f1f5f9;color:#64748b}
-.chart-canvas-wrap{position:relative;height:160px}
-.chart-meta{display:flex;justify-content:space-between;margin-top:.6rem;font-size:.78rem;color:var(--muted)}
-.chart-meta .val{font-weight:700;font-size:.9rem}
-.chart-meta .val.critical{color:#dc2626}
-.chart-meta .val.abnormal{color:#d97706}
-.chart-meta .val.normal  {color:#16a34a}
-
-/* ── Latest values grid ─────────────────────────────────────────────────── */
-.snapshot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
-.snap-card{background:white;border-radius:14px;padding:1rem 1.25rem;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
-.snap-card .bioname{font-size:.8rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem}
-.snap-card .biovalue{font-size:1.5rem;font-weight:800;line-height:1}
-.snap-card .biounit{font-size:.8rem;color:var(--muted);margin-left:.2rem;font-weight:400}
-.snap-card .bioref{font-size:.75rem;color:#94a3b8;margin-top:.4rem}
-.snap-card .biostatus{font-size:.72rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;margin-top:.4rem;display:inline-block}
-.status-normal  {background:#dcfce7;color:#16a34a}
-.status-abnormal{background:#fef3c7;color:#d97706}
-.status-critical{background:#fee2e2;color:#dc2626}
-.snap-card .biovalue.critical{color:#dc2626}
-.snap-card .biovalue.abnormal{color:#d97706}
-.snap-card .biovalue:not(.critical):not(.abnormal){color:#16a34a}
-
-/* ── Two-column layout ───────────────────────────────────────────────────── */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
-@media(max-width:768px){.two-col{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}}
-@media(max-width:500px){.stat-grid{grid-template-columns:repeat(2,1fr)}.snapshot-grid{grid-template-columns:repeat(2,1fr)}}
-
-/* .card and .card-body styles inherited from base.html */
-
-/* ── Alert rows ─────────────────────────────────────────────────────────── */
-.alert-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:10px;margin-bottom:.5rem;font-size:.85rem}
-.alert-row:last-child{margin-bottom:0}
-.alert-critical{background:#fff5f5;border-left:3px solid #ef4444}
-.alert-warning {background:#fffbf0;border-left:3px solid #f59e0b}
-.alert-info    {background:#f0f9ff;border-left:3px solid #3b82f6}
-.alert-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.dot-critical{background:#ef4444}
-.dot-warning {background:#f59e0b}
-.dot-info    {background:#3b82f6}
-
-/* ── Upload activity ─────────────────────────────────────────────────────── */
-.no-data-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem;color:var(--muted);text-align:center;gap:.75rem}
-.no-data-msg i{font-size:2rem;opacity:.4}
-.no-data-msg.compact{padding:1.5rem}
-
-/* ── Risk badge ─────────────────────────────────────────────────────────── */
-.risk-ring{width:80px;height:80px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;border:4px solid}
-.risk-low   {border-color:#22c55e;color:#16a34a;background:#f0fdf4}
-.risk-medium{border-color:#f59e0b;color:#d97706;background:#fffbeb}
-.risk-high  {border-color:#ef4444;color:#dc2626;background:#fef2f2}
-
-/* ── Population tab extras ───────────────────────────────────────────────── */
-.pop-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
-.pop-stat{background:white;border-radius:14px;padding:1.25rem 1rem;border:1px solid var(--border);text-align:center;box-shadow:var(--shadow-sm)}
-.pop-stat .pop-num{font-size:1.9rem;font-weight:800;line-height:1.1}
-.pop-stat .pop-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.3rem}
-.pop-stat .pop-sub{font-size:.75rem;color:#94a3b8;margin-top:.2rem}
-
-.mode-legend{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem}
-.mode-pill{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:600;padding:.25rem .7rem;border-radius:999px}
-.mode-personal  {background:#ede9fe;color:#7c3aed}
-.mode-general   {background:#dbeafe;color:#1d4ed8}
-.mode-hybrid    {background:#d1fae5;color:#065f46}
-.mode-trajectory{background:#fef3c7;color:#92400e}
-.mode-unknown   {background:#f1f5f9;color:#64748b}
-
-.topic-bar-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.55rem}
-.topic-bar-label{font-size:.8rem;color:#475569;min-width:120px;text-align:right;text-transform:capitalize}
-.topic-bar-track{flex:1;background:#f1f5f9;border-radius:999px;height:10px;overflow:hidden}
-.topic-bar-fill{height:10px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#a855f7);transition:width .6s ease}
-.topic-bar-count{font-size:.75rem;color:#94a3b8;min-width:28px;text-align:right}
-
-.privacy-notice{display:flex;align-items:center;gap:.6rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:.75rem 1rem;font-size:.82rem;color:#0369a1;margin-bottom:1.5rem}
-.privacy-notice i{flex-shrink:0;font-size:1rem}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/ai_insights__patient_analytics.css' %}">
 {% endblock %}
 
 {% block content %}
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <div class="page-hero">
-  <h1><i class="fas fa-chart-line icon-mr" aria-hidden="true"></i>AI & Analytics</h1>
+  <h1>{% icon 'chart-line' cls='icon-mr' %}AI & Analytics</h1>
   <p>Your personal health trends and anonymised population benchmarks</p>
 </div>
 
 <!-- ── Tab switcher ─────────────────────────────────────────────────────────── -->
 <div class="dual-tab-bar">
   <button class="dual-tab-btn active" data-tab="personal">
-    <i class="fas fa-user-circle"></i> My Health
+    {% icon 'user-circle' %} My Health
   </button>
   <button class="dual-tab-btn" data-tab="population">
-    <i class="fas fa-users"></i> Population Insights
+    {% icon 'users' %} Population Insights
   </button>
 </div>
 
@@ -147,7 +45,7 @@
     </div>
     <div class="stat-card">
       <div class="num num-date">
-        {% if last_record_date %}{{ last_record_date|date:"M d, Y" }}{% else %}—{% endif %}
+        {% if last_record_date %}{{ last_record_date|date:"DATE_FORMAT" }}{% else %}—{% endif %}
       </div>
       <div class="lbl">Last Record</div>
     </div>
@@ -156,12 +54,12 @@
   {% if not has_data %}
   <div class="card">
     <div class="no-data-msg">
-      <i class="fas fa-flask"></i>
+      {% icon 'flask' %}
       <div>
         <strong>No health records yet</strong><br>
         <span class="text-sm">Upload your lab results to see your biomarker trends and analytics here.</span>
       </div>
-      <a href="/records/" class="btn btn-primary mt-sm"><i class="fas fa-upload"></i> Upload Records</a>
+      <a href="/records/" class="btn btn-primary mt-sm">{% icon 'upload' %} Upload Records</a>
     </div>
   </div>
 
@@ -169,13 +67,13 @@
 
   <!-- ── Biomarker Trend Charts ──────────────────────────────────────────── -->
   {% if trending_json != '{}' %}
-  <div class="section-title"><i class="fas fa-chart-line"></i> Biomarker Trends</div>
+  <div class="section-title">{% icon 'chart-line' %} Biomarker Trends</div>
   <div class="chart-grid" id="trend-charts-container"></div>
   {% endif %}
 
   <!-- ── Latest Values Snapshot ─────────────────────────────────────────── -->
   {% if latest_values %}
-  <div class="section-title"><i class="fas fa-vial"></i> Latest Lab Values</div>
+  <div class="section-title">{% icon 'vial' %} Latest Lab Values</div>
   <div class="snapshot-grid">
     {% for name, pt in latest_values.items %}
     <div class="snap-card">
@@ -189,11 +87,11 @@
       {% if pt.ref %}<div class="bioref">Ref: {{ pt.ref }}</div>{% endif %}
       <div>
         {% if pt.critical %}
-          <span class="biostatus status-critical"><i class="fas fa-exclamation-circle"></i> Critical</span>
+          <span class="biostatus status-critical">{% icon 'exclamation-circle' %} Critical</span>
         {% elif pt.abnormal %}
-          <span class="biostatus status-abnormal"><i class="fas fa-exclamation-triangle"></i> Abnormal</span>
+          <span class="biostatus status-abnormal">{% icon 'exclamation-triangle' %} Abnormal</span>
         {% else %}
-          <span class="biostatus status-normal"><i class="fas fa-check-circle"></i> Normal</span>
+          <span class="biostatus status-normal">{% icon 'check-circle' %} Normal</span>
         {% endif %}
       </div>
       <div class="text-xs text-subtle mt-xs">{{ pt.date }}</div>
@@ -205,7 +103,7 @@
   <!-- ── Row: Alerts + Record Types ─────────────────────────────────────── -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header"><i class="fas fa-bell" aria-hidden="true"></i> Health Alerts</div>
+      <div class="card-header">{% icon 'bell' %} Health Alerts</div>
       <div class="card-body">
         <div class="counter-row">
           <div class="text-center">
@@ -228,9 +126,9 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-folder-medical" aria-hidden="true"></i> Records by Type</div>
+      <div class="card-header">{% icon 'notes-medical' %} Records by Type</div>
       <div class="card-body flex-center">
-        <div class="chart-wrap" style="height:180px;width:260px">
+        <div class="chart-wrap x-5db459d2">
           <canvas id="records-type-chart"></canvas>
         </div>
       </div>
@@ -240,7 +138,7 @@
   <!-- ── Upload Activity + Risk ─────────────────────────────────────────── -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header"><i class="fas fa-calendar-check" aria-hidden="true"></i> Upload Activity</div>
+      <div class="card-header">{% icon 'calendar-check' %} Upload Activity</div>
       <div class="card-body">
         <div class="chart-wrap chart-h-sm">
           <canvas id="upload-chart"></canvas>
@@ -249,12 +147,12 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-brain" aria-hidden="true"></i> AI Risk Assessment</div>
+      <div class="card-header">{% icon 'brain' %} AI Risk Assessment</div>
       <div class="card-body">
         {% if latest_risk is not None %}
         <div class="risk-row">
           <div class="risk-ring {% if latest_risk >= 70 %}risk-high{% elif latest_risk >= 30 %}risk-medium{% else %}risk-low{% endif %}">
-            {{ latest_risk|floatformat:0 }}<span style="font-size:.7rem;font-weight:600">%</span>
+            {{ latest_risk|floatformat:0 }}<span class="x-703f26ec">%</span>
           </div>
           <div>
             <div class="risk-label">
@@ -268,7 +166,7 @@
         </div>
         {% else %}
         <div class="no-data-msg compact">
-          <i class="fas fa-robot"></i>
+          {% icon 'robot' %}
           <span class="text-sm">No AI predictions yet.<br>Run an AI model from the Insights section.</span>
         </div>
         {% endif %}
@@ -280,10 +178,10 @@
 
   <!-- Action bar -->
   <div class="action-bar">
-    <a href="/records/" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Records</a>
-    <a href="/assistant/" class="btn btn-outline"><i class="fas fa-robot"></i> Ask AI</a>
-    <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
-    <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>
+    <a href="/records/" class="btn btn-primary">{% icon 'upload' %} Upload Records</a>
+    <a href="/assistant/" class="btn btn-outline">{% icon 'robot' %} Ask AI</a>
+    <a href="/insights/" class="btn btn-outline">{% icon 'brain' %} AI Models</a>
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline">{% icon 'home' %} Home</a>
   </div>
 
 </div>{# end tab-personal #}
@@ -295,7 +193,7 @@
 <div id="tab-population" class="tab-pane">
 
   <div class="privacy-notice">
-    <i class="fas fa-shield-alt"></i>
+    {% icon 'shield-alt' %}
     All statistics below are fully anonymised aggregates. No individual patient data is ever exposed.
   </div>
 
@@ -329,7 +227,7 @@
   <div class="two-col">
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-route" aria-hidden="true"></i> Query Mode Distribution</div>
+      <div class="card-header">{% icon 'route' %} Query Mode Distribution</div>
       <div class="card-body">
         <div class="chart-wrap chart-h-lg">
           <canvas id="pop-mode-chart"></canvas>
@@ -339,7 +237,7 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><i class="fas fa-chart-bar" aria-hidden="true"></i> Monthly Query Volume</div>
+      <div class="card-header">{% icon 'chart-bar' %} Monthly Query Volume</div>
       <div class="card-body">
         <div class="chart-wrap chart-h-lg">
           <canvas id="pop-volume-chart"></canvas>
@@ -351,15 +249,15 @@
 
   <!-- ── Knowledge base topic coverage ──────────────────────────────────── -->
   <div class="card mb-md">
-    <div class="card-header"><i class="fas fa-book-medical" aria-hidden="true"></i> Knowledge Base Topic Coverage</div>
+    <div class="card-header">{% icon 'book-medical' %} Knowledge Base Topic Coverage</div>
     <div class="card-body" id="pop-topics-bars">
-      <div class="no-data-msg compact"><i class="fas fa-spinner fa-spin"></i><span>Loading…</span></div>
+      <div class="no-data-msg compact">{% icon 'spinner' cls='icon-spin' %}<span>Loading…</span></div>
     </div>
   </div>
 
   <!-- ── Safety interventions over time ─────────────────────────────────── -->
   <div class="card mb-md">
-    <div class="card-header"><i class="fas fa-shield-alt" aria-hidden="true"></i> Safety Interventions Over Time</div>
+    <div class="card-header">{% icon 'shield-alt' %} Safety Interventions Over Time</div>
     <div class="card-body">
       <div class="chart-wrap chart-h-md">
         <canvas id="pop-safety-chart"></canvas>
@@ -372,9 +270,9 @@
 
   <!-- Action bar -->
   <div class="action-bar">
-    <a href="/assistant/" class="btn btn-primary"><i class="fas fa-robot"></i> Ask AI Assistant</a>
-    <a href="/insights/" class="btn btn-outline"><i class="fas fa-brain"></i> AI Models</a>
-    <a href="{% url 'dashboard:home' %}" class="btn btn-outline"><i class="fas fa-home"></i> Dashboard</a>
+    <a href="/assistant/" class="btn btn-primary">{% icon 'robot' %} Ask AI Assistant</a>
+    <a href="/insights/" class="btn btn-outline">{% icon 'brain' %} AI Models</a>
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline">{% icon 'home' %} Home</a>
   </div>
 
 </div>{# end tab-population #}
@@ -384,333 +282,6 @@
 {% load static %}
 {% block extra_js %}
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
-<script>
-// ── Tab switching ─────────────────────────────────────────────────────────────
-document.querySelectorAll('.dual-tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.dual-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
-});
-
-// ── Data from Django ──────────────────────────────────────────────────────────
-const TRENDING    = {{ trending_json|safe }};
-const ALERTS_DATA = {{ alerts_summary_json|safe }};
-const REC_TYPES   = {{ records_type_json|safe }};
-const UPL_LABELS  = {{ upload_labels_json|safe }};
-const UPL_COUNTS  = {{ upload_counts_json|safe }};
-const PRED_LABELS = {{ pred_labels_json|safe }};
-const PRED_SCORES = {{ pred_scores_json|safe }};
-
-const POP_MODE_DIST    = {{ pop_mode_dist_json|safe }};
-const POP_QUERY_LABELS = {{ pop_query_labels_json|safe }};
-const POP_QUERY_COUNTS = {{ pop_query_counts_json|safe }};
-const POP_TOPICS       = {{ pop_topics_json|safe }};
-const POP_SAFETY_LABELS= {{ pop_safety_labels_json|safe }};
-const POP_SAFETY_COUNTS= {{ pop_safety_counts_json|safe }};
-
-// ── Colour helpers ────────────────────────────────────────────────────────────
-function ptColor(pt) {
-  if (pt.critical) return '#ef4444';
-  if (pt.abnormal) return '#f59e0b';
-  return '#22c55e';
-}
-function bioColor(idx) {
-  const palette = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
-  return palette[idx % palette.length];
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// TAB 1 — Personal charts
-// ────────────────────────────────────────────────────────────────────────────
-
-// ── Trend line charts ─────────────────────────────────────────────────────────
-const container = document.getElementById('trend-charts-container');
-if (container) {
-  let idx = 0;
-  for (const [biomarker, points] of Object.entries(TRENDING)) {
-    const labels  = points.map(p => p.date);
-    const values  = points.map(p => p.value);
-    const colors  = points.map(p => ptColor(p));
-    const unit    = points[0]?.unit || '';
-    const latest  = points[points.length - 1];
-    const prev    = points[points.length - 2];
-    const delta   = latest.value - prev.value;
-    const pct     = prev.value ? ((delta / prev.value) * 100).toFixed(1) : 0;
-    const isUp    = delta > 0;
-    const isDown  = delta < 0;
-
-    const statusClass = latest.critical ? 'critical' : (latest.abnormal ? 'abnormal' : 'normal');
-    const trendClass  = isUp ? 'trend-up' : (isDown ? 'trend-down' : 'trend-stable');
-    const trendIcon   = isUp ? '&#x2191;' : (isDown ? '&#x2193;' : '&#x2192;');
-    const trendText   = isUp
-      ? `+${Math.abs(pct)}% since last`
-      : (isDown ? `-${Math.abs(pct)}% since last` : 'Stable');
-
-    const card = document.createElement('div');
-    card.className = 'chart-card';
-    card.innerHTML = `
-      <div class="chart-card-header">
-        <span class="chart-card-title">${biomarker}</span>
-        <span class="trend-badge ${trendClass}">${trendIcon} ${trendText}</span>
-      </div>
-      <div class="chart-canvas-wrap">
-        <canvas id="tc-${idx}"></canvas>
-      </div>
-      <div class="chart-meta">
-        <span>${points.length} readings</span>
-        <span class="val ${statusClass}">${latest.value} ${unit}</span>
-      </div>`;
-    container.appendChild(card);
-
-    new Chart(document.getElementById(`tc-${idx}`), {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: biomarker,
-          data: values,
-          borderColor: bioColor(idx),
-          backgroundColor: bioColor(idx) + '18',
-          pointBackgroundColor: colors,
-          pointBorderColor: colors,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          tension: 0.35,
-          fill: true,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} ${unit}` } }
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-          y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
-        }
-      }
-    });
-    idx++;
-  }
-}
-
-// ── Alerts counts ─────────────────────────────────────────────────────────────
-const cntCritical = document.getElementById('cnt-critical');
-const cntWarning  = document.getElementById('cnt-warning');
-const cntInfo     = document.getElementById('cnt-info');
-if (cntCritical) cntCritical.textContent = ALERTS_DATA.critical || 0;
-if (cntWarning)  cntWarning.textContent  = ALERTS_DATA.warning  || 0;
-if (cntInfo)     cntInfo.textContent     = ALERTS_DATA.info     || 0;
-
-// ── Alerts donut ──────────────────────────────────────────────────────────────
-const alertsCtx = document.getElementById('alerts-chart');
-if (alertsCtx && (ALERTS_DATA.critical + ALERTS_DATA.warning + ALERTS_DATA.info) > 0) {
-  new Chart(alertsCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Critical','Warning','Info'],
-      datasets: [{ data: [ALERTS_DATA.critical, ALERTS_DATA.warning, ALERTS_DATA.info],
-        backgroundColor: ['#ef4444','#f59e0b','#3b82f6'], borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
-  });
-} else if (alertsCtx) {
-  alertsCtx.parentElement.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:.85rem"><i class="fas fa-check-circle" style="font-size:1.5rem;color:#22c55e;display:block;margin-bottom:.5rem"></i>No alerts yet</div>';
-}
-
-// ── Record types donut ────────────────────────────────────────────────────────
-const recTypeCtx = document.getElementById('records-type-chart');
-if (recTypeCtx && REC_TYPES.length) {
-  const rtColors = ['#0ea5e9','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
-  new Chart(recTypeCtx, {
-    type: 'doughnut',
-    data: {
-      labels: REC_TYPES.map(r => r.record_type.replace('_',' ')),
-      datasets: [{ data: REC_TYPES.map(r => r.count), backgroundColor: rtColors, borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '55%',
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } } }
-  });
-}
-
-// ── Upload activity bar chart ─────────────────────────────────────────────────
-const uplCtx = document.getElementById('upload-chart');
-if (uplCtx) {
-  new Chart(uplCtx, {
-    type: 'bar',
-    data: {
-      labels: UPL_LABELS.length ? UPL_LABELS : ['No data'],
-      datasets: [{ label: 'Records uploaded', data: UPL_COUNTS.length ? UPL_COUNTS : [0],
-        backgroundColor: '#6366f120', borderColor: '#6366f1', borderWidth: 2, borderRadius: 6 }]
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } } } }
-  });
-}
-
-// ── AI risk score line chart ──────────────────────────────────────────────────
-const riskCtx = document.getElementById('risk-chart');
-if (riskCtx && PRED_SCORES.length) {
-  new Chart(riskCtx, {
-    type: 'line',
-    data: {
-      labels: PRED_LABELS,
-      datasets: [{ label: 'Risk %', data: PRED_SCORES, borderColor: '#8b5cf6',
-        backgroundColor: '#8b5cf620',
-        pointBackgroundColor: PRED_SCORES.map(s => s >= 70 ? '#ef4444' : s >= 30 ? '#f59e0b' : '#22c55e'),
-        pointRadius: 5, tension: 0.35, fill: true }]
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `Risk: ${ctx.parsed.y}%` } } },
-      scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { min: 0, max: 100, grid: { color: '#f1f5f9' }, ticks: { callback: v => v+'%', font: { size: 10 } } } } }
-  });
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// TAB 2 — Population charts
-// ────────────────────────────────────────────────────────────────────────────
-
-const MODE_COLORS = {
-  personal:   '#7c3aed',
-  general:    '#1d4ed8',
-  hybrid:     '#065f46',
-  trajectory: '#92400e',
-  '':         '#64748b',
-};
-const MODE_BG = {
-  personal:   '#ede9fe',
-  general:    '#dbeafe',
-  hybrid:     '#d1fae5',
-  trajectory: '#fef3c7',
-  '':         '#f1f5f9',
-};
-const MODE_LABELS = {
-  personal:   'Personal',
-  general:    'General Knowledge',
-  hybrid:     'Hybrid',
-  trajectory: 'Trend Analysis',
-  '':         'Unknown',
-};
-
-// ── Query mode donut ──────────────────────────────────────────────────────────
-const modeCtx = document.getElementById('pop-mode-chart');
-if (modeCtx && POP_MODE_DIST.length) {
-  const modeLabels = POP_MODE_DIST.map(d => MODE_LABELS[d.query_mode] || d.query_mode || 'Unknown');
-  const modeCounts = POP_MODE_DIST.map(d => d.count);
-  const modeColors = POP_MODE_DIST.map(d => MODE_COLORS[d.query_mode] || '#64748b');
-  const modeBgs    = POP_MODE_DIST.map(d => MODE_BG[d.query_mode] || '#f1f5f9');
-
-  new Chart(modeCtx, {
-    type: 'doughnut',
-    data: {
-      labels: modeLabels,
-      datasets: [{ data: modeCounts, backgroundColor: modeColors, borderWidth: 3, borderColor: '#fff' }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '60%',
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} queries` } } }
-    }
-  });
-
-  // Legend pills
-  const legend = document.getElementById('pop-mode-legend');
-  if (legend) {
-    const total = modeCounts.reduce((a, b) => a + b, 0);
-    POP_MODE_DIST.forEach((d, i) => {
-      const pct = total ? Math.round(d.count / total * 100) : 0;
-      const pill = document.createElement('span');
-      pill.className = 'mode-pill mode-' + (d.query_mode || 'unknown');
-      pill.textContent = `${modeLabels[i]} ${pct}%`;
-      legend.appendChild(pill);
-    });
-  }
-} else if (modeCtx) {
-  modeCtx.parentElement.innerHTML = '<div style="text-align:center;padding:2rem;color:#94a3b8;font-size:.85rem">No queries yet</div>';
-}
-
-// ── Monthly query volume bar chart ────────────────────────────────────────────
-const volCtx = document.getElementById('pop-volume-chart');
-if (volCtx) {
-  new Chart(volCtx, {
-    type: 'bar',
-    data: {
-      labels: POP_QUERY_LABELS.length ? POP_QUERY_LABELS : ['No data'],
-      datasets: [{
-        label: 'Queries',
-        data: POP_QUERY_COUNTS.length ? POP_QUERY_COUNTS : [0],
-        backgroundColor: '#6366f130',
-        borderColor: '#6366f1',
-        borderWidth: 2,
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } }
-      }
-    }
-  });
-}
-
-// ── Knowledge base topic bars ─────────────────────────────────────────────────
-const topicContainer = document.getElementById('pop-topics-bars');
-if (topicContainer && POP_TOPICS.length) {
-  const maxCount = Math.max(...POP_TOPICS.map(t => t.count));
-  topicContainer.innerHTML = POP_TOPICS.map(t => {
-    const pct = Math.round(t.count / maxCount * 100);
-    return `<div class="topic-bar-row">
-      <span class="topic-bar-label">${t.topic || 'General'}</span>
-      <div class="topic-bar-track">
-        <div class="topic-bar-fill" style="width:${pct}%"></div>
-      </div>
-      <span class="topic-bar-count">${t.count}</span>
-    </div>`;
-  }).join('');
-} else if (topicContainer) {
-  topicContainer.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:.85rem">No topics indexed yet.<br>Run <code>python manage.py load_knowledge_base</code></div>';
-}
-
-// ── Safety interventions line chart ──────────────────────────────────────────
-const safetyCtx = document.getElementById('pop-safety-chart');
-if (safetyCtx) {
-  new Chart(safetyCtx, {
-    type: 'line',
-    data: {
-      labels: POP_SAFETY_LABELS.length ? POP_SAFETY_LABELS : ['No data'],
-      datasets: [{
-        label: 'Safety Interceptions',
-        data: POP_SAFETY_COUNTS.length ? POP_SAFETY_COUNTS : [0],
-        borderColor: '#ef4444',
-        backgroundColor: '#ef444418',
-        pointBackgroundColor: '#ef4444',
-        pointRadius: 5,
-        tension: 0.35,
-        fill: true,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 10 } } }
-      }
-    }
-  });
-}
-</script>
+<script type="application/json" id="hc-page-data-ai_insights__patient_analytics">{"k1": {{ trending_json|safe }}, "k2": {{ alerts_summary_json|safe }}, "k3": {{ records_type_json|safe }}, "k4": {{ upload_labels_json|safe }}, "k5": {{ upload_counts_json|safe }}, "k6": {{ pred_labels_json|safe }}, "k7": {{ pred_scores_json|safe }}, "k8": {{ pop_mode_dist_json|safe }}, "k9": {{ pop_query_labels_json|safe }}, "k10": {{ pop_query_counts_json|safe }}, "k11": {{ pop_topics_json|safe }}, "k12": {{ pop_safety_labels_json|safe }}, "k13": {{ pop_safety_counts_json|safe }}}</script>
+<script src="{% static 'js/pages/ai_insights__patient_analytics.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,9 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+{{ sharer }} would like to share their health information with you on HealthCompass: {{ scopes }}.
+
+Nothing is shared until you accept. Accept or decline on your Companions page:
+
+{{ link }}
+
+The HealthCompass team

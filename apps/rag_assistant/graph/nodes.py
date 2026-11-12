@@ -97,8 +97,8 @@ def understand_node(state: HealthState) -> Dict[str, Any]:
     try:
         from django.contrib.auth import get_user_model
         user = get_user_model().objects.filter(pk=state.get('patient_id')).first()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning('Could not load the patient for the graph: %s', type(exc).__name__)
 
     try:
         qi = understand(question, history, user=user)

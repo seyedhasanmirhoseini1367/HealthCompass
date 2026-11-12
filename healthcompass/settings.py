@@ -8,7 +8,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # No default — Railway (and any production environment) MUST set this explicitly.
 SECRET_KEY    = config('SECRET_KEY')
 DEBUG         = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv()) + ['healthcheck.railway.app']
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='127.0.0.1,localhost',
+    cast=Csv()
+) + [
+    'healthcompass-ibco.onrender.com',
+    'healthcompass.hasanai.net',
+]
 
 # Trust Railway's HTTPS proxy and the subdomain
 CSRF_TRUSTED_ORIGINS = config(
@@ -25,6 +32,17 @@ AUTHENTICATION_BACKENDS = [
 
 # Email address to notify when a new professional role registers
 ADMIN_NOTIFICATION_EMAIL = config('ADMIN_NOTIFICATION_EMAIL', default='')
+# Shown on About and Privacy when set. Empty hides the contact lines.
+CONTACT_EMAIL = config('CONTACT_EMAIL', default='')
+# Owner details for the privacy page (healthcompass/legal.py). Empty values show
+# a TODO banner in development and fail `check --deploy` (pages.E001).
+LEGAL_CONTROLLER_NAME    = config('LEGAL_CONTROLLER_NAME', default='')
+LEGAL_CONTROLLER_ADDRESS = config('LEGAL_CONTROLLER_ADDRESS', default='')
+LEGAL_BASIS              = config('LEGAL_BASIS', default='')
+LEGAL_HOSTING_PROVIDER   = config('LEGAL_HOSTING_PROVIDER', default='')
+LEGAL_DATABASE_PROVIDER  = config('LEGAL_DATABASE_PROVIDER', default='')
+LEGAL_EMAIL_PROVIDER     = config('LEGAL_EMAIL_PROVIDER', default='')
+LEGAL_STORAGE_PROVIDER   = config('LEGAL_STORAGE_PROVIDER', default='')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -34,11 +52,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'django.contrib.sitemaps',
     # allauth
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    # TOTP + recovery codes; required for staff and professional roles by
+    # apps.accounts.mfa.RequireMFAMiddleware (audit SEC-17).
+    'allauth.mfa',
     # Project apps
     'apps.accounts',
     'apps.medical_records',
@@ -48,10 +70,17 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.appointments',
     'apps.care',
+    'apps.ops',     # scheduled jobs and their heartbeats
+    'apps.scribe',  # experimental AI scribe demo — see apps/scribe/README.md
     # Mobile API
     'apps.api',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_spectacular',
+    # Revocable refresh tokens: logout, logout-all and password change blacklist
+    # them (audit SEC-04). Run `manage.py flushexpiredtokens` daily.
+    'rest_framework_simplejwt.token_blacklist',
+    'django_rq',
     'corsheaders',
 ]
 
@@ -60,14 +89,29 @@ MIDDLEWARE = [
     # WhiteNoise must be directly after SecurityMiddleware
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # Language from the session or Accept-Language (en, fi, sv; audit UX-07).
+    'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # CSP (enforcing), Permissions-Policy, no-store/noindex on signed-in pages.
+    'healthcompass.middleware.SecurityHeadersMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    # After AuthenticationMiddleware: needs request.user.
+    'apps.accounts.idle_session.IdleSessionMiddleware',
+    # After AuthenticationMiddleware: staff/professional accounts without an
+    # authenticator are sent to enrolment.
+    'apps.accounts.mfa.RequireMFAMiddleware',
 ]
+
+# Signed out after this long without a request (see apps/accounts/idle_session.py).
+# 30 minutes idle for a site holding health records (audit SEC-17).
+SESSION_COOKIE_AGE = config('SESSION_IDLE_MINUTES', default=30, cast=int) * 60
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 ROOT_URLCONF = 'healthcompass.urls'
 
@@ -77,12 +121,17 @@ TEMPLATES = [
         'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
+            # {% icon %} everywhere without {% load %} (apps/dashboard/templatetags/icons.py).
+            'builtins': ['apps.dashboard.templatetags.icons'],
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.notifications.context_processors.unread_notifications',
+                'apps.dashboard.navigation.nav_menu',
+                'apps.ai_insights.labs.labs_context',
+                'apps.accounts.verification.verification_context',
             ],
         },
     },
@@ -97,6 +146,9 @@ DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
         conn_max_age=600,
+        # A pooled connection that died (database restart, idle timeout) is
+        # replaced instead of failing the next request.
+        conn_health_checks=True,
     )
 }
 
@@ -109,17 +161,25 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
+# Finnish and Swedish catalogues exist (locale/) but are not translated yet.
+LANGUAGES = [('en', 'English'), ('fi', 'Suomi'), ('sv', 'Svenska')]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'Europe/Helsinki'
 USE_I18N = True
 USE_TZ = True
+# One date format everywhere, in every language (healthcompass/formats/<lang>/).
+DATE_FORMAT = 'j M Y'
+DATETIME_FORMAT = 'j M Y, H:i'
+FORMAT_MODULE_PATH = ['healthcompass.formats']
 
 # ── Static files ───────────────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# Compress and cache-bust static files in production
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STORAGES is defined below, unconditionally. STATICFILES_STORAGE was removed in
+# Django 5.1 and was silently ignored here, so static files were served
+# unhashed and uncompressed (audit ARCH-01).
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
@@ -146,13 +206,22 @@ import sys as _sys_storage
 ALLOW_EPHEMERAL_MEDIA = ('test' in _sys_storage.argv
                          or config('ALLOW_EPHEMERAL_MEDIA', default=False, cast=bool))
 
+# Hashed, compressed static files (WhiteNoise). The test runner uses the plain
+# compressed storage: the manifest one needs collectstatic to have run.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': (
+        'whitenoise.storage.CompressedStaticFilesStorage' if 'test' in _sys_storage.argv
+        else 'whitenoise.storage.CompressedManifestStaticFilesStorage')},
+}
+
 _OBJECT_STORAGE_URL = config('OBJECT_STORAGE_URL', default='')
 if _OBJECT_STORAGE_URL:
     INSTALLED_APPS += ['storages']
-    STORAGES = {
-        'default': {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'},
-        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
-    }
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
+    # Private bucket, short-lived signed URLs only.
+    AWS_QUERYSTRING_AUTH     = True
+    AWS_QUERYSTRING_EXPIRE   = 60
     AWS_S3_ENDPOINT_URL      = _OBJECT_STORAGE_URL
     AWS_STORAGE_BUCKET_NAME  = config('STORAGE_BUCKET_NAME', default='healthcompass-media')
     AWS_ACCESS_KEY_ID        = config('STORAGE_ACCESS_KEY',  default='')
@@ -162,6 +231,14 @@ if _OBJECT_STORAGE_URL:
     MEDIA_URL                = f'{_OBJECT_STORAGE_URL}/{AWS_STORAGE_BUCKET_NAME}/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Checks muted on purpose, by id, per environment (e.g. CI acknowledging
+# ephemeral media). Empty by default.
+# Enforcing Content-Security-Policy (healthcompass/middleware.py). Set False to
+# switch to report-only while investigating a violation.
+CSP_ENFORCE = config('CSP_ENFORCE', default=True, cast=bool)
+
+SILENCED_SYSTEM_CHECKS = config('SILENCED_SYSTEM_CHECKS', default='', cast=Csv())
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
@@ -173,7 +250,9 @@ EMAIL_PORT         = config('EMAIL_PORT',         default=587, cast=int)
 EMAIL_USE_TLS      = True
 EMAIL_HOST_USER    = config('EMAIL_HOST_USER',    default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default='noreply@healthcompass.dev')
+# No made-up default domain: mail from a domain you do not control fails SPF/DKIM.
+# accounts.W003 warns when this is unset or not on SITE_DOMAIN's domain.
+DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default='webmaster@localhost')
 
 # Use SMTP only when credentials are actually configured; fall back to console
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
@@ -195,7 +274,9 @@ else:
 # used, so it changes nothing on its own; narrowing it is now a configuration
 # change instead of a code change.
 PHI_LLM_PROVIDERS = config(
-    'PHI_LLM_PROVIDERS', default='groq,gemini,anthropic,openai', cast=Csv())
+    # Two vendors by default, one primary and one fallback, each of which needs
+    # a data-processing agreement (audit SEC-09). Widen only with a DPA.
+    'PHI_LLM_PROVIDERS', default='gemini,anthropic', cast=Csv())
 
 GROQ_API_KEY      = config('GROQ_API_KEY',      default='')
 GEMINI_API_KEY    = config('GEMINI_API_KEY',    default='')
@@ -259,9 +340,16 @@ RAG_CONFIG = {
 #   upload spools from memory to a temp file.
 # MAX_UPLOAD_BYTES is the actual per-file ceiling, enforced in
 # apps/medical_records/services.py::validate_upload.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
+# 5 MB for non-file request bodies (JSON, form fields); was 50 MB (SEC-16).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
+# Longest pasted or OCR'd text accepted as a record.
+MAX_PASTED_TEXT_CHARS = 200_000
 MAX_UPLOAD_BYTES = config('MAX_UPLOAD_BYTES', default=25 * 1024 * 1024, cast=int)
+
+# Research demos (seizure analysis, real-time EEG, ICU demo, model submission).
+# Off by default: every Labs route returns 404 unless this is True (audit SEC-03).
+LABS_ENABLED = config('LABS_ENABLED', default=False, cast=bool)
 
 # Model files are legitimately larger than clinical documents, so they get their
 # own ceiling rather than being forced under the record limit. Enforced in
@@ -291,10 +379,26 @@ LOGIN_REDIRECT_URL  = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
 SOCIALACCOUNT_ADAPTER       = 'apps.accounts.adapters.HealthCompassSocialAdapter'
+ACCOUNT_ADAPTER             = 'apps.accounts.adapters.HealthCompassAccountAdapter'
 SOCIALACCOUNT_AUTO_SIGNUP   = True    # auto-create user; role selection handled post-signup
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # link Google to existing email account
-SOCIALACCOUNT_LOGIN_ON_GET  = True    # skip confirmation page; GET directly redirects to Google
-ACCOUNT_EMAIL_VERIFICATION  = 'none'
+# False: a GET must not start an OAuth flow, or any page could sign a visitor
+# in through an <img> tag (audit SEC-17). allauth shows a one-click confirm page.
+SOCIALACCOUNT_LOGIN_ON_GET  = False
+# Mandatory once mail can actually be delivered; 'none' otherwise, which
+# accounts.W002 reports. Unverified users can sign in but cannot share or use
+# the assistant until they confirm (audit SEC-05).
+# The test runner always starts from 'none' so results do not depend on the
+# machine's .env; verification tests switch it on with override_settings.
+import sys as _sys
+ACCOUNT_EMAIL_VERIFICATION  = config(
+    'ACCOUNT_EMAIL_VERIFICATION',
+    default='mandatory' if (EMAIL_HOST_USER and EMAIL_HOST_PASSWORD
+                            and 'test' not in _sys.argv) else 'none')
+ACCOUNT_CONFIRM_EMAIL_ON_GET = False
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
+MFA_SUPPORTED_TYPES = ['totp', 'recovery_codes']
+MFA_TOTP_ISSUER = 'HealthCompass'
 ACCOUNT_SIGNUP_FIELDS       = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS       = {'email'}
 SOCIALACCOUNT_EMAIL_REQUIRED = False  # don't block signup if Google omits email
@@ -317,6 +421,14 @@ ICU_DEMO_DATA_PATH = config('ICU_DEMO_DATA_PATH', default='')
 # Set CACHE_URL (e.g. redis://localhost:6379/0) to switch to Redis in production.
 # Redis is required for django-ratelimit to work correctly across gunicorn workers.
 _CACHE_URL = config('CACHE_URL', default='')
+# Rate limits and throttles count in the cache. LocMem counts per worker
+# process, so production needs Redis; accounts.E002 refuses to start without it
+# unless this is set deliberately. Always true under the test runner.
+ALLOW_LOCAL_CACHE = ('test' in _sys_storage.argv
+                     or config('ALLOW_LOCAL_CACHE', default=False, cast=bool))
+# Reverse proxies in front of the app (Render/Railway edge = 1). client_ip()
+# trusts this many hops of X-Forwarded-For, read from the right (SEC-06).
+TRUSTED_PROXY_COUNT = config('TRUSTED_PROXY_COUNT', default=1, cast=int)
 if _CACHE_URL:
     CACHES = {
         'default': {
@@ -337,7 +449,17 @@ else:
 # to delete records older than this many days.
 # Set to 0 to disable automatic purging (retain forever — not recommended for
 # any deployment targeting regulated health data contexts such as Kanta/THL).
+# Field encryption keys (apps/accounts/fields.py, audit SEC-15): comma-separated
+# Fernet keys, newest first. The SECRET_KEY-derived key is always tried last, so
+# existing data stays readable. See docs/FIELD_ENCRYPTION.md for rotation.
+FIELD_ENCRYPTION_KEYS = config('FIELD_ENCRYPTION_KEYS', default='', cast=Csv())
+
 QUERYLOG_RETENTION_DAYS = config('QUERYLOG_RETENTION_DAYS', default=90, cast=int)
+
+# Population statistics: every figure must rest on at least this many distinct
+# patients, for every viewer (audit SEC-11). POPULATION_MIN_PATIENTS, if set, is
+# the stricter threshold applied to viewers without research/admin access.
+POPULATION_MIN_COHORT = config('POPULATION_MIN_COHORT', default=5, cast=int)
 
 # ── Consent ────────────────────────────────────────────────────────────────────
 # Version of the consent text for each purpose. Bump a value when the wording
@@ -388,7 +510,9 @@ CONSENT_REQUIRED_PURPOSES = config(
 # the static prediction interpretation instead of the generated one, cannot use
 # the seizure analysis, and have new records left unindexed until they consent.
 # Nothing is deleted and nothing already processed is affected.
-CONSENT_ENFORCED_EGRESS = config('CONSENT_ENFORCED_EGRESS', default='rag', cast=Csv())
+# Default 'all' (audit SEC-09): no health data leaves the system for parsing,
+# OCR or embedding before external_llm consent. Set 'rag' only to roll back.
+CONSENT_ENFORCED_EGRESS = config('CONSENT_ENFORCED_EGRESS', default='all', cast=Csv())
 
 # ── Embedding provenance enforcement ───────────────────────────────────────────
 # When False (default), chunks embedded before provenance tracking existed
@@ -406,7 +530,12 @@ EMBEDDING_STRICT_PROVENANCE = config('EMBEDDING_STRICT_PROVENANCE', default=Fals
 if not DEBUG:
     SESSION_COOKIE_SECURE        = True
     CSRF_COOKIE_SECURE           = True
-    SECURE_BROWSER_XSS_FILTER    = True
+    # The proxy terminates TLS and sets X-Forwarded-Proto (SECURE_PROXY_SSL_HEADER),
+    # so this only redirects requests that really arrived over plain HTTP.
+    # Health probes from the platform come in over HTTP and must not be redirected.
+    SECURE_SSL_REDIRECT          = config('SECURE_SSL_REDIRECT',
+                                      default='test' not in _sys_storage.argv, cast=bool)
+    SECURE_REDIRECT_EXEMPT       = [r'^health/']
     SECURE_CONTENT_TYPE_NOSNIFF  = True
     SECURE_HSTS_SECONDS          = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -435,7 +564,7 @@ LOGGING = {
     'loggers': {
         'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
         'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
-        'allauth': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+        'allauth': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
         # DEBUG only when DEBUG is on. In production this logger carries per-query
         # retrieval detail for every request; the volume buries the ERROR lines
         # that actually need attention. No patient content is logged at any level
@@ -474,6 +603,14 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
         'rest_framework.throttling.AnonRateThrottle',
     ),
+    # Client IP for anonymous throttles: the right-most XFF hop our proxy added,
+    # never the client-controlled left-most one (SEC-06).
+    'NUM_PROXIES': TRUSTED_PROXY_COUNT,
+    'DEFAULT_PAGINATION_CLASS': 'apps.api.pagination.StandardPagination',
+    'PAGE_SIZE': 20,
+    # One error body for unhandled exceptions: {error, code, reference}.
+    'EXCEPTION_HANDLER': 'apps.api.errors.exception_handler',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_RATES': {
         'user':           config('THROTTLE_USER',           default='1000/hour'),
         'anon':           config('THROTTLE_ANON',           default='100/hour'),
@@ -503,11 +640,33 @@ RATELIMIT_PASSWORD_RESET = config('RATELIMIT_PASSWORD_RESET', default='5/h')
 
 # Set True in tests that are not specifically exercising throttling.
 RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)
+# A blocked request is a 429 with Retry-After, not a 403.
+RATELIMIT_VIEW = 'healthcompass.error_views.ratelimited'
+CSRF_FAILURE_VIEW = 'healthcompass.error_views.csrf_failure'
 
+# Short access tokens, refresh tokens blacklisted on rotation, logout and
+# password change: a stolen token is useful for minutes, not a month (SEC-04).
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME':  timedelta(hours=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
     'ROTATE_REFRESH_TOKENS':  True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN':      True,
+}
+
+# ── OpenAPI schema (drf-spectacular) ─────────────────────────────────────────
+# Regenerate after changing the API:
+#   python manage.py spectacular --file openapi.yaml
+# CI fails when the committed openapi.yaml is stale.
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'HealthCompass API',
+    'DESCRIPTION': 'Mobile API. JWT bearer authentication (auth/login/, auth/refresh/).',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser'],
+    'COMPONENT_SPLIT_REQUEST': True,
+    # PatientReport.input_method and TaskOccurrence.response_input share choices.
+    'ENUM_NAME_OVERRIDES': {'InputMethodEnum': 'apps.care.models.PatientReport.InputMethod'},
 }
 
 # ── CORS (allow Flutter app to call this API) ──────────────────────────────────
@@ -531,6 +690,25 @@ DATE_FORMAT_PREFERENCE = config('DATE_FORMAT_PREFERENCE', default='eu')
 # deterministic and free from SQLite "table is locked" race conditions.
 import sys as _sys
 RAG_AUTO_INDEX_SYNC = 'test' in _sys.argv
+
+# ── Background jobs (django-rq; healthcompass/tasks.py) ────────────────────────
+# Async only with a Redis CACHE_URL and outside the test runner; otherwise jobs
+# run inline. Worker: `python manage.py rqworker ingest default`.
+RQ_ASYNC = config('RQ_ASYNC', default=bool(_CACHE_URL) and 'test' not in _sys.argv, cast=bool)
+RQ_JOB_TIMEOUT = config('RQ_JOB_TIMEOUT', default=600, cast=int)
+# In-database vector search on PostgreSQL (pgvector). Set False to fall back
+# to the NumPy path, e.g. while backfill_embedding_vectors --verify is pending.
+RAG_PGVECTOR = config('RAG_PGVECTOR', default=True, cast=bool)
+RQ_QUEUES = {
+    'ingest':  {'URL': _CACHE_URL or 'redis://localhost:6379/0', 'DEFAULT_TIMEOUT': RQ_JOB_TIMEOUT},
+    'default': {'URL': _CACHE_URL or 'redis://localhost:6379/0', 'DEFAULT_TIMEOUT': RQ_JOB_TIMEOUT},
+}
+
+# ── MFA enforcement for privileged roles ───────────────────────────────────────
+# apps.accounts.mfa.RequireMFAMiddleware. Off under the test runner so the many
+# tests that sign in a clinician with force_login are not redirected to
+# enrolment; the MFA tests switch it on explicitly.
+MFA_ENFORCED = config('MFA_ENFORCED', default='test' not in _sys.argv, cast=bool)
 
 # ── The test suite must not call the embedding provider ───────────────────────
 #
@@ -571,3 +749,20 @@ RAG_ALLOW_EXTERNAL_EMBEDDING = config(
 if 'test' in _sys.argv:
     import tempfile as _tempfile
     MEDIA_ROOT = Path(_tempfile.mkdtemp(prefix='healthcompass-test-media-'))
+
+# ── Error tracking (Sentry, audit ARCH-09) ───────────────────────────────────
+# Off unless SENTRY_DSN is set. Use an EU-region project. PII and request
+# bodies are never sent; see healthcompass/sentry.py for the scrubbing.
+SENTRY_DSN = config('SENTRY_DSN', default='')
+if SENTRY_DSN and 'test' not in _sys.argv:
+    from healthcompass import sentry as _sentry
+    _sentry.init(SENTRY_DSN,
+                 environment=config('SENTRY_ENVIRONMENT', default='production'),
+                 traces_sample_rate=config('SENTRY_TRACES_SAMPLE_RATE', default=0.05, cast=float))
+    LOGGING['handlers']['sentry_ops'] = {'class': 'healthcompass.sentry.OpsToSentryHandler',
+                                         'level': 'ERROR'}
+    LOGGING['loggers']['healthcompass.ops']['handlers'].append('sentry_ops')
+
+# Load testing only: the assistant answers with a stub after this many seconds
+# instead of calling a provider. Honoured only with DEBUG=True (loadtest/README.md).
+LOADTEST_STUB_LLM_DELAY = config('LOADTEST_STUB_LLM_DELAY', default=0, cast=float)

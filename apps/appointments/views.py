@@ -1,8 +1,13 @@
+import calendar as pycal
+from datetime import date, datetime, time
+
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
 from .models import Appointment
+from . import calendar_export
 
 
 @login_required
@@ -17,10 +22,60 @@ def appointment_list(request):
         patient=request.user,
         appointment_datetime__lt=now,
     ).order_by('-appointment_datetime')[:20]
+    # The next appointment leads the page. It used to be a card on My Health,
+    # which could only link here; showing it where it can be edited saves a hop.
+    upcoming = list(upcoming.order_by('appointment_datetime'))
+    next_appt = upcoming[0] if upcoming else None
     return render(request, 'appointments/list.html', {
-        'upcoming': upcoming,
+        'next_appt': next_appt,
+        'upcoming': upcoming[1:],
         'past': past,
     })
+
+
+@login_required
+def appointment_month(request):
+    """Month grid. ?m=YYYY-MM picks the month; anything else means this month."""
+    today = timezone.localdate()
+    try:
+        year, month = (int(x) for x in request.GET.get('m', '').split('-'))
+        first = date(year, month, 1)
+    except (ValueError, TypeError):
+        first = today.replace(day=1)
+
+    weeks = pycal.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)
+    start = timezone.make_aware(datetime.combine(weeks[0][0], time.min))
+    end = timezone.make_aware(datetime.combine(weeks[-1][-1], time.max))
+    by_day = {}
+    for appt in Appointment.objects.filter(
+            patient=request.user,
+            appointment_datetime__gte=start, appointment_datetime__lte=end):
+        by_day.setdefault(timezone.localtime(appt.appointment_datetime).date(), []).append(appt)
+
+    return render(request, 'appointments/month.html', {
+        'month': first,
+        'prev_m': _shift(first, -1).strftime('%Y-%m'),
+        'next_m': _shift(first, 1).strftime('%Y-%m'),
+        'this_m': today.strftime('%Y-%m'),
+        'today': today,
+        'weekdays': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'weeks': [[{'date': d, 'in_month': d.month == first.month,
+                    'appts': by_day.get(d, [])} for d in week] for week in weeks],
+    })
+
+
+def _shift(first: date, months: int) -> date:
+    index = first.year * 12 + first.month - 1 + months
+    return date(index // 12, index % 12 + 1, 1)
+
+
+@login_required
+def appointment_ics(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk, patient=request.user)
+    response = HttpResponse(calendar_export.ics(appt, request.get_host()),
+                            content_type='text/calendar; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="appointment.ics"'
+    return response
 
 
 @login_required

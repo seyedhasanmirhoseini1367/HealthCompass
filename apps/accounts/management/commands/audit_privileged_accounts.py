@@ -35,9 +35,11 @@ Shell equivalent (if a command cannot be deployed):
         print(u.pk, u.username, u.role, u.is_approved, u.is_staff, u.date_joined)
 """
 import json
+import logging
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q
+logger = logging.getLogger(__name__)
 
 PRIVILEGED_ROLES = ('doctor', 'hospital_admin', 'data_scientist', 'admin')
 
@@ -142,8 +144,8 @@ class Command(BaseCommand):
             sources += list(
                 SocialAccount.objects.filter(user=user).values_list('provider', flat=True)
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning('Could not read social accounts: %s', type(exc).__name__)
         return sources or ['none']
 
     # ── Rendering ─────────────────────────────────────────────────────────────

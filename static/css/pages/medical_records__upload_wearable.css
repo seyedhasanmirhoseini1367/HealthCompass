@@ -1,0 +1,10 @@
+/* Moved from templates/medical_records/upload_wearable.html */
+.upload-card{max-width:560px;margin:0 auto}
+.form-group{margin-bottom:1.25rem}
+.form-label{display:block;font-size:.875rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.form-control{width:100%;padding:.6rem .85rem;border-radius:10px;border:1.5px solid var(--border);font-size:.9rem;color:var(--text);background:white;box-sizing:border-box}
+.form-control:focus{border-color:var(--primary)}
+.help-text{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.device-chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.device-chip{padding:.4rem 1rem;border-radius:20px;border:1.5px solid var(--border);font-size:.82rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.device-chip:hover{border-color:var(--primary);color:var(--primary)}

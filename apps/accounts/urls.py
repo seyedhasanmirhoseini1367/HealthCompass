@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
-from . import views
+from . import security_views, views
 
 app_name = "accounts"
 
@@ -12,6 +12,14 @@ urlpatterns = [
     path("profile/edit/",    views.profile_edit,    name="profile_edit"),
     path("password/change/", views.change_password, name="change_password"),
     path("delete/",          views.delete_account,  name="delete_account"),
+    path("access-history/",  views.access_history,  name="access_history"),
+    path("delete/confirm/<str:token>/", security_views.delete_account_confirm,
+         name="delete_account_confirm"),
+    path("email/change/",    security_views.email_change, name="email_change"),
+    path("email/change/<str:token>/", security_views.email_change_confirm,
+         name="email_change_confirm"),
+    path("email/verify/resend/", security_views.resend_verification, name="resend_verification"),
+    path("session/ping/",    security_views.session_ping, name="session_ping"),
     path("consent/",                 views.consent_settings,       name="consent"),
     path("export/",                  views.data_export,            name="data_export"),
     # Patient control over who may read their records (NEW-05).
@@ -19,6 +27,11 @@ urlpatterns = [
     path("my-shares/",                     views.my_shares,             name="my_shares"),
     path("my-shares/create/",              views.create_share,          name="create_share"),
     path("my-shares/<int:pk>/revoke/",     views.revoke_share,          name="revoke_share"),
+    path("my-shares/<int:pk>/accept/",     views.accept_share,          name="accept_share"),
+    path("my-shares/<int:pk>/decline/",    views.decline_share,         name="decline_share"),
+    path("share-requests/",                views.request_share,         name="request_share"),
+    path("share-requests/<uuid:pk>/answer/", views.answer_share_request, name="answer_share_request"),
+    path("share-requests/<uuid:pk>/cancel/", views.cancel_share_request, name="cancel_share_request"),
     path("shared/<int:pk>/",               views.shared_patient,        name="shared_patient"),
     path("shared/<int:pk>/record/<uuid:record_pk>/", views.shared_record, name="shared_record"),
     path("my-doctors/<int:pk>/approve/",   views.approve_doctor_access, name="approve_doctor_access"),
@@ -40,10 +53,7 @@ urlpatterns = [
          name="password_reset_done"),
 
     path("password/reset/<uidb64>/<token>/",
-         auth_views.PasswordResetConfirmView.as_view(
-             template_name="accounts/password_reset_confirm.html",
-             success_url="/accounts/password/reset/complete/",
-         ),
+         security_views.HealthCompassPasswordResetConfirmView.as_view(),
          name="password_reset_confirm"),
 
     path("password/reset/complete/",

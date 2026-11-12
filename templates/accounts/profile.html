@@ -1,51 +1,45 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}My Profile — HealthCompass{% endblock %}
 {% block extra_css %}
-<style>
-.profile-card{background:white;border-radius:16px;border:1px solid var(--border);padding:2rem;margin-bottom:1.25rem}
-.avatar{width:80px;height:80px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#0ea5e9,#6366f1);display:flex;align-items:center;justify-content:center;font-size:2rem;color:white;flex-shrink:0}
-.role-badge{display:inline-block;padding:.25rem .8rem;border-radius:20px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1.25rem}
-.info-item .label{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem}
-.info-item .value{font-size:.9rem;color:var(--text);font-weight:500}
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/accounts__profile.css' %}">
 {% endblock %}
 {% block content %}
 
 <div class="page-hero">
   <div class="page-hero-inner">
     <div>
-      <h1><i class="fas fa-user-circle" style="margin-right:.45rem;opacity:.9"></i>My Profile</h1>
+      <h1>{% icon 'user-circle' cls='x-3b9e8df6' %}My Profile</h1>
       <p>Manage your account details and preferences</p>
     </div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-      <a href="{% url 'accounts:profile_edit' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .9rem;border-radius:9px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:white;font-size:.78rem;font-weight:700;text-decoration:none">
-        <i class="fas fa-edit"></i> Edit Profile
+    <div class="x-48591d9c">
+      <a href="{% url 'accounts:profile_edit' %}" class="x-51d99160">
+        {% icon 'edit' %} Edit Profile
       </a>
-      <a href="{% url 'accounts:change_password' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .9rem;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:white;font-size:.78rem;font-weight:600;text-decoration:none">
-        <i class="fas fa-lock"></i> Password
+      <a href="{% url 'accounts:change_password' %}" class="x-46459a3c">
+        {% icon 'lock' %} Password
       </a>
     </div>
   </div>
 </div>
 
 <div class="profile-card">
-  <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
+  <div class="x-3f8eba3f">
     {% if user.profile_picture %}
     <img src="{{ user.profile_picture.url }}" class="avatar" alt="Avatar">
     {% else %}
     <div class="avatar">{{ user.username|first|upper }}</div>
     {% endif %}
     <div>
-      <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:.3rem">{{ user.get_full_name|default:user.username }}</h2>
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:.5rem">@{{ user.username }}</p>
+      <h2 class="x-316ced83">{{ user.get_full_name|default:user.username }}</h2>
+      <p class="x-0ec4151e">@{{ user.username }}</p>
       <span class="role-badge"
-        style="{% if user.is_patient %}background:#dbeafe;color:#1d4ed8
-        {% elif user.is_doctor %}background:#dcfce7;color:#16a34a
+        data-inline-style="{% if user.is_patient %}background:#dbeafe;color:#1d4ed8
+        {% elif user.is_doctor %}background:#dcfce7;color:#15803d
         {% elif user.is_data_scientist %}background:#ede9fe;color:#7c3aed
         {% elif user.is_hospital_admin %}background:#fef3c7;color:#b45309
         {% else %}background:#f1f5f9;color:var(--text){% endif %}">
-        {{ user.get_role_display }}
+        {{ user.get_role_display }}{% if user.is_data_scientist and profile.job_title %} · {{ profile.get_job_title_display }}{% endif %}
       </span>
     </div>
   </div>
@@ -61,21 +55,21 @@
     </div>
     <div class="info-item">
       <div class="label">Date of Birth</div>
-      <div class="value">{{ user.date_of_birth|date:"M d, Y"|default:"—" }}</div>
+      <div class="value">{{ user.date_of_birth|date:"DATE_FORMAT"|default:"—" }}</div>
     </div>
     <div class="info-item">
       <div class="label">Member Since</div>
-      <div class="value">{{ user.date_joined|date:"M d, Y" }}</div>
+      <div class="value">{{ user.date_joined|date:"DATE_FORMAT" }}</div>
     </div>
   </div>
 </div>
 
 {% if profile %}
 <div class="profile-card">
-  <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)">
+  <h3 class="x-03fcde56">
     {% if user.is_patient %}🏥 Patient Details
     {% elif user.is_doctor %}👨‍⚕️ Doctor Details
-    {% elif user.is_data_scientist %}🔬 Researcher Details
+    {% elif user.is_data_scientist %}🔬 Staff Details
     {% elif user.is_hospital_admin %}🏨 Hospital Details
     {% endif %}
   </h3>
@@ -91,10 +85,11 @@
       <div class="info-item"><div class="label">Hospital</div><div class="value">{{ profile.hospital|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Department</div><div class="value">{{ profile.department|default:"—" }}</div></div>
     {% elif user.is_data_scientist %}
+      <div class="info-item"><div class="label">Job Title</div><div class="value">{{ profile.get_job_title_display|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Institution</div><div class="value">{{ profile.institution|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Research Area</div><div class="value">{{ profile.research_area|default:"—" }}</div></div>
       <div class="info-item"><div class="label">Approval Status</div>
-        <div class="value">{% if user.is_approved %}<span style="color:#16a34a">✓ Approved</span>{% else %}<span style="color:#f59e0b">⏳ Pending</span>{% endif %}</div>
+        <div class="value">{% if user.is_approved %}<span class="x-72389269">✓ Approved</span>{% else %}<span class="x-6a6a237e">⏳ Pending</span>{% endif %}</div>
       </div>
     {% elif user.is_hospital_admin %}
       <div class="info-item"><div class="label">Hospital Name</div><div class="value">{{ profile.hospital_name|default:"—" }}</div></div>
@@ -104,13 +99,13 @@
 </div>
 {% endif %}
 
-<div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
-  <a href="{% url 'dashboard:home' %}" class="btn" style="background:#f1f5f9;color:var(--text)">← Dashboard</a>
+<div class="x-0947090a">
+  <a href="{% url 'dashboard:home' %}" class="btn x-6f47a536">← Home</a>
   {% if user.is_patient %}
-  <a href="{% url 'medical_records:list' %}" class="btn" style="background:var(--primary);color:white">My Records</a>
+  <a href="{% url 'medical_records:list' %}" class="btn x-1564302c">My Records</a>
   {% endif %}
-  <a href="{% url 'accounts:change_password' %}" class="btn" style="background:#f1f5f9;color:var(--text)"><i class="fas fa-lock"></i> Change Password</a>
-  <a href="{% url 'accounts:delete_account' %}" style="margin-left:auto;font-size:.8rem;color:#dc2626;text-decoration:none"><i class="fas fa-trash-alt"></i> Delete account</a>
+  <a href="{% url 'accounts:change_password' %}" class="btn x-6f47a536">{% icon 'lock' %} Change Password</a>
+  <a href="{% url 'accounts:delete_account' %}" class="x-5f4c928d">{% icon 'trash-alt' %} Delete account</a>
 </div>
 
 {% endblock %}

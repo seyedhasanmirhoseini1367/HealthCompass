@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Edit record — HealthCompass{% endblock %}
+{% block content %}
+<div class="acct-wrap"><div class="acct-card">
+  <h1>Edit record</h1>
+  <p>Correct the details if the upload got them wrong. The file and the values read from it are not changed.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="field">
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+    {% endfor %}
+    <div class="acct-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="{% url 'medical_records:detail' record.pk %}">Cancel</a>
+    </div>
+  </form>
+</div></div>
+{% endblock %}

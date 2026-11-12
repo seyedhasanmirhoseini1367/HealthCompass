@@ -62,13 +62,20 @@ def row_counts(alias: str = 'default') -> Dict[str, int]:
     Counting every model rather than a hand-picked list means a future model
     cannot silently fall outside backup verification.
     """
+    from django.db import transaction
+
     counts: Dict[str, int] = {}
     for model in django_apps.get_models():
-        if model._meta.abstract or model._meta.proxy:
+        # Unmanaged models (e.g. django-rq's Queue, an admin placeholder) have
+        # no table of ours to back up.
+        if model._meta.abstract or model._meta.proxy or not model._meta.managed:
             continue
         label = f'{model._meta.app_label}.{model.__name__}'
         try:
-            counts[label] = model.objects.using(alias).count()
+            # A savepoint per count: on PostgreSQL a failed query otherwise
+            # aborts the whole surrounding transaction.
+            with transaction.atomic(using=alias):
+                counts[label] = model.objects.using(alias).count()
         except Exception:                       # table absent in this database
             counts[label] = -1
     return counts

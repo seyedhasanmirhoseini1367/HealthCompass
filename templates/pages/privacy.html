@@ -1,0 +1,65 @@
+{% extends 'pages/_legal.html' %}
+{% block title %}Privacy — HealthCompass{% endblock %}
+{% block doc %}
+<h1>Privacy</h1>
+<p class="lg-meta">How HealthCompass handles your information</p>
+
+<div class="lg-callout info">Short version: we keep what you put in, use it to run the features you choose, send health data to an outside AI provider only if you allow it, and you can download or delete everything at any time.</div>
+
+<h2>What we store</h2>
+<table>
+  <thead><tr><th>Information</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Account details: name, email, role, password (hashed) or Google sign-in</td><td>To let you sign in and show the right pages for your role</td></tr>
+    <tr><td>Health information you add: records, documents, measurements, reminders, appointments, messages to the assistant</td><td>To provide the features you use</td></tr>
+    <tr><td>Sharing settings: who can see what, and for how long</td><td>So companions and clinicians see only what you allowed</td></tr>
+    <tr><td>Consent decisions, with date and version</td><td>To respect and prove what you agreed to</td></tr>
+    <tr><td>Security and audit logs: sign-ins, access to records</td><td>To protect accounts and investigate misuse</td></tr>
+  </tbody>
+</table>
+<p>Sensitive identifiers are encrypted in the database. Uploaded files are only served back to people allowed to see them.</p>
+
+<h2>AI processing and outside providers</h2>
+<p>Some features use AI. Each use is a separate choice in your <a href="{% url 'accounts:consent' %}">consent settings</a>:</p>
+<ul>
+  <li><strong>AI analysis of my health data</strong> and <strong>automated reading of my documents</strong>: processing to organise and summarise your records.</li>
+  <li><strong>Sending my health data to external AI providers</strong>: the assistant, document reading and scribe send the relevant text to the AI provider listed below. Without this consent nothing is sent out: uploads are saved but not AI-processed.</li>
+  <li><strong>Sharing with linked clinicians</strong> and <strong>anonymised research</strong> are separate choices too.</li>
+</ul>
+<p>You can withdraw any consent at any time. Withdrawing stops future processing for that purpose.</p>
+
+<h2>Who is responsible</h2>
+<p>The controller of your data is {% if controller_name %}<strong>{{ controller_name }}</strong>{% if controller_address %}, {{ controller_address }}{% endif %}{% else %}<em>(TODO: controller name and address)</em>{% endif %}.</p>
+<p><strong>Legal basis:</strong> {% if legal_basis %}{{ legal_basis }}{% else %}<em>(TODO: legal basis for processing health data)</em>{% endif %}</p>
+
+<h2>Who else handles data</h2>
+<table>
+  <thead><tr><th>Processor</th><th>What for</th></tr></thead>
+  <tbody>
+    {% for p in processors %}<tr><td>{{ p.name }}</td><td>{{ p.purpose }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p>We do not sell your data and do not use it for advertising.</p>
+
+<h2>How long we keep it</h2>
+<ul>
+  <li>Your records, documents and measurements: until you delete them or your account.</li>
+  <li>Questions to the assistant and its answers: {{ retention_days }} days, then deleted automatically.</li>
+  <li>The record of who opened your data: kept as an audit trail; your name is removed from it when you delete your account.</li>
+</ul>
+
+<h2>Cookies</h2>
+<p>HealthCompass sets only the cookies it needs to work: one to keep you signed in, one to protect forms against forgery, and short-lived ones for on-screen messages. There are no advertising or analytics cookies, so there is nothing to opt out of.</p>
+
+<h2>Your choices</h2>
+<ul>
+  <li><a href="{% url 'accounts:data_export' %}">Download your data</a> at any time.</li>
+  <li><a href="/care/#sharing">See and revoke</a> who can see your information, and <a href="{% url 'accounts:access_history' %}">see who has opened it</a>.</li>
+  <li><a href="{% url 'accounts:delete_account' %}">Delete your account</a> and the data in it.</li>
+  <li>Change your <a href="{% url 'accounts:consent' %}">consent settings</a>.</li>
+</ul>
+{% if contact_email %}<p>For anything else, write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>{% endif %}
+
+<h2>Changes</h2>
+<p>If this page changes in a way that affects how your data is used, you will be asked again before it applies to you.</p>
+{% endblock %}

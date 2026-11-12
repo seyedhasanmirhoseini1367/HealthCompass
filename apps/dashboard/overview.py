@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 # ── Today's care ──────────────────────────────────────────────────────────────
 
+#: Medication reminders and "How are you feeling?" are both sections of My
+#: Health. /care/ is Companions (people and sharing) and has neither.
+REMINDERS_HREF = '/dashboard/health/#reminders'
+FEELING_HREF = '/dashboard/health/#feeling'
+
+
 def medication_section(patient) -> Section:
     """
     Doses due today and what became of them.
@@ -44,7 +50,7 @@ def medication_section(patient) -> Section:
     from apps.care.models import CareTask, TaskOccurrence
 
     section = Section(key='medications', title='Medications',
-                      href='/care/', state=State.NO_DATA)
+                      href=REMINDERS_HREF, state=State.NO_DATA)
 
     if not CareTask.objects.filter(patient=patient, is_active=True).exists():
         section.summary = 'No medication reminders set up.'
@@ -73,7 +79,7 @@ def medication_section(patient) -> Section:
             state=State.ATTENTION,
             # The wording is the whole point. See the module docstring.
             detail='The app did not hear back. Only you can say what happened.',
-            href='/care/', action=('Update now', '/care/')))
+            href=REMINDERS_HREF, action=('Update now', REMINDERS_HREF)))
 
     upcoming = next((o for o in pending if o.due_at >= timezone.now()), None)
     if upcoming is not None:
@@ -81,7 +87,7 @@ def medication_section(patient) -> Section:
             title=f'Next: {upcoming.task.label}',
             state=State.UPCOMING,
             detail=timezone.localtime(upcoming.due_at).strftime('%H:%M'),
-            href='/care/'))
+            href=REMINDERS_HREF))
 
     if not section.items:
         section.items.append(Item(title='All confirmed today', state=State.OK))
@@ -177,7 +183,7 @@ def care_section(patient) -> Section:
     """
     from apps.care.models import MonitoringSignal, PatientReport
 
-    section = Section(key='care', title='My care', href='/care/',
+    section = Section(key='care', title='My care', href=FEELING_HREF,
                       state=State.NO_DATA)
 
     try:
@@ -208,7 +214,7 @@ def care_section(patient) -> Section:
     for signal in open_signals:
         section.items.append(Item(
             title=signal.get_kind_display(), state=State.ATTENTION,
-            detail=_signal_detail(signal), href='/care/'))
+            detail=_signal_detail(signal), href=FEELING_HREF))
 
     if measurements:
         newest = measurements[0]
@@ -361,11 +367,11 @@ def build_dashboard(user) -> dict:
         _section_or_unavailable(alerts_section, user, key='alerts',
                                 title='Health alerts', href='/insights/'),
         _section_or_unavailable(medication_section, user, key='medications',
-                                title='Medications', href='/dashboard/health/'),
+                                title='Medications', href=REMINDERS_HREF),
         _section_or_unavailable(appointment_section, user, key='appointments',
                                 title='Appointments', href='/appointments/'),
         _section_or_unavailable(care_section, user, key='care',
-                                title='My care', href='/care/'),
+                                title='My care', href=FEELING_HREF),
     ]
     watching = _section_or_unavailable(watching_section, user, key='watching',
                                        title='People I look after', href='/care/')
@@ -395,7 +401,7 @@ def build_dashboard(user) -> dict:
     setup_gaps = [
         {'label': label, 'href': href}
         for key, label, href in (
-            ('medications', 'Set up medication reminders', '/care/'),
+            ('medications', 'Set up medication reminders', REMINDERS_HREF),
             ('appointments', 'Add an appointment', '/appointments/'),
         )
         if sections_by_key(sections, key).state == State.NO_DATA
@@ -526,3 +532,30 @@ def _ago(when) -> str:
         return f'{hours} hour{"" if hours == 1 else "s"} ago'
     days = hours // 24
     return f'{days} day{"" if days == 1 else "s"} ago'
+
+
+def first_run_checklist(user):
+    """The three steps a new patient needs (audit UX-06), or None once all are
+    done or the patient closed the list.
+
+    The assistant is blocked until external_llm consent is granted, and sign-up
+    used to land on a page that said nothing about it.
+    """
+    from apps.accounts.models import Consent, PatientProfile
+    from apps.medical_records.models import MedicalRecord
+    from apps.rag_assistant.models import QueryLog
+
+    profile = PatientProfile.objects.filter(user=user).only('onboarding_dismissed').first()
+    if profile is not None and profile.onboarding_dismissed:
+        return None
+    steps = [
+        {'label': 'Review your privacy choices', 'href': '/accounts/consent/',
+         'done': Consent.objects.filter(user=user).exists()},
+        {'label': 'Add your first record', 'href': '/records/',
+         'done': MedicalRecord.objects.filter(patient=user).exists()},
+        {'label': 'Ask your first question', 'href': '/assistant/',
+         'done': QueryLog.objects.filter(session__patient=user).exists()},
+    ]
+    if all(step['done'] for step in steps):
+        return None
+    return {'steps': steps, 'done': sum(step['done'] for step in steps), 'total': len(steps)}

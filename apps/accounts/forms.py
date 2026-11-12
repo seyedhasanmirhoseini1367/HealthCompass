@@ -6,7 +6,7 @@ from django.contrib.auth.forms import (UserCreationForm, AuthenticationForm,
 from .models import CustomUser, PatientProfile, DoctorProfile, DataScientistProfile
 
 _FC = {'class': 'form-control'}
-_PHONE_RE = re.compile(r'^[\d\s\+\-\(\)\.]{0,20}$')
+from .validators import PHONE_RE as _PHONE_RE, validate_phone  # noqa: E402
 
 
 class RegisterForm(UserCreationForm):
@@ -18,6 +18,26 @@ class RegisterForm(UserCreationForm):
         model  = CustomUser
         fields = ["username", "first_name", "last_name", "email", "password1", "password2"]
 
+    def validate_unique(self):
+        """With verification on, a taken email must not surface as a form error
+        (audit SEC-14); auth_service.register_or_notify handles it instead."""
+        from django.core.exceptions import ValidationError
+        from .auth_service import verification_required
+        exclude = self._get_validation_exclusions()
+        if verification_required():
+            exclude.add('email')
+        try:
+            self.instance.validate_unique(exclude=exclude)
+        except ValidationError as exc:
+            self._update_errors(exc)
+
+    def clean_username(self):
+        """Usernames may not contain '@', so one can never pass for an email (SEC-02)."""
+        username = self.cleaned_data.get('username') or ''
+        if '@' in username:
+            raise forms.ValidationError("Usernames cannot contain '@'.")
+        return username
+
     def clean_email(self):
         """
         Reject a duplicate regardless of case.
@@ -28,7 +48,10 @@ class RegisterForm(UserCreationForm):
         decided by row order.
         """
         email = (self.cleaned_data['email'] or '').strip().lower()
-        if CustomUser.objects.filter(email__iexact=email).exists():
+        # With verification on, a taken address is not revealed here: the view
+        # answers identically and mails the owner (audit SEC-14).
+        from .auth_service import verification_required
+        if not verification_required() and CustomUser.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError("An account with this email already exists.")
         return email
 
@@ -59,13 +82,20 @@ class ProfileForm(forms.ModelForm):
             raise forms.ValidationError(message)
         return pic
 
+    def clean_phone_number(self):
+        phone = self.cleaned_data.get('phone_number', '')
+        validate_phone(phone)
+        return phone
+
     class Meta:
         model   = CustomUser
-        fields  = ["first_name", "last_name", "email", "phone_number", "date_of_birth", "profile_picture"]
+        # No 'email': changing it needs the current password and a link sent to
+        # the new address (security_views.email_change, audit SEC-05). Editing
+        # it here let a borrowed session redirect password resets.
+        fields  = ["first_name", "last_name", "phone_number", "date_of_birth", "profile_picture"]
         widgets = {
             "first_name":      forms.TextInput(attrs=_FC),
             "last_name":       forms.TextInput(attrs=_FC),
-            "email":           forms.EmailInput(attrs=_FC),
             "phone_number":    forms.TextInput(attrs={**_FC, 'type': 'tel'}),
             "date_of_birth":   forms.DateInput(attrs={**_FC, 'type': 'date'}),
             "profile_picture": forms.ClearableFileInput(attrs=_FC),
@@ -86,8 +116,7 @@ class PatientProfileForm(forms.ModelForm):
 
     def clean_emergency_contact_phone(self):
         phone = self.cleaned_data.get('emergency_contact_phone', '')
-        if phone and not _PHONE_RE.match(phone):
-            raise forms.ValidationError('Enter a valid phone number (digits, spaces, +, -, ( ) allowed).')
+        validate_phone(phone)
         return phone
 
 
@@ -106,8 +135,9 @@ class DoctorProfileForm(forms.ModelForm):
 class DataScientistProfileForm(forms.ModelForm):
     class Meta:
         model   = DataScientistProfile
-        fields  = ['institution', 'research_area']
+        fields  = ['job_title', 'institution', 'research_area']
         widgets = {
+            'job_title':     forms.Select(attrs=_FC),
             'institution':   forms.TextInput(attrs=_FC),
             'research_area': forms.TextInput(attrs=_FC),
         }

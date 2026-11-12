@@ -1,0 +1,19 @@
+{% comment %}
+  What to share. Separate on purpose: "tell me if something is wrong, but do
+  not read my file" is what people actually want. Nothing is pre-ticked.
+{% endcomment %}
+<label class="cr-check">
+  <input type="checkbox" name="scopes" value="alerts">
+  <span><strong>Care &amp; alerts</strong>
+    <span class="hint">That something needs attention and how serious, not the values behind it.</span></span>
+</label>
+<label class="cr-check">
+  <input type="checkbox" name="scopes" value="appointments">
+  <span><strong>Appointments</strong>
+    <span class="hint">Upcoming appointments, so they can help you get there.</span></span>
+</label>
+<label class="cr-check">
+  <input type="checkbox" name="scopes" value="records">
+  <span><strong>Medical records</strong>
+    <span class="hint">Lab results, documents and the files behind them.</span></span>
+</label>

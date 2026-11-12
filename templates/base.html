@@ -1,6 +1,6 @@
-{% load static %}
+{% load static i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,100 +9,92 @@
     <meta property="og:type"        content="website">
     <meta property="og:title"       content="{% block og_title %}HealthCompass — Data · Insight · Care{% endblock %}">
     <meta property="og:description" content="{% block og_description %}Transform fragmented medical records into integrated, insightful health trajectories with AI-powered cited answers.{% endblock %}">
-    <meta property="og:image"       content="{% block og_image %}{% static 'images/compass.jpg' %}{% endblock %}">
+    <meta property="og:image"       content="{% block og_image %}{{ site_url }}{% static 'images/compass.jpg' %}{% endblock %}">
+    <meta property="og:url"         content="{{ site_url }}{{ request.path }}">
+    <link rel="canonical" href="{{ site_url }}{{ request.path }}">
+    <meta name="theme-color" content="#0369a1">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="apple-touch-icon" href="{% static 'healthcompass-favicon.svg' %}">
     <meta name="twitter:card"       content="summary_large_image">
     <link rel="icon" type="image/svg+xml" href="{% static 'healthcompass-favicon.svg' %}">
-    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components.css' %}">
     {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'css/generated.css' %}">
 </head>
-<body {% if user.is_authenticated %}class="auth-layout"{% endif %}>
-<nav class="navbar">
-    <a href="/" class="nav-brand"><img src="{% static 'healthcompass-horizontal.svg' %}" alt="HealthCompass" style="height:38px;width:auto"></a>
+<body {% if user.is_authenticated %}class="auth-layout" data-session-seconds="{{ session_seconds }}" data-session-ping="{% url 'accounts:session_ping' %}"{% endif %} data-icons="{% static 'icons.svg' %}">
+<a class="skip-link" href="#main">{% trans "Skip to content" %}</a>
+<nav class="navbar" aria-label="{% trans "Main" %}">
+    <a href="{% if user.is_authenticated %}{{ nav_home }}{% else %}/{% endif %}" class="nav-brand"><img src="{% static 'healthcompass-horizontal.svg' %}" alt="HealthCompass" class="x-316afbcc"></a>
 
-    <!-- Desktop nav links -->
+    {% comment %}
+      Signed-in users navigate with the sidebar only. A second menu up here
+      listed the same places in another order and under other names.
+    {% endcomment %}
+    {% if not user.is_authenticated %}
     <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        {% if user.is_authenticated %}
-        <li><a href="/dashboard/">Dashboard</a></li>
-        <li><a href="/dashboard/health/">My Health</a></li>
-        <li><a href="/care/">Care</a></li>
-        <li><a href="/records/">Records</a></li>
-        <li><a href="/assistant/">Assistant</a></li>
-        {% else %}
-        <li><a href="/insights/">AI &amp; Analytics</a></li>
-        <li><a href="/accounts/login/?next=/assistant/">AI Assistant</a></li>
-        {% endif %}
+        <li><a href="/">{% trans "Home" %}</a></li>
+        <li><a href="/assistant/">{% trans "AI Assistant" %}</a></li>
+        <li><a href="/insights/">{% trans "AI &amp; Analytics" %}</a></li>
+        <li><a href="/#how-to-use">{% trans "How it works" %}</a></li>
     </ul>
+    {% endif %}
 
     <div class="nav-right">
-        <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileMenu">&#9776;</button>
+        <button class="nav-hamburger" id="hamburgerBtn" data-on-click="toggleMobileMenu" aria-label="{% trans "Open navigation menu" %}" aria-expanded="false" aria-controls="mobileMenu">&#9776;</button>
         {% if user.is_authenticated %}
         <a href="/notifications/" class="nav-notification"
            aria-label="Notifications{% if unread_notifications_count %}, {{ unread_notifications_count }} unread{% endif %}">
-            <i class="fas fa-bell" aria-hidden="true"></i>
+            {% icon 'bell' %}
             {% if unread_notifications_count %}<span class="notif-badge" aria-hidden="true">{{ unread_notifications_count }}</span>{% endif %}
         </a>
-        <div class="nav-user" style="position:relative" id="navUserBtn" onclick="toggleUserMenu()">
+        <button type="button" class="nav-user x-d461c96d" id="navUserBtn" data-on-click="toggleUserMenu"
+                aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu">
             {% if user.profile_picture %}
-            <img src="{{ user.profile_picture.url }}" class="nav-avatar" style="object-fit:cover">
+            <img src="{{ user.profile_picture.url }}" class="nav-avatar x-808de9a9" alt="">
             {% else %}
             <div class="nav-avatar">{{ user.username|first|upper }}</div>
             {% endif %}
-            <span style="font-size:.85rem;font-weight:600">{{ user.username }}</span>
-            <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}</span>
-            <i class="fas fa-chevron-down" style="font-size:.65rem;color:var(--muted)"></i>
-        </div>
+            <span class="x-0b8d2e97">{{ user.username }}</span>
+            <span class="role-pill role-{{ user.role }}">{{ user.get_role_display }}{% if user.is_data_scientist and user.scientist_profile.job_title %}<span class="role-job"> · {{ user.scientist_profile.get_job_title_display }}</span>{% endif %}</span>
+            {% icon 'chevron-down' cls='x-7c89ecc9' %}
+        </button>
         {% comment %}
           Account-level things only. Dashboard is the first item in the sidebar,
           and Edit Profile / Change Password both live on the Profile page this
           menu opens — a menu that repeats what is one click behind it makes the
           list longer without making anything reachable.
         {% endcomment %}
-        <div id="userMenu" style="display:none;position:absolute;top:56px;right:1.5rem;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:190px;z-index:200;overflow:hidden">
-            <a href="/accounts/profile/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user" style="color:var(--primary);width:16px"></i> My Profile</a>
-            <a href="/accounts/consent/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text);border-top:1px solid var(--border)"><i class="fas fa-shield-halved" style="color:var(--primary);width:16px"></i> Privacy &amp; Consent</a>
-            <a href="/accounts/my-shares/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-user-group" style="color:var(--primary);width:16px"></i> Sharing</a>
-            <a href="/accounts/emergency-card/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:var(--text)"><i class="fas fa-id-card-clip" style="color:#ef4444;width:16px"></i> Emergency Card</a>
-            <a href="/accounts/logout/" style="display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;font-size:.875rem;color:#dc2626;border-top:1px solid var(--border)"><i class="fas fa-sign-out-alt" style="width:16px"></i> Log out</a>
+        <div id="userMenu" class="user-menu x-bc28bf23" role="menu" aria-labelledby="navUserBtn" hidden>
+            <a role="menuitem" href="/accounts/profile/" class="x-93dc166a">{% icon 'user' cls='x-d8b62444' %} {% trans "My Profile" %}</a>
+            <a role="menuitem" href="/accounts/consent/" class="x-c59fe3ce">{% icon 'shield-halved' cls='x-d8b62444' %} {% trans "Privacy &amp; Consent" %}</a>
+            <a role="menuitem" href="/accounts/my-shares/" class="x-93dc166a">{% icon 'user-group' cls='x-d8b62444' %} {% trans "Sharing" %}</a>
+            <a role="menuitem" href="/accounts/emergency-card/" class="x-93dc166a">{% icon 'id-card-clip' cls='x-0c9b686d' %} {% trans "Emergency Card" %}</a>
+            <form method="post" action="/accounts/logout/" class="logout-form">{% csrf_token %}<button type="submit" role="menuitem" class="x-45cbb7f4">{% icon 'sign-out-alt' cls='x-7375d50b' %} {% trans "Log out" %}</button></form>
         </div>
         {% else %}
-        <a href="/accounts/login/" class="btn-nav-outline">Log in</a>
-        <a href="/accounts/register/" class="btn-nav-solid">Get Started</a>
+        <a href="/accounts/login/" class="btn-nav-outline">{% trans "Log in" %}</a>
+        <a href="/accounts/register/" class="btn-nav-solid">{% trans "Get started" %}</a>
         {% endif %}
     </div>
 
     <!-- Mobile menu -->
     <div id="mobileMenu" class="mobile-menu">
-      <a href="/" class="mm-link"><i class="fas fa-home"></i> Home</a>
       {% if user.is_authenticated %}
-      {% comment %}
-        Same order and same labels as the sidebar. The Dashboard sub-items are
-        listed inline rather than behind a disclosure: a phone menu is already
-        a temporary overlay the user opened on purpose, so hiding items behind
-        a second tap inside it buys nothing and costs a tap.
-      {% endcomment %}
-      <a href="/" class="mm-link"><i class="fas fa-house"></i> Home</a>
-      <a href="/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
-      <a href="/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
-      <a href="/records/" class="mm-link"><i class="fas fa-file-medical"></i> Records</a>
-      <a href="/dashboard/" class="mm-link"><i class="fas fa-house-medical"></i> Dashboard</a>
+      {# Same entries, order and labels as the sidebar: both come from nav_menu. #}
+      {% include 'partials/nav.html' with variant='mobile' %}
       <div class="mm-divider"></div>
-      <span class="mm-section-label">Under Dashboard</span>
-      <a href="/dashboard/health/" class="mm-link"><i class="fas fa-heart-pulse"></i> My Health</a>
-      <a href="/care/" class="mm-link"><i class="fas fa-hand-holding-heart"></i> Companions</a>
-      <a href="/appointments/" class="mm-link"><i class="fas fa-calendar-check"></i> Appointments</a>
-      <div class="mm-divider"></div>
-      <a href="/dashboard/settings/" class="mm-link"><i class="fas fa-gear"></i> Settings</a>
-      <div class="mm-divider"></div>
-      <a href="/accounts/logout/" class="mm-link" style="color:#dc2626"><i class="fas fa-sign-out-alt" style="color:#dc2626"></i> Log Out</a>
+      <form method="post" action="/accounts/logout/" class="logout-form">{% csrf_token %}<button type="submit" class="mm-link x-20565543">{% icon 'sign-out-alt' cls='x-20565543' %} {% trans "Log out" %}</button></form>
       {% else %}
-      <a href="/accounts/login/?next=/insights/" class="mm-link"><i class="fas fa-brain"></i> AI &amp; Analytics</a>
-      <a href="/accounts/login/?next=/assistant/" class="mm-link"><i class="fas fa-robot"></i> AI Assistant</a>
+      <a href="/" class="mm-link">{% icon 'home' %} Home</a>
+      <a href="/assistant/" class="mm-link">{% icon 'robot' %} AI Assistant</a>
+      <a href="/insights/" class="mm-link">{% icon 'brain' %} AI &amp; Analytics</a>
+      <a href="/#how-to-use" class="mm-link">{% icon 'circle-question' %} How it works</a>
       <div class="mm-divider"></div>
-      <div style="display:flex;gap:.75rem;padding:.25rem 0">
-        <a href="/accounts/login/" class="btn btn-outline" style="flex:1;justify-content:center">Log In</a>
-        <a href="/accounts/register/" class="btn btn-primary" style="flex:1;justify-content:center">Get Started</a>
+      <div class="x-63c3b328">
+        <a href="/accounts/login/" class="btn btn-outline x-2cc6475e">Log In</a>
+        <a href="/accounts/register/" class="btn btn-primary x-2cc6475e">Get Started</a>
       </div>
       {% endif %}
     </div>
@@ -111,210 +103,86 @@
 {% if user.is_authenticated %}
 <aside class="app-sidebar" id="appSidebar">
   <div class="sb-toggle-row">
-    <button class="sb-toggle" id="sbToggleBtn" onclick="toggleSidebar()"
+    <button class="sb-toggle" id="sbToggleBtn" data-on-click="toggleSidebar"
             aria-label="Collapse sidebar" aria-expanded="true" aria-controls="appSidebar">
-      <i class="fas fa-bars" aria-hidden="true"></i>
+      {% icon 'bars' %}
     </button>
   </div>
   <nav class="sb-nav">
     {% comment %}
-      Six destinations, in the order the product is actually used, with the
-      lower-frequency surfaces folded under Dashboard.
+      One menu per role, from apps/dashboard/navigation.py. Each role sees only
+      what it uses; the first entry is that role's home page.
 
-      Dashboard is BOTH a link and a group. Clicking the label opens the page —
-      it is still the answer to "what needs my attention" and losing that would
-      be a real regression — while the chevron expands the surfaces that live
-      underneath it. A parent item that only toggles is a menu pretending to be
-      a destination, and the user then has no way to reach the overview at all.
-    {% endcomment %}
-    <a href="/" class="sb-link"><i class="fas fa-house"></i><span class="sb-txt">Home</span></a>
-    <a href="/assistant/" class="sb-link"><i class="fas fa-robot"></i><span class="sb-txt">AI Assistant</span></a>
-    <a href="/insights/" class="sb-link"><i class="fas fa-brain"></i><span class="sb-txt">AI &amp; Analytics</span></a>
-    <a href="/records/" class="sb-link"><i class="fas fa-file-medical"></i><span class="sb-txt">Records</span></a>
-
-    <div class="sb-group">
-      <a href="/dashboard/" class="sb-link sb-parent"><i class="fas fa-house-medical"></i><span class="sb-txt">Dashboard</span></a>
-      <button type="button" class="sb-caret" id="dashCaret"
-              onclick="toggleDashGroup(event)"
-              aria-expanded="false" aria-controls="dashSub"
-              aria-label="Show more under Dashboard">
-        <i class="fas fa-chevron-down" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="sb-sub" id="dashSub" hidden>
-      <a href="/dashboard/health/" class="sb-link sb-sublink"><i class="fas fa-heart-pulse"></i><span class="sb-txt">My Health</span></a>
-      <a href="/care/" class="sb-link sb-sublink"><i class="fas fa-hand-holding-heart"></i><span class="sb-txt">Companions</span></a>
-      <a href="/appointments/" class="sb-link sb-sublink"><i class="fas fa-calendar-check"></i><span class="sb-txt">Appointments</span></a>
-    </div>
-
-    <a href="/dashboard/settings/" class="sb-link"><i class="fas fa-gear"></i><span class="sb-txt">Settings</span></a>
-    {% comment %}
       No Notifications row: the bell with its unread badge sits in the top bar
-      on every page and every viewport, so a second entry here would be the
-      same destination twice in one screen.
+      on every page and every viewport.
     {% endcomment %}
+    {% include 'partials/nav.html' with variant='sidebar' %}
   </nav>
 </aside>
 {% endif %}
 
+{% comment %}
+  Flash messages float as toasts in the top-right corner instead of pushing
+  the page down. Success and info fade out on their own; warnings and errors
+  stay until closed, because they usually ask the reader to do something.
+{% endcomment %}
 {% if messages %}
-{% if messages %}<div class="messages-wrap">{% for message in messages %}<div class="alert alert-{{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>{% endfor %}</div>{% endif %}
+<div class="toast-stack" id="toastStack">
+  {% for message in messages %}
+  <div class="toast toast-{{ message.tags|default:'info' }}"
+       role="{% if message.level >= 30 %}alert{% else %}status{% endif %}"
+       data-autohide="{% if message.level >= 30 %}0{% else %}1{% endif %}">
+    <span class="toast-icon" aria-hidden="true">{% if 'success' in message.tags %}{% icon 'circle-check' %}{% elif 'error' in message.tags %}{% icon 'circle-exclamation' %}{% elif 'warning' in message.tags %}{% icon 'triangle-exclamation' %}{% else %}{% icon 'circle-info' %}{% endif %}</span>
+    <div class="toast-body">{{ message }}</div>
+    <button type="button" class="toast-close" aria-label="Dismiss">{% icon 'xmark' %}</button>
+    <span class="toast-timer" aria-hidden="true"></span>
+  </div>
+  {% endfor %}
+</div>
 {% endif %}
-<main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
-<footer>
-    <p><strong>HealthCompass</strong> &nbsp;·&nbsp; AI-Powered Health Insights &nbsp;·&nbsp; MVP Prototype</p>
-    <p style="margin-top:.3rem;font-size:.75rem">Not a substitute for professional medical advice</p>
+<main id="main" tabindex="-1" class="{% block main_class %}{% endblock %}">{% if needs_email_verification %}<div class="verify-banner" role="status"><span>{% blocktrans with email=user.email %}Please confirm your email address <strong>{{ email }}</strong>. Sharing and the assistant unlock once you do.{% endblocktrans %}</span><form method="post" action="{% url 'accounts:resend_verification' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit">{% trans "Send the link again" %}</button></form></div>{% endif %}{% block content %}{% endblock %}</main>
+{# Before page scripts: copies data-inline-style into the CSSOM (CSP-safe inline styles). #}
+<script src="{% static 'js/styles.js' %}"></script>
+<footer class="site-footer">
+    <div class="ft-inner">
+        <div class="ft-brand">
+            <strong>HealthCompass</strong>
+            <span>{% trans "Your health records, reminders and care in one place." %}</span>
+        </div>
+        <nav class="ft-links" aria-label="Footer">
+            <a href="{% url 'about' %}">{% trans "About" %}</a>
+            <a href="{% url 'privacy' %}">{% trans "Privacy" %}</a>
+            <a href="{% url 'terms' %}">{% trans "Terms" %}</a>
+            <a href="{% url 'disclaimer' %}">{% trans "Medical disclaimer" %}</a>
+            <a href="{% url 'contact' %}">{% trans "Contact" %}</a>
+        </nav>
+    </div>
+    <p class="ft-note">&copy; {% now "Y" %} HealthCompass &nbsp;·&nbsp; {% trans "Not a substitute for professional medical advice. In an emergency call 112." %}</p>
 </footer>
+<script src="{% static 'js/ui.js' %}" defer></script>
 {% block extra_js %}{% endblock %}
 
-<!-- ── Global delete-confirmation modal ───────────────────────────────────── -->
-<div id="deleteModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center">
-  <div style="background:white;border-radius:18px;padding:2rem 2rem 1.5rem;max-width:380px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.18);text-align:center">
-    <div style="font-size:2.2rem;margin-bottom:.75rem">🗑️</div>
-    <h3 id="deleteModalTitle" style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Are you sure?</h3>
-    <p id="deleteModalMsg" style="font-size:.875rem;color:#64748b;margin-bottom:1.5rem">This action cannot be undone.</p>
-    <div style="display:flex;gap:.75rem;justify-content:center">
-      <button onclick="closeDeleteModal()" style="padding:.6rem 1.4rem;border:1.5px solid #e2e8f0;border-radius:10px;background:white;font-size:.9rem;font-weight:600;cursor:pointer">Cancel</button>
-      <button id="deleteModalConfirm" style="padding:.6rem 1.4rem;border:none;border-radius:10px;background:#ef4444;color:white;font-size:.9rem;font-weight:600;cursor:pointer">Delete</button>
-    </div>
+<!-- Global confirmation dialog: native <dialog>, so focus moves in on open,
+     returns on close, and Escape closes it. window.openDeleteModal() opens it. -->
+<dialog id="deleteModal" class="modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMsg">
+  <h2 id="deleteModalTitle">{% trans "Are you sure?" %}</h2>
+  <p id="deleteModalMsg">{% trans "This action cannot be undone." %}</p>
+  <div class="modal-actions">
+    <button type="button" class="btn btn-secondary" data-on-click="closeDeleteModal">{% trans "Cancel" %}</button>
+    <button type="button" class="btn btn-danger" id="deleteModalConfirm">{% trans "Delete" %}</button>
   </div>
-</div>
+</dialog>
 
-<script>
-function toggleUserMenu() {
-  const m = document.getElementById('userMenu');
-  m.style.display = m.style.display === 'none' ? 'block' : 'none';
-  // close More if open
-  closeMoreMenu();
-}
-function toggleMobileMenu() {
-  const menu = document.getElementById('mobileMenu');
-  const btn  = document.getElementById('hamburgerBtn');
-  const open = menu.classList.toggle('open');
-  btn && btn.setAttribute('aria-expanded', open);
-}
-function toggleMoreMenu(e) {
-  e.stopPropagation();
-  const menu = document.getElementById('moreMenu');
-  const btn  = document.getElementById('moreBtn');
-  const isOpen = menu && menu.classList.contains('open');
-  closeMoreMenu();
-  if (!isOpen) {
-    menu && menu.classList.add('open');
-    btn  && btn.classList.add('open');
-    btn  && btn.setAttribute('aria-expanded', 'true');
-  }
-  // close user menu if open
-  const um = document.getElementById('userMenu');
-  if (um) um.style.display = 'none';
-}
-function closeMoreMenu() {
-  const menu = document.getElementById('moreMenu');
-  const btn  = document.getElementById('moreBtn');
-  menu && menu.classList.remove('open');
-  btn  && btn.classList.remove('open');
-  btn  && btn.setAttribute('aria-expanded', 'false');
-}
-let _deleteCallback = null;
-function openDeleteModal(message, onConfirm, title) {
-  const modal = document.getElementById('deleteModal');
-  document.getElementById('deleteModalTitle').textContent = title || 'Are you sure?';
-  document.getElementById('deleteModalMsg').textContent = message || 'This action cannot be undone.';
-  document.getElementById('deleteModalConfirm').onclick = function() { closeDeleteModal(); onConfirm(); };
-  modal.style.display = 'flex';
-}
-function closeDeleteModal() {
-  document.getElementById('deleteModal').style.display = 'none';
-}
-document.getElementById('deleteModal').addEventListener('click', function(e) {
-  if (e.target === this) closeDeleteModal();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeDeleteModal();
-});
-
-
-// Dashboard sub-group: the chevron expands, the label still navigates.
-//
-// Kept separate from the link deliberately. A parent item that only toggles
-// leaves no way to reach the page itself, and Dashboard is the overview — the
-// one screen that answers "does anything need me right now".
-//
-// The open/closed choice persists like the sidebar collapse does, because a
-// group that springs shut on every page load is a group nobody uses twice.
-function toggleDashGroup(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  const sub   = document.getElementById('dashSub');
-  const caret = document.getElementById('dashCaret');
-  if (!sub || !caret) return;
-  const open = sub.hasAttribute('hidden');
-  if (open) { sub.removeAttribute('hidden'); } else { sub.setAttribute('hidden', ''); }
-  caret.setAttribute('aria-expanded', open ? 'true' : 'false');
-  caret.setAttribute('aria-label', open ? 'Hide more under Dashboard' : 'Show more under Dashboard');
-  caret.classList.toggle('open', open);
-  localStorage.setItem('hc_dash', open ? '1' : '0');
-}
-
-(function(){
-  const sub   = document.getElementById('dashSub');
-  const caret = document.getElementById('dashCaret');
-  if (!sub || !caret) return;
-  // Open by default when the user is already on one of the pages inside it,
-  // so the group shows where they are rather than hiding it.
-  const path = location.pathname;
-  const inside = ['/dashboard/health/', '/care/', '/appointments/']
-                 .some(function (h) { return path.startsWith(h); });
-  if (localStorage.getItem('hc_dash') === '1' || inside) {
-    sub.removeAttribute('hidden');
-    caret.setAttribute('aria-expanded', 'true');
-    caret.classList.add('open');
-  }
-})();
-
-function toggleSidebar() {
-  const sb  = document.getElementById('appSidebar');
-  const btn = document.getElementById('sbToggleBtn');
-  if (!sb) return;
-  const collapsed = sb.classList.toggle('collapsed');
-  document.body.classList.toggle('sidebar-collapsed', collapsed);
-  localStorage.setItem('hc_sb', collapsed ? '1' : '0');
-  if (btn) {
-    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-  }
-}
-(function(){
-  const sb  = document.getElementById('appSidebar');
-  const btn = document.getElementById('sbToggleBtn');
-  if (!sb) return;
-  if (localStorage.getItem('hc_sb') === '1') {
-    sb.classList.add('collapsed');
-    document.body.classList.add('sidebar-collapsed');
-    if (btn) { btn.setAttribute('aria-expanded','false'); btn.setAttribute('aria-label','Expand sidebar'); }
-  }
-  const path = location.pathname;
-  document.querySelectorAll('.sb-link').forEach(function(a) {
-    const h = a.getAttribute('href');
-    if (h && h !== '/' && path.startsWith(h)) a.classList.add('active');
-  });
-})();
-
-document.addEventListener('click', function(e) {
-  if (!document.getElementById('navUserBtn')?.contains(e.target)) {
-    const m = document.getElementById('userMenu');
-    if (m) m.style.display = 'none';
-  }
-  if (!document.getElementById('moreBtn')?.contains(e.target) &&
-      !document.getElementById('moreMenu')?.contains(e.target)) {
-    closeMoreMenu();
-  }
-  const btn = document.getElementById('hamburgerBtn');
-  const mm = document.getElementById('mobileMenu');
-  if (mm && btn && !mm.contains(e.target) && !btn.contains(e.target)) {
-    mm.classList.remove('open');
-  }
-});
-</script>
+{% if user.is_authenticated %}
+<dialog id="idleDialog" class="modal" aria-labelledby="idleTitle" aria-describedby="idleMsg">
+  <h2 id="idleTitle">{% trans "Still there?" %}</h2>
+  <p id="idleMsg">{% trans "For your privacy you will be signed out in a minute because nothing has happened for a while." %}</p>
+  <div class="modal-actions">
+    <form method="post" action="/accounts/logout/" class="logout-form">{% csrf_token %}<button type="submit" class="btn btn-secondary">{% trans "Sign out now" %}</button></form>
+    <button type="button" class="btn btn-primary" id="idleStay">{% trans "Stay signed in" %}</button>
+  </div>
+</dialog>
+{% endif %}
+<script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
