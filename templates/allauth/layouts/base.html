@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+  Every allauth page (two-step setup, recovery codes, password reset, email
+  management) uses this layout. It used to be allauth's bare default, an
+  unstyled page with its own menu. It now uses the site's frame and styles
+  allauth's plain markup through .allauth-page.
+{% endcomment %}
+{% block title %}{% block head_title %}{% endblock head_title %} — HealthCompass{% endblock title %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/allauth.css' %}">{% block extra_head %}{% endblock extra_head %}{% endblock extra_css %}
+{% block main_class %}allauth-page{% endblock main_class %}
+{% block extra_js %}{% block extra_body %}{% endblock extra_body %}{% endblock extra_js %}
