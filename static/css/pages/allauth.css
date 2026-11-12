@@ -1,0 +1,20 @@
+/* allauth pages (two-step login, recovery codes, password reset, emails).
+   allauth renders plain h1/p/form/label/input; this gives them the site's look. */
+.allauth-page{display:flex;flex-direction:column;align-items:center;padding:2.5rem 1rem}
+.allauth-page > *:not(.verify-banner){width:100%;max-width:520px}
+.allauth-page > h1,.allauth-page > h2{font-size:1.4rem;font-weight:800;color:var(--text);margin:0 0 .6rem}
+.allauth-page > p{color:var(--muted);font-size:.92rem;line-height:1.6;margin:0 0 1rem}
+.allauth-page form{background:white;border:1px solid var(--border);border-radius:16px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.allauth-page form p{margin:0 0 1rem;display:flex;flex-direction:column;gap:.35rem;font-size:.85rem;color:var(--muted)}
+.allauth-page label{font-weight:600;font-size:.85rem;color:var(--text)}
+.allauth-page input[type=text],.allauth-page input[type=email],.allauth-page input[type=password],.allauth-page input:not([type]),.allauth-page textarea{width:100%;padding:.6rem .8rem;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:.95rem;color:var(--text);background:white;box-sizing:border-box}
+.allauth-page input:focus,.allauth-page textarea:focus{outline:2px solid var(--primary);outline-offset:1px;border-color:var(--primary)}
+.allauth-page input:disabled{background:#f8fafc;font-family:ui-monospace,monospace;letter-spacing:.04em}
+.allauth-page img{display:block;width:200px;height:200px;margin:0 auto 1.2rem;padding:.6rem;background:white;border:1px solid var(--border);border-radius:12px}
+.allauth-page button:not(.pw-toggle),.allauth-page input[type=submit]{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.3rem;border:none;border-radius:10px;background:var(--primary);color:white;font:inherit;font-weight:600;font-size:.9rem;cursor:pointer}
+.allauth-page button:not(.pw-toggle):hover{filter:brightness(.95)}
+.allauth-page a{color:var(--primary)}
+.allauth-page ul{padding-left:1.2rem;color:var(--text)}
+.allauth-page .errorlist{list-style:none;padding:0;margin:0 0 .4rem;color:#b91c1c;font-size:.83rem}
+.allauth-page table{width:100%;border-collapse:collapse;font-size:.88rem}
+.allauth-page th,.allauth-page td{text-align:left;padding:.5rem;border-bottom:1px solid var(--border)}
