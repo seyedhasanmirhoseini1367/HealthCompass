@@ -50,7 +50,7 @@ pdfplumber==0.11.9
 pandas==3.0.2
 numpy==2.4.4
 anthropic==0.88.0
-pyarrow==23.0.1
+pyarrow==26.0.1
 joblib==1.5.3
 scipy==1.17.1
 langgraph==1.2.14
