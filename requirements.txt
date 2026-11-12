@@ -104,7 +104,7 @@ faster-whisper==1.2.1
 # limits already need. Jobs run inline under the test runner and when
 # RQ_ASYNC=False, so nothing else needs Redis locally.
 django-rq==4.2.0
-rq==2.9.1
+rq==3.0.0
 # Vector search in PostgreSQL (audit ARCH-05); SQLite keeps the NumPy path.
 pgvector==0.5.1
 # Error tracking, enabled only when SENTRY_DSN is set (audit ARCH-09).
