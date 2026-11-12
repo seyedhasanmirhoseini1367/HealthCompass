@@ -22,8 +22,8 @@ django==5.2.17
 pillow==13.0.0
 python-decouple==3.8
 google-genai==1.72.0
-groq==1.2.0
-onnxruntime==1.28.0
+groq==1.7.0
+onnxruntime==1.31.1
 
 # SECURITY-CRITICAL — do not remove.
 # Hardens the Kanta XML upload path against entity-expansion attacks.
@@ -42,44 +42,44 @@ defusedxml==0.7.1
 qrcode==8.2
 
 django-storages[s3]==1.14.6
-boto3==1.43.70
+boto3==1.43.127
 rank-bm25==0.2.2
 openai==2.54.0
-scikit-learn==1.8.0
-pdfplumber==0.11.9
-pandas==3.0.2
-numpy==2.4.4
+scikit-learn==1.9.1
+pdfplumber==0.11.10
+pandas==3.1.1
+numpy==2.4.6
 anthropic==0.88.0
 pyarrow==23.0.1
-joblib==1.5.3
+joblib==1.6.0
 scipy==1.17.1
-langgraph==1.2.14
+langgraph==1.2.20
 
 # Google OAuth. Was `>=65.0.0,<66.0.0`; 66+ may have breaking changes, and
 # allauth 65.x has a known interaction documented in the project memory
 # (never combine a settings APP key with a DB SocialApp).
-django-allauth==65.16.1
+django-allauth==65.21.1
 # allauth.mfa (TOTP for staff and clinicians) imports fido2 for its URL
 # config even when only TOTP is enabled; this is allauth's [mfa] extra.
 fido2==2.2.1
 
-PyJWT==2.15.0
-requests==2.33.1
+PyJWT==2.15.1
+requests==2.34.2
 
 # Mobile API
-djangorestframework==3.18.2
+djangorestframework==3.18.3
 # OpenAPI schema for the mobile client (/api/v1/schema/, staff-only docs).
 drf-spectacular==0.30.0
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
-firebase-admin==7.5.0
+firebase-admin==7.7.0
 
 # Security: field-level encryption + rate limiting
 # cryptography provides Fernet (AES-128-CBC + HMAC-SHA256) for
 # EncryptedCharField in apps/accounts/fields.py.
 # It is already a transitive dependency of several packages (google-genai,
 # anthropic, etc.) — listed here explicitly to guarantee it is present.
-cryptography==50.0.0
+cryptography==50.0.2
 django-ratelimit==4.1.0
 
 # Cache backend for django-ratelimit (multi-worker safe) and population insights.
@@ -88,8 +88,8 @@ django-ratelimit==4.1.0
 redis==8.1.0
 
 # Production server & database
-gunicorn==26.0.0
-psycopg2-binary==2.9.12
+gunicorn==26.2.0
+psycopg2-binary==2.9.13
 whitenoise==6.12.0
 dj-database-url==3.1.2
 
@@ -108,4 +108,4 @@ rq==2.9.1
 # Vector search in PostgreSQL (audit ARCH-05); SQLite keeps the NumPy path.
 pgvector==0.5.1
 # Error tracking, enabled only when SENTRY_DSN is set (audit ARCH-09).
-sentry-sdk==2.73.0
+sentry-sdk==2.74.0
