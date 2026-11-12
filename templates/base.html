@@ -69,7 +69,6 @@
         <div id="userMenu" class="user-menu x-bc28bf23" role="menu" aria-labelledby="navUserBtn" hidden>
             <a role="menuitem" href="/accounts/profile/" class="x-93dc166a">{% icon 'user' cls='x-d8b62444' %} {% trans "My Profile" %}</a>
             <a role="menuitem" href="/accounts/consent/" class="x-c59fe3ce">{% icon 'shield-halved' cls='x-d8b62444' %} {% trans "Privacy &amp; Consent" %}</a>
-            <a role="menuitem" href="/accounts/my-shares/" class="x-93dc166a">{% icon 'user-group' cls='x-d8b62444' %} {% trans "Sharing" %}</a>
             <a role="menuitem" href="/accounts/emergency-card/" class="x-93dc166a">{% icon 'id-card-clip' cls='x-0c9b686d' %} {% trans "Emergency Card" %}</a>
             <form method="post" action="/accounts/logout/" class="logout-form">{% csrf_token %}<button type="submit" role="menuitem" class="x-45cbb7f4">{% icon 'sign-out-alt' cls='x-7375d50b' %} {% trans "Log out" %}</button></form>
         </div>

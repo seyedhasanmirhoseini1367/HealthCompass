@@ -681,12 +681,14 @@ class SetupGuidanceTests(_Dash):
         body = self.client.get('/dashboard/health/').content.decode()
         menu = body[body.index('id="userMenu"'):body.index('id="userMenu"') + 1800]
 
-        for gone in ('/accounts/profile/edit/', '/accounts/password/change/'):
+        # Sharing is managed on Companions; /accounts/my-shares/ only redirects there.
+        for gone in ('/accounts/profile/edit/', '/accounts/password/change/',
+                     '/accounts/my-shares/'):
             self.assertNotIn(gone, menu, f'{gone} is back in the profile menu')
         self.assertNotIn('Dashboard</a>', menu)
 
         for kept in ('/accounts/profile/', '/accounts/consent/',
-                     '/accounts/my-shares/', '/accounts/emergency-card/',
+                     '/accounts/emergency-card/',
                      '/accounts/logout/'):
             self.assertIn(kept, menu, f'{kept} left the profile menu')
 
