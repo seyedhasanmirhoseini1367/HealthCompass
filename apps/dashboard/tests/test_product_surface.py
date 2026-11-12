@@ -31,12 +31,12 @@ class NavigationTests(TestCase):
                 self.assertNotIn(f'>{absent}<', body)
                 self.assertIn('aria-current="page"', body)
 
-    def test_labs_link_only_when_enabled(self):
+    def test_labs_never_in_the_menu(self):
         user = _user('nav_labs')
         self.client.force_login(user)
-        self.assertNotIn('/insights/models/', self.client.get('/dashboard/settings/').content.decode())
-        with override_settings(LABS_ENABLED=True):
-            self.assertIn('/insights/models/', self.client.get('/dashboard/settings/').content.decode())
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled), override_settings(LABS_ENABLED=enabled):
+                self.assertNotIn('/insights/models/', self.client.get('/dashboard/settings/').content.decode())
 
     def test_menus_come_only_from_the_partial(self):
         from pathlib import Path
