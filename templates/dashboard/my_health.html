@@ -57,7 +57,7 @@
       {% for d in adherence.days %}
       <div class="ad-col{% if d.is_today %} today{% endif %}" title="{{ d.label }}">
         <div class="ad-stack">
-          {% for kind, n, pct in d.parts %}<span class="ad-seg {{ kind }} x-59fce93f"1u" }}%"></span>{% endfor %}
+          {% for kind, n, pct in d.parts %}<span class="ad-seg {{ kind }}" data-inline-style="height:{{ pct|floatformat:"1u" }}%"></span>{% endfor %}
         </div>
         <span class="ad-day">{{ d.date|date:"j" }}</span>
       </div>

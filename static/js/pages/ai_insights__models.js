@@ -25,7 +25,8 @@ function applyFilters() {
   const grid = document.getElementById('modelGrid');
   allCards.forEach(c => c.style.display='none');
   visible.forEach(c => { c.style.display='flex'; grid.appendChild(c); });
-  document.getElementById('noResults').style.display = visible.length===0 ? 'block' : 'none';
+  // Only a filter that hides every model is "no match"; an empty catalogue has its own message.
+  document.getElementById('noResults').hidden = !(allCards.length && visible.length === 0);
 }
 
 function resetFilters() {

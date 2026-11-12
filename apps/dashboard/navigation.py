@@ -82,19 +82,10 @@ def home_url(user) -> str:
     return MY_HEALTH.href if user.is_patient else '/dashboard/'
 
 
-#: Research demos, listed only when LABS_ENABLED (see apps/ai_insights/labs.py).
-LABS = Item('/insights/models/', _('Labs'), 'flask')
-LABS_ROLES = {'patient', 'data_scientist', 'admin'}
-
-
 def items_for(user) -> list:
-    from apps.ai_insights.labs import labs_enabled
-
-    items = list(menu_for(user))
-    if labs_enabled() and menu_key(user) in LABS_ROLES:
-        at = items.index(DIVIDER) if DIVIDER in items else len(items)
-        items.insert(at, LABS)
-    return items
+    """The sidebar for this user. The research demos (Labs) are deliberately
+    not listed; they are reachable from the Analytics page when enabled."""
+    return list(menu_for(user))
 
 
 def current_href(items, path: str):
