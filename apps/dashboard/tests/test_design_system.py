@@ -88,3 +88,20 @@ class ContrastTests(SimpleTestCase):
     def test_every_text_pair_meets_wcag_aa(self):
         failing = {pair: r for pair, r in ratios().items() if r < 4.5}
         self.assertEqual(failing, {}, f'below 4.5:1: {failing}')
+
+
+class GeneratedCssTests(SimpleTestCase):
+    """generated.css came from inline styles; a template tag in one of them
+    once broke the parser and silently disabled every rule after it."""
+
+    def test_no_template_syntax_and_balanced_braces(self):
+        css = (ROOT / 'static/css/generated.css').read_text(encoding='utf-8')
+        css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+        self.assertNotRegex(css, r'\{\{|\{%')
+        self.assertEqual(css.count('{'), css.count('}'))
+        for line in css.splitlines():
+            if line.strip():
+                self.assertRegex(line, r'^[^{}]+\{[^{}]*\}$', line[:80])
+
+    def test_no_class_attribute_swallowed_a_template_tag(self):
+        self.assertEqual(_all(r'x-[0-9a-f]{8}"[^\s>]'), [])

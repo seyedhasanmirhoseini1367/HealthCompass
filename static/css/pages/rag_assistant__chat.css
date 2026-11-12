@@ -36,7 +36,7 @@
   .bubble{font-size:.875rem;padding:.6rem .8rem}
   .chat-input-area{flex-shrink:0;gap:.4rem;margin-top:.35rem}
   .chat-input{font-size:.9rem;padding:.55rem .75rem;border-radius:10px}
-  .send-btn{padding:.55rem .9rem;border-radius:10px;font-size:.875rem;flex-shrink:0}
+  .send-btn,.stop-btn{padding:.55rem .9rem;border-radius:10px;font-size:.875rem;flex-shrink:0}
   .no-records-banner{font-size:.78rem;padding:.5rem .7rem;margin-bottom:.35rem;flex-shrink:0}
 }
 .sidebar{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto}
@@ -97,6 +97,10 @@
 .send-btn:hover{background:#0284c7}
 .send-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .send-btn:disabled{opacity:.5;cursor:not-allowed}
+.stop-btn{padding:.65rem 1.1rem;background:white;color:#b91c1c;border:1.5px solid #fca5a5;border-radius:12px;cursor:pointer;font-size:.9rem;font-weight:600;font-family:inherit;line-height:inherit;transition:all .15s;flex-shrink:0}
+.stop-btn:hover{background:#fef2f2}
+.stop-btn:focus-visible{outline:2px solid #b91c1c;outline-offset:2px}
+.stop-btn[hidden]{display:none}
 .typing-indicator{display:none;align-self:flex-start}
 .typing-bubble{background:#f1f5f9;border-radius:14px 14px 14px 4px;padding:.65rem 1rem;display:flex;gap:.35rem;align-items:center}
 .typing-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;animation:bounce .8s infinite}
