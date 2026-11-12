@@ -1,5 +1,6 @@
 """Request-level chat tests, web and API (audit T-07, prompt 9 task 2)."""
 import json
+from unittest import mock
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -23,14 +24,6 @@ def _events(*tokens, done=True):
 
 class _Chat(TestCase):
     def setUp(self):
-        # Closing a streamed response fires request_finished, whose
-        # close_old_connections() closes the connection inside the test
-        # transaction on PostgreSQL. The test client only guards non-streamed
-        # responses, so keep the handler off for these tests.
-        from django.core.signals import request_finished
-        from django.db import close_old_connections
-        request_finished.disconnect(close_old_connections)
-        self.addCleanup(request_finished.connect, close_old_connections)
         cache.clear()
         self.user = make_patient()
         grant_consent(self.user, ConsentPurpose.EXTERNAL_LLM)
@@ -61,7 +54,11 @@ class StreamPersistenceTests(_Chat):
             response = self.client.post('/assistant/stream/', json.dumps({'message': 'hi'}),
                                         content_type='application/json')
             next(iter(response.streaming_content))
-            response.close()   # what the server does when the client goes away
+            # What the server does when the client goes away. close() fires
+            # request_finished, whose close_old_connections() would close the
+            # test's own transaction on PostgreSQL; keep the connection open.
+            with mock.patch('django.db.backends.base.base.BaseDatabaseWrapper.close_if_unusable_or_obsolete'):
+                response.close()
         self.assertEqual(QueryLog.objects.get().response, 'Partial')
 
     def test_an_empty_answer_is_not_saved_and_sends_an_error(self):
