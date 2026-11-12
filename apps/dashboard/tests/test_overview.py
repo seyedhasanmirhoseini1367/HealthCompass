@@ -368,7 +368,7 @@ class NavigationTests(_Dash):
     """
 
     #: A patient's menu, in order.
-    PATIENT_NAV = ('/dashboard/health/', '/records/', '/appointments/', '/care/',
+    PATIENT_NAV = ('/dashboard/health/', '/records/', '/care/',
                    '/assistant/', '/insights/', '/dashboard/settings/')
 
     def _sidebar(self, user, url='/dashboard/health/'):
@@ -376,7 +376,7 @@ class NavigationTests(_Dash):
         body = self.client.get(url, follow=True).content.decode()
         return body[body.index('class="sb-nav"'):body.index('</aside>')]
 
-    def test_the_patient_menu_is_seven_destinations_in_order(self):
+    def test_the_patient_menu_is_six_destinations_in_order(self):
         sidebar = self._sidebar(self.patient)
         positions = [sidebar.index(f'href="{h}"') for h in self.PATIENT_NAV]
         self.assertEqual(positions, sorted(positions), 'menu order changed')
@@ -469,21 +469,21 @@ class NavigationTests(_Dash):
             for href in expected:
                 self.assertIn(href, main, f'{href} is not reachable from {hub}')
 
-    def test_appointments_is_reached_from_the_navigation_not_a_hub(self):
+    def test_appointments_is_reached_from_my_health_not_the_sidebar(self):
         """
-        Appointments is not a retired destination — it has its own sidebar
-        entry. It was also echoed on Companions, which made that page a second
-        navigation menu instead of an answer to "who needs me?", so it was
-        removed from there.
-
-        The reachability guarantee still has to hold, so assert it where the
-        link actually lives now: outside <main>, in the navigation.
+        Appointments left the sidebar; its card on My Health is the way in.
+        It is still not echoed on Companions, which should answer "who needs
+        me?" rather than act as a second menu.
         """
         self.client.force_login(self.patient)
+        body = self.client.get('/dashboard/health/').content.decode()
+        main = body[body.index('<main'):body.index('</main>')]
+        self.assertIn('href="/appointments/"', main, 'Appointments card left My Health')
+        self.assertNotIn('href="/appointments/"', self._sidebar(self.patient),
+                         'Appointments is back in the sidebar')
+
         body = self.client.get('/care/').content.decode()
         main = body[body.index('<main'):body.index('</main>')]
-
-        self.assertIn('/appointments/', body, 'Appointments left the navigation')
         self.assertNotIn('/appointments/', main,
                          'Appointments is echoed on Companions again')
 

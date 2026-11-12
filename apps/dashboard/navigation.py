@@ -44,7 +44,8 @@ HOSPITAL = Item('/dashboard/', _('Hospital'), 'hospital')
 ADMIN = Item('/dashboard/', _('Admin'), 'shield-halved')
 
 MENUS = {
-    'patient': [MY_HEALTH, RECORDS, APPOINTMENTS, COMPANIONS,
+    # Appointments is reached from its card on My Health, not the sidebar.
+    'patient': [MY_HEALTH, RECORDS, COMPANIONS,
                 AI_TOOLS, ASSISTANT, ANALYTICS, DIVIDER, SETTINGS],
     # No Appointments: that page lists the signed-in user's OWN appointments
     # as a patient. There is no doctor-side calendar yet, and doctors have no
