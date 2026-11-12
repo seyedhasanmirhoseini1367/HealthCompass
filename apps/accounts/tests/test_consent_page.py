@@ -97,7 +97,9 @@ class InterleavedLinksTests(_Page):
         insertion order. Asserting on the cheaper query would have quietly
         measured a different plan than the one that matters.
         """
-        statuses = [link.status for link in self.patient.my_doctors.all()]
+        # Explicit order: without ORDER BY, SQLite happens to return insertion
+        # order and PostgreSQL promises nothing, so the test was engine-dependent.
+        statuses = [link.status for link in self.patient.my_doctors.order_by('pk')]
         self.assertNotEqual(statuses, sorted(statuses),
                             'links are no longer interleaved; the dictsort tests '
                             'below have stopped testing anything')

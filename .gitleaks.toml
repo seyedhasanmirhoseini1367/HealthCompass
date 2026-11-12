@@ -1,0 +1,12 @@
+# Secret scanning (CI "Secret scan" step and pre-commit). Default gitleaks rules,
+# minus test fixtures, which use made-up passwords like 'Very-strong-pass-42'.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test, browser-test and load-test fixtures use made-up credentials"
+paths = [
+  '''apps/[^/]+/tests/''',
+  '''^e2e/''',
+  '''^loadtest/''',
+]

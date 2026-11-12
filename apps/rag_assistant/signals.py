@@ -79,13 +79,16 @@ def _index_in_background(record_pk: str):
         ops_emit(OpsEvent.INDEXING_FAILED, record_id=record_pk,
                  error_type=type(exc).__name__)
     finally:
-        # Pool threads are long-lived, so their database connections would be
-        # too. Close explicitly or they accumulate and eventually exhaust the
-        # server's connection limit.
-        try:
-            connection.close()
-        except Exception as exc:
-            logger.debug('Closing the worker DB connection failed: %s', type(exc).__name__)
+        # In a worker process, close the job's connection so long-lived workers
+        # do not accumulate them. Never when running inline (tests, no worker):
+        # that connection belongs to the caller, and on PostgreSQL closing it
+        # breaks the request or test that triggered the indexing.
+        from healthcompass.tasks import is_async
+        if is_async():
+            try:
+                connection.close()
+            except Exception as exc:
+                logger.debug('Closing the worker DB connection failed: %s', type(exc).__name__)
 
 
 @receiver(post_save, sender='medical_records.MedicalRecord')
